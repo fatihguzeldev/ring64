@@ -1,9 +1,53 @@
-use super::{ENTRY, Emitter, REASON, REMAINING, RIP};
+use super::{ENTRY, Emitter, FLAGS, REASON, REMAINING, RIP};
 use crate::embedding::layout::{BUDGET, DISPATCH, STOP, TARGET};
 use crate::memory::canonical48;
+use crate::x86::instruction::Condition;
 use wasm_encoder::{BlockType, Instruction as Op};
 
 impl Emitter {
+    pub(super) fn condition(&mut self, condition: Condition) {
+        use Condition::*;
+        match condition {
+            Overflow | NotOverflow => self.flag_bits_clear(0x800),
+            Below | AboveOrEqual => self.flag_bits_clear(1),
+            Equal | NotEqual => self.flag_bits_clear(0x40),
+            BelowOrEqual | Above => self.flag_bits_clear(0x41),
+            Sign | NotSign => self.flag_bits_clear(0x80),
+            Parity | NotParity => self.flag_bits_clear(4),
+            Less | GreaterOrEqual => self.signed_flags_equal(),
+            LessOrEqual | Greater => {
+                self.flag_bits_clear(0x40);
+                self.signed_flags_equal();
+                self.op(Op::I32And);
+            }
+        }
+        if matches!(
+            condition,
+            Overflow | Below | Equal | BelowOrEqual | Sign | Parity | Less | LessOrEqual
+        ) {
+            self.op(Op::I32Eqz);
+        }
+    }
+
+    fn flag_bits_clear(&mut self, mask: i64) {
+        self.op(Op::LocalGet(FLAGS))
+            .op(Op::I64Const(mask))
+            .op(Op::I64And)
+            .op(Op::I64Eqz);
+    }
+
+    fn signed_flags_equal(&mut self) {
+        // Align OF with SF before comparing their values.
+        self.op(Op::LocalGet(FLAGS))
+            .op(Op::LocalGet(FLAGS))
+            .op(Op::I64Const(4))
+            .op(Op::I64ShrU)
+            .op(Op::I64Xor)
+            .op(Op::I64Const(0x80))
+            .op(Op::I64And)
+            .op(Op::I64Eqz);
+    }
+
     pub(super) fn exit(&mut self, reason: i32, depth: u32) {
         self.op(Op::I32Const(reason))
             .op(Op::LocalSet(REASON))

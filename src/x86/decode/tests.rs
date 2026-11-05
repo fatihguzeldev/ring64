@@ -6,6 +6,7 @@ use crate::x86::instruction::{
 };
 
 mod addressing;
+mod conditions;
 mod logical;
 
 fn missing(address: u64) -> Fault {

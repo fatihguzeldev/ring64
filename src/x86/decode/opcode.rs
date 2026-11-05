@@ -119,17 +119,22 @@ where
                 width,
             })
         }
-        0xeb | 0xe9 | 0x75 | 0x0f => {
+        0xeb | 0xe9 | 0x70..=0x7f | 0x0f => {
             if rex.present {
                 return Err(DecodeError::Unsupported);
             }
             let conditional = match opcode {
-                0x75 => Some(condition(opcode)),
-                0x0f if cursor.byte()? == 0x85 => Some(condition(0x85)),
-                0x0f => return Err(DecodeError::Unsupported),
+                0x70..=0x7f => Some(condition(opcode)),
+                0x0f => {
+                    let second = cursor.byte()?;
+                    if !(0x80..=0x8f).contains(&second) {
+                        return Err(DecodeError::Unsupported);
+                    }
+                    Some(condition(second))
+                }
                 _ => None,
             };
-            let displacement = if opcode == 0xeb || opcode == 0x75 {
+            let displacement = if matches!(opcode, 0xeb | 0x70..=0x7f) {
                 i64::from(cursor.byte()? as i8)
             } else {
                 i64::from(cursor.unsigned(4)? as u32 as i32)

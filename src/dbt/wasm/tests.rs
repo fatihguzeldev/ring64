@@ -1,4 +1,5 @@
 mod addressing;
+mod conditions;
 mod logical;
 
 use super::*;
