@@ -35,9 +35,17 @@ impl Emitter {
         self.register(dst, width);
         self.op(Op::LocalSet(LHS));
         self.operand(src, width);
-        self.op(Op::LocalSet(RHS))
-            .op(Op::LocalGet(LHS))
-            .op(Op::LocalGet(RHS));
+        self.op(Op::LocalSet(RHS));
+        self.arithmetic_result(kind, width);
+        self.arithmetic_flags(kind, width);
+        if kind != Alu::Cmp {
+            self.op(Op::LocalGet(RESULT))
+                .op(Op::LocalSet(GPR + u32::from(dst)));
+        }
+    }
+
+    pub(super) fn arithmetic_result(&mut self, kind: Alu, width: Width) {
+        self.op(Op::LocalGet(LHS)).op(Op::LocalGet(RHS));
         self.op(if kind == Alu::Add {
             Op::I64Add
         } else {
@@ -45,6 +53,9 @@ impl Emitter {
         });
         self.narrow(width);
         self.op(Op::LocalSet(RESULT));
+    }
+
+    pub(super) fn arithmetic_flags(&mut self, kind: Alu, width: Width) {
         // All admitted arithmetic forms define these six bits. No control
         // flags are admitted by this context; fixed bit 1 remains set.
         self.op(Op::I64Const(2));
@@ -101,50 +112,54 @@ impl Emitter {
             .op(Op::I64Shl)
             .op(Op::I64Or)
             .op(Op::LocalSet(FLAGS));
-        if kind != Alu::Cmp {
-            self.op(Op::LocalGet(RESULT))
-                .op(Op::LocalSet(GPR + u32::from(dst)));
-        }
     }
 
     fn logical(&mut self, kind: Alu, dst: u8, src: Operand, width: Width) {
         self.register(dst, width);
         self.operand(src, width);
+        self.logical_result(kind);
+        self.logical_flags(width);
+        if kind != Alu::Test {
+            self.op(Op::LocalGet(RESULT))
+                .op(Op::LocalSet(GPR + u32::from(dst)));
+        }
+    }
+
+    pub(super) fn logical_result(&mut self, kind: Alu) {
         self.op(match kind {
             Alu::And | Alu::Test => Op::I64And,
             Alu::Or => Op::I64Or,
             Alu::Xor => Op::I64Xor,
             _ => unreachable!(),
         })
-        .op(Op::LocalSet(RESULT))
-        .op(Op::I64Const(2))
-        .op(Op::LocalGet(RESULT))
-        .op(Op::I64Const(255))
-        .op(Op::I64And)
-        .op(Op::I64Popcnt)
-        .op(Op::I64Const(1))
-        .op(Op::I64And)
-        .op(Op::I64Eqz)
-        .op(Op::I64ExtendI32U)
-        .op(Op::I64Const(2))
-        .op(Op::I64Shl)
-        .op(Op::I64Or)
-        .op(Op::LocalGet(RESULT))
-        .op(Op::I64Eqz)
-        .op(Op::I64ExtendI32U)
-        .op(Op::I64Const(6))
-        .op(Op::I64Shl)
-        .op(Op::I64Or)
-        .op(Op::LocalGet(RESULT))
-        .op(Op::I64Const(i64::from(width.bits() - 1)))
-        .op(Op::I64ShrU)
-        .op(Op::I64Const(7))
-        .op(Op::I64Shl)
-        .op(Op::I64Or)
-        .op(Op::LocalSet(FLAGS));
-        if kind != Alu::Test {
-            self.op(Op::LocalGet(RESULT))
-                .op(Op::LocalSet(GPR + u32::from(dst)));
-        }
+        .op(Op::LocalSet(RESULT));
+    }
+
+    pub(super) fn logical_flags(&mut self, width: Width) {
+        self.op(Op::I64Const(2))
+            .op(Op::LocalGet(RESULT))
+            .op(Op::I64Const(255))
+            .op(Op::I64And)
+            .op(Op::I64Popcnt)
+            .op(Op::I64Const(1))
+            .op(Op::I64And)
+            .op(Op::I64Eqz)
+            .op(Op::I64ExtendI32U)
+            .op(Op::I64Const(2))
+            .op(Op::I64Shl)
+            .op(Op::I64Or)
+            .op(Op::LocalGet(RESULT))
+            .op(Op::I64Eqz)
+            .op(Op::I64ExtendI32U)
+            .op(Op::I64Const(6))
+            .op(Op::I64Shl)
+            .op(Op::I64Or)
+            .op(Op::LocalGet(RESULT))
+            .op(Op::I64Const(i64::from(width.bits() - 1)))
+            .op(Op::I64ShrU)
+            .op(Op::I64Const(7))
+            .op(Op::I64Shl)
+            .op(Op::I64Or)
+            .op(Op::LocalSet(FLAGS));
     }
 }
