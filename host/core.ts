@@ -57,6 +57,7 @@ type CoreExports = WebAssembly.Exports & {
     maxArtifactBytes: number,
   ): number;
   core_load(address: bigint, width: number): bigint;
+  core_load_for_write(address: bigint, width: number): bigint;
   core_store(address: bigint, width: number, value: bigint): number;
   core_access_failed(): number;
   core_fault_info(reason: number): void;
@@ -171,6 +172,7 @@ export class Core {
       'core_probe',
       'core_compile',
       'core_load',
+      'core_load_for_write',
       'core_store',
       'core_access_failed',
       'core_fault_info',
@@ -300,6 +302,7 @@ export class Core {
       env: {
         memory: this.#exports.memory,
         load: this.#exports.core_load,
+        load_for_write: this.#exports.core_load_for_write,
         store: this.#exports.core_store,
         access_failed: this.#exports.core_access_failed,
       },

@@ -185,18 +185,8 @@ fn logical_modrm_and_immediates_keep_the_first_required_byte_failure() {
 }
 
 #[test]
-fn unsupported_logical_memory_and_selectors_do_not_request_operand_tails() {
+fn unsupported_logical_selectors_do_not_request_operand_tails() {
     let mut packets = Vec::new();
-    for opcode in [0x21, 0x23, 0x09, 0x0b, 0x31, 0x33, 0x85] {
-        for mode in 0..3 {
-            packets.push(vec![0x4f, opcode, (mode << 6) | 4]);
-        }
-    }
-    for (opcode, selector) in [(0x81, 4), (0x83, 1), (0xf7, 0)] {
-        for mode in 0..3 {
-            packets.push(vec![0x4f, opcode, (mode << 6) | (selector << 3) | 4]);
-        }
-    }
     for selector in 1..8 {
         packets.push(vec![0x4f, 0xf7, 0xc0 | (selector << 3)]);
     }

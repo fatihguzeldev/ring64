@@ -177,6 +177,21 @@ pub extern "C" fn core_load(address: u64, width: u32) -> u64 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn core_load_for_write(address: u64, width: u32) -> u64 {
+    BRIDGE.with_borrow_mut(|bridge| {
+        let core = bridge.core.as_mut().unwrap();
+        core.fault = None;
+        match core.image.read_for_write(address, width) {
+            Ok(value) => value,
+            Err(fault) => {
+                core.fault = Some(fault);
+                0
+            }
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn core_store(address: u64, width: u32, value: u64) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();

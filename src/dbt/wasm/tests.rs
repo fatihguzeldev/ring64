@@ -1,5 +1,6 @@
 mod addressing;
 mod conditions;
+mod integer_memory;
 mod logical;
 
 use super::*;
@@ -446,9 +447,10 @@ for (const [index,c] of cases.entries()) {
  };
  const bits=v=>BigInt.asUintN(64,v).toString(16);
  const load=(address,width)=>BigInt('0x'+access('load',[bits(address),width]));
+ const load_for_write=(address,width)=>BigInt('0x'+access('load_for_write',[bits(address),width]));
  const store=(address,width,value)=>access('store',[bits(address),width,bits(value)]);
  const access_failed=()=>access('access_failed',[]);
- const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,store,access_failed}});
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const snapshot=reason=>{
   const flags=d.getBigUint64(l.flags,true);

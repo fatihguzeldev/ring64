@@ -1,4 +1,4 @@
-use super::{ADDRESS, Emitter, GPR, VALUE};
+use super::{ADDRESS, Emitter, GPR, RESULT, VALUE};
 use crate::embedding::layout::DATA;
 use crate::x86::instruction::{Address, AddressBase, Width};
 use wasm_encoder::{BlockType, Instruction as Op};
@@ -48,18 +48,41 @@ impl Emitter {
         next_pc: u64,
         exit_depth: u32,
     ) {
+        self.load_value(address, width, next_pc, false, exit_depth);
+        self.op(Op::LocalGet(VALUE));
+        self.narrow(width);
+        self.op(Op::LocalSet(GPR + u32::from(dst)));
+    }
+
+    pub(super) fn load_value(
+        &mut self,
+        address: Address,
+        width: Width,
+        next_pc: u64,
+        for_write: bool,
+        exit_depth: u32,
+    ) {
         self.address(address, next_pc);
         self.op(Op::LocalSet(ADDRESS))
             .op(Op::LocalGet(ADDRESS))
             .op(Op::I32Const(i32::from(width.bytes())))
-            .op(Op::Call(0))
+            .op(Op::Call(if for_write { 3 } else { 0 }))
             .op(Op::LocalSet(VALUE))
             .op(Op::Call(2))
             .op(Op::If(BlockType::Empty));
         self.exit(DATA, exit_depth + 1);
-        self.op(Op::End).op(Op::LocalGet(VALUE));
-        self.narrow(width);
-        self.op(Op::LocalSet(GPR + u32::from(dst)));
+        self.op(Op::End);
+    }
+
+    pub(super) fn store_result(&mut self, width: Width, exit_depth: u32) {
+        self.op(Op::LocalGet(ADDRESS))
+            .op(Op::I32Const(i32::from(width.bytes())))
+            .op(Op::LocalGet(RESULT))
+            .op(Op::Call(1))
+            .op(Op::I32Eqz)
+            .op(Op::If(BlockType::Empty));
+        self.exit(DATA, exit_depth + 1);
+        self.op(Op::End);
     }
 
     pub(super) fn store(

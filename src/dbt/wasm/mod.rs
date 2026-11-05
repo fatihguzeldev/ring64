@@ -1,5 +1,6 @@
 mod control;
 mod integer;
+mod integer_memory;
 mod memory;
 mod state;
 
@@ -11,7 +12,7 @@ use wasm_encoder::{
 
 use super::unit::Unit;
 use crate::embedding::layout::DISPATCH;
-use crate::x86::instruction::Operation;
+use crate::x86::instruction::{MemoryAluOperands, Operation};
 
 const ENTRY_INDEX: u32 = 4;
 const GPR: u32 = 5;
@@ -73,10 +74,18 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     imports.import("env", "load", EntityType::Function(0));
     imports.import("env", "store", EntityType::Function(1));
     imports.import("env", "access_failed", EntityType::Function(2));
+    let write_intent = unit.instructions.iter().any(|instruction| {
+        matches!(instruction.operation,
+            Operation::MemoryAlu { kind, operands: MemoryAluOperands::MemoryFirst(_), .. }
+                if kind.writes_result())
+    });
+    if write_intent {
+        imports.import("env", "load_for_write", EntityType::Function(0));
+    }
     let mut functions = FunctionSection::new();
     functions.function(3);
     let mut exports = ExportSection::new();
-    exports.export("run", ExportKind::Func, 3);
+    exports.export("run", ExportKind::Func, 3 + u32::from(write_intent));
     let mut emitter = Emitter {
         current_index: 0,
         body: Function::new([(19, ValType::I64), (2, ValType::I32), (5, ValType::I64)]),
@@ -124,6 +133,19 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 src,
                 width,
             } => emitter.integer(kind, dst, src, width),
+            Operation::MemoryAlu {
+                kind,
+                address,
+                operands,
+                width,
+            } => emitter.memory_integer(
+                kind,
+                address,
+                operands,
+                width,
+                instruction.next_pc,
+                exit_depth,
+            ),
             Operation::Load {
                 dst,
                 address,

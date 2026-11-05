@@ -245,17 +245,13 @@ fn every_required_sib_and_displacement_byte_keeps_its_fetch_failure() {
 }
 
 #[test]
-fn new_address_forms_do_not_admit_other_prefixes_or_memory_arithmetic() {
+fn new_address_forms_do_not_admit_other_prefixes() {
     for bytes in [
         &[0x66, 0x48, 0x8b, 0x04][..],
         &[0x67, 0x8b, 0x04][..],
         &[0xf0, 0x8b, 0x04][..],
         &[0xf2, 0x8b, 0x04][..],
         &[0xf3, 0x8b, 0x04][..],
-        &[0x01, 0x04][..],
-        &[0x29, 0x04][..],
-        &[0x39, 0x04][..],
-        &[0x83, 0x04][..],
     ] {
         assert_eq!(at(0x1000, bytes), Err(DecodeError::Unsupported));
     }

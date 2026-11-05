@@ -272,6 +272,13 @@ export function logicalScenarios(core: WebAssembly.Module): Scenario[] {
           '4881e000000080',
           '4883f080',
           '4ff7c000000080',
+          '210424',
+          '0b0500000000',
+          '31842400000000',
+          '850424',
+          '810c2400000000',
+          '83242400',
+          'f70000000000',
         ])
           for (let length = 1; length < full.length / 2; length++) {
             const code = full.slice(0, length * 2);
@@ -297,13 +304,6 @@ export function logicalScenarios(core: WebAssembly.Module): Scenario[] {
             );
           }
         for (const code of [
-          '2104',
-          '0b05',
-          '3184',
-          '8504',
-          '810c',
-          '8324',
-          'f700',
           'f7c8',
           '6621c0',
           '6721c0',

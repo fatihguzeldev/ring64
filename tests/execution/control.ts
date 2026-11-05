@@ -192,7 +192,7 @@ export function controlScenarios(core: WebAssembly.Module): Scenario[] {
           'c3',
           '67498b0500000000',
           '67498b0424',
-          '0103',
+          '1103',
           '6689c0',
           '4889',
           '4883c0',

@@ -57,6 +57,21 @@ pub enum Alu {
     Test,
 }
 
+impl Alu {
+    pub fn writes_result(self) -> bool {
+        match self {
+            Self::Add | Self::Sub | Self::And | Self::Or | Self::Xor => true,
+            Self::Cmp | Self::Test => false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MemoryAluOperands {
+    MemoryFirst(Operand),
+    RegisterFirst(u8),
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Condition {
     Overflow,
@@ -106,6 +121,12 @@ pub enum Operation {
         src: Operand,
         width: Width,
     },
+    MemoryAlu {
+        kind: Alu,
+        address: Address,
+        operands: MemoryAluOperands,
+        width: Width,
+    },
     Jump {
         target: u64,
     },
@@ -124,7 +145,17 @@ pub struct Instruction {
 
 #[cfg(test)]
 mod tests {
-    use super::Width;
+    use super::{Alu, Width};
+
+    #[test]
+    fn compare_and_test_have_no_operand_write() {
+        for kind in [Alu::Add, Alu::Sub, Alu::And, Alu::Or, Alu::Xor] {
+            assert!(kind.writes_result(), "{kind:?}");
+        }
+        for kind in [Alu::Cmp, Alu::Test] {
+            assert!(!kind.writes_result(), "{kind:?}");
+        }
+    }
 
     #[test]
     fn operand_widths_match_the_selected_data_forms() {
