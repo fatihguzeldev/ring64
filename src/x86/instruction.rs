@@ -51,6 +51,10 @@ pub enum Alu {
     Add,
     Sub,
     Cmp,
+    And,
+    Or,
+    Xor,
+    Test,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -77,6 +81,7 @@ pub enum Operation {
     },
     Alu {
         kind: Alu,
+        /// First register operand; Cmp and Test do not write it.
         dst: u8,
         src: Operand,
         width: Width,

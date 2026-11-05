@@ -1,4 +1,5 @@
 mod addressing;
+mod logical;
 
 use super::*;
 use crate::embedding::layout::RunState;
@@ -444,12 +445,28 @@ for (const [index,c] of cases.entries()) {
  const access_failed=()=>access('access_failed',[]);
  const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,store,access_failed}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
+ const snapshot=reason=>{
+  const flags=d.getBigUint64(l.flags,true);
+  assert.equal(flags&~0x8d7n,0n,'valid flag word '+index);
+  assert.equal(flags&2n,2n,'reserved flag bit '+index);
+  return {registers:Array.from({length:16},(_,i)=>d.getBigUint64(l.registers+8*i,true).toString(16)),
+   flags:flags.toString(16),pc:d.getBigUint64(l.rip,true).toString(16),
+   reason,remaining:d.getBigUint64(l.remaining,true).toString()};
+ };
  const entryIndex=c.entries.indexOf(c.pc);assert(entryIndex>=0,'entry must belong to the artifact');
  const reason=instance.exports.run(0,BigInt(c.budget),BigInt('0x'+(c.stop??'0')),c.stop===undefined?0:1,entryIndex);
- const actual={registers:Array.from({length:16},(_,i)=>d.getBigUint64(l.registers+8*i,true).toString(16)),
-  flags:d.getBigUint64(l.flags,true).toString(16),pc:d.getBigUint64(l.rip,true).toString(16),
-  reason,remaining:d.getBigUint64(l.remaining,true).toString()};
+ const actual=snapshot(reason);
+ const flagWord=BigInt('0x'+actual.flags);
+ if(c.flagMask!==undefined) actual.flags=(flagWord&BigInt('0x'+c.flagMask)).toString(16);
  assert.deepEqual(actual,c.expected,'generated case '+index);
+ if(c.preservingSuffix!==undefined){
+  const suffix=c.preservingSuffix;
+  const savedFlags=suffix.flags===undefined?flagWord:BigInt('0x'+suffix.flags);
+  d.setBigUint64(l.flags,savedFlags,true);d.setBigUint64(l.rip,BigInt('0x'+suffix.pc),true);
+  const suffixIndex=c.entries.indexOf(suffix.pc);assert(suffixIndex>=0,'suffix entry belongs to the artifact');
+  const suffixReason=instance.exports.run(0,BigInt(suffix.budget),0n,0,suffixIndex);
+  assert.deepEqual(snapshot(suffixReason),{...suffix.expected,flags:savedFlags.toString(16)},'preserving suffix '+index);
+ }
  assert.equal(accessIndex,c.accesses?.length??0,'memory import count '+index);
 }
 "#;

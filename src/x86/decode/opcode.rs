@@ -59,34 +59,48 @@ where
                 width,
             })
         }
-        0x01 | 0x29 | 0x39 => {
+        0x01 | 0x09 | 0x0b | 0x21 | 0x23 | 0x29 | 0x31 | 0x33 | 0x39 | 0x85 => {
             let operands = ModRm::read(cursor, rex)?;
             if operands.mode != 3 {
                 return Err(DecodeError::Unsupported);
             }
             let kind = match opcode {
                 0x01 => Alu::Add,
+                0x09 | 0x0b => Alu::Or,
+                0x21 | 0x23 => Alu::And,
                 0x29 => Alu::Sub,
+                0x31 | 0x33 => Alu::Xor,
                 0x39 => Alu::Cmp,
+                0x85 => Alu::Test,
                 _ => unreachable!(),
+            };
+            let (dst, src) = if matches!(opcode, 0x0b | 0x23 | 0x33) {
+                (operands.register, operands.rm)
+            } else {
+                (operands.rm, operands.register)
             };
             Ok(Operation::Alu {
                 kind,
-                dst: operands.rm,
-                src: Operand::Register(operands.register),
+                dst,
+                src: Operand::Register(src),
                 width,
             })
         }
-        0x81 | 0x83 => {
+        0x81 | 0x83 | 0xf7 => {
             let operands = ModRm::read(cursor, rex)?;
             if operands.mode != 3 {
                 return Err(DecodeError::Unsupported);
             }
             // REX.R extends register operands, never this opcode selector.
-            let kind = match operands.selector {
-                0 => Alu::Add,
-                5 => Alu::Sub,
-                7 => Alu::Cmp,
+            let kind = match (opcode, operands.selector) {
+                (0xf7, 0) => Alu::Test,
+                (0xf7, _) => return Err(DecodeError::Unsupported),
+                (_, 0) => Alu::Add,
+                (_, 1) => Alu::Or,
+                (_, 4) => Alu::And,
+                (_, 5) => Alu::Sub,
+                (_, 6) => Alu::Xor,
+                (_, 7) => Alu::Cmp,
                 _ => return Err(DecodeError::Unsupported),
             };
             let value = if opcode == 0x83 {
