@@ -1,4 +1,5 @@
 import { integerScenarios } from './integer.js';
+import { addressingScenarios } from './addressing.js';
 import { memoryScenarios } from './memory.js';
 import { controlScenarios } from './control.js';
 import { translationsScenarios } from './translations.js';
@@ -13,6 +14,7 @@ export async function runScenarios(
       : await WebAssembly.compile(new Uint8Array(compiler));
   const scenarios = [
     ...integerScenarios(core),
+    ...addressingScenarios(core),
     ...memoryScenarios(core),
     ...controlScenarios(core),
     ...translationsScenarios(core),
