@@ -11,11 +11,14 @@ impl Image {
     pub fn read(&self, address: u64, width: u32) -> Result<u64, Fault> {
         assert!(matches!(width, 4 | 8), "scalar access width must be 4 or 8");
         self.preflight(address, width, Access::Read)?;
-        let mut value = 0;
-        for byte in 0..width {
-            value |= u64::from(self.byte_after_preflight(address + u64::from(byte))) << (byte * 8);
-        }
-        Ok(value)
+        Ok(self.scalar_after_preflight(address, width))
+    }
+
+    pub fn read_for_write(&self, address: u64, width: u32) -> Result<u64, Fault> {
+        assert!(matches!(width, 4 | 8), "scalar access width must be 4 or 8");
+        // In this fixed image, every writable span is also readable.
+        self.preflight(address, width, Access::Write)?;
+        Ok(self.scalar_after_preflight(address, width))
     }
 
     pub fn write(&mut self, address: u64, width: u32, value: u64) -> Result<(), Fault> {
@@ -78,6 +81,14 @@ impl Image {
         Ok(())
     }
 
+    fn scalar_after_preflight(&self, address: u64, width: u32) -> u64 {
+        let mut value = 0;
+        for byte in 0..width {
+            value |= u64::from(self.byte_after_preflight(address + u64::from(byte))) << (byte * 8);
+        }
+        value
+    }
+
     fn byte_after_preflight(&self, address: u64) -> u8 {
         let (_, span) = self
             .locate(address)
@@ -90,6 +101,8 @@ impl Image {
 mod tests {
     use super::super::{Access, Cause};
     use super::*;
+
+    mod read_for_write;
 
     #[test]
     fn loads_can_cross_readable_code_and_ram_but_ram_is_not_executable() {
