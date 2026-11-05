@@ -30,6 +30,14 @@ fn store(src: u8, width: Width, address: Address) -> Operation {
     }
 }
 
+fn lea(dst: u8, width: Width, address: Address) -> Operation {
+    Operation::Lea {
+        dst,
+        width,
+        address,
+    }
+}
+
 #[test]
 fn sib_literals_keep_extended_base_index_source_and_signed_displacements() {
     for (bytes, expected) in [
@@ -251,4 +259,170 @@ fn new_address_forms_do_not_admit_other_prefixes_or_memory_arithmetic() {
     ] {
         assert_eq!(at(0x1000, bytes), Err(DecodeError::Unsupported));
     }
+}
+
+#[test]
+fn lea_register_sources_are_invalid_before_any_address_tail_is_requested() {
+    for prefix in std::iter::once(None).chain((0x40..=0x4f).map(Some)) {
+        for modrm in 0xc0..=0xff {
+            let mut bytes = prefix.into_iter().collect::<Vec<_>>();
+            bytes.extend([0x8d, modrm]);
+            let pc = u64::MAX - bytes.len() as u64 + 1;
+            let mut reads = Vec::new();
+            let decoded = decode::decode(pc, |address| {
+                reads.push(address);
+                address
+                    .checked_sub(pc)
+                    .and_then(|offset| bytes.get(offset as usize))
+                    .copied()
+                    .ok_or_else(|| missing(address))
+            });
+            assert_eq!(decoded, Err(DecodeError::Invalid), "{bytes:02x?}");
+            assert_eq!(
+                reads,
+                (0..bytes.len())
+                    .map(|offset| pc + offset as u64)
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+}
+
+#[test]
+fn lea_fetches_each_required_byte_but_retains_the_existing_prefix_scope() {
+    for bytes in [
+        &[0x48, 0x8d, 0x04, 0xe4][..],
+        &[0x4f, 0x8d, 0x44, 0x8c, 0xf0][..],
+        &[0x49, 0x8d, 0x04, 0x25, 0xfc, 0xff, 0xff, 0xff][..],
+        &[0x49, 0x8d, 0x05, 0xf9, 0xff, 0xff, 0xff][..],
+        &[0x8d, 0x84, 0x8b, 0, 0, 0, 0x80][..],
+    ] {
+        for length in 0..bytes.len() {
+            assert_eq!(
+                at(0x1000, &bytes[..length]),
+                Err(DecodeError::Fetch(missing(0x1000 + length as u64))),
+                "{bytes:02x?} truncated to {length}"
+            );
+        }
+        for length in 1..bytes.len() {
+            let pc = u64::MAX - length as u64 + 1;
+            assert_eq!(
+                at(pc, &bytes[..length]),
+                Err(DecodeError::Fetch(Fault {
+                    address: pc,
+                    width: length as u32 + 1,
+                    access: Access::Execute,
+                    cause: Cause::AddressRange,
+                    failing: 1u128 << 64,
+                })),
+                "{bytes:02x?} truncated to {length} at {pc:x}"
+            );
+        }
+    }
+    for prefix in [0x66, 0x67, 0xf0, 0xf2, 0xf3] {
+        assert_eq!(
+            at(0x1000, &[prefix, 0x8d, 0xc4]),
+            Err(DecodeError::Unsupported)
+        );
+        assert_eq!(
+            at(0x1000, &[prefix, 0x48, 0x8d, 0x04]),
+            Err(DecodeError::Unsupported)
+        );
+    }
+    assert_eq!(
+        at(0x1000, &[0x48, 0x49, 0x8d, 0xc4]),
+        Err(DecodeError::Unsupported)
+    );
+}
+
+#[test]
+fn lea_decodes_shared_address_expressions_at_both_destination_widths() {
+    for (bytes, expected) in [
+        (
+            &[0x4f, 0x8d, 0x44, 0x8c, 0xf0][..],
+            lea(8, W64, address(Register(12), Some((9, 4)), -16)),
+        ),
+        (
+            &[0x47, 0x8d, 0x44, 0x8c, 0xf0][..],
+            lea(8, W32, address(Register(12), Some((9, 4)), -16)),
+        ),
+        (
+            &[0x48, 0x8d, 0x04, 0xe4][..],
+            lea(0, W64, address(Register(4), None, 0)),
+        ),
+        (
+            &[0x4a, 0x8d, 0x04, 0xe4][..],
+            lea(0, W64, address(Register(4), Some((12, 8)), 0)),
+        ),
+        (
+            &[0x49, 0x8d, 0x04, 0x25, 0xfc, 0xff, 0xff, 0xff][..],
+            lea(0, W64, address(NoBase, None, -4)),
+        ),
+        (
+            &[0x48, 0x8d, 0x44, 0x80, 0x08][..],
+            lea(0, W64, address(Register(0), Some((0, 4)), 8)),
+        ),
+        (
+            &[0x8d, 0x43, 0x01][..],
+            lea(0, W32, address(Register(3), None, 1)),
+        ),
+        (
+            &[0x48, 0x8d, 0x43, 0x01][..],
+            lea(0, W64, address(Register(3), None, 1)),
+        ),
+        (
+            &[0x4f, 0x8d, 0x84, 0xcc, 0, 0, 0, 0x80][..],
+            lea(8, W64, address(Register(12), Some((9, 8)), i32::MIN.into())),
+        ),
+    ] {
+        assert_eq!(operation(bytes), expected, "{bytes:02x?}");
+    }
+    for dst in 0..16 {
+        for (width, width_bit) in [(W32, 0), (W64, 8)] {
+            let rex = 0x40 | width_bit | ((dst >> 3) << 2);
+            let modrm = ((dst & 7) << 3) | 3;
+            assert_eq!(
+                operation(&[rex, 0x8d, modrm]),
+                lea(dst, width, address(Register(3), None, 0))
+            );
+        }
+    }
+}
+
+#[test]
+fn lea_rip_relative_marker_uses_the_containing_complete_next_pc() {
+    for (prefix, dst, width) in [
+        (0x40, 0, W32),
+        (0x41, 0, W32),
+        (0x42, 0, W32),
+        (0x43, 0, W32),
+        (0x44, 8, W32),
+        (0x45, 8, W32),
+        (0x46, 8, W32),
+        (0x47, 8, W32),
+        (0x48, 0, W64),
+        (0x49, 0, W64),
+        (0x4a, 0, W64),
+        (0x4b, 0, W64),
+        (0x4c, 8, W64),
+        (0x4d, 8, W64),
+        (0x4e, 8, W64),
+        (0x4f, 8, W64),
+    ] {
+        let bytes = [prefix, 0x8d, 0x05, 0xf9, 0xff, 0xff, 0xff];
+        let expected = lea(dst, width, address(NextPc, None, -7));
+        for (pc, next_pc) in [
+            (0x1000, 0x1007),
+            (0x7fff_ffff_fff9, 0x8000_0000_0000),
+            (u64::MAX - 6, 0),
+        ] {
+            let decoded = at(pc, &bytes).unwrap();
+            assert_eq!(decoded.pc, pc);
+            assert_eq!(decoded.next_pc, next_pc);
+            assert_eq!(decoded.operation, expected);
+        }
+    }
+    let decoded = at(0x1000, &[0x8d, 0x05, 0xfa, 0xff, 0xff, 0xff]).unwrap();
+    assert_eq!(decoded.next_pc, 0x1006);
+    assert_eq!(decoded.operation, lea(0, W32, address(NextPc, None, -6)));
 }

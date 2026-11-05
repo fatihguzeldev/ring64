@@ -32,7 +32,12 @@ impl Emitter {
                 self.op(Op::I64Add);
             }
         }
-        self.op(Op::LocalSet(ADDRESS));
+    }
+
+    pub(super) fn lea(&mut self, dst: u8, address: Address, width: Width, next_pc: u64) {
+        self.address(address, next_pc);
+        self.narrow(width);
+        self.op(Op::LocalSet(GPR + u32::from(dst)));
     }
 
     pub(super) fn load(
@@ -44,7 +49,8 @@ impl Emitter {
         exit_depth: u32,
     ) {
         self.address(address, next_pc);
-        self.op(Op::LocalGet(ADDRESS))
+        self.op(Op::LocalSet(ADDRESS))
+            .op(Op::LocalGet(ADDRESS))
             .op(Op::I32Const(i32::from(width.bytes())))
             .op(Op::Call(0))
             .op(Op::LocalSet(VALUE))
@@ -65,7 +71,8 @@ impl Emitter {
         exit_depth: u32,
     ) {
         self.address(address, next_pc);
-        self.op(Op::LocalGet(ADDRESS))
+        self.op(Op::LocalSet(ADDRESS))
+            .op(Op::LocalGet(ADDRESS))
             .op(Op::I32Const(i32::from(width.bytes())));
         self.register(src, width);
         self.op(Op::Call(1))

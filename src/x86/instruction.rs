@@ -60,6 +60,11 @@ pub enum Operation {
         src: Operand,
         width: Width,
     },
+    Lea {
+        dst: u8,
+        address: Address,
+        width: Width,
+    },
     Load {
         dst: u8,
         address: Address,

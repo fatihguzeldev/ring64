@@ -134,6 +134,11 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 address,
                 width,
             } => emitter.store(src, address, width, instruction.next_pc, exit_depth),
+            Operation::Lea {
+                dst,
+                address,
+                width,
+            } => emitter.lea(dst, address, width, instruction.next_pc),
             Operation::Jump { target } => {
                 emitter.target(target, loop_depth, exit_depth);
                 continue;

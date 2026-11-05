@@ -48,6 +48,17 @@ where
                 }
             }
         }
+        0x8d => {
+            let operands = ModRm::read(cursor, rex)?;
+            if operands.mode == 3 {
+                return Err(DecodeError::Invalid);
+            }
+            Ok(Operation::Lea {
+                dst: operands.register,
+                address: operands.address(cursor, rex)?,
+                width,
+            })
+        }
         0x01 | 0x29 | 0x39 => {
             let operands = ModRm::read(cursor, rex)?;
             if operands.mode != 3 {
