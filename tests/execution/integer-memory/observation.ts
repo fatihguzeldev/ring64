@@ -173,6 +173,97 @@ export function observationScenarios(core: WebAssembly.Module): Scenario[] {
       },
     },
     {
+      name: 'memory integer flags feed internal conditions before public state publication',
+      run: async () => {
+        for (const packet of [
+          {
+            code: '4839037507b901000000eb05b902000000',
+            stop: 0x1011n,
+            entries: [0x1000n, 0x1003n, 0x1005n, 0x100an, 0x100cn],
+            word: '0200000000000000',
+            incomingFlags: 2n,
+            flags: 0x46n,
+            rcx: 1n,
+            retired: 4n,
+            logical: false,
+          },
+          {
+            code: '4839037507b901000000eb05b902000000',
+            stop: 0x1011n,
+            entries: [0x1000n, 0x1003n, 0x1005n, 0x100an, 0x100cn],
+            word: '0100000000000000',
+            incomingFlags: 0x42n,
+            flags: 0x97n,
+            rcx: 2n,
+            retired: 3n,
+            logical: false,
+          },
+          {
+            code: '48830b007807b901000000eb05b902000000',
+            stop: 0x1012n,
+            entries: [0x1000n, 0x1004n, 0x1006n, 0x100bn, 0x100dn],
+            word: '0100000000000000',
+            incomingFlags: 0x82n,
+            flags: 2n,
+            rcx: 1n,
+            retired: 4n,
+            logical: true,
+          },
+          {
+            code: '48830b007807b901000000eb05b902000000',
+            stop: 0x1012n,
+            entries: [0x1000n, 0x1004n, 0x1006n, 0x100bn, 0x100dn],
+            word: '0100000000000080',
+            incomingFlags: 0x12n,
+            flags: 0x82n,
+            rcx: 2n,
+            retired: 3n,
+            logical: true,
+          },
+        ]) {
+          const ram = frame(packet.word);
+          await using(
+            packet.code,
+            async (cpu) => {
+              const before = input(CODE, { 0: 2n }, packet.incomingFlags);
+              cpu.setState(before);
+              const result = await cpu.run({ budget: 5n, stop: packet.stop });
+              const assertExit = packet.logical ? logicalExit : exit;
+              assertExit(
+                result,
+                'stop',
+                5n,
+                packet.retired,
+                changed(before, packet.stop, { 1: packet.rcx }, packet.flags),
+              );
+              noFault(result);
+              equal(
+                result.resources.nativeEntries,
+                1,
+                'condition consumes flags in one invocation',
+              );
+              equal(result.resources.dispatches, 0, 'internal condition never returns to dispatch');
+              const units = cpu.inspectTranslations();
+              equal(units.length, 1, 'producer and both paths share one artifact');
+              equal(
+                units[0]!.entries.length,
+                packet.entries.length,
+                'all diamond entries admitted',
+              );
+              for (const entry of packet.entries)
+                equal(
+                  units[0]!.entries.includes(entry),
+                  true,
+                  `internal entry ${entry.toString(16)}`,
+                );
+              memory(cpu, 0x4000n, ram);
+            },
+            { ramBase: 0x4000n, ram },
+          );
+        }
+      },
+    },
+    {
       name: 'published logical memory flags survive preserving instructions and failed memory compares',
       run: async () => {
         const original = frame('0100000000000080');
