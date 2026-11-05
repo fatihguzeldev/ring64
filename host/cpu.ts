@@ -1,0 +1,237 @@
+import {
+  Core,
+  captureState,
+  copyMemoryInput,
+  unsigned64,
+  type CompileLimits,
+  type Fault,
+  type Span,
+  type State,
+} from './core.js';
+import { Translations, type Artifact } from './translations.js';
+
+export interface Limits extends CompileLimits {
+  maxCachedArtifacts: number;
+  maxCachedBytes: number;
+  maxTranslationsPerRun: number;
+}
+
+export interface Options {
+  compiler: Uint8Array | WebAssembly.Module;
+  code: Span;
+  ram: Span;
+  limits: Limits;
+}
+
+export interface RunResult {
+  reason: string;
+  retired: bigint;
+  remaining: bigint;
+  state: State;
+  fault?: Fault;
+  resources: {
+    compilations: number;
+    cacheHits: number;
+    nativeEntries: number;
+    dispatches: number;
+    generatedBytes: number;
+    cachedArtifacts: number;
+    cachedBytes: number;
+  };
+  timings: {
+    translationMs: number;
+    browserCompileMs: number;
+    instantiationMs: number;
+    executionMs: number;
+    totalMs: number;
+  };
+}
+
+function checkedLimits(limits: Limits): Limits {
+  const names = [
+    'maxInstructions',
+    'maxSourceBytes',
+    'maxArtifactBytes',
+    'maxCachedArtifacts',
+    'maxCachedBytes',
+    'maxTranslationsPerRun',
+  ] as const;
+  const result = { ...limits };
+  for (const name of names) {
+    const value = result[name];
+    if (!Number.isSafeInteger(value) || value <= 0 || value > 0xffffffff) {
+      throw new TypeError(`${name} must be an explicit positive wasm32 integer`);
+    }
+  }
+  return result;
+}
+
+const CONSTRUCTION = Symbol('createCpu');
+
+export async function createCpu(options: Options): Promise<Cpu> {
+  const began = performance.now();
+  const limits = checkedLimits(options.limits);
+  const core = await Core.create(options.compiler, options.code, options.ram);
+  return new Cpu(CONSTRUCTION, core, limits, performance.now() - began);
+}
+
+export class Cpu {
+  #lifecycle: 'idle' | 'running' | 'failed' | 'disposed' = 'idle';
+  readonly #cache: Translations;
+  #core: Core | undefined;
+  readonly #limits: Limits;
+
+  constructor(
+    token: typeof CONSTRUCTION,
+    core: Core,
+    limits: Limits,
+    readonly creationMs: number,
+  ) {
+    if (token !== CONSTRUCTION) throw new TypeError('use the createCpu factory');
+    this.#core = core;
+    this.#limits = { ...limits };
+    this.#cache = new Translations(limits.maxCachedArtifacts, limits.maxCachedBytes);
+  }
+
+  private requireIdle(): void {
+    if (this.#lifecycle !== 'idle') throw new Error(`cpu is ${this.#lifecycle}`);
+  }
+
+  get #engine(): Core {
+    if (!this.#core) throw new Error('cpu is disposed');
+    return this.#core;
+  }
+
+  setState(state: State): void {
+    this.requireIdle();
+    const input = captureState(state);
+    // Input accessors can start a run or dispose the CPU.
+    this.requireIdle();
+    this.#engine.setState(input);
+  }
+  readState(): State {
+    this.requireIdle();
+    return this.#engine.snapshot();
+  }
+  readMemory(address: bigint, length: number): Uint8Array {
+    this.requireIdle();
+    return this.#engine.readMemory(address, length);
+  }
+  writeMemory(address: bigint, bytes: Uint8Array): void {
+    this.requireIdle();
+    unsigned64(address, 'address');
+    const input = copyMemoryInput(bytes);
+    this.requireIdle();
+    this.#engine.writeOwnedMemory(address, input);
+  }
+  inspectTranslations() {
+    this.requireIdle();
+    return this.#cache.inspect();
+  }
+
+  async run({ budget, stop }: { budget: bigint; stop?: bigint }): Promise<RunResult> {
+    this.requireIdle();
+    unsigned64(budget, 'budget');
+    if (stop !== undefined) unsigned64(stop, 'stop');
+    this.#lifecycle = 'running';
+    const began = performance.now();
+    const resources = {
+      compilations: 0,
+      cacheHits: 0,
+      nativeEntries: 0,
+      dispatches: 0,
+      generatedBytes: 0,
+    };
+    const timings = {
+      translationMs: 0,
+      browserCompileMs: 0,
+      instantiationMs: 0,
+      executionMs: 0,
+      totalMs: 0,
+    };
+    let remaining = budget;
+    const finish = (reason: string): RunResult => {
+      const fault = this.#engine.fault(reason);
+      const result = {
+        reason,
+        retired: budget - remaining,
+        remaining,
+        state: this.#engine.snapshot(),
+        ...(fault ? { fault } : {}),
+        resources: { ...resources, ...this.#cache.resources() },
+        timings,
+      };
+      timings.totalMs = performance.now() - began;
+      return result;
+    };
+    try {
+      this.#engine.clearFault();
+      for (;;) {
+        const pc = this.#engine.current().rip;
+        if (remaining === 0n) return finish('budget');
+        if (stop !== undefined && pc === stop) return finish('stop');
+        let entry = this.#cache.get(pc);
+        if (entry) {
+          resources.cacheHits++;
+        } else {
+          const probe = this.#engine.probe(pc);
+          if (probe !== 'dispatch') return finish(probe);
+          if (resources.compilations >= this.#limits.maxTranslationsPerRun)
+            return finish('resource-limit');
+          resources.compilations++;
+          let at = performance.now();
+          const output = this.#engine.compile(pc, this.#limits);
+          timings.translationMs += performance.now() - at;
+          if (!output) return finish('resource-limit');
+          resources.generatedBytes += output.bytes.length;
+          if (!this.#cache.canFit(output.bytes.length)) return finish('resource-limit');
+          at = performance.now();
+          const module = await WebAssembly.compile(new Uint8Array(output.bytes));
+          timings.browserCompileMs += performance.now() - at;
+          at = performance.now();
+          const artifact: Artifact = {
+            run: this.#engine.instantiate(module),
+            metadata: output.metadata,
+          };
+          timings.instantiationMs += performance.now() - at;
+          if (!this.#cache.install(artifact)) return finish('resource-limit');
+          entry = this.#cache.get(pc);
+          if (entry?.artifact !== artifact)
+            throw new Error('installed artifact does not own its requested entry');
+        }
+        const before = remaining;
+        const at = performance.now();
+        this.#engine.clearFault();
+        const reason = this.#engine.execute(entry.artifact.run, entry.index, remaining, stop);
+        timings.executionMs += performance.now() - at;
+        resources.nativeEntries++;
+        remaining = this.#engine.current().remaining;
+        if (
+          remaining > before ||
+          (reason === 'dispatch' && remaining === before) ||
+          (reason === 'budget' && remaining !== 0n)
+        ) {
+          throw new Error('generated execution violated its progress contract');
+        }
+        if (reason !== 'dispatch') return finish(reason);
+        resources.dispatches++;
+      }
+    } catch (cause) {
+      this.#lifecycle = 'failed';
+      throw new Error('cpu engine failed', { cause });
+    } finally {
+      if (this.#lifecycle === 'running') this.#lifecycle = 'idle';
+    }
+  }
+
+  dispose(): void {
+    if (this.#lifecycle === 'running') throw new Error('cpu is running');
+    if (this.#lifecycle === 'disposed') return;
+    const core = this.#core;
+    const failed = this.#lifecycle === 'failed';
+    this.#lifecycle = 'disposed';
+    this.#core = undefined;
+    this.#cache.clear();
+    if (!failed) core?.dispose();
+  }
+}
