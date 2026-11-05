@@ -11,7 +11,7 @@ use wasm_encoder::{
 
 use super::unit::Unit;
 use crate::embedding::layout::DISPATCH;
-use crate::x86::instruction::Operation;
+use crate::x86::instruction::{Condition, Operation};
 
 const ENTRY_INDEX: u32 = 4;
 const GPR: u32 = 5;
@@ -143,7 +143,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 emitter.target(target, loop_depth, exit_depth);
                 continue;
             }
-            Operation::Jnz { target } => {
+            Operation::Jcc { condition, target } => {
+                if condition != Condition::NotEqual {
+                    unreachable!("only JNZ is admitted");
+                }
                 emitter
                     .op(Op::LocalGet(FLAGS))
                     .op(Op::I64Const(0x40))

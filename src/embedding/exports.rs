@@ -205,7 +205,7 @@ pub extern "C" fn core_fault_info(reason: i32) {
             let rip = unsafe { (*core.state.get()).rip };
             match decode::decode(rip, |address| core.image.fetch(address)) {
                 Ok(instruction) => match instruction.operation {
-                    Operation::Jump { target } | Operation::Jnz { target } => Some(Fault {
+                    Operation::Jump { target } | Operation::Jcc { target, .. } => Some(Fault {
                         address: target,
                         width: 0,
                         access: Access::Execute,

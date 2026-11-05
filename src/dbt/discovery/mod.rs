@@ -37,7 +37,7 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
                     pending.push_back(target);
                 }
             }
-            Operation::Jnz { target } => {
+            Operation::Jcc { target, .. } => {
                 pending.push_back(instruction.next_pc);
                 if canonical48(target) {
                     pending.push_back(target);
@@ -56,7 +56,7 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
             Operation::Jump { target } => {
                 leaders.insert(target);
             }
-            Operation::Jnz { target } => {
+            Operation::Jcc { target, .. } => {
                 leaders.insert(target);
                 leaders.insert(instruction.next_pc);
             }

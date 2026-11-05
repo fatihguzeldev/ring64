@@ -58,6 +58,26 @@ pub enum Alu {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Condition {
+    Overflow,
+    NotOverflow,
+    Below,
+    AboveOrEqual,
+    Equal,
+    NotEqual,
+    BelowOrEqual,
+    Above,
+    Sign,
+    NotSign,
+    Parity,
+    NotParity,
+    Less,
+    GreaterOrEqual,
+    LessOrEqual,
+    Greater,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
     Mov {
         dst: u8,
@@ -89,7 +109,8 @@ pub enum Operation {
     Jump {
         target: u64,
     },
-    Jnz {
+    Jcc {
+        condition: Condition,
         target: u64,
     },
 }

@@ -3,7 +3,7 @@ mod logical;
 
 use super::*;
 use crate::embedding::layout::RunState;
-use crate::x86::instruction::{Alu, Instruction, Operand, Operation, Width};
+use crate::x86::instruction::{Alu, Condition, Instruction, Operand, Operation, Width};
 use serde_json::{Value, json};
 use std::process::{Command, Stdio};
 
@@ -174,7 +174,10 @@ fn generated_integer_and_control_paths_match_independent_literals() {
         Instruction {
             pc: 0x1004,
             next_pc: 0x1006,
-            operation: Operation::Jnz { target: 0x1000 },
+            operation: Operation::Jcc {
+                condition: Condition::NotEqual,
+                target: 0x1000,
+            },
         },
         Instruction {
             pc: 0x1006,
@@ -215,7 +218,8 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             vec![Instruction {
                 pc: 0x7ffffffffff0,
                 next_pc: 0x7ffffffffff2,
-                operation: Operation::Jnz {
+                operation: Operation::Jcc {
+                    condition: Condition::NotEqual,
                     target: 0x800000000000,
                 },
             }],

@@ -1,5 +1,5 @@
 use crate::memory::Fault;
-use crate::x86::instruction::{Alu, Operand, Operation, Width};
+use crate::x86::instruction::{Alu, Condition, Operand, Operation, Width};
 
 use super::{DecodeError, cursor::Cursor, operand::ModRm, prefix::Rex};
 
@@ -124,10 +124,10 @@ where
                 return Err(DecodeError::Unsupported);
             }
             let conditional = match opcode {
-                0x75 => true,
-                0x0f if cursor.byte()? == 0x85 => true,
+                0x75 => Some(condition(opcode)),
+                0x0f if cursor.byte()? == 0x85 => Some(condition(0x85)),
                 0x0f => return Err(DecodeError::Unsupported),
-                _ => false,
+                _ => None,
             };
             let displacement = if opcode == 0xeb || opcode == 0x75 {
                 i64::from(cursor.byte()? as i8)
@@ -135,12 +135,34 @@ where
                 i64::from(cursor.unsigned(4)? as u32 as i32)
             };
             let target = cursor.next_pc().wrapping_add(displacement as u64);
-            if conditional {
-                Ok(Operation::Jnz { target })
+            if let Some(condition) = conditional {
+                Ok(Operation::Jcc { condition, target })
             } else {
                 Ok(Operation::Jump { target })
             }
         }
         _ => Err(DecodeError::Unsupported),
+    }
+}
+
+fn condition(opcode: u8) -> Condition {
+    match opcode & 15 {
+        0x0 => Condition::Overflow,
+        0x1 => Condition::NotOverflow,
+        0x2 => Condition::Below,
+        0x3 => Condition::AboveOrEqual,
+        0x4 => Condition::Equal,
+        0x5 => Condition::NotEqual,
+        0x6 => Condition::BelowOrEqual,
+        0x7 => Condition::Above,
+        0x8 => Condition::Sign,
+        0x9 => Condition::NotSign,
+        0xa => Condition::Parity,
+        0xb => Condition::NotParity,
+        0xc => Condition::Less,
+        0xd => Condition::GreaterOrEqual,
+        0xe => Condition::LessOrEqual,
+        0xf => Condition::Greater,
+        _ => unreachable!(),
     }
 }

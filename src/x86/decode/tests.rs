@@ -1,7 +1,9 @@
 use crate::memory::{Access, Cause, Fault};
 
 use super::{DecodeError, decode};
-use crate::x86::instruction::{Address, AddressBase, Alu, Instruction, Operand, Operation, Width};
+use crate::x86::instruction::{
+    Address, AddressBase, Alu, Condition, Instruction, Operand, Operation, Width,
+};
 
 mod addressing;
 mod logical;
@@ -321,10 +323,19 @@ fn relative_targets_use_the_following_pc_and_signed_displacements() {
             &[0xe9, 0xfb, 0xef, 0xff, 0xff][..],
             Operation::Jump { target: 0 },
         ),
-        (&[0x75, 0xf7][..], Operation::Jnz { target: 0xff9 }),
+        (
+            &[0x75, 0xf7][..],
+            Operation::Jcc {
+                condition: Condition::NotEqual,
+                target: 0xff9,
+            },
+        ),
         (
             &[0x0f, 0x85, 0xfa, 0xef, 0xff, 0xff][..],
-            Operation::Jnz { target: 0 },
+            Operation::Jcc {
+                condition: Condition::NotEqual,
+                target: 0,
+            },
         ),
     ] {
         assert_eq!(operation(bytes), expected);
@@ -336,7 +347,8 @@ fn relative_targets_use_the_following_pc_and_signed_displacements() {
     // A target is decoded even if execution must later reject it when taken.
     assert_eq!(
         at(0x7fff_ffff_fff0, &[0x75, 0x0e]).unwrap().operation,
-        Operation::Jnz {
+        Operation::Jcc {
+            condition: Condition::NotEqual,
             target: 0x8000_0000_0000
         }
     );
@@ -498,7 +510,14 @@ fn integrated_literal_has_the_declared_instruction_boundaries_and_loop_target() 
                 width: Width::W64,
             },
         ),
-        (17, 19, Operation::Jnz { target: 0x100a }),
+        (
+            17,
+            19,
+            Operation::Jcc {
+                condition: Condition::NotEqual,
+                target: 0x100a,
+            },
+        ),
         (
             19,
             22,
