@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript"],
+  "categories": { "correctness": "error" },
+  "ignorePatterns": [
+    "build/**",
+    "target/**",
+    "node_modules/**",
+    "test-results/**",
+    "playwright-report/**"
+  ],
+  "overrides": [
+    {
+      "files": ["scripts/**/*.mjs"],
+      "env": { "node": true },
+      "rules": { "eslint/no-undef": "error" }
+    },
+    {
+      "files": ["scripts/browser-check.mjs"],
+      "globals": { "window": "readonly" }
+    }
+  ]
+}

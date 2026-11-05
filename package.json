@@ -6,9 +6,13 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
+    "lint": "oxlint --deny-warnings .",
+    "lint:fix": "oxlint --fix --deny-warnings .",
+    "format": "cargo fmt && prettier --write .",
+    "format:check": "cargo fmt --check && prettier --check .",
     "test": "node --import tsx --test \"host/**/*.test.ts\" \"tests/**/*.test.ts\"",
     "test:browser": "node scripts/browser-check.mjs",
-    "check": "cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo clippy --target wasm32-unknown-unknown --lib -- -D warnings && cargo test --locked && npm run build && npm test && npm run test:browser"
+    "check": "npm run format:check && npm run lint && cargo clippy --all-targets -- -D warnings && cargo clippy --target wasm32-unknown-unknown --lib -- -D warnings && cargo test --locked && npm run build && npm test && npm run test:browser"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
