@@ -25,10 +25,13 @@ impl Emitter {
     }
 
     pub(super) fn integer(&mut self, kind: Alu, dst: u8, src: Operand, width: Width) {
-        if matches!(kind, Alu::And | Alu::Or | Alu::Xor | Alu::Test) {
-            self.logical(kind, dst, src, width);
-            return;
+        match kind {
+            Alu::And | Alu::Or | Alu::Xor | Alu::Test => self.logical(kind, dst, src, width),
+            Alu::Add | Alu::Sub | Alu::Cmp => self.arithmetic(kind, dst, src, width),
         }
+    }
+
+    fn arithmetic(&mut self, kind: Alu, dst: u8, src: Operand, width: Width) {
         self.register(dst, width);
         self.op(Op::LocalSet(LHS));
         self.operand(src, width);
