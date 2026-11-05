@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"host/**/*.test.ts\""
+    "test": "node --import tsx --test \"host/**/*.test.ts\" \"tests/**/*.test.ts\""
   },
   "devDependencies": {
     "@types/node": "22.20.5",
