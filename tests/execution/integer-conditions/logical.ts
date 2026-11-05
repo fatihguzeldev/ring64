@@ -32,12 +32,17 @@ export function logicalScenarios(core: WebAssembly.Module): Scenario[] {
           },
         ])
           for (const width of [32, 64])
-            for (const extended of [false, true])
-              for (const opcode of operation.opcodes) {
-                const prefix = extended ? (width === 64 ? '4d' : '45') : width === 64 ? '48' : '';
+            for (const pair of [
+              { dst: 0, src: 2, extensions: [0, 0] },
+              { dst: 8, src: 10, extensions: [5, 5] },
+              { dst: 8, src: 2, extensions: [1, 4] },
+              { dst: 0, src: 10, extensions: [4, 1] },
+            ])
+              for (const [direction, opcode] of operation.opcodes.entries()) {
+                const rex = 0x40 | (width === 64 ? 8 : 0) | pair.extensions[direction]!;
+                const prefix = rex === 0x40 ? '' : rex.toString(16);
                 const code = prefix + opcode;
-                const dst = extended ? 8 : 0;
-                const src = extended ? 10 : 2;
+                const { dst, src } = pair;
                 await using(
                   code,
                   async (cpu) => {
