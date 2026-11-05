@@ -1,5 +1,5 @@
 use crate::memory::Fault;
-use crate::x86::instruction::Address;
+use crate::x86::instruction::{Address, AddressBase};
 
 use super::{DecodeError, cursor::Cursor, prefix::Rex};
 
@@ -43,7 +43,8 @@ impl ModRm {
             _ => unreachable!(),
         };
         Ok(Address {
-            base: self.rm,
+            base: AddressBase::Register(self.rm),
+            index: None,
             displacement,
         })
     }

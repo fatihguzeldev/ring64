@@ -1,7 +1,7 @@
 use crate::memory::{Access, Cause, Fault};
 
 use super::{DecodeError, decode};
-use crate::x86::instruction::{Address, Alu, Instruction, Operand, Operation, Width};
+use crate::x86::instruction::{Address, AddressBase, Alu, Instruction, Operand, Operation, Width};
 
 fn missing(address: u64) -> Fault {
     Fault {
@@ -217,7 +217,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
         Operation::Load {
             dst: 0,
             address: Address {
-                base: 3,
+                base: AddressBase::Register(3),
+                index: None,
                 displacement: 0
             },
             width: Width::W32
@@ -228,7 +229,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
         Operation::Store {
             src: 0,
             address: Address {
-                base: 3,
+                base: AddressBase::Register(3),
+                index: None,
                 displacement: 0
             },
             width: Width::W64
@@ -239,7 +241,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
         Operation::Load {
             dst: 8,
             address: Address {
-                base: 13,
+                base: AddressBase::Register(13),
+                index: None,
                 displacement: 0
             },
             width: Width::W32
@@ -250,7 +253,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
         Operation::Store {
             src: 8,
             address: Address {
-                base: 13,
+                base: AddressBase::Register(13),
+                index: None,
                 displacement: -4
             },
             width: Width::W64
@@ -261,7 +265,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
         Operation::Load {
             dst: 0,
             address: Address {
-                base: 3,
+                base: AddressBase::Register(3),
+                index: None,
                 displacement: -2_147_483_648
             },
             width: Width::W64
@@ -272,7 +277,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
         Operation::Store {
             src: 7,
             address: Address {
-                base: 5,
+                base: AddressBase::Register(5),
+                index: None,
                 displacement: 2_147_483_647
             },
             width: Width::W32
@@ -283,7 +289,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
         Operation::Load {
             dst: 0,
             address: Address {
-                base: 3,
+                base: AddressBase::Register(3),
+                index: None,
                 displacement: -128
             },
             width: Width::W32
@@ -294,7 +301,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
         Operation::Load {
             dst: 0,
             address: Address {
-                base: 3,
+                base: AddressBase::Register(3),
+                index: None,
                 displacement: 127
             },
             width: Width::W32
@@ -496,7 +504,8 @@ fn integrated_literal_has_the_declared_instruction_boundaries_and_loop_target() 
             Operation::Store {
                 src: 0,
                 address: Address {
-                    base: 3,
+                    base: AddressBase::Register(3),
+                    index: None,
                     displacement: 0,
                 },
                 width: Width::W64,

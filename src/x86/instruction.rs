@@ -25,8 +25,24 @@ pub enum Operand {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AddressBase {
+    Register(u8),
+    /// The containing instruction's completed next_pc.
+    NextPc,
+    None,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AddressIndex {
+    pub register: u8,
+    /// The effective-address multiplier: 1, 2, 4 or 8.
+    pub scale: u8,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Address {
-    pub base: u8,
+    pub base: AddressBase,
+    pub index: Option<AddressIndex>,
     pub displacement: i64,
 }
 

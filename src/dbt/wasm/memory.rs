@@ -1,11 +1,14 @@
 use super::{ADDRESS, Emitter, GPR, VALUE};
 use crate::embedding::layout::DATA;
-use crate::x86::instruction::{Address, Width};
+use crate::x86::instruction::{Address, AddressBase, Width};
 use wasm_encoder::{BlockType, Instruction as Op};
 
 impl Emitter {
     fn address(&mut self, address: Address) {
-        self.op(Op::LocalGet(GPR + u32::from(address.base)))
+        let (AddressBase::Register(base), None) = (address.base, address.index) else {
+            unreachable!("only base-register addressing is admitted");
+        };
+        self.op(Op::LocalGet(GPR + u32::from(base)))
             .op(Op::I64Const(address.displacement))
             .op(Op::I64Add)
             .op(Op::LocalSet(ADDRESS));
