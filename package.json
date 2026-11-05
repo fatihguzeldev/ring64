@@ -6,7 +6,9 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"host/**/*.test.ts\" \"tests/**/*.test.ts\""
+    "test": "node --import tsx --test \"host/**/*.test.ts\" \"tests/**/*.test.ts\"",
+    "test:browser": "node scripts/browser-check.mjs",
+    "check": "cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo clippy --target wasm32-unknown-unknown --lib -- -D warnings && cargo test --locked && npm run build && npm test && npm run test:browser"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
