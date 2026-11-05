@@ -1,5 +1,6 @@
 import { integerScenarios } from './integer.js';
 import { integerConditionsScenarios } from './integer-conditions.js';
+import { integerMemoryScenarios } from './integer-memory.js';
 import { addressingScenarios } from './addressing.js';
 import { memoryScenarios } from './memory.js';
 import { controlScenarios } from './control.js';
@@ -16,6 +17,7 @@ export async function runScenarios(
   const scenarios = [
     ...integerScenarios(core),
     ...integerConditionsScenarios(core),
+    ...integerMemoryScenarios(core),
     ...addressingScenarios(core),
     ...memoryScenarios(core),
     ...controlScenarios(core),
