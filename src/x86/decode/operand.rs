@@ -1,5 +1,5 @@
 use crate::memory::Fault;
-use crate::x86::instruction::{Address, AddressBase};
+use crate::x86::instruction::{Address, AddressBase, AddressIndex};
 
 use super::{DecodeError, cursor::Cursor, prefix::Rex};
 
@@ -28,23 +28,47 @@ impl ModRm {
         })
     }
 
-    pub(super) fn address<F>(&self, cursor: &mut Cursor<F>) -> Result<Address, DecodeError>
+    pub(super) fn address<F>(
+        &self,
+        cursor: &mut Cursor<F>,
+        rex: Rex,
+    ) -> Result<Address, DecodeError>
     where
         F: FnMut(u64) -> Result<u8, Fault>,
     {
-        // These low-bit forms keep their special meaning even with REX.B.
-        if self.mode == 3 || self.rm_low == 4 || (self.mode == 0 && self.rm_low == 5) {
+        if self.mode == 3 {
             return Err(DecodeError::Unsupported);
         }
-        let displacement = match self.mode {
-            0 => 0,
-            1 => i64::from(cursor.byte()? as i8),
-            2 => i64::from(cursor.unsigned(4)? as u32 as i32),
+        let (base, index) = if self.rm_low == 4 {
+            let sib = cursor.byte()?;
+            let base_low = sib & 7;
+            let base = if self.mode == 0 && base_low == 5 {
+                AddressBase::None
+            } else {
+                AddressBase::Register(base_low | rex.base_extension())
+            };
+            let register = ((sib >> 3) & 7) | rex.index_extension();
+            let index = (register != 4).then_some(AddressIndex {
+                register,
+                scale: 1 << (sib >> 6),
+            });
+            (base, index)
+        } else if self.mode == 0 && self.rm_low == 5 {
+            (AddressBase::NextPc, None)
+        } else {
+            (AddressBase::Register(self.rm), None)
+        };
+        let displacement = match (self.mode, base) {
+            (0, AddressBase::NextPc | AddressBase::None) | (2, _) => {
+                i64::from(cursor.unsigned(4)? as u32 as i32)
+            }
+            (0, _) => 0,
+            (1, _) => i64::from(cursor.byte()? as i8),
             _ => unreachable!(),
         };
         Ok(Address {
-            base: AddressBase::Register(self.rm),
-            index: None,
+            base,
+            index,
             displacement,
         })
     }

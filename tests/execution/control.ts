@@ -190,8 +190,8 @@ export function controlScenarios(core: WebAssembly.Module): Scenario[] {
         for (const code of [
           'f4',
           'c3',
-          '498b0500000000',
-          '498b0424',
+          '67498b0500000000',
+          '67498b0424',
           '0103',
           '6689c0',
           '4889',

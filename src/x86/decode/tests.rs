@@ -3,6 +3,8 @@ use crate::memory::{Access, Cause, Fault};
 use super::{DecodeError, decode};
 use crate::x86::instruction::{Address, AddressBase, Alu, Instruction, Operand, Operation, Width};
 
+mod addressing;
+
 fn missing(address: u64) -> Fault {
     Fault {
         address,
@@ -342,9 +344,7 @@ fn relative_targets_use_the_following_pc_and_signed_displacements() {
 #[test]
 fn valid_forms_outside_the_subset_are_unsupported_without_operand_effects() {
     for bytes in [
-        &[0x49, 0x8b, 5, 0, 0, 0, 0][..], // RIP-relative even with REX.B.
-        &[0x49, 0x8b, 4, 0x24][..],       // R12 needs a SIB byte.
-        &[0x01, 3][..],                   // Memory arithmetic.
+        &[0x01, 3][..], // Memory arithmetic.
         &[0x83, 0x03, 1][..],
         &[0x83, 0xc8, 1][..], // OR is not an implemented group selector.
         &[0x66, 0x89, 0xc0][..],

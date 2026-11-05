@@ -32,7 +32,7 @@ where
                     width,
                 })
             } else {
-                let address = operands.address(cursor)?;
+                let address = operands.address(cursor, rex)?;
                 if opcode == 0x89 {
                     Ok(Operation::Store {
                         src: operands.register,

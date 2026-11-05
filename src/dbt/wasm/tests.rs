@@ -1,6 +1,8 @@
 use super::*;
 use crate::embedding::layout::RunState;
-use crate::x86::instruction::{Alu, Instruction, Operand, Operation, Width};
+use crate::x86::instruction::{
+    Address, AddressBase, AddressIndex, Alu, Instruction, Operand, Operation, Width,
+};
 use serde_json::{Value, json};
 use std::process::{Command, Stdio};
 
@@ -404,6 +406,186 @@ fn artifact_entry_indices_and_forward_edges_match_literal_boundaries() {
     run_cases(cases);
 }
 
+#[test]
+fn generated_mov_addresses_match_literal_memory_calls() {
+    use AddressBase::{NextPc, None as NoBase, Register};
+    let mut cases = Vec::new();
+    for (base, index, displacement, input, pc, next_pc, expected_address) in [
+        (
+            Register(12),
+            Some((9, 4)),
+            -16,
+            vec![(12, 0x100004000), (9, 5)],
+            0x1000,
+            0x1005,
+            0x100004004u64,
+        ),
+        (
+            NoBase,
+            Some((9, 1)),
+            -4,
+            vec![(9, 0x100004004)],
+            0x1000,
+            0x1008,
+            0x100004000,
+        ),
+        (
+            NoBase,
+            None,
+            -16,
+            vec![],
+            0x1000,
+            0x1008,
+            0xfffffffffffffff0,
+        ),
+        (
+            NextPc,
+            None,
+            -7,
+            vec![],
+            0x100001000,
+            0x100001007,
+            0x100001000,
+        ),
+        (NextPc, None, 0, vec![], 0xfffffffffffffff9, 0, 0),
+        (
+            Register(3),
+            Some((1, 8)),
+            0,
+            vec![(3, 0xfffffffffffffff8), (1, 0x2000000100000002)],
+            0x1000,
+            0x1004,
+            0x800000008,
+        ),
+        (
+            Register(3),
+            Some((1, 2)),
+            0,
+            vec![(3, 0xfffffffffffffff8), (1, 0x8000000080002004)],
+            0x1000,
+            0x1004,
+            0x100004000,
+        ),
+        (
+            Register(0),
+            Some((0, 4)),
+            8,
+            vec![(0, 1)],
+            0x1000,
+            0x1005,
+            13,
+        ),
+    ] {
+        for width in [Width::W32, Width::W64] {
+            let mut packet = case(
+                vec![Instruction {
+                    pc,
+                    next_pc,
+                    operation: Operation::Load {
+                        dst: 0,
+                        address: Address {
+                            base,
+                            index: index.map(|(register, scale)| AddressIndex { register, scale }),
+                            displacement,
+                        },
+                        width,
+                    },
+                }],
+                &input,
+                0x8d7,
+                pc,
+                1,
+                (
+                    &[(
+                        0,
+                        if width == Width::W32 {
+                            0x44332211
+                        } else {
+                            0x8877665544332211
+                        },
+                    )],
+                    0x8d7,
+                    next_pc,
+                    1,
+                    0,
+                ),
+            );
+            packet["accesses"] = json!([
+                { "kind": "load", "args": [format!("{expected_address:x}"), width.bytes()], "result": "8877665544332211" },
+                { "kind": "access_failed", "args": [], "result": 0 }
+            ]);
+            cases.push(packet);
+        }
+    }
+    for (source, base, index, input, width, expected_address, expected_value) in [
+        (
+            8,
+            12,
+            9,
+            vec![(12, 0x100004000), (9, 5), (8, 0x11223344aabbccdd)],
+            Width::W32,
+            0x100004004u64,
+            0xaabbccddu64,
+        ),
+        (
+            8,
+            12,
+            9,
+            vec![(12, 0x100004000), (9, 5), (8, 0x11223344aabbccdd)],
+            Width::W64,
+            0x100004004,
+            0x11223344aabbccdd,
+        ),
+        (
+            1,
+            3,
+            1,
+            vec![(3, 0x4000), (1, 0x100000002)],
+            Width::W32,
+            0x400003ff8,
+            2,
+        ),
+        (
+            0,
+            0,
+            1,
+            vec![(0, 0x100004000), (1, 6)],
+            Width::W32,
+            0x100004008,
+            0x4000,
+        ),
+    ] {
+        let mut packet = case(
+            vec![Instruction {
+                pc: 0x1000,
+                next_pc: 0x1005,
+                operation: Operation::Store {
+                    src: source,
+                    address: Address {
+                        base: Register(base),
+                        index: Some(AddressIndex {
+                            register: index,
+                            scale: 4,
+                        }),
+                        displacement: -16,
+                    },
+                    width,
+                },
+            }],
+            &input,
+            0x8d7,
+            0x1000,
+            1,
+            (&[], 0x8d7, 0x1005, 1, 0),
+        );
+        packet["accesses"] = json!([
+            { "kind": "store", "args": [format!("{expected_address:x}"), width.bytes(), format!("{expected_value:x}")], "result": 1 }
+        ]);
+        cases.push(packet);
+    }
+    run_cases(cases);
+}
+
 fn compiled_fixture(base: u64, code: &[u8], entry: u64) -> crate::dbt::Artifact {
     let image = crate::memory::Image::new(base, code.to_vec(), 0x8000, vec![0; 8]).unwrap();
     crate::dbt::compile(
@@ -420,8 +602,8 @@ fn compiled_fixture(base: u64, code: &[u8], entry: u64) -> crate::dbt::Artifact 
 
 fn run_cases(cases: Vec<Value>) {
     let input = json!({ "layout": RunState::descriptor(), "cases": cases });
-    // Arithmetic/control use no memory helper. Throwing imports prevent this
-    // backend test from accidentally supplying a second memory implementation.
+    // Memory imports assert literal calls; other cases forbid data access.
+    // No import implements an alternative guest memory policy.
     let script = r#"
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
@@ -430,8 +612,17 @@ for (const [index,c] of cases.entries()) {
  const memory=new WebAssembly.Memory({initial:1}); const d=new DataView(memory.buffer);
  c.registers.forEach((v,i)=>d.setBigUint64(l.registers+8*i,BigInt('0x'+v),true));
  d.setBigUint64(l.flags,BigInt('0x'+c.flags),true); d.setBigUint64(l.rip,BigInt('0x'+c.pc),true);
- const forbidden=()=>{throw Error('unexpected memory import')};
- const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load:forbidden,store:forbidden,access_failed:forbidden}});
+ let accessIndex=0;
+ const access=(kind,args)=>{
+  const expected=c.accesses?.[accessIndex++];assert(expected,'unexpected '+kind+' import');
+  assert.deepEqual({kind,args},{kind:expected.kind,args:expected.args},'memory import '+index);
+  return expected.result;
+ };
+ const bits=v=>BigInt.asUintN(64,v).toString(16);
+ const load=(address,width)=>BigInt('0x'+access('load',[bits(address),width]));
+ const store=(address,width,value)=>access('store',[bits(address),width,bits(value)]);
+ const access_failed=()=>access('access_failed',[]);
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,store,access_failed}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const entryIndex=c.entries.indexOf(c.pc);assert(entryIndex>=0,'entry must belong to the artifact');
  const reason=instance.exports.run(0,BigInt(c.budget),BigInt('0x'+(c.stop??'0')),c.stop===undefined?0:1,entryIndex);
@@ -439,6 +630,7 @@ for (const [index,c] of cases.entries()) {
   flags:d.getBigUint64(l.flags,true).toString(16),pc:d.getBigUint64(l.rip,true).toString(16),
   reason,remaining:d.getBigUint64(l.remaining,true).toString()};
  assert.deepEqual(actual,c.expected,'generated case '+index);
+ assert.equal(accessIndex,c.accesses?.length??0,'memory import count '+index);
 }
 "#;
     let mut child = Command::new("node")

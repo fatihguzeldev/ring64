@@ -25,6 +25,10 @@ impl Rex {
     pub(super) fn base_extension(self) -> u8 {
         (self.bits & 1) << 3
     }
+
+    pub(super) fn index_extension(self) -> u8 {
+        (self.bits & 2) << 2
+    }
 }
 
 pub(super) fn read<F>(cursor: &mut Cursor<F>) -> Result<(Rex, u8), DecodeError>

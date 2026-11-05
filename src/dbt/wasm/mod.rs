@@ -128,12 +128,12 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 dst,
                 address,
                 width,
-            } => emitter.load(dst, address, width, exit_depth),
+            } => emitter.load(dst, address, width, instruction.next_pc, exit_depth),
             Operation::Store {
                 src,
                 address,
                 width,
-            } => emitter.store(src, address, width, exit_depth),
+            } => emitter.store(src, address, width, instruction.next_pc, exit_depth),
             Operation::Jump { target } => {
                 emitter.target(target, loop_depth, exit_depth);
                 continue;
