@@ -1,0 +1,86 @@
+mod discovery;
+mod unit;
+mod wasm;
+
+use crate::memory::Image;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Limits {
+    pub max_instructions: u32,
+    pub max_source_bytes: u32,
+    pub max_artifact_bytes: u32,
+}
+
+#[derive(Debug)]
+pub struct Artifact {
+    pub bytes: Vec<u8>,
+    /// Each position is the entry index accepted by this artifact's `run`.
+    pub entries: Vec<u64>,
+    pub instruction_count: usize,
+    pub block_count: usize,
+    pub source_bytes: usize,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum CompileError {
+    Resource,
+}
+
+pub fn compile(image: &Image, entry: u64, limits: Limits) -> Result<Artifact, CompileError> {
+    let unit = discovery::discover(image, entry, limits)?;
+    let bytes = wasm::emit(&unit);
+    if bytes.len() > limits.max_artifact_bytes as usize {
+        return Err(CompileError::Resource);
+    }
+    Ok(Artifact {
+        entries: unit
+            .instructions
+            .iter()
+            .map(|instruction| instruction.pc)
+            .collect(),
+        instruction_count: unit.instructions.len(),
+        block_count: unit.block_count,
+        source_bytes: unit.source_bytes,
+        bytes,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn emitted_artifact_limit_is_checked_before_returning_an_artifact() {
+        let image = Image::new(0x1000, vec![0xb8, 1, 0, 0, 0], 0x8000, vec![0; 8]).unwrap();
+        let limits = Limits {
+            max_instructions: 8,
+            max_source_bytes: 32,
+            max_artifact_bytes: 1,
+        };
+        assert!(matches!(
+            compile(&image, 0x1000, limits),
+            Err(CompileError::Resource)
+        ));
+        let artifact = compile(
+            &image,
+            0x1000,
+            Limits {
+                max_artifact_bytes: 65536,
+                ..limits
+            },
+        )
+        .unwrap();
+        assert_eq!(artifact.entries, [0x1000]);
+        assert_eq!(
+            (
+                artifact.instruction_count,
+                artifact.block_count,
+                artifact.source_bytes
+            ),
+            (1, 1, 5)
+        );
+        wasmparser::Validator::new()
+            .validate_all(&artifact.bytes)
+            .unwrap();
+    }
+}
