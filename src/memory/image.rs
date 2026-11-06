@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::rc::Rc;
 
 use super::address::span_failure;
@@ -46,6 +47,7 @@ pub struct Image {
     pub(super) mappings: Vec<Mapping>,
     limits: MemoryLimits,
     pub(super) validity: Validity,
+    pub(super) last_mapping: Cell<usize>,
 }
 
 #[derive(Debug)]
@@ -140,6 +142,7 @@ impl Image {
             mappings: Vec::new(),
             limits,
             validity: Validity::default(),
+            last_mapping: Cell::new(usize::MAX),
         };
         for (id, bytes) in backings {
             image.add_backing(id, bytes)?;
@@ -248,11 +251,26 @@ impl Image {
         }
         self.validity.mapping_change(&self.backings, &mappings);
         self.mappings = mappings;
+        self.last_mapping.set(usize::MAX);
         Ok(())
     }
 
     pub(super) fn locate(&self, address: u64) -> Option<&Mapping> {
-        locate(&self.mappings, address)
+        self.locate_index(address)
+            .map(|index| &self.mappings[index])
+    }
+
+    pub(super) fn locate_index(&self, address: u64) -> Option<usize> {
+        let cached = self.last_mapping.get();
+        if let Some(mapping) = self.mappings.get(cached)
+            && address >= mapping.base
+            && address - mapping.base < u64::from(mapping.length)
+        {
+            return Some(cached);
+        }
+        let index = locate_index(&self.mappings, address)?;
+        self.last_mapping.set(index);
+        Some(index)
     }
 }
 

@@ -1,5 +1,4 @@
 use super::address::check_span;
-use super::image::locate_index;
 use super::{Access, Cause, Fault, Image};
 
 impl Image {
@@ -119,7 +118,8 @@ impl Image {
             cause,
             failing,
         };
-        let first = locate_index(&self.mappings, address)
+        let first = self
+            .locate_index(address)
             .ok_or_else(|| failure(Cause::Unmapped, cursor))?;
         let mut index = first;
         loop {

@@ -199,3 +199,50 @@ fn a_final_address_source_can_be_patched_through_a_low_alias() {
     );
     assert_eq!(image.read(u64::MAX, 1), Ok(0xb9));
 }
+
+#[test]
+fn cached_mapping_still_checks_full_split_permissions_and_successful_remaps() {
+    let mut image = image(vec![mapping(0x1000, 0, 2, 7), mapping(0x1002, 4, 2, 7)]);
+    assert_eq!(image.read(0x1001, 1), Ok(1));
+    assert_eq!(image.last_mapping.get(), 0);
+    assert_eq!(image.read_for_write(0x1001, 2), Ok(0x0401));
+    let cached = image.last_mapping.get();
+    assert!(image.set_mappings(vec![mapping(0x1000, 7, 2, 7)]).is_err());
+    assert_eq!(image.last_mapping.get(), cached);
+    assert_eq!(image.read(0x1001, 2), Ok(0x0401));
+    image
+        .set_mappings(vec![mapping(0x1000, 0, 2, 7), mapping(0x1002, 4, 2, 1)])
+        .unwrap();
+    assert_eq!(image.last_mapping.get(), usize::MAX);
+    assert_eq!(image.read(0x1001, 1), Ok(1));
+    let before = image.backings[0].bytes.clone();
+    let fault = image.read_for_write(0x1001, 2).unwrap_err();
+    assert_eq!(
+        (fault.access, fault.cause, fault.failing),
+        (Access::Write, Cause::Permission, 0x1002)
+    );
+    assert_eq!(image.backings[0].bytes, before);
+    image.set_mappings(vec![mapping(0x1000, 6, 2, 3)]).unwrap();
+    assert_eq!(image.read(0x1000, 2), Ok(0x0706));
+    assert_eq!(image.fetch(0x1000).unwrap_err().cause, Cause::Permission);
+    image.set_mappings(vec![]).unwrap();
+    assert_eq!(image.read(0x1000, 1).unwrap_err().cause, Cause::Unmapped);
+}
+
+#[test]
+fn cached_mapping_never_bypasses_domain_checks_or_selects_a_nearby_span() {
+    let mut image = image(vec![mapping(u64::MAX, 0, 1, 7), mapping(0x1000, 1, 1, 3)]);
+    assert_eq!(image.read(u64::MAX, 1), Ok(0xb8));
+    assert_eq!(
+        image.read(u64::MAX, 2).unwrap_err().cause,
+        Cause::AddressRange
+    );
+    assert_eq!(image.read(0x1000, 1), Ok(1));
+    assert_eq!(image.read(0x1001, 1).unwrap_err().cause, Cause::Unmapped);
+    image.write(0x1000, 1, 0x77).unwrap();
+    assert_eq!(image.fetch(u64::MAX), Ok(0xb8));
+    assert_eq!(
+        image.read(0x8000_0000_0000, 1).unwrap_err().cause,
+        Cause::Noncanonical
+    );
+}
