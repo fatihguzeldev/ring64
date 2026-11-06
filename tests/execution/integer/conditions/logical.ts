@@ -312,9 +312,9 @@ export function logicalScenarios(core: WebAssembly.Module): Scenario[] {
           'f7e0',
           'f7e8',
           'd3',
-          'f7d8',
-          'f6d0',
-          'f7d0',
+          'f7f0',
+          'f6f0',
+          'f7f8',
         ]) {
           await using(
             code,
