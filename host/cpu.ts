@@ -148,9 +148,9 @@ export class Cpu {
     }
   }
 
-  private mutate(action: () => void): void {
+  private engineCall<T>(action: () => T): T {
     try {
-      action();
+      return action();
     } catch (cause) {
       if (cause instanceof TypeError || cause instanceof RangeError) throw cause;
       this.#lifecycle = 'failed';
@@ -163,7 +163,7 @@ export class Cpu {
     const captured = captureBackings([input], this.#memoryLimits, this.#backings);
     this.requireIdle();
     const lengths = validateBackings(captured, this.#backings, this.#memoryLimits);
-    this.mutate(() => this.#engine.addBacking(captured[0]!));
+    this.engineCall(() => this.#engine.addBacking(captured[0]!));
     this.#backings = lengths;
   }
 
@@ -171,7 +171,7 @@ export class Cpu {
     this.requireIdle();
     backingName(id);
     if (!this.#backings.has(id)) throw new TypeError('unknown backing name');
-    this.mutate(() => this.#engine.removeBacking(id));
+    this.engineCall(() => this.#engine.removeBacking(id));
     this.#backings.delete(id);
   }
 
@@ -180,7 +180,7 @@ export class Cpu {
     const captured = captureMappings(mappings, this.#memoryLimits);
     this.requireIdle();
     validateMappings(captured, this.#backings);
-    this.mutate(() => this.#engine.setMappings(captured));
+    this.engineCall(() => this.#engine.setMappings(captured));
     this.pruneTranslations();
   }
 
@@ -189,22 +189,22 @@ export class Cpu {
     const input = captureState(state);
     // Input accessors can start a run or dispose the CPU.
     this.requireIdle();
-    this.#engine.setState(input);
+    this.engineCall(() => this.#engine.setState(input));
   }
   readState(): State {
     this.requireIdle();
-    return this.#engine.snapshot();
+    return this.engineCall(() => this.#engine.snapshot());
   }
   readMemory(address: bigint, length: number): Uint8Array {
     this.requireIdle();
-    return this.#engine.readMemory(address, length);
+    return this.engineCall(() => this.#engine.readMemory(address, length));
   }
   writeMemory(address: bigint, bytes: Uint8Array): void {
     this.requireIdle();
     unsigned64(address, 'address');
     const input = copyMemoryInput(bytes);
     this.requireIdle();
-    this.mutate(() => this.#engine.writeOwnedMemory(address, input));
+    this.engineCall(() => this.#engine.writeOwnedMemory(address, input));
     this.pruneTranslations();
   }
   inspectTranslations() {
