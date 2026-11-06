@@ -23,11 +23,9 @@ test('backing capacity precedes indexed access and proportional copying', () => 
     get: () => assert.fail('rejected count must not be captured'),
   });
   assert.throws(() => captureBackings(oversized, limits), RangeError);
-  const bytes = new Proxy(new Uint8Array(8), {
-    get(target, key) {
-      if (key === '0') assert.fail('later backing exceeds capacity');
-      return Reflect.get(target, key, target) as unknown;
-    },
+  const bytes = new Uint8Array(8);
+  Object.defineProperty(bytes, 'length', {
+    get: () => assert.fail('preflight must use the actual typed-array length'),
   });
   assert.throws(
     () =>
@@ -40,6 +38,55 @@ test('backing capacity precedes indexed access and proportional copying', () => 
       ),
     RangeError,
   );
+});
+test('backing capture ignores shadow lengths and never truncates an oversized view', () => {
+  const bytes = Uint8Array.of(1, 2, 3, 4);
+  Object.defineProperty(bytes, 'length', { value: 1 });
+  assert.throws(
+    () => captureBackings([{ id: 'a', bytes }], { ...limits, maxBackingBytes: 1 }),
+    RangeError,
+  );
+  assert.deepEqual(
+    captureBackings([{ id: 'a', bytes }], limits)[0]!.bytes,
+    Uint8Array.of(1, 2, 3, 4),
+  );
+});
+test('detachment during later input capture rejects instead of silently zero-filling', () => {
+  const bytes = Uint8Array.of(1, 2, 3, 4);
+  const other = {
+    get id() {
+      structuredClone(bytes.buffer, { transfer: [bytes.buffer] });
+      return 'b';
+    },
+    bytes: Uint8Array.of(5),
+  };
+  assert.throws(() => captureBackings([{ id: 'a', bytes }, other], limits), TypeError);
+});
+test('legacy mapping capacity is rejected before backing copy allocations', () => {
+  const Native = Uint8Array;
+  const code = new Native(4);
+  const ram = new Native(4);
+  let allocations = 0;
+  globalThis.Uint8Array = new Proxy(Native, {
+    construct(target, args, newTarget) {
+      allocations++;
+      return Reflect.construct(target, args, newTarget) as Uint8Array;
+    },
+  });
+  try {
+    assert.throws(
+      () =>
+        captureInitialMemory({
+          code: { base: 0x1000n, bytes: code },
+          ram: { base: 0x2000n, bytes: ram },
+          memoryLimits: { ...limits, maxMappings: 1 },
+        }),
+      RangeError,
+    );
+    assert.equal(allocations, 0);
+  } finally {
+    globalThis.Uint8Array = Native;
+  }
 });
 test('backings own their bytes and use exact map keys', () => {
   const bytes = Uint8Array.of(1, 2);

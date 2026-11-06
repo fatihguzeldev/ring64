@@ -32,6 +32,16 @@ export interface InitialMemory {
   entry: bigint;
 }
 
+const typedArrayLength = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(Uint8Array.prototype) as object,
+  'length',
+)!.get!;
+const setBytes = Uint8Array.prototype.set;
+
+function actualLength(bytes: Uint8Array): number {
+  return typedArrayLength.call(bytes) as number;
+}
+
 export function backingName(id: unknown): asserts id is string {
   if (typeof id !== 'string' || id.length === 0)
     throw new TypeError('backing id must be a nonempty string');
@@ -90,7 +100,7 @@ export function captureBackings(
     const bytes = backing.bytes;
     backingName(id);
     if (!(bytes instanceof Uint8Array)) throw new TypeError('backing bytes must be Uint8Array');
-    const length = bytes.length;
+    const length = actualLength(bytes);
     byteLength(length, 'backing length');
     if (length === 0) throw new TypeError('backings must be nonempty');
     total += length;
@@ -100,7 +110,8 @@ export function captureBackings(
   // Allocate only after every declared length passed the capacity preflight.
   const result = captured.map(({ id, bytes, length }) => {
     const copy = new Uint8Array(length);
-    for (let index = 0; index < length; index++) copy[index] = bytes[index]!;
+    // Native typed-array copying rejects a source detached by a later accessor.
+    setBytes.call(copy, bytes);
     return { id, bytes: copy };
   });
   validateBackings(result, existing, limits);
@@ -196,11 +207,12 @@ export function captureInitialMemory(options: MemoryOptions): InitialMemory {
     const supplied = options.memoryLimits;
     memoryLimits = captureMemoryLimits(
       supplied ?? {
-        maxBackingBytes: codeBytes.length + ramBytes.length,
+        maxBackingBytes: actualLength(codeBytes) + actualLength(ramBytes),
         maxBackings: 2,
         maxMappings: 2,
       },
     );
+    if (memoryLimits.maxMappings < 2) throw new RangeError('mapping capacity exceeded');
     backings = captureBackings(
       [
         { id: 'code', bytes: codeBytes },
@@ -208,7 +220,6 @@ export function captureInitialMemory(options: MemoryOptions): InitialMemory {
       ],
       memoryLimits,
     );
-    if (memoryLimits.maxMappings < 2) throw new RangeError('mapping capacity exceeded');
     mappings = captureMappings(
       [
         {
