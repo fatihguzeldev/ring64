@@ -2,6 +2,7 @@ import { integerScenarios } from './execution/integer/index.js';
 import { stackScenarios } from './execution/stack/index.js';
 import { addressingScenarios } from './execution/addressing/index.js';
 import { memoryScenarios } from './execution/memory.js';
+import { mappedMemoryScenarios } from './execution/mapped-memory/index.js';
 import { controlScenarios } from './execution/control.js';
 import { translationsScenarios } from './execution/translations.js';
 import { embeddingScenarios } from './embedding/scenarios.js';
@@ -18,6 +19,7 @@ export async function runScenarios(
     ...stackScenarios(core),
     ...addressingScenarios(core),
     ...memoryScenarios(core),
+    ...mappedMemoryScenarios(core),
     ...controlScenarios(core),
     ...translationsScenarios(core),
     ...embeddingScenarios(core),
