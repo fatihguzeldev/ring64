@@ -23,6 +23,8 @@ pub(super) struct Validity {
     next: u64,
     owners: BTreeMap<u64, Owner>,
     active: Option<u64>,
+    active_invalid: bool,
+    sources: BTreeMap<usize, Vec<(u32, u64)>>,
 }
 
 impl Default for Validity {
@@ -31,22 +33,65 @@ impl Default for Validity {
             next: 1,
             owners: BTreeMap::new(),
             active: None,
+            active_invalid: false,
+            sources: BTreeMap::new(),
         }
     }
 }
 
 impl Validity {
+    fn rebuild_sources(&mut self) {
+        self.sources.clear();
+        for owner in self.owners.values().filter(|owner| owner.valid) {
+            for source in &owner.sources {
+                self.sources
+                    .entry(Rc::as_ptr(&source.incarnation) as usize)
+                    .or_default()
+                    .push((
+                        source.offset,
+                        u64::from(source.offset) + u64::from(source.length),
+                    ));
+            }
+        }
+        for ranges in self.sources.values_mut() {
+            ranges.sort_unstable();
+            let mut merged = 0;
+            for index in 0..ranges.len() {
+                let current = ranges[index];
+                if merged > 0 && u64::from(current.0) <= ranges[merged - 1].1 {
+                    ranges[merged - 1].1 = ranges[merged - 1].1.max(current.1);
+                } else {
+                    ranges[merged] = current;
+                    merged += 1;
+                }
+            }
+            ranges.truncate(merged);
+        }
+    }
+
     pub(super) fn write(&mut self, incarnation: &Rc<()>, offset: u32, length: u32) {
         let end = u64::from(offset) + u64::from(length);
-        for owner in self.owners.values_mut().filter(|owner| owner.valid) {
+        let Some(ranges) = self.sources.get(&(Rc::as_ptr(incarnation) as usize)) else {
+            return;
+        };
+        let index = ranges.partition_point(|range| u64::from(range.0) < end);
+        if index == 0 || ranges[index - 1].1 <= u64::from(offset) {
+            return;
+        }
+        for (&id, owner) in self.owners.iter_mut().filter(|(_, owner)| owner.valid) {
             if owner.sources.iter().any(|source| {
                 Rc::ptr_eq(&source.incarnation, incarnation)
                     && u64::from(source.offset) < end
                     && u64::from(offset) < u64::from(source.offset) + u64::from(source.length)
             }) {
                 owner.valid = false;
+                if self.active == Some(id) {
+                    self.active_invalid = true;
+                }
             }
         }
+        // Keep this conservative union until cold registration/release/remapping.
+        // A guest store neither allocates bookkeeping nor scans source-free owners.
     }
 
     pub(super) fn mapping_change(&mut self, backings: &[Backing], mappings: &[Mapping]) {
@@ -56,6 +101,10 @@ impl Validity {
                 .iter()
                 .all(|source| source_current(source, backings, mappings));
         }
+        self.active_invalid = self
+            .active
+            .is_some_and(|id| !self.owners.get(&id).is_some_and(|owner| owner.valid));
+        self.rebuild_sources();
     }
 }
 
@@ -122,6 +171,7 @@ impl Image {
             },
         );
         self.validity.next = next;
+        self.validity.rebuild_sources();
         Ok(owner)
     }
 
@@ -137,26 +187,64 @@ impl Image {
             return false;
         }
         self.validity.active = Some(owner);
+        self.validity.active_invalid = false;
         true
     }
 
     pub fn active_changed(&self) -> bool {
-        self.validity
-            .active
-            .is_some_and(|owner| !self.owner_valid(owner))
+        self.validity.active_invalid
     }
 
     pub fn release(&mut self, owner: u64) {
         self.validity.owners.remove(&owner);
         if self.validity.active == Some(owner) {
             self.validity.active = None;
+            self.validity.active_invalid = false;
         }
+        self.validity.rebuild_sources();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn source_union_retains_gaps_and_reclaims_released_owners() {
+        let mut image = Image::new(0x1000, vec![0; 64], 0x4000, vec![0; 8]).unwrap();
+        image
+            .set_mappings(vec![super::super::MappingInput {
+                base: 0x1000,
+                backing: "code".into(),
+                offset: 0,
+                length: 64,
+                permissions: super::super::Permissions {
+                    read: true,
+                    write: true,
+                    execute: true,
+                },
+            }])
+            .unwrap();
+        let first = image.register_source([(0x1000, 4)]).unwrap();
+        let second = image.register_source([(0x1010, 4)]).unwrap();
+        let key = Rc::as_ptr(&image.backings[0].incarnation) as usize;
+        assert_eq!(image.validity.sources[&key], [(0, 4), (16, 20)]);
+        let bridge = image.register_source([(0x1004, 12)]).unwrap();
+        assert_eq!(image.validity.sources[&key], [(0, 20)]);
+        image.release(bridge);
+        assert_eq!(image.validity.sources[&key], [(0, 4), (16, 20)]);
+        image.activate(first);
+        image.write(0x1008, 1, 7).unwrap();
+        assert!(image.owner_valid(first) && image.owner_valid(second));
+        image.write(0x1011, 1, 8).unwrap();
+        assert!(image.owner_valid(first));
+        assert!(!image.owner_valid(second));
+        assert!(!image.active_changed());
+        image.release(second);
+        assert_eq!(image.validity.sources[&key], [(0, 4)]);
+        image.release(first);
+        assert!(image.validity.sources.is_empty());
+    }
 
     #[test]
     fn exhausted_compile_identity_never_breaks_a_guest_store_or_reuses_a_token() {
