@@ -1,10 +1,53 @@
-use super::{ENTRY, Emitter, FLAGS, REASON, REMAINING, RIP};
-use crate::embedding::layout::{BUDGET, DISPATCH, STOP, TARGET};
+use super::{ENTRY, Emitter, FLAGS, GPR, REASON, REMAINING, RHS, RIP};
+use crate::embedding::layout::{BUDGET, DISPATCH, RunState, STOP, TARGET};
 use crate::memory::canonical48;
 use crate::x86::instruction::Condition;
-use wasm_encoder::{BlockType, Instruction as Op};
+use wasm_encoder::{BlockType, Instruction as Op, MemArg};
 
 impl Emitter {
+    pub(super) fn target_failure(&mut self, exit_depth: u32) {
+        // Runtime targets cannot be recovered by decoding the published RIP.
+        self.op(Op::LocalGet(0))
+            .op(Op::LocalGet(RHS))
+            .op(Op::I64Store(MemArg {
+                offset: std::mem::offset_of!(RunState, target) as u64,
+                align: 3,
+                memory_index: 0,
+            }));
+        self.exit(TARGET, exit_depth);
+    }
+
+    pub(super) fn check_runtime_target(&mut self, exit_depth: u32) {
+        self.op(Op::LocalGet(RHS))
+            .op(Op::I64Const(16))
+            .op(Op::I64Shl)
+            .op(Op::I64Const(16))
+            .op(Op::I64ShrS)
+            .op(Op::LocalGet(RHS))
+            .op(Op::I64Ne)
+            .op(Op::If(BlockType::Empty));
+        self.target_failure(exit_depth + 1);
+        self.op(Op::End);
+    }
+
+    pub(super) fn commit_runtime_target(&mut self, exit_depth: u32) {
+        self.op(Op::LocalGet(RHS))
+            .op(Op::LocalSet(RIP))
+            .op(Op::LocalGet(REMAINING))
+            .op(Op::I64Const(1))
+            .op(Op::I64Sub)
+            .op(Op::LocalSet(REMAINING));
+        self.gates(exit_depth);
+        self.exit(DISPATCH, exit_depth);
+    }
+
+    pub(super) fn jump_register(&mut self, target: u8, exit_depth: u32) {
+        self.op(Op::LocalGet(GPR + u32::from(target)))
+            .op(Op::LocalSet(RHS));
+        self.check_runtime_target(exit_depth);
+        self.commit_runtime_target(exit_depth);
+    }
+
     pub(super) fn condition(&mut self, condition: Condition) {
         use Condition::*;
         match condition {

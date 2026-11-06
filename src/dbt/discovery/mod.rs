@@ -1,7 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use crate::memory::{Image, canonical48};
-use crate::x86::{decode::decode, instruction::Operation};
+use crate::x86::{
+    decode::decode,
+    instruction::{Operand, Operation},
+};
 
 use super::{CompileError, Limits, unit::Unit};
 
@@ -43,6 +46,15 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
                     pending.push_back(target);
                 }
             }
+            Operation::Call { target } => {
+                pending.push_back(instruction.next_pc);
+                if let Operand::Immediate(target) = target
+                    && canonical48(target)
+                {
+                    pending.push_back(target);
+                }
+            }
+            Operation::JumpRegister { .. } | Operation::Return { .. } => {}
             _ => pending.push_back(instruction.next_pc),
         }
         instructions.insert(pc, instruction);
@@ -59,6 +71,12 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
             Operation::Jcc { target, .. } => {
                 leaders.insert(target);
                 leaders.insert(instruction.next_pc);
+            }
+            Operation::Call { target } => {
+                leaders.insert(instruction.next_pc);
+                if let Operand::Immediate(target) = target {
+                    leaders.insert(target);
+                }
             }
             _ => {}
         }
@@ -86,6 +104,36 @@ mod tests {
             max_instructions: 64,
             max_source_bytes: 256,
             max_artifact_bytes: 65536,
+        }
+    }
+
+    #[test]
+    fn calls_discover_static_continuations_without_guessing_dynamic_targets() {
+        let direct = image(&[
+            0xe8, 11, 0, 0, 0, 0xb9, 1, 0, 0, 0, 0xeb, 20, 0, 0, 0, 0, 0xba, 2, 0, 0, 0, 0xc3,
+        ]);
+        let unit = discover(&direct, 0x1000, limits()).unwrap();
+        assert_eq!(
+            unit.instructions.iter().map(|i| i.pc).collect::<Vec<_>>(),
+            [0x1000, 0x1005, 0x100a, 0x1010, 0x1015]
+        );
+        assert_eq!(unit.source_bytes, 18);
+        assert_eq!(unit.block_count, 3);
+
+        let indirect = image(&[0xff, 0xd0, 0xb9, 1, 0, 0, 0, 0xc3, 0xb8, 2, 0, 0, 0, 0xc3]);
+        let unit = discover(&indirect, 0x1000, limits()).unwrap();
+        assert_eq!(
+            unit.instructions.iter().map(|i| i.pc).collect::<Vec<_>>(),
+            [0x1000, 0x1002, 0x1007]
+        );
+        assert_eq!(unit.source_bytes, 8);
+        assert_eq!(unit.block_count, 2);
+        for code in [
+            vec![0xc3, 0xb8, 1, 0, 0, 0],
+            vec![0xff, 0xe0, 0xb8, 1, 0, 0, 0],
+        ] {
+            let unit = discover(&image(&code), 0x1000, limits()).unwrap();
+            assert_eq!(unit.instructions.len(), 1);
         }
     }
 

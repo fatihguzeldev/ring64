@@ -2,6 +2,7 @@ mod control;
 mod integer;
 mod integer_memory;
 mod memory;
+mod stack;
 mod state;
 
 use std::collections::BTreeMap;
@@ -161,6 +162,20 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 address,
                 width,
             } => emitter.lea(dst, address, width, instruction.next_pc),
+            Operation::Push { src } => emitter.push(src, exit_depth),
+            Operation::Pop { dst } => emitter.pop(dst, exit_depth),
+            Operation::Call { target } => {
+                emitter.call(target, instruction.next_pc, loop_depth, exit_depth);
+                continue;
+            }
+            Operation::JumpRegister { target } => {
+                emitter.jump_register(target, exit_depth);
+                continue;
+            }
+            Operation::Return { cleanup } => {
+                emitter.return_stack(cleanup, exit_depth);
+                continue;
+            }
             Operation::Jump { target } => {
                 emitter.target(target, loop_depth, exit_depth);
                 continue;

@@ -13,6 +13,44 @@ where
 {
     let width = rex.width();
     match opcode {
+        0x50..=0x57 => Ok(Operation::Push {
+            src: Operand::Register((opcode - 0x50) | rex.base_extension()),
+        }),
+        0x58..=0x5f => Ok(Operation::Pop {
+            dst: (opcode - 0x58) | rex.base_extension(),
+        }),
+        0x68 | 0x6a => Ok(Operation::Push {
+            src: Operand::Immediate(if opcode == 0x6a {
+                cursor.byte()? as i8 as i64 as u64
+            } else {
+                cursor.unsigned(4)? as u32 as i32 as i64 as u64
+            }),
+        }),
+        0xe8 => {
+            let displacement = cursor.unsigned(4)? as u32 as i32 as i64;
+            Ok(Operation::Call {
+                target: Operand::Immediate(cursor.next_pc().wrapping_add(displacement as u64)),
+            })
+        }
+        0xff => {
+            let operands = ModRm::read(cursor, rex)?;
+            if operands.mode != 3 {
+                return Err(DecodeError::Unsupported);
+            }
+            match operands.selector {
+                2 => Ok(Operation::Call {
+                    target: Operand::Register(operands.rm),
+                }),
+                4 => Ok(Operation::JumpRegister {
+                    target: operands.rm,
+                }),
+                _ => Err(DecodeError::Unsupported),
+            }
+        }
+        0xc3 => Ok(Operation::Return { cleanup: 0 }),
+        0xc2 => Ok(Operation::Return {
+            cleanup: cursor.unsigned(2)? as u16,
+        }),
         0xb8..=0xbf => Ok(Operation::Mov {
             dst: (opcode - 0xb8) | rex.base_extension(),
             src: Operand::Immediate(cursor.unsigned(width.bytes())?),

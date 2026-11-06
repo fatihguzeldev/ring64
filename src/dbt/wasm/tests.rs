@@ -2,6 +2,7 @@ mod addressing;
 mod conditions;
 mod integer_memory;
 mod logical;
+mod stack;
 
 use super::*;
 use crate::embedding::layout::RunState;
@@ -428,13 +429,14 @@ fn compiled_fixture(base: u64, code: &[u8], entry: u64) -> crate::dbt::Artifact 
 }
 
 fn run_cases(cases: Vec<Value>) {
-    let input = json!({ "layout": RunState::descriptor(), "cases": cases });
+    let input = json!({ "layout": RunState::descriptor(), "cases": cases,
+        "targetOffset": std::mem::offset_of!(RunState, target) });
     // Memory imports assert literal calls; other cases forbid data access.
     // No import implements an alternative guest memory policy.
     let script = r#"
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-const {layout:l,cases}=JSON.parse(fs.readFileSync(0,'utf8'));
+const {layout:l,cases,targetOffset}=JSON.parse(fs.readFileSync(0,'utf8'));
 for (const [index,c] of cases.entries()) {
  const memory=new WebAssembly.Memory({initial:1}); const d=new DataView(memory.buffer);
  c.registers.forEach((v,i)=>d.setBigUint64(l.registers+8*i,BigInt('0x'+v),true));
@@ -466,6 +468,7 @@ for (const [index,c] of cases.entries()) {
  const flagWord=BigInt('0x'+actual.flags);
  if(c.flagMask!==undefined) actual.flags=(flagWord&BigInt('0x'+c.flagMask)).toString(16);
  assert.deepEqual(actual,c.expected,'generated case '+index);
+ if(c.target!==undefined) assert.equal(d.getBigUint64(targetOffset,true).toString(16),c.target,'executed target '+index);
  if(c.preservingSuffix!==undefined){
   const suffix=c.preservingSuffix;
   const savedFlags=suffix.flags===undefined?flagWord:BigInt('0x'+suffix.flags);

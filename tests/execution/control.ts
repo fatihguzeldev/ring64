@@ -189,7 +189,7 @@ export function controlScenarios(core: WebAssembly.Module): Scenario[] {
       run: async () => {
         for (const code of [
           'f4',
-          'c3',
+          '8f',
           '67498b0500000000',
           '67498b0424',
           '1103',

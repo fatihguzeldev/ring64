@@ -9,6 +9,7 @@ mod addressing;
 mod conditions;
 mod integer_memory;
 mod logical;
+mod stack;
 
 fn missing(address: u64) -> Fault {
     Fault {
@@ -365,8 +366,6 @@ fn valid_forms_outside_the_subset_are_unsupported_without_operand_effects() {
         &[0x48, 0xeb, 0][..],
         &[0x48, 0x0f, 0x85, 0, 0, 0, 0][..],
         &[0x48, 0x49, 0x89, 0xc0][..],
-        &[0xe8, 0, 0, 0, 0][..],
-        &[0xc3][..],
         &[0xf4][..],
         &[0x0f, 0xaf, 0xc0][..],
     ] {

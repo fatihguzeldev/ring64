@@ -127,6 +127,22 @@ pub enum Operation {
         operands: MemoryAluOperands,
         width: Width,
     },
+    Push {
+        src: Operand,
+    },
+    Pop {
+        dst: u8,
+    },
+    Call {
+        /// Absolute guest target, also for a decoded relative CALL.
+        target: Operand,
+    },
+    JumpRegister {
+        target: u8,
+    },
+    Return {
+        cleanup: u16,
+    },
     Jump {
         target: u64,
     },
