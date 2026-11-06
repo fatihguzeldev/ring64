@@ -35,6 +35,16 @@ where
                 cursor.unsigned(4)? as u32 as i32 as i64 as u64
             }),
         }),
+        0x69 | 0x6b => {
+            let operands = ModRm::read(cursor, rex)?;
+            let src = operands.location(cursor, rex, wide)?;
+            Ok(Operation::Imul {
+                dst: rex.view(operands.register, wide),
+                src,
+                immediate: Some(immediate(cursor, wide, opcode == 0x6b)?),
+                width: wide,
+            })
+        }
         0xe8 => {
             let displacement = cursor.unsigned(4)? as u32 as i32 as i64;
             Ok(Operation::Call {
@@ -219,6 +229,20 @@ where
                             width,
                         });
                     }
+                    4 | 5 => {
+                        return Ok(Operation::Multiply {
+                            signed: operands.selector == 5,
+                            src: operands.location(cursor, rex, width)?,
+                            width,
+                        });
+                    }
+                    6 | 7 => {
+                        return Ok(Operation::Divide {
+                            signed: operands.selector == 7,
+                            src: operands.location(cursor, rex, width)?,
+                            width,
+                        });
+                    }
                     _ => return Err(DecodeError::Unsupported),
                 }
             } else {
@@ -398,6 +422,15 @@ where
     let rex = prefixes.rex;
     let width = prefixes.width();
     match opcode {
+        0xaf => {
+            let operands = ModRm::read(cursor, rex)?;
+            Ok(Operation::Imul {
+                dst: rex.view(operands.register, width),
+                src: operands.location(cursor, rex, width)?,
+                immediate: None,
+                width,
+            })
+        }
         0xa3 | 0xab | 0xb3 | 0xbb => {
             let operands = ModRm::read(cursor, rex)?;
             Ok(Operation::Bit {

@@ -211,8 +211,8 @@ fn logical_modrm_and_immediates_keep_the_first_required_byte_failure() {
 #[test]
 fn unsupported_logical_selectors_do_not_request_operand_tails() {
     let mut packets = Vec::new();
-    for selector in [1, 4, 5, 6, 7] {
-        packets.push(vec![0x4f, 0xf7, 0xc0 | (selector << 3)]);
+    for opcode in [0xf6, 0xf7] {
+        packets.push(vec![0x4f, opcode, 0xc8]);
     }
     for bytes in packets {
         let pc = u64::MAX - bytes.len() as u64 + 1;

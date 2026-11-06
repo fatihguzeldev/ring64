@@ -378,11 +378,7 @@ fn admitted_memory_integer_forms_fetch_each_required_address_and_immediate_byte(
 
 #[test]
 fn unsupported_integer_memory_selectors_stop_before_address_tails() {
-    for (opcode, selectors) in [
-        (0xf6, &[1, 4, 5, 6, 7][..]),
-        (0xf7, &[1, 4, 5, 6, 7]),
-        (0xfe, &[2, 3, 4, 5, 6, 7]),
-    ] {
+    for (opcode, selectors) in [(0xf6, &[1][..]), (0xf7, &[1]), (0xfe, &[2, 3, 4, 5, 6, 7])] {
         for selector in selectors {
             for mode in 0..4 {
                 let bytes = [0x4f, opcode, (mode << 6) | (selector << 3) | 4];

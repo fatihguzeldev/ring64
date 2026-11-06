@@ -369,7 +369,7 @@ fn valid_forms_outside_the_subset_are_unsupported_without_operand_effects() {
         &[0x48, 0x0f, 0x85, 0, 0, 0, 0][..],
         &[0x48, 0x49, 0x89, 0xc0][..],
         &[0xf4][..],
-        &[0x0f, 0xaf, 0xc0][..],
+        &[0x0f, 0xc0, 0xc0][..],
     ] {
         assert_eq!(
             at(0x1000, bytes),

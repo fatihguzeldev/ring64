@@ -6,6 +6,7 @@ mod entry_lookup;
 mod integer;
 mod integer_memory;
 mod memory;
+mod multiply_divide;
 mod stack;
 mod state;
 mod unary;
@@ -38,6 +39,9 @@ struct Emitter {
     entries: BTreeMap<u64, u32>,
     current_index: u32,
     entry_lookup: Option<u32>,
+    multiply_high: Option<u32>,
+    divide: Option<u32>,
+    divide_failed: Option<u32>,
 }
 
 impl Emitter {
@@ -79,6 +83,44 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     if dynamic_targets {
         types.ty().function([ValType::I64], [ValType::I32]);
     }
+    let mut next_type = 4 + u32::from(dynamic_targets);
+    let wide_product = unit.instructions.iter().any(|i| {
+        matches!(
+            i.operation,
+            Operation::Multiply {
+                width: crate::x86::instruction::Width::W64,
+                ..
+            } | Operation::Imul {
+                width: crate::x86::instruction::Width::W64,
+                ..
+            }
+        )
+    });
+    let wide_divide = unit.instructions.iter().any(|i| {
+        matches!(
+            i.operation,
+            Operation::Divide {
+                width: crate::x86::instruction::Width::W64,
+                ..
+            }
+        )
+    });
+    let multiply_type = wide_product.then(|| {
+        let index = next_type;
+        types
+            .ty()
+            .function([ValType::I64, ValType::I64, ValType::I32], [ValType::I64]);
+        next_type += 1;
+        index
+    });
+    let divide_type = wide_divide.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [ValType::I64, ValType::I64, ValType::I64, ValType::I32],
+            [ValType::I64],
+        );
+        index
+    });
     let mut imports = ImportSection::new();
     imports.import(
         "env",
@@ -117,16 +159,38 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     if write_intent {
         imports.import("env", "load_for_write", EntityType::Function(0));
     }
+    let mut run_index = 3 + u32::from(write_intent);
+    let multiply_high = multiply_type.map(|index| {
+        imports.import("env", "multiply_high", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let divide = divide_type.map(|index| {
+        imports.import("env", "divide", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let divide_failed = wide_divide.then(|| {
+        imports.import("env", "divide_failed", EntityType::Function(2));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let mut functions = FunctionSection::new();
     functions.function(3);
     if dynamic_targets {
         functions.function(4);
     }
     let mut exports = ExportSection::new();
-    exports.export("run", ExportKind::Func, 3 + u32::from(write_intent));
+    exports.export("run", ExportKind::Func, run_index);
     let mut emitter = Emitter {
         current_index: 0,
-        entry_lookup: dynamic_targets.then_some(4 + u32::from(write_intent)),
+        entry_lookup: dynamic_targets.then_some(run_index + 1),
+        multiply_high,
+        divide,
+        divide_failed,
         body: Function::new([(19, ValType::I64), (2, ValType::I32), (5, ValType::I64)]),
         entries: unit
             .instructions
@@ -217,6 +281,18 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             Operation::SignHigh { width } => emitter.sign_high(width),
             Operation::Unary { kind, dst, width } => {
                 emitter.unary(kind, dst, width, instruction.next_pc, exit_depth)
+            }
+            Operation::Multiply { signed, src, width } => {
+                emitter.multiply(signed, src, width, instruction.next_pc, exit_depth)
+            }
+            Operation::Imul {
+                dst,
+                src,
+                immediate,
+                width,
+            } => emitter.imul(dst, src, immediate, width, instruction.next_pc, exit_depth),
+            Operation::Divide { signed, src, width } => {
+                emitter.divide(signed, src, width, instruction.next_pc, exit_depth)
             }
             Operation::Shift {
                 kind,

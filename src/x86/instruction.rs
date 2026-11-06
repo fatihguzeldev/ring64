@@ -245,6 +245,22 @@ pub enum Operation {
         dst: Location,
         width: Width,
     },
+    Multiply {
+        signed: bool,
+        src: Location,
+        width: Width,
+    },
+    Imul {
+        dst: RegisterView,
+        src: Location,
+        immediate: Option<u64>,
+        width: Width,
+    },
+    Divide {
+        signed: bool,
+        src: Location,
+        width: Width,
+    },
     Carry {
         kind: Carry,
     },
