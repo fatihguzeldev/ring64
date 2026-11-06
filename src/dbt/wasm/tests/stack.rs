@@ -70,6 +70,9 @@ fn stack_publication_follows_checked_access_and_preserves_aliases() {
 fn runtime_targets_are_checked_before_stack_or_architectural_commit() {
     let mut cases = vec![];
     for bad in [0x800000000000, 0xffff7fff12345678] {
+        let mut p = packet(Operation::Jump { target: bad }, &[], &[], 0x1000, TARGET, 1);
+        p["target"] = json!(format!("{bad:x}"));
+        cases.push(p);
         for (operation, input, reads) in [
             (
                 Operation::Call {

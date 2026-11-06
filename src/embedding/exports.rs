@@ -3,7 +3,6 @@ use std::cell::{RefCell, UnsafeCell};
 use crate::dbt::{self, CompileError, Limits};
 use crate::memory::{Access, Cause, Fault, Image};
 use crate::x86::decode::{self, DecodeError};
-use crate::x86::instruction::Operation;
 use crate::x86::state::State;
 
 use super::layout::{DATA, FETCH, INVALID, RESOURCE, RunState, TARGET, UNSUPPORTED};
@@ -222,16 +221,8 @@ pub extern "C" fn core_fault_info(reason: i32) {
         let fault = match reason {
             DATA | FETCH => core.fault.as_ref().map(fault_json),
             TARGET => {
-                // Generated execution has returned. Existing static branches do
-                // not write the runtime target transport.
-                let state = unsafe { &*core.state.get() };
-                let target = match decode::decode(state.rip, |address| core.image.fetch(address)) {
-                    Ok(instruction) => match instruction.operation {
-                        Operation::Jump { target } | Operation::Jcc { target, .. } => target,
-                        _ => state.target,
-                    },
-                    Err(_) => state.target,
-                };
+                // Every generated target failure publishes the executed value.
+                let target = unsafe { (*core.state.get()).target };
                 Some(fault_json(&Fault {
                     address: target,
                     width: 0,

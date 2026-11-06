@@ -38,15 +38,19 @@ fn memory_fault_metadata_only_belongs_to_data_and_fetch_exits() {
 }
 
 #[test]
-fn static_target_metadata_keeps_the_decoded_target() {
+fn static_target_metadata_uses_the_execution_transport() {
     for code in [&[0xeb, 0x0e][..], &[0x75, 0x0e][..]] {
         initialize(0x7fff_ffff_fff0, code);
         assert_eq!(core_load(0x7000, 8), 0);
+        BRIDGE.with_borrow_mut(|bridge| {
+            // Metadata consumes execution transport, independently of bytes at RIP.
+            unsafe { (*bridge.core.as_mut().unwrap().state.get()).target = 0x8000_0000_0008 };
+        });
         assert_eq!(
             metadata(TARGET),
             serde_json::json!({
-                "address": "0x800000000000", "width": 0, "access": "execute",
-                "cause": "noncanonical", "failingAddress": "0x800000000000",
+                "address": "0x800000000008", "width": 0, "access": "execute",
+                "cause": "noncanonical", "failingAddress": "0x800000000008",
             })
         );
     }

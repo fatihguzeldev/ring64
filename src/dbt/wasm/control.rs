@@ -143,7 +143,8 @@ impl Emitter {
 
     pub(super) fn target(&mut self, target: u64, loop_depth: u32, exit_depth: u32) {
         if !canonical48(target) {
-            self.exit(TARGET, exit_depth);
+            self.op(Op::I64Const(target as i64)).op(Op::LocalSet(RHS));
+            self.target_failure(exit_depth);
         } else {
             self.commit(target);
             self.route(target, loop_depth, exit_depth);
