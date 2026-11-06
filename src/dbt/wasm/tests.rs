@@ -1,6 +1,7 @@
 mod addressing;
 mod arithmetic_bits;
 mod bits;
+mod code_validity;
 mod conditions;
 mod counts;
 mod data_widths;
@@ -21,6 +22,7 @@ use std::process::{Command, Stdio};
 fn unit(instructions: Vec<Instruction>) -> Unit {
     Unit {
         source_bytes: instructions.len(),
+        source_ranges: vec![],
         block_count: 1,
         instructions,
     }

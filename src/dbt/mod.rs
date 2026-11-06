@@ -19,6 +19,13 @@ pub struct Artifact {
     pub instruction_count: usize,
     pub block_count: usize,
     pub source_bytes: usize,
+    pub source_ranges: Vec<SourceRange>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SourceRange {
+    pub start: u64,
+    pub length: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -41,6 +48,7 @@ pub fn compile(image: &Image, entry: u64, limits: Limits) -> Result<Artifact, Co
         instruction_count: unit.instructions.len(),
         block_count: unit.block_count,
         source_bytes: unit.source_bytes,
+        source_ranges: unit.source_ranges,
         bytes,
     })
 }

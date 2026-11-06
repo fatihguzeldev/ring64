@@ -1,4 +1,4 @@
-use super::{ENTRY, Emitter, FLAGS, GPR, REASON, REMAINING, RHS, RIP};
+use super::{ENTRY, Emitter, FLAGS, GPR, REASON, REMAINING, RHS, RIP, STORE_STATUS};
 use crate::embedding::layout::{BUDGET, DISPATCH, RunState, STOP, TARGET};
 use crate::memory::canonical48;
 use crate::x86::instruction::Condition;
@@ -38,6 +38,7 @@ impl Emitter {
             .op(Op::I64Sub)
             .op(Op::LocalSet(REMAINING));
         self.gates(exit_depth);
+        self.code_write_boundary(exit_depth);
         let lookup = self
             .entry_lookup
             .expect("dynamic transfer has an entry lookup");
@@ -134,6 +135,7 @@ impl Emitter {
     }
 
     pub(super) fn route(&mut self, target: u64, loop_depth: u32, exit_depth: u32) {
+        self.code_write_boundary(exit_depth);
         if let Some(&index) = self.entries.get(&target) {
             if index > self.current_index {
                 // Later instructions retain enclosing labels. A conditional
@@ -149,6 +151,20 @@ impl Emitter {
             // Budget/stop still precede fetch even at an external frontier.
             self.gates(exit_depth);
             self.exit(DISPATCH, exit_depth);
+        }
+    }
+
+    fn code_write_boundary(&mut self, exit_depth: u32) {
+        if self.stores {
+            // Status two is successful storage that invalidated this owner.
+            // All instruction effects and its retirement are committed first.
+            self.op(Op::LocalGet(STORE_STATUS))
+                .op(Op::I32Const(2))
+                .op(Op::I32Eq)
+                .op(Op::If(BlockType::Empty));
+            self.gates(exit_depth + 1);
+            self.exit(DISPATCH, exit_depth + 1);
+            self.op(Op::End);
         }
     }
 

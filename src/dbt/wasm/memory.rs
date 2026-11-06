@@ -1,4 +1,4 @@
-use super::{ADDRESS, Emitter, GPR, RESULT, VALUE};
+use super::{ADDRESS, Emitter, GPR, RESULT, STORE_STATUS, VALUE};
 use crate::embedding::layout::DATA;
 use crate::x86::instruction::{Address, AddressBase, DataOperand, RegisterView, Width};
 use wasm_encoder::{BlockType, Instruction as Op};
@@ -79,10 +79,12 @@ impl Emitter {
     }
 
     pub(super) fn store_result(&mut self, width: Width, exit_depth: u32) {
+        self.stores = true;
         self.op(Op::LocalGet(ADDRESS))
             .op(Op::I32Const(i32::from(width.bytes())))
             .op(Op::LocalGet(RESULT))
             .op(Op::Call(1))
+            .op(Op::LocalTee(STORE_STATUS))
             .op(Op::I32Eqz)
             .op(Op::If(BlockType::Empty));
         self.exit(DATA, exit_depth + 1);
@@ -97,12 +99,14 @@ impl Emitter {
         next_pc: u64,
         exit_depth: u32,
     ) {
+        self.stores = true;
         self.address(address, next_pc);
         self.op(Op::LocalSet(ADDRESS))
             .op(Op::LocalGet(ADDRESS))
             .op(Op::I32Const(i32::from(width.bytes())));
         self.data_operand(src, width);
         self.op(Op::Call(1))
+            .op(Op::LocalTee(STORE_STATUS))
             .op(Op::I32Eqz)
             .op(Op::If(BlockType::Empty));
         self.exit(DATA, exit_depth + 1);

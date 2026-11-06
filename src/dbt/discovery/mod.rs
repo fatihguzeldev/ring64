@@ -6,7 +6,7 @@ use crate::x86::{
     instruction::{Operand, Operation},
 };
 
-use super::{CompileError, Limits, unit::Unit};
+use super::{CompileError, Limits, SourceRange, unit::Unit};
 
 pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit, CompileError> {
     let mut pending = VecDeque::from([entry]);
@@ -81,6 +81,19 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
             _ => {}
         }
     }
+    let mut source_ranges: Vec<SourceRange> = Vec::new();
+    for address in &source {
+        if let Some(last) = source_ranges.last_mut()
+            && u128::from(last.start) + u128::from(last.length) == u128::from(*address)
+        {
+            last.length += 1;
+        } else {
+            source_ranges.push(SourceRange {
+                start: *address,
+                length: 1,
+            });
+        }
+    }
     Ok(Unit {
         block_count: leaders
             .iter()
@@ -88,6 +101,7 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
             .count(),
         instructions: instructions.into_values().collect(),
         source_bytes: source.len(),
+        source_ranges,
     })
 }
 
@@ -186,5 +200,51 @@ mod tests {
             },
         );
         assert!(matches!(result, Err(CompileError::Resource)));
+    }
+
+    #[test]
+    fn source_ranges_retain_exact_guest_bytes_without_baking_future_diagnostics() {
+        let mut bytes = vec![0xa5; 32];
+        bytes[..2].copy_from_slice(&[0xeb, 14]);
+        bytes[16..21].copy_from_slice(&[0xb8, 1, 0, 0, 0]);
+        let unit = discover(&image(&bytes), 0x1000, limits()).unwrap();
+        assert_eq!(unit.source_bytes, 7);
+        assert_eq!(
+            unit.source_ranges,
+            [
+                SourceRange {
+                    start: 0x1000,
+                    length: 2
+                },
+                SourceRange {
+                    start: 0x1010,
+                    length: 5
+                },
+            ]
+        );
+
+        let overlapping = discover(
+            &image(&[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0, 0xa5]),
+            0x1000,
+            limits(),
+        )
+        .unwrap();
+        assert_eq!(
+            overlapping.source_ranges,
+            [SourceRange {
+                start: 0x1000,
+                length: 8
+            }]
+        );
+        let top = Image::new(u64::MAX - 4, vec![0xb8, 1, 0, 0, 0], 0x8000, vec![0; 8]).unwrap();
+        assert_eq!(
+            discover(&top, u64::MAX - 4, limits())
+                .unwrap()
+                .source_ranges,
+            [SourceRange {
+                start: u64::MAX - 4,
+                length: 5
+            }]
+        );
     }
 }

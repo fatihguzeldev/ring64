@@ -33,6 +33,7 @@ const RHS: u32 = 27;
 const RESULT: u32 = 28;
 const ADDRESS: u32 = 29;
 const VALUE: u32 = 30;
+const STORE_STATUS: u32 = 31;
 
 struct Emitter {
     body: Function,
@@ -42,6 +43,7 @@ struct Emitter {
     multiply_high: Option<u32>,
     divide: Option<u32>,
     divide_failed: Option<u32>,
+    stores: bool,
 }
 
 impl Emitter {
@@ -191,7 +193,13 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         multiply_high,
         divide,
         divide_failed,
-        body: Function::new([(19, ValType::I64), (2, ValType::I32), (5, ValType::I64)]),
+        stores: false,
+        body: Function::new([
+            (19, ValType::I64),
+            (2, ValType::I32),
+            (5, ValType::I64),
+            (1, ValType::I32),
+        ]),
         entries: unit
             .instructions
             .iter()
@@ -219,6 +227,7 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     for (index, instruction) in unit.instructions.iter().enumerate() {
         emitter.op(Op::End);
         emitter.current_index = index as u32;
+        emitter.stores = false;
         let loop_depth = count - index as u32;
         let exit_depth = loop_depth + 1;
         emitter
