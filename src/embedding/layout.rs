@@ -9,8 +9,9 @@ pub const TARGET: i32 = 5;
 pub const DATA: i32 = 6;
 pub const INVALID: i32 = 7;
 pub const RESOURCE: i32 = 8;
+pub const DIVIDE_ERROR: i32 = 9;
 
-pub const REASONS: [&str; 9] = [
+pub const REASONS: [&str; 10] = [
     "dispatch",
     "budget",
     "stop",
@@ -20,6 +21,7 @@ pub const REASONS: [&str; 9] = [
     "data-fault",
     "invalid-encoding",
     "resource-limit",
+    "divide-error",
 ];
 
 #[repr(C)]
@@ -67,6 +69,28 @@ impl RunState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn divide_error_extends_the_controlled_reasons_without_moving_state() {
+        assert_eq!(DIVIDE_ERROR, 9);
+        assert_eq!(REASONS[DIVIDE_ERROR as usize], "divide-error");
+        assert_eq!(
+            &REASONS[..9],
+            &[
+                "dispatch",
+                "budget",
+                "stop",
+                "unsupported",
+                "fetch-fault",
+                "target-fault",
+                "data-fault",
+                "invalid-encoding",
+                "resource-limit",
+            ]
+        );
+        assert_eq!(RunState::descriptor()["reasons"][9], "divide-error");
+        assert_eq!(size_of::<RunState>(), 160);
+    }
 
     #[test]
     fn runtime_target_transport_keeps_existing_state_offsets() {

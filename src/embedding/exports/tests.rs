@@ -1,5 +1,5 @@
 use super::*;
-use crate::embedding::layout::{BUDGET, DATA, DISPATCH, STOP};
+use crate::embedding::layout::{BUDGET, DATA, DISPATCH, DIVIDE_ERROR, STOP};
 
 fn initialize(code_base: u64, code: &[u8]) {
     BRIDGE.with_borrow_mut(|bridge| {
@@ -24,7 +24,15 @@ fn memory_fault_metadata_only_belongs_to_data_and_fetch_exits() {
         "cause": "unmapped", "failingAddress": "0x7000",
     });
     assert_eq!(metadata(DATA), data);
-    for reason in [DISPATCH, BUDGET, STOP, RESOURCE, UNSUPPORTED, INVALID] {
+    for reason in [
+        DISPATCH,
+        BUDGET,
+        STOP,
+        RESOURCE,
+        UNSUPPORTED,
+        INVALID,
+        DIVIDE_ERROR,
+    ] {
         assert_eq!(metadata(reason), serde_json::Value::Null, "reason {reason}");
     }
     assert_eq!(core_probe(0x7001), FETCH);
@@ -74,7 +82,7 @@ fn runtime_target_metadata_uses_each_executed_value() {
                 })
             );
         }
-        for reason in [BUDGET, STOP, RESOURCE, UNSUPPORTED, INVALID] {
+        for reason in [BUDGET, STOP, RESOURCE, UNSUPPORTED, INVALID, DIVIDE_ERROR] {
             assert_eq!(metadata(reason), serde_json::Value::Null);
         }
     }
