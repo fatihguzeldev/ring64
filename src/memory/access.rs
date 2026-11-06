@@ -1,12 +1,11 @@
 use super::address::check_span;
+use super::image::locate_index;
 use super::{Access, Cause, Fault, Image};
 
 impl Image {
     pub fn fetch(&self, address: u64) -> Result<u8, Fault> {
-        let index = self.preflight(address, 1, Access::Execute, false)?;
-        let mapping = &self.mappings[index];
-        let offset = mapping.offset as usize + (address - mapping.base) as usize;
-        Ok(self.backings[mapping.backing].bytes[offset])
+        let index = self.preflight(address, 1, Access::Execute, false, false)?;
+        Ok(self.byte_after_preflight(address, index))
     }
 
     pub fn read(&self, address: u64, width: u32) -> Result<u64, Fault> {
@@ -14,7 +13,11 @@ impl Image {
             matches!(width, 1 | 2 | 4 | 8),
             "unsupported scalar access width"
         );
-        let first = self.preflight(address, width, Access::Read, false)?;
+        if width == 1 {
+            let first = self.preflight(address, 1, Access::Read, false, true)?;
+            return Ok(u64::from(self.byte_after_preflight(address, first)));
+        }
+        let first = self.preflight(address, width, Access::Read, false, true)?;
         Ok(self.scalar_after_preflight(address, width, first))
     }
 
@@ -23,7 +26,11 @@ impl Image {
             matches!(width, 1 | 2 | 4 | 8),
             "unsupported scalar access width"
         );
-        let first = self.preflight(address, width, Access::Write, true)?;
+        if width == 1 {
+            let first = self.preflight(address, 1, Access::Write, true, true)?;
+            return Ok(u64::from(self.byte_after_preflight(address, first)));
+        }
+        let first = self.preflight(address, width, Access::Write, true, true)?;
         Ok(self.scalar_after_preflight(address, width, first))
     }
 
@@ -32,7 +39,7 @@ impl Image {
             matches!(width, 1 | 2 | 4 | 8),
             "unsupported scalar access width"
         );
-        let first = self.preflight(address, width, Access::Write, false)?;
+        let first = self.preflight(address, width, Access::Write, false, true)?;
         let mapping = &self.mappings[first];
         let relative = address - mapping.base;
         if u64::from(width) <= u64::from(mapping.length) - relative {
@@ -60,7 +67,7 @@ impl Image {
     }
 
     pub fn read_bytes(&self, address: u64, length: u32) -> Result<Vec<u8>, Fault> {
-        let mut index = self.preflight(address, length, Access::Read, false)?;
+        let mut index = self.preflight(address, length, Access::Read, false, false)?;
         let mut output = Vec::with_capacity(length as usize);
         let mut cursor = u128::from(address);
         let end = cursor + u128::from(length);
@@ -77,7 +84,7 @@ impl Image {
 
     pub fn write_bytes(&mut self, address: u64, bytes: &[u8]) -> Result<(), Fault> {
         let width = u32::try_from(bytes.len()).expect("memory copy length exceeds u32");
-        let first = self.preflight(address, width, Access::Write, false)?;
+        let first = self.preflight(address, width, Access::Write, false, false)?;
         self.write_after_preflight(address, bytes, first);
         Ok(())
     }
@@ -109,6 +116,7 @@ impl Image {
         width: u32,
         access: Access,
         rmw: bool,
+        cache_scalar: bool,
     ) -> Result<usize, Fault> {
         check_span(address, width, access)?;
         if width == 0 {
@@ -123,9 +131,12 @@ impl Image {
             cause,
             failing,
         };
-        let first = self
-            .locate_index(address)
-            .ok_or_else(|| failure(Cause::Unmapped, cursor))?;
+        let first = if cache_scalar {
+            self.locate_index(address)
+        } else {
+            locate_index(&self.mappings, address)
+        }
+        .ok_or_else(|| failure(Cause::Unmapped, cursor))?;
         let mut index = first;
         loop {
             let mapping = &self.mappings[index];
@@ -150,6 +161,13 @@ impl Image {
                 return Err(failure(Cause::Unmapped, cursor));
             }
         }
+    }
+
+    #[inline]
+    fn byte_after_preflight(&self, address: u64, index: usize) -> u8 {
+        let mapping = &self.mappings[index];
+        let offset = mapping.offset as usize + (address - mapping.base) as usize;
+        self.backings[mapping.backing].bytes[offset]
     }
 
     #[inline]

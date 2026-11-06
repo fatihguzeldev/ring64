@@ -295,7 +295,7 @@ fn two_checked_mapping_indices_cover_alternating_regions_and_table_changes() {
         assert_eq!(image.read_for_write(0x1000, 1), Ok(0xb8));
         assert_eq!(
             (image.last_mapping.get(), image.previous_mapping.get()),
-            (0, 1)
+            (1, 0)
         );
         assert_eq!(image.read_for_write(0x2000, 1), Ok(1));
         assert_eq!(
@@ -331,4 +331,95 @@ fn two_checked_mapping_indices_cover_alternating_regions_and_table_changes() {
     image.set_mappings(vec![]).unwrap();
     assert_eq!(image.read(0x1000, 1).unwrap_err().cause, Cause::Unmapped);
     assert_eq!(image.read(0x2000, 1).unwrap_err().cause, Cause::Unmapped);
+}
+
+#[test]
+fn fetch_discovery_and_source_registration_do_not_fill_data_mapping_indices() {
+    let image = image(vec![
+        mapping(0x1000, 0, 5, 5),
+        mapping(0x4000, 5, 1, 3),
+        mapping(0x5000, 6, 1, 3),
+    ]);
+    assert_eq!(image.read(0x4000, 1), Ok(5));
+    assert_eq!(image.read(0x5000, 1), Ok(6));
+    let cached = (image.last_mapping.get(), image.previous_mapping.get());
+    assert_eq!(cached, (2, 1));
+    for address in 0x1000..0x1005 {
+        image.fetch(address).unwrap();
+        assert_eq!(
+            (image.last_mapping.get(), image.previous_mapping.get()),
+            cached
+        );
+    }
+    let artifact = crate::dbt::compile(
+        &image,
+        0x1000,
+        crate::dbt::Limits {
+            max_instructions: 8,
+            max_source_bytes: 32,
+            max_artifact_bytes: 65536,
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        (image.last_mapping.get(), image.previous_mapping.get()),
+        cached
+    );
+    let mut image = image;
+    let owner = image
+        .register_source(
+            artifact
+                .source_ranges
+                .iter()
+                .map(|range| (range.start, range.length)),
+        )
+        .unwrap();
+    assert!(image.owner_valid(owner));
+    assert_eq!(
+        (image.last_mapping.get(), image.previous_mapping.get()),
+        cached
+    );
+    assert_eq!(image.read_for_write(0x4000, 1), Ok(5));
+    assert_eq!(image.read(0x5000, 1), Ok(6));
+    assert_eq!(
+        (image.last_mapping.get(), image.previous_mapping.get()),
+        cached
+    );
+}
+
+#[test]
+fn host_bulk_copies_cannot_replace_warm_scalar_data_mapping_indices() {
+    let mut image = image(vec![
+        mapping(0x1000, 0, 5, 5),
+        mapping(0x4000, 5, 1, 3),
+        mapping(0x5000, 6, 1, 3),
+        mapping(0x6000, 0, 5, 3),
+    ]);
+    assert_eq!(image.read(0x4000, 1), Ok(5));
+    assert_eq!(image.read(0x5000, 1), Ok(6));
+    let cached = (image.last_mapping.get(), image.previous_mapping.get());
+    let owner = image.register_source([(0x1000, 5)]).unwrap();
+    assert_eq!(image.read_bytes(0x1000, 5), Ok(vec![0xb8, 1, 2, 3, 4]));
+    assert_eq!(
+        (image.last_mapping.get(), image.previous_mapping.get()),
+        cached
+    );
+    image.write_bytes(0x6001, &[9]).unwrap();
+    assert!(!image.owner_valid(owner));
+    assert_eq!(
+        (image.last_mapping.get(), image.previous_mapping.get()),
+        cached
+    );
+    assert_eq!(image.read_bytes(0x6000, 5), Ok(vec![0xb8, 9, 2, 3, 4]));
+    assert_eq!(
+        (image.last_mapping.get(), image.previous_mapping.get()),
+        cached
+    );
+    image.write(0x5000, 1, 7).unwrap();
+    assert_eq!(image.read_for_write(0x4000, 1), Ok(5));
+    assert_eq!(
+        (image.last_mapping.get(), image.previous_mapping.get()),
+        cached
+    );
+    assert_eq!(image.read(0x5000, 1), Ok(7));
 }

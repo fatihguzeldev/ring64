@@ -262,11 +262,10 @@ impl Image {
     }
 
     pub(super) fn locate(&self, address: u64) -> Option<&Mapping> {
-        self.locate_index(address)
-            .map(|index| &self.mappings[index])
+        locate(&self.mappings, address)
     }
 
-    #[inline]
+    #[inline(always)]
     pub(super) fn locate_index(&self, address: u64) -> Option<usize> {
         let cached = self.last_mapping.get();
         if let Some(mapping) = self.mappings.get(cached)
@@ -275,13 +274,16 @@ impl Image {
         {
             return Some(cached);
         }
+        self.locate_secondary(address)
+    }
+
+    #[inline(never)]
+    fn locate_secondary(&self, address: u64) -> Option<usize> {
         let previous = self.previous_mapping.get();
         if let Some(mapping) = self.mappings.get(previous)
             && address >= mapping.base
             && address - mapping.base < u64::from(mapping.length)
         {
-            self.previous_mapping.set(cached);
-            self.last_mapping.set(previous);
             return Some(previous);
         }
         self.locate_uncached(address)
