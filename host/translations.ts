@@ -60,6 +60,7 @@ export class Translations {
     return Array.from(this.#artifacts.keys(), (artifact) => ({
       ...artifact.metadata,
       entries: [...artifact.metadata.entries],
+      dependencies: artifact.metadata.dependencies.map((range) => ({ ...range })),
     }));
   }
 

@@ -1,3 +1,5 @@
+import type { InitialMemory, MemoryBackingInput, MemoryMapping } from './memory.js';
+
 export interface State {
   registers: bigint[];
   flags: bigint;
@@ -30,6 +32,8 @@ export interface UnitMetadata {
   instructionCount: number;
   blockCount: number;
   sourceBytes: number;
+  owner: bigint;
+  dependencies: { start: bigint; length: number }[];
   byteLength: number;
 }
 
@@ -46,6 +50,13 @@ type CoreExports = WebAssembly.Exports & {
   memory: WebAssembly.Memory;
   core_input(length: number): number;
   core_init(codeBase: bigint, codeLen: number, ramBase: bigint, ramLen: number): number;
+  core_init_mapped(entry: bigint, metadataLength: number): number;
+  core_add_backing(metadataLength: number): number;
+  core_remove_backing(): number;
+  core_set_mappings(): number;
+  core_validity(owner: bigint): number;
+  core_activate(owner: bigint): number;
+  core_release(owner: bigint): void;
   core_state_ptr(): number;
   core_import_state(): number;
   core_clear_fault(): void;
@@ -119,6 +130,42 @@ export function copyMemoryInput(bytes: Uint8Array): Uint8Array {
   return copy;
 }
 
+function backingKey(name: string): string {
+  // JSON's Unicode strings cannot carry lone UTF-16 surrogates into Rust.
+  let key = '';
+  for (let index = 0; index < name.length; index++)
+    key += name.charCodeAt(index).toString(16).padStart(4, '0');
+  return key;
+}
+
+function mappingInput(mappings: readonly MemoryMapping[]): MemoryMapping[] {
+  return mappings.map((mapping) => ({ ...mapping, backing: backingKey(mapping.backing) }));
+}
+
+function writeInput(
+  exports: CoreExports,
+  metadata: unknown,
+  backings: readonly Uint8Array[] = [],
+): number {
+  const header = new TextEncoder().encode(
+    JSON.stringify(metadata, (_key, value: unknown) =>
+      typeof value === 'bigint' ? `0x${value.toString(16)}` : value,
+    ),
+  );
+  let length = header.length;
+  for (const bytes of backings) length += bytes.length;
+  byteLength(length, 'mapped input length');
+  const pointer = exports.core_input(length);
+  const input = new Uint8Array(exports.memory.buffer, pointer, length);
+  input.set(header);
+  let offset = header.length;
+  for (const bytes of backings) {
+    input.set(bytes, offset);
+    offset += bytes.length;
+  }
+  return header.length;
+}
+
 export class Core {
   readonly #exports: CoreExports;
   readonly #layout: Layout;
@@ -144,21 +191,8 @@ export class Core {
 
   static async create(
     compiler: Uint8Array | WebAssembly.Module,
-    code: Span,
-    ram: Span,
+    memory: InitialMemory,
   ): Promise<Core> {
-    const codeBase = code.base;
-    unsigned64(codeBase, 'code base');
-    const ramBase = ram.base;
-    unsigned64(ramBase, 'ram base');
-    const codeInput = code.bytes;
-    const ramInput = ram.bytes;
-    if (!(codeInput instanceof Uint8Array) || !(ramInput instanceof Uint8Array)) {
-      throw new TypeError('code and ram must contain Uint8Array bytes');
-    }
-    const codeBytes = new Uint8Array(codeInput);
-    const ramBytes = new Uint8Array(ramInput);
-    byteLength(codeBytes.length + ramBytes.length, 'combined image');
     const module =
       compiler instanceof WebAssembly.Module
         ? compiler
@@ -168,7 +202,13 @@ export class Core {
     if (!(exports.memory instanceof WebAssembly.Memory)) throw new Error('core must export memory');
     for (const name of [
       'core_input',
-      'core_init',
+      'core_init_mapped',
+      'core_add_backing',
+      'core_remove_backing',
+      'core_set_mappings',
+      'core_validity',
+      'core_activate',
+      'core_release',
       'core_state_ptr',
       'core_import_state',
       'core_clear_fault',
@@ -189,20 +229,28 @@ export class Core {
     ]) {
       if (typeof exports[name] !== 'function') throw new Error(`core must export ${name}`);
     }
-    const pointer = exports.core_input(codeBytes.length + ramBytes.length);
-    const input = new Uint8Array(
-      exports.memory.buffer,
-      pointer,
-      codeBytes.length + ramBytes.length,
+    const metadataLength = writeInput(
+      exports,
+      {
+        memoryLimits: memory.memoryLimits,
+        backings: memory.backings.map(({ id, bytes }) => ({
+          id: backingKey(id),
+          length: bytes.length,
+        })),
+        mappings: mappingInput(memory.mappings),
+      },
+      memory.backings.map(({ bytes }) => bytes),
     );
-    input.set(codeBytes);
-    input.set(ramBytes, codeBytes.length);
-    if (exports.core_init(codeBase, codeBytes.length, ramBase, ramBytes.length) !== 0) {
+    const status = exports.core_init_mapped(memory.entry, metadataLength);
+    if (status !== 0) {
       const text = new TextDecoder().decode(
         new Uint8Array(exports.memory.buffer, exports.core_info_ptr(), exports.core_info_len()),
       );
       exports.core_dispose();
-      throw new TypeError((JSON.parse(text) as { error: string }).error);
+      const error = (JSON.parse(text) as { error: string }).error;
+      if (status === 1) throw new TypeError(error);
+      if (status === 2) throw new RangeError(error);
+      throw new Error('mapped initialization returned an invalid status');
     }
     return new Core(exports);
   }
@@ -287,7 +335,11 @@ export class Core {
     if (this.reason(status) === 'resource-limit') return undefined;
     if (status !== 0) throw new Error('translator returned an unexpected result');
     const metadata = this.info<
-      Omit<UnitMetadata, 'entries' | 'byteLength'> & { entries: string[] }
+      Omit<UnitMetadata, 'entries' | 'byteLength' | 'owner' | 'dependencies'> & {
+        entries: string[];
+        owner: string;
+        dependencies: { start: string; length: number }[];
+      }
     >();
     const bytes = this.output();
     return {
@@ -295,6 +347,11 @@ export class Core {
       metadata: {
         ...metadata,
         entries: metadata.entries.map((pc) => BigInt(pc)),
+        owner: BigInt(metadata.owner),
+        dependencies: metadata.dependencies.map(({ start, length }) => ({
+          start: BigInt(start),
+          length,
+        })),
         byteLength: bytes.length,
       },
     };
@@ -358,6 +415,41 @@ export class Core {
     new Uint8Array(this.#exports.memory.buffer, pointer, input.length).set(input);
     if (this.#exports.core_write_memory(address) !== 0)
       throw new RangeError(JSON.stringify(this.info()));
+  }
+
+  private memoryResult(status: number): void {
+    if (status === 0) return;
+    const { error } = this.info<{ error: string }>();
+    if (status === 1) throw new TypeError(error);
+    if (status === 2) throw new RangeError(error);
+    throw new Error('memory mutation returned an invalid status');
+  }
+
+  addBacking(input: MemoryBackingInput): void {
+    const length = writeInput(this.#exports, { id: backingKey(input.id) }, [input.bytes]);
+    this.memoryResult(this.#exports.core_add_backing(length));
+  }
+
+  removeBacking(id: string): void {
+    writeInput(this.#exports, backingKey(id));
+    this.memoryResult(this.#exports.core_remove_backing());
+  }
+
+  setMappings(mappings: MemoryMapping[]): void {
+    writeInput(this.#exports, mappingInput(mappings));
+    this.memoryResult(this.#exports.core_set_mappings());
+  }
+
+  valid(owner: bigint): boolean {
+    return this.#exports.core_validity(owner) === 1;
+  }
+
+  activate(owner: bigint): boolean {
+    return this.#exports.core_activate(owner) === 1;
+  }
+
+  release(owner: bigint): void {
+    this.#exports.core_release(owner);
   }
 
   dispose(): void {

@@ -18,7 +18,10 @@ const limits = {
   maxTranslationsPerRun: 8,
 };
 
-function options(): Options {
+function options(): Options & {
+  code: { base: bigint; bytes: Uint8Array };
+  ram: { base: bigint; bytes: Uint8Array };
+} {
   return {
     compiler,
     code: { base: CODE, bytes: Uint8Array.of(0xb8, 1, 0, 0, 0, 0xb9, 2, 0, 0, 0) },
