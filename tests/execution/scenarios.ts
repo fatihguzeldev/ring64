@@ -1,6 +1,7 @@
 import { integerScenarios } from './integer.js';
 import { integerConditionsScenarios } from './integer-conditions.js';
 import { integerMemoryScenarios } from './integer-memory.js';
+import { stackAndNearControlFlowScenarios } from './stack-and-near-control-flow/index.js';
 import { addressingScenarios } from './addressing.js';
 import { memoryScenarios } from './memory.js';
 import { controlScenarios } from './control.js';
@@ -18,6 +19,7 @@ export async function runScenarios(
     ...integerScenarios(core),
     ...integerConditionsScenarios(core),
     ...integerMemoryScenarios(core),
+    ...stackAndNearControlFlowScenarios(core),
     ...addressingScenarios(core),
     ...memoryScenarios(core),
     ...controlScenarios(core),
