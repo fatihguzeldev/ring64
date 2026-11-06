@@ -38,6 +38,17 @@ impl Emitter {
             .op(Op::I64Sub)
             .op(Op::LocalSet(REMAINING));
         self.gates(exit_depth);
+        let lookup = self
+            .entry_lookup
+            .expect("dynamic transfer has an entry lookup");
+        self.op(Op::LocalGet(RHS))
+            .op(Op::Call(lookup))
+            .op(Op::LocalTee(ENTRY))
+            .op(Op::I32Const(-1))
+            .op(Op::I32Ne)
+            .op(Op::If(BlockType::Empty))
+            .op(Op::Br(exit_depth))
+            .op(Op::End);
         self.exit(DISPATCH, exit_depth);
     }
 

@@ -2,6 +2,7 @@ mod addressing;
 mod conditions;
 mod integer_memory;
 mod logical;
+mod routing;
 mod stack;
 
 use super::*;

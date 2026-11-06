@@ -1,4 +1,5 @@
 mod control;
+mod entry_lookup;
 mod integer;
 mod integer_memory;
 mod memory;
@@ -32,6 +33,7 @@ struct Emitter {
     body: Function,
     entries: BTreeMap<u64, u32>,
     current_index: u32,
+    entry_lookup: Option<u32>,
 }
 
 impl Emitter {
@@ -42,6 +44,16 @@ impl Emitter {
 }
 
 pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
+    let dynamic_targets = unit.instructions.iter().any(|i| {
+        matches!(
+            i.operation,
+            Operation::Return { .. }
+                | Operation::JumpRegister { .. }
+                | Operation::Call {
+                    target: crate::x86::instruction::Operand::Register(_)
+                }
+        )
+    });
     let mut types = TypeSection::new();
     types
         .ty()
@@ -60,6 +72,9 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         ],
         [ValType::I32],
     );
+    if dynamic_targets {
+        types.ty().function([ValType::I64], [ValType::I32]);
+    }
     let mut imports = ImportSection::new();
     imports.import(
         "env",
@@ -85,10 +100,14 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     }
     let mut functions = FunctionSection::new();
     functions.function(3);
+    if dynamic_targets {
+        functions.function(4);
+    }
     let mut exports = ExportSection::new();
     exports.export("run", ExportKind::Func, 3 + u32::from(write_intent));
     let mut emitter = Emitter {
         current_index: 0,
+        entry_lookup: dynamic_targets.then_some(4 + u32::from(write_intent)),
         body: Function::new([(19, ValType::I64), (2, ValType::I32), (5, ValType::I64)]),
         entries: unit
             .instructions
@@ -197,6 +216,9 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     emitter.op(Op::LocalGet(REASON)).op(Op::End);
     let mut code = CodeSection::new();
     code.function(&emitter.body);
+    if dynamic_targets {
+        code.function(&entry_lookup::emit(&emitter.entries));
+    }
     let mut module = Module::new();
     module
         .section(&types)
