@@ -311,7 +311,7 @@ export function logicalScenarios(core: WebAssembly.Module): Scenario[] {
           'f620',
           'f7e0',
           'f7e8',
-          'd3',
+          'd3f0',
           'f7f0',
           'f6f0',
           'f7f8',
