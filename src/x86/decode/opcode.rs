@@ -138,6 +138,8 @@ where
         }
         0x00..=0x05
         | 0x08..=0x0d
+        | 0x10..=0x15
+        | 0x18..=0x1d
         | 0x20..=0x25
         | 0x28..=0x2d
         | 0x30..=0x35
@@ -303,6 +305,8 @@ fn selector_kind(selector: u8) -> Option<Alu> {
     match selector {
         0 => Some(Alu::Add),
         1 => Some(Alu::Or),
+        2 => Some(Alu::Adc),
+        3 => Some(Alu::Sbb),
         4 => Some(Alu::And),
         5 => Some(Alu::Sub),
         6 => Some(Alu::Xor),

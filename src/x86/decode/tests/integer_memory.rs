@@ -379,8 +379,7 @@ fn admitted_memory_integer_forms_fetch_each_required_address_and_immediate_byte(
 #[test]
 fn unsupported_integer_memory_selectors_stop_before_address_tails() {
     for (opcode, selectors) in [
-        (0x81, &[2, 3][..]),
-        (0x83, &[2, 3]),
+        (0xf6, &[1, 2, 3, 4, 5, 6, 7][..]),
         (0xf7, &[1, 2, 3, 4, 5, 6, 7]),
     ] {
         for selector in selectors {

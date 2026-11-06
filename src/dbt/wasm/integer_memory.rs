@@ -32,6 +32,7 @@ impl Emitter {
         }
         match kind {
             Alu::Add | Alu::Sub | Alu::Cmp => self.arithmetic_result(kind, width),
+            Alu::Adc | Alu::Sbb => self.carry_result(kind, width),
             Alu::And | Alu::Or | Alu::Xor | Alu::Test => {
                 self.op(Op::LocalGet(LHS)).op(Op::LocalGet(RHS));
                 self.logical_result(kind);
@@ -43,6 +44,7 @@ impl Emitter {
         // A failed store exits above with the incoming flags still live.
         match kind {
             Alu::Add | Alu::Sub | Alu::Cmp => self.arithmetic_flags(kind, width),
+            Alu::Adc | Alu::Sbb => self.carry_flags(kind, width),
             Alu::And | Alu::Or | Alu::Xor | Alu::Test => self.logical_flags(width),
         }
         if let MemoryAluOperands::RegisterFirst(register) = operands

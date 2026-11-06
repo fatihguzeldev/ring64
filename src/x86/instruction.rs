@@ -100,7 +100,9 @@ pub struct Address {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Alu {
     Add,
+    Adc,
     Sub,
+    Sbb,
     Cmp,
     And,
     Or,
@@ -111,7 +113,9 @@ pub enum Alu {
 impl Alu {
     pub fn writes_result(self) -> bool {
         match self {
-            Self::Add | Self::Sub | Self::And | Self::Or | Self::Xor => true,
+            Self::Add | Self::Adc | Self::Sub | Self::Sbb | Self::And | Self::Or | Self::Xor => {
+                true
+            }
             Self::Cmp | Self::Test => false,
         }
     }
@@ -236,7 +240,15 @@ mod tests {
 
     #[test]
     fn compare_and_test_have_no_operand_write() {
-        for kind in [Alu::Add, Alu::Sub, Alu::And, Alu::Or, Alu::Xor] {
+        for kind in [
+            Alu::Add,
+            Alu::Adc,
+            Alu::Sub,
+            Alu::Sbb,
+            Alu::And,
+            Alu::Or,
+            Alu::Xor,
+        ] {
             assert!(kind.writes_result(), "{kind:?}");
         }
         for kind in [Alu::Cmp, Alu::Test] {

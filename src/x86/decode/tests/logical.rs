@@ -214,11 +214,6 @@ fn unsupported_logical_selectors_do_not_request_operand_tails() {
     for selector in 1..8 {
         packets.push(vec![0x4f, 0xf7, 0xc0 | (selector << 3)]);
     }
-    for opcode in [0x81, 0x83] {
-        for selector in [2, 3] {
-            packets.push(vec![0x4f, opcode, 0xc0 | (selector << 3)]);
-        }
-    }
     for bytes in packets {
         let pc = u64::MAX - bytes.len() as u64 + 1;
         let mut reads = Vec::new();

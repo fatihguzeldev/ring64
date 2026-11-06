@@ -7,6 +7,7 @@ use crate::x86::instruction::{
 };
 
 mod addressing;
+mod arithmetic_bits;
 mod conditions;
 mod integer_memory;
 mod logical;
@@ -362,7 +363,7 @@ fn relative_targets_use_the_following_pc_and_signed_displacements() {
 #[test]
 fn valid_forms_outside_the_subset_are_unsupported_without_operand_effects() {
     for bytes in [
-        &[0x83, 0xd0, 1][..], // ADC is not an implemented group selector.
+        &[0x82, 0xd0, 1][..],
         &[0x67, 0x8b, 3][..],
         &[0x48, 0xeb, 0][..],
         &[0x48, 0x0f, 0x85, 0, 0, 0, 0][..],

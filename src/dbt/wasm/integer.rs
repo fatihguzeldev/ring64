@@ -1,4 +1,4 @@
-use super::{Emitter, FLAGS, GPR, LHS, RESULT, RHS};
+use super::{Emitter, FLAGS, GPR, LHS, RESULT, RHS, VALUE};
 use crate::x86::instruction::{Alu, DataOperand, Operand, RegisterView, Width};
 use wasm_encoder::Instruction as Op;
 
@@ -66,7 +66,9 @@ impl Emitter {
     pub(super) fn integer(&mut self, kind: Alu, dst: RegisterView, src: DataOperand, width: Width) {
         match kind {
             Alu::And | Alu::Or | Alu::Xor | Alu::Test => self.logical(kind, dst, src, width),
-            Alu::Add | Alu::Sub | Alu::Cmp => self.arithmetic(kind, dst, src, width),
+            Alu::Add | Alu::Sub | Alu::Cmp | Alu::Adc | Alu::Sbb => {
+                self.arithmetic(kind, dst, src, width)
+            }
         }
     }
 
@@ -75,12 +77,48 @@ impl Emitter {
         self.op(Op::LocalSet(LHS));
         self.data_operand(src, width);
         self.op(Op::LocalSet(RHS));
-        self.arithmetic_result(kind, width);
-        self.arithmetic_flags(kind, width);
+        if matches!(kind, Alu::Adc | Alu::Sbb) {
+            self.carry_result(kind, width);
+            self.carry_flags(kind, width);
+        } else {
+            self.arithmetic_result(kind, width);
+            self.arithmetic_flags(kind, width);
+        }
         if kind != Alu::Cmp {
             self.op(Op::LocalGet(RESULT));
             self.write_register(dst, width);
         }
+    }
+
+    pub(super) fn carry_result(&mut self, kind: Alu, width: Width) {
+        self.op(Op::LocalGet(FLAGS))
+            .op(Op::I64Const(1))
+            .op(Op::I64And)
+            .op(Op::LocalSet(VALUE))
+            .op(Op::LocalGet(LHS))
+            .op(Op::LocalGet(RHS));
+        let add = kind == Alu::Adc;
+        self.op(if add { Op::I64Add } else { Op::I64Sub })
+            .op(Op::LocalGet(VALUE))
+            .op(if add { Op::I64Add } else { Op::I64Sub });
+        self.narrow(width);
+        self.op(Op::LocalSet(RESULT));
+    }
+
+    pub(super) fn carry_flags(&mut self, kind: Alu, width: Width) {
+        let add = kind == Alu::Adc;
+        // Original operands plus the final result also determine OF and AF
+        // with carry. CF additionally covers the equality boundary.
+        self.arithmetic_flags(if add { Alu::Add } else { Alu::Sub }, width);
+        self.op(Op::LocalGet(if add { RESULT } else { LHS }))
+            .op(Op::LocalGet(if add { LHS } else { RHS }))
+            .op(Op::I64Eq)
+            .op(Op::I64ExtendI32U)
+            .op(Op::LocalGet(VALUE))
+            .op(Op::I64And)
+            .op(Op::LocalGet(FLAGS))
+            .op(Op::I64Or)
+            .op(Op::LocalSet(FLAGS));
     }
 
     pub(super) fn arithmetic_result(&mut self, kind: Alu, width: Width) {
