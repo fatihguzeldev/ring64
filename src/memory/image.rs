@@ -257,11 +257,14 @@ impl Image {
 }
 
 pub(super) fn locate(mappings: &[Mapping], address: u64) -> Option<&Mapping> {
+    locate_index(mappings, address).map(|index| &mappings[index])
+}
+
+pub(super) fn locate_index(mappings: &[Mapping], address: u64) -> Option<usize> {
     let index = mappings
         .partition_point(|mapping| mapping.base <= address)
         .checked_sub(1)?;
-    let mapping = &mappings[index];
-    (u128::from(address) < mapping.end()).then_some(mapping)
+    (u128::from(address) < mappings[index].end()).then_some(index)
 }
 
 #[cfg(test)]

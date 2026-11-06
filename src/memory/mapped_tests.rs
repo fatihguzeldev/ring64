@@ -117,3 +117,85 @@ fn rejected_table_and_capacity_changes_are_atomic() {
     assert!(image.owner_valid(owner));
     assert_eq!(image.read(0x1000, 1), Ok(0xb8));
 }
+
+#[test]
+fn every_split_scalar_width_keeps_old_reads_and_ordered_alias_stores() {
+    for width in [2u32, 4, 8] {
+        for split in 1..width {
+            let mut image = image(vec![
+                mapping(0x1000, 0, split, 7),
+                mapping(0x1000 + u64::from(split), 0, width - split, 7),
+            ]);
+            let original = [0xb8, 1, 2, 3, 4, 5, 6, 7];
+            let old: Vec<_> = original[..split as usize]
+                .iter()
+                .chain(&original[..(width - split) as usize])
+                .copied()
+                .collect();
+            let mut old_word = [0u8; 8];
+            old_word[..width as usize].copy_from_slice(&old);
+            assert_eq!(
+                image.read_for_write(0x1000, width),
+                Ok(u64::from_le_bytes(old_word))
+            );
+            let value = 0x8877_6655_4433_2211u64;
+            let input = value.to_le_bytes();
+            let mut expected = original;
+            for (byte, &value) in input.iter().enumerate().take(width as usize) {
+                let backing_offset = if byte < split as usize {
+                    byte
+                } else {
+                    byte - split as usize
+                };
+                expected[backing_offset] = value;
+            }
+            image.write(0x1000, width, value).unwrap();
+            assert_eq!(image.backings[0].bytes, expected);
+        }
+    }
+}
+
+#[test]
+fn split_preflight_rejects_before_bytes_or_source_validity_can_change() {
+    for width in [2u32, 4, 8] {
+        for split in 1..width {
+            for permissions in [1, 2] {
+                let mut image = image(vec![
+                    mapping(0x1000, 0, split, 7),
+                    mapping(0x1000 + u64::from(split), split, width - split, permissions),
+                ]);
+                let owner = image.register_source([(0x1000, split)]).unwrap();
+                image.activate(owner);
+                let before = image.backings[0].bytes.clone();
+                let fault = image.read_for_write(0x1000, width).unwrap_err();
+                assert_eq!(
+                    (fault.access, fault.cause, fault.failing),
+                    (Access::Write, Cause::Permission, u128::from(0x1000 + split))
+                );
+                if permissions == 1 {
+                    assert!(image.write(0x1000, width, 0).is_err());
+                }
+                assert_eq!(image.backings[0].bytes, before);
+                assert!(image.owner_valid(owner));
+                assert!(!image.active_changed());
+            }
+        }
+    }
+}
+
+#[test]
+fn a_final_address_source_can_be_patched_through_a_low_alias() {
+    let mut image = image(vec![mapping(u64::MAX, 0, 1, 7), mapping(0x1000, 0, 1, 3)]);
+    let owner = image.register_source([(u64::MAX, 1)]).unwrap();
+    image.activate(owner);
+    assert_eq!(image.fetch(u64::MAX), Ok(0xb8));
+    assert_eq!(image.read(u64::MAX, 1), Ok(0xb8));
+    image.write(0x1000, 1, 0xb9).unwrap();
+    assert_eq!(image.fetch(u64::MAX), Ok(0xb9));
+    assert!(image.active_changed());
+    assert_eq!(
+        image.write(u64::MAX, 2, 0).unwrap_err().cause,
+        Cause::AddressRange
+    );
+    assert_eq!(image.read(u64::MAX, 1), Ok(0xb9));
+}
