@@ -204,3 +204,65 @@ test('reentrant backing additions revalidate current capacity and names before p
     }
   }
 });
+
+test('alias patch invalidates an older owner while preserving a newer shared middle entry', async () => {
+  const bytes = Uint8Array.of(0xe9, 5, 0, 0, 0, 0xe9, 0, 0, 0, 0, 0xb8, 1, 0, 0, 0, 0xa5);
+  const cpu = await createCpu({
+    compiler,
+    memory: {
+      backings: [{ id: 'code', bytes }],
+      mappings: [
+        {
+          base: 0x1000n,
+          backing: 'code',
+          offset: 0,
+          length: 16,
+          permissions: { read: true, write: false, execute: true },
+        },
+        {
+          base: 0x4000n,
+          backing: 'code',
+          offset: 0,
+          length: 1,
+          permissions: { read: true, write: true, execute: false },
+        },
+      ],
+    },
+    entry: 0x1000n,
+    memoryLimits: { maxBackings: 1, maxMappings: 2, maxBackingBytes: 16 },
+    limits: LIMITS,
+  });
+  try {
+    for (const pc of [0x1000n, 0x1005n]) {
+      const input = initial(pc);
+      cpu.setState(input);
+      const result = await cpu.run({ budget: 1n });
+      assert.equal(result.resources.compilations, 1);
+      assert.deepEqual(result.state, changed(input, 0x100an));
+    }
+    const owners = cpu.inspectTranslations();
+    assert.equal(owners.length, 2);
+    assert.deepEqual(
+      owners.map(({ entries }) => entries),
+      [
+        [0x1000n, 0x100an],
+        [0x1005n, 0x100an],
+      ],
+    );
+    cpu.writeMemory(0x4000n, Uint8Array.of(0xeb));
+    assert.deepEqual(cpu.inspectTranslations(), [owners[1]]);
+    const input = initial(0x100an, {}, 0x8d7n);
+    cpu.setState(input);
+    const result = await cpu.run({ budget: 1n });
+    assert.equal(result.reason, 'budget');
+    assert.equal(result.resources.compilations, 0);
+    assert.equal(result.resources.cacheHits, 1);
+    assert.equal(result.resources.cachedArtifacts, 1);
+    assert.deepEqual(result.state, changed(input, 0x100fn, { 0: 1n }));
+    const expected = bytes.slice();
+    expected[0] = 0xeb;
+    assert.deepEqual(cpu.readMemory(0x1000n, 16), expected);
+  } finally {
+    cpu.dispose();
+  }
+});

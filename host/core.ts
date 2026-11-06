@@ -154,7 +154,7 @@ function writeInput(
   );
   let length = header.length;
   for (const bytes of backings) length += bytes.length;
-  byteLength(length, 'mapped input length');
+  if (length > 0xffffffff) throw new RangeError('mapped input exceeds wasm32 capacity');
   const pointer = exports.core_input(length);
   const input = new Uint8Array(exports.memory.buffer, pointer, length);
   input.set(header);
