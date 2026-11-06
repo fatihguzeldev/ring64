@@ -337,6 +337,15 @@ export function boundaryScenarios(core: WebAssembly.Module): Scenario[] {
             push: false,
           },
           {
+            code: '54',
+            base: 0x7ffffffffff0n,
+            length: 16,
+            offset: 8,
+            sp: 0x800000000000n,
+            after: 0x7ffffffffff8n,
+            push: true,
+          },
+          {
             code: '58',
             base: 0x7ffffffffff8n,
             length: 8,
@@ -388,7 +397,9 @@ export function boundaryScenarios(core: WebAssembly.Module): Scenario[] {
               memory(
                 cpu,
                 row.base,
-                row.push ? stack(0xfedcba9876543210n, row.offset, row.length) : original,
+                row.push
+                  ? stack(row.code === '54' ? row.sp : 0xfedcba9876543210n, row.offset, row.length)
+                  : original,
               );
               memory(cpu, CODE, row.code);
             },
