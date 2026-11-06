@@ -62,6 +62,23 @@ test('detachment during later input capture rejects instead of silently zero-fil
   };
   assert.throws(() => captureBackings([{ id: 'a', bytes }, other], limits), TypeError);
 });
+test('resizing during later input capture rejects stale backing lengths', () => {
+  for (const length of [1, 8]) {
+    const buffer = Reflect.construct(ArrayBuffer, [4, { maxByteLength: 8 }]) as ArrayBuffer & {
+      resize(length: number): void;
+    };
+    const bytes = new Uint8Array(buffer);
+    bytes.set([7, 8, 9, 10]);
+    const other = {
+      id: 'b',
+      get bytes() {
+        buffer.resize(length);
+        return Uint8Array.of(5);
+      },
+    };
+    assert.throws(() => captureBackings([{ id: 'a', bytes }, other], limits), TypeError);
+  }
+});
 test('legacy mapping capacity is rejected before backing copy allocations', () => {
   const Native = Uint8Array;
   const code = new Native(4);

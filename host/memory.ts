@@ -110,6 +110,8 @@ export function captureBackings(
   // Allocate only after every declared length passed the capacity preflight.
   const result = captured.map(({ id, bytes, length }) => {
     const copy = new Uint8Array(length);
+    if (actualLength(bytes) !== length)
+      throw new TypeError('backing byte length changed during input capture');
     // Native typed-array copying rejects a source detached by a later accessor.
     setBytes.call(copy, bytes);
     return { id, bytes: copy };
