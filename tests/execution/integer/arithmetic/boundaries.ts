@@ -97,8 +97,7 @@ export function arithmeticBoundaryScenarios(core: WebAssembly.Module): Scenario[
         for (let selector = 0; selector < 4; selector++)
           unsupported.push('66440fba' + modrm(selector, 4, 0));
         for (const opcode of ['f6', 'f7'])
-          for (const selector of [1, 4, 5, 6, 7])
-            unsupported.push('6644' + opcode + modrm(selector, 4, 0));
+          for (const selector of [1]) unsupported.push('6644' + opcode + modrm(selector, 4, 0));
         for (const code of ['66ff', ...unsupported])
           await using(
             code,

@@ -305,16 +305,16 @@ export function logicalScenarios(core: WebAssembly.Module): Scenario[] {
           }
         for (const code of [
           'f7c8',
-          '66f7e0',
+          '66f7c8',
           '6721c0',
           'f021c0',
-          'f620',
-          'f7e0',
-          'f7e8',
+          'f608',
+          'f7c9',
+          'f7ca',
           'd3f0',
-          'f7f0',
-          'f6f0',
-          'f7f8',
+          'f7cb',
+          'f6c8',
+          'f7cc',
         ]) {
           await using(
             code,

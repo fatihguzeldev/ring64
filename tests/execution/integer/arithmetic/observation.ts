@@ -433,7 +433,7 @@ export function arithmeticObservationScenarios(core: WebAssembly.Module): Scenar
           { ...setup, limits: { maxInstructions: 1, maxTranslationsPerRun: 1 } },
         );
         for (const [tail, reason] of [
-          ['f724', 'unsupported'],
+          ['f70c', 'unsupported'],
           ['c183ff', 'fetch-fault'],
           ['c12300', 'resource-limit'],
         ] as const) {

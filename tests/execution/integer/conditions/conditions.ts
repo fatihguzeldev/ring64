@@ -296,7 +296,7 @@ export function conditionScenarios(core: WebAssembly.Module): Scenario[] {
           '667400',
           '677400',
           'e300',
-          '0fafc0',
+          '0fc1c0',
           '0fb1c0',
         ])
           await using(

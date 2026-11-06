@@ -95,8 +95,7 @@ export function dataBoundaryScenarios(core: WebAssembly.Module): Scenario[] {
           for (let selector = 1; selector < 8; selector++)
             codes.push('6644' + opcode + modrm(selector, 4, 0));
         for (const opcode of ['f6', 'f7'])
-          for (const selector of [1, 4, 5, 6, 7])
-            codes.push('6644' + opcode + modrm(selector, 4, 0));
+          for (const selector of [1]) codes.push('6644' + opcode + modrm(selector, 4, 0));
         for (const opcode of ['c0', 'c1', 'd0', 'd1', 'd2', 'd3'])
           codes.push('6644' + opcode + modrm(6, 4, 0));
         for (const code of codes)

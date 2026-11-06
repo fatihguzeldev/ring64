@@ -238,7 +238,7 @@ export function boundaryScenarios(core: WebAssembly.Module): Scenario[] {
     {
       name: 'reached memory diagnostics precede translation caps and caps precede operand failures',
       run: async () => {
-        for (const suffix of ['480116', '4801', '488104251040000001', '48f72425']) {
+        for (const suffix of ['480116', '4801', '488104251040000001', '48f70c25']) {
           const code = '488903' + suffix;
           await using(
             code,
@@ -249,7 +249,7 @@ export function boundaryScenarios(core: WebAssembly.Module): Scenario[] {
               const reason =
                 suffix === '480116'
                   ? 'resource-limit'
-                  : suffix === '48f72425'
+                  : suffix === '48f70c25'
                     ? 'unsupported'
                     : 'fetch-fault';
               exit(result, reason, 3n, 1n, changed(before, 0x1003n));
@@ -333,23 +333,23 @@ export function boundaryScenarios(core: WebAssembly.Module): Scenario[] {
           'c134',
           'c034',
           'f70c',
-          'f624',
-          'f62c',
-          'f724',
-          'f72c',
-          'f734',
-          'f73c',
-          'f7e0',
-          'f7e8',
-          'f7f0',
-          '66f723',
+          'fe14',
+          'fe1c',
+          'fe24',
+          'fe2c',
+          'fe34',
+          'fe3c',
+          'f7c8',
+          'f7c9',
+          'f7ca',
+          '66f70b',
           '670303',
           'f00103',
           'f30103',
           '260103',
           '48490303',
-          'f623',
-          'f7f8',
+          'f60b',
+          'f7cd',
         ])
           await using(
             code,

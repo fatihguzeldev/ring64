@@ -192,8 +192,8 @@ export function controlScenarios(core: WebAssembly.Module): Scenario[] {
           '8f',
           '67498b0500000000',
           '67498b0424',
-          'f723',
-          '66f7e0',
+          'f70b',
+          '66f7c8',
           '4889',
           '4883c0',
         ]) {
