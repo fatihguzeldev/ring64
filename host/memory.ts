@@ -1,0 +1,235 @@
+import { byteLength, unsigned64, type Span } from './core.js';
+
+export interface MemoryBackingInput {
+  id: string;
+  bytes: Uint8Array;
+}
+
+export interface MemoryPermissions {
+  read: boolean;
+  write: boolean;
+  execute: boolean;
+}
+
+export interface MemoryMapping {
+  base: bigint;
+  backing: string;
+  offset: number;
+  length: number;
+  permissions: MemoryPermissions;
+}
+
+export interface MemoryLimits {
+  maxBackingBytes: number;
+  maxBackings: number;
+  maxMappings: number;
+}
+
+export interface InitialMemory {
+  backings: MemoryBackingInput[];
+  mappings: MemoryMapping[];
+  memoryLimits: MemoryLimits;
+  entry: bigint;
+}
+
+export function backingName(id: unknown): asserts id is string {
+  if (typeof id !== 'string' || id.length === 0)
+    throw new TypeError('backing id must be a nonempty string');
+}
+
+export function captureMemoryLimits(input: MemoryLimits): MemoryLimits {
+  const result = {
+    maxBackingBytes: input.maxBackingBytes,
+    maxBackings: input.maxBackings,
+    maxMappings: input.maxMappings,
+  };
+  for (const value of Object.values(result)) {
+    if (!Number.isInteger(value) || value <= 0 || value > 0xffffffff)
+      throw new TypeError('memory capacities must be explicit positive wasm32 integers');
+  }
+  return result;
+}
+
+function capacity(bytes: number, count: number, limits: MemoryLimits): void {
+  if (bytes > limits.maxBackingBytes || count > limits.maxBackings)
+    throw new RangeError('backing capacity exceeded');
+}
+
+export function validateBackings(
+  added: readonly MemoryBackingInput[],
+  existing: ReadonlyMap<string, number>,
+  limits: MemoryLimits,
+): Map<string, number> {
+  const lengths = new Map(existing);
+  let bytes = 0;
+  for (const length of existing.values()) bytes += length;
+  for (const backing of added) {
+    backingName(backing.id);
+    if (lengths.has(backing.id)) throw new TypeError('duplicate backing id');
+    lengths.set(backing.id, backing.bytes.length);
+    bytes += backing.bytes.length;
+  }
+  capacity(bytes, lengths.size, limits);
+  return lengths;
+}
+
+export function captureBackings(
+  input: MemoryBackingInput[],
+  limits: MemoryLimits,
+  existing: ReadonlyMap<string, number> = new Map(),
+): MemoryBackingInput[] {
+  if (!Array.isArray(input)) throw new TypeError('backings must be an array');
+  const count = input.length;
+  let total = 0;
+  for (const length of existing.values()) total += length;
+  capacity(total, existing.size + count, limits);
+  const captured: { id: string; bytes: Uint8Array; length: number }[] = [];
+  for (let index = 0; index < count; index++) {
+    const backing = input[index]!;
+    const id = backing.id;
+    const bytes = backing.bytes;
+    backingName(id);
+    if (!(bytes instanceof Uint8Array)) throw new TypeError('backing bytes must be Uint8Array');
+    const length = bytes.length;
+    byteLength(length, 'backing length');
+    if (length === 0) throw new TypeError('backings must be nonempty');
+    total += length;
+    capacity(total, existing.size + count, limits);
+    captured.push({ id, bytes, length });
+  }
+  // Allocate only after every declared length passed the capacity preflight.
+  const result = captured.map(({ id, bytes, length }) => {
+    const copy = new Uint8Array(length);
+    for (let index = 0; index < length; index++) copy[index] = bytes[index]!;
+    return { id, bytes: copy };
+  });
+  validateBackings(result, existing, limits);
+  return result;
+}
+
+export function captureMappings(input: MemoryMapping[], limits: MemoryLimits): MemoryMapping[] {
+  if (!Array.isArray(input)) throw new TypeError('mappings must be an array');
+  const count = input.length;
+  if (count > limits.maxMappings) throw new RangeError('mapping capacity exceeded');
+  const result: MemoryMapping[] = [];
+  for (let index = 0; index < count; index++) {
+    const mapping = input[index]!;
+    const base = mapping.base;
+    const backing = mapping.backing;
+    const offset = mapping.offset;
+    const length = mapping.length;
+    const permissions = mapping.permissions;
+    const read = permissions.read;
+    const write = permissions.write;
+    const execute = permissions.execute;
+    unsigned64(base, 'mapping base');
+    backingName(backing);
+    byteLength(offset, 'mapping offset');
+    byteLength(length, 'mapping length');
+    if (length === 0) throw new TypeError('mappings must be nonempty');
+    if ([read, write, execute].some((permission) => typeof permission !== 'boolean'))
+      throw new TypeError('mapping permissions must be booleans');
+    const end = base + BigInt(length);
+    const lowEnd = 0x800000000000n;
+    const highStart = 0xffff800000000000n;
+    if (end > 1n << 64n || !(end <= lowEnd || base >= highStart))
+      throw new TypeError('mapping must have a nonwrapping canonical48 address range');
+    result.push({ base, backing, offset, length, permissions: { read, write, execute } });
+  }
+  return result;
+}
+
+export function validateMappings(
+  mappings: readonly MemoryMapping[],
+  lengths: ReadonlyMap<string, number>,
+): void {
+  const sorted = [...mappings].sort((a, b) => (a.base < b.base ? -1 : a.base > b.base ? 1 : 0));
+  let end = 0n;
+  for (const mapping of sorted) {
+    const backingLength = lengths.get(mapping.backing);
+    if (backingLength === undefined || mapping.offset + mapping.length > backingLength)
+      throw new TypeError('mapping must fit an existing backing');
+    if (mapping.base < end) throw new TypeError('guest mappings overlap');
+    end = mapping.base + BigInt(mapping.length);
+  }
+}
+
+type MemoryOptions =
+  | { code: Span; ram: Span; memoryLimits?: MemoryLimits }
+  | {
+      memory: { backings: MemoryBackingInput[]; mappings: MemoryMapping[] };
+      entry: bigint;
+      memoryLimits: MemoryLimits;
+    };
+
+export function captureInitialMemory(options: MemoryOptions): InitialMemory {
+  let backings: MemoryBackingInput[];
+  let mappings: MemoryMapping[];
+  let memoryLimits: MemoryLimits;
+  let entry: bigint;
+  if ('memory' in options || 'entry' in options) {
+    if ('code' in options || 'ram' in options || !('memory' in options))
+      throw new TypeError('mixed or incomplete memory forms');
+    const memory = options.memory;
+    entry = options.entry;
+    unsigned64(entry, 'entry');
+    memoryLimits = captureMemoryLimits(options.memoryLimits);
+    const backingInput = memory.backings;
+    const mappingInput = memory.mappings;
+    // Both record counts are bounded before either table is captured.
+    if (!Array.isArray(mappingInput)) throw new TypeError('mappings must be an array');
+    if (mappingInput.length > memoryLimits.maxMappings)
+      throw new RangeError('mapping capacity exceeded');
+    backings = captureBackings(backingInput, memoryLimits);
+    mappings = captureMappings(mappingInput, memoryLimits);
+  } else {
+    const code = options.code;
+    const ram = options.ram;
+    const codeBase = code.base;
+    const ramBase = ram.base;
+    unsigned64(codeBase, 'code base');
+    unsigned64(ramBase, 'ram base');
+    const codeBytes = code.bytes;
+    const ramBytes = ram.bytes;
+    if (!(codeBytes instanceof Uint8Array) || !(ramBytes instanceof Uint8Array))
+      throw new TypeError('code and ram must contain Uint8Array bytes');
+    const supplied = options.memoryLimits;
+    memoryLimits = captureMemoryLimits(
+      supplied ?? {
+        maxBackingBytes: codeBytes.length + ramBytes.length,
+        maxBackings: 2,
+        maxMappings: 2,
+      },
+    );
+    backings = captureBackings(
+      [
+        { id: 'code', bytes: codeBytes },
+        { id: 'ram', bytes: ramBytes },
+      ],
+      memoryLimits,
+    );
+    if (memoryLimits.maxMappings < 2) throw new RangeError('mapping capacity exceeded');
+    mappings = captureMappings(
+      [
+        {
+          base: codeBase,
+          backing: 'code',
+          offset: 0,
+          length: backings[0]!.bytes.length,
+          permissions: { read: true, write: false, execute: true },
+        },
+        {
+          base: ramBase,
+          backing: 'ram',
+          offset: 0,
+          length: backings[1]!.bytes.length,
+          permissions: { read: true, write: true, execute: false },
+        },
+      ],
+      memoryLimits,
+    );
+    entry = codeBase;
+  }
+  validateMappings(mappings, validateBackings(backings, new Map(), memoryLimits));
+  return { backings, mappings, memoryLimits, entry };
+}
