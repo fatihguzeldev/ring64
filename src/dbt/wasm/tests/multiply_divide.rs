@@ -287,6 +287,104 @@ console.log('checked '+checked+' actual generated-Wasm byte arithmetic cases');
     run_node(input, script);
 }
 
+#[test]
+fn word_and_dword_products_and_full_dividends_match_exact_integer_ranges() {
+    let mut modules = Vec::new();
+    for width in [Width::W16, Width::W32] {
+        for signed in [false, true] {
+            for divide in [false, true] {
+                let src = crate::x86::instruction::Location::Register(RegisterView::low(1));
+                let operation = if divide {
+                    Operation::Divide { signed, src, width }
+                } else {
+                    Operation::Multiply { signed, src, width }
+                };
+                let bytes = emit(&unit(vec![Instruction {
+                    pc: 0x1000,
+                    next_pc: 0x1003,
+                    operation,
+                }]));
+                modules.push(
+                    json!({"bytes":bytes,"width":width.bits(),"signed":signed,"divide":divide}),
+                );
+            }
+        }
+    }
+    let script = r#"
+import fs from 'node:fs';import assert from 'node:assert/strict';
+const {layout:l,modules}=JSON.parse(fs.readFileSync(0,'utf8'));
+const signed=(v,w)=>BigInt.asIntN(w,v),unsigned=(v,w)=>BigInt.asUintN(w,v);
+const seed=Array.from({length:16},(_,i)=>0x1122334455660000n+BigInt(i));
+let checked=0;
+for(const m of modules){
+ const w=m.width,M=1n<<BigInt(w),mask=M-1n,sign=M/2n;
+ const patterns=[0n,1n,2n,mask,mask-1n,sign,sign-1n,(1n<<BigInt(w/2))-1n,1n<<BigInt(w/2),(1n<<BigInt(w/2))+1n];
+ const memory=new WebAssembly.Memory({initial:1}),d=new DataView(memory.buffer);
+ const forbidden=()=>{throw new Error('narrow arithmetic called a helper')};
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(m.bytes),{env:{memory,load:forbidden,store:forbidden,access_failed:forbidden}});
+ const write=(old,v)=>w===32?unsigned(v,w):(old&~mask)|unsigned(v,w);
+ for(const flags of [2n,0x8d7n])for(const a of patterns)for(const b of patterns){
+  for(const high of (m.divide?patterns:[0n])){
+   const before=[...seed];before[0]=(seed[0]&~mask)|a;before[1]=(seed[1]&~mask)|b;before[2]=(seed[2]&~mask)|high;
+   before.forEach((v,i)=>d.setBigUint64(l.registers+8*i,v,true));d.setBigUint64(l.flags,flags,true);d.setBigUint64(l.rip,0x1000n,true);
+   let fail=false,overflow=false,low,upper;
+   if(m.divide){
+    const n=m.signed?signed(high*M+a,2*w):high*M+a,divisor=m.signed?signed(b,w):b;
+    const q=divisor===0n?0n:n/divisor,r=n-q*divisor;
+    fail=divisor===0n || (m.signed?(q < -sign || q >= sign):(q < 0n || q >= M));low=q;upper=r;
+   }else{
+    const p=m.signed?signed(a,w)*signed(b,w):a*b;low=unsigned(p,w);upper=unsigned(p,2*w)>>BigInt(w);
+    overflow=m.signed?(p < -sign || p >= sign):p>=M;
+   }
+   const expected=[...before];if(!fail){expected[0]=write(before[0],low);expected[2]=write(before[2],upper);}
+   const reason=instance.exports.run(0,1n,0n,0,0),observed=d.getBigUint64(l.flags,true);
+   const context=JSON.stringify({...m,bytes:undefined})+` a=${a} b=${b} high=${high} flags=${flags}`;
+   assert.equal(reason,fail?9:1,context);
+   for(let i=0;i<16;i++)assert.equal(d.getBigUint64(l.registers+8*i,true),expected[i],context+` bank=${i}`);
+   assert.equal(observed&~0x8d7n,0n,context);assert.equal(observed&2n,2n,context);
+   if(fail)assert.equal(observed,flags,context);
+   if(!m.divide)assert.equal(observed&0x803n,overflow?0x803n:2n,context);
+   assert.equal(d.getBigUint64(l.rip,true),fail?0x1000n:0x1003n,context);
+   assert.equal(d.getBigUint64(l.remaining,true),fail?1n:0n,context);checked++;
+  }
+ }
+}
+console.log('checked '+checked+' word/dword full-state arithmetic cases');
+"#;
+    run_node(
+        json!({"layout":RunState::descriptor(),"modules":modules}),
+        script,
+    );
+}
+
+#[test]
+fn wide_imports_keep_write_intent_and_dynamic_entry_lookup_indices_distinct() {
+    let code = [
+        0x48, 0xf7, 0x13, 0x48, 0xf7, 0xe1, 0x48, 0xf7, 0xf1, 0x41, 0xff, 0xe0,
+    ];
+    let artifact = compiled_fixture(0x1000, &code, 0x1000);
+    let mut case = execution_case(
+        &artifact.bytes,
+        &artifact.entries,
+        &[(0, 2), (1, 3), (2, 0), (3, 0x4010), (8, 0x1100)],
+        0x8d7,
+        0x1000,
+        4,
+        (&[(0, 2), (2, 0)], 0xd6, 0x1100, 1, 0),
+    );
+    case["flagMask"] = json!("803");
+    case["expected"]["flags"] = json!("2");
+    case["accesses"] = json!([
+        {"kind":"load_for_write","args":["4010",8],"result":"0"},
+        {"kind":"access_failed","args":[],"result":0},
+        {"kind":"store","args":["4010",8,"ffffffffffffffff"],"result":1},
+        {"kind":"multiply_high","args":["3","2",0],"result":"0"},
+        {"kind":"divide","args":["0","6","3",0],"result":"2"},
+        {"kind":"divide_failed","args":[],"result":0}
+    ]);
+    run_cases(vec![case]);
+}
+
 fn run_node(input: Value, script: &str) {
     let mut child = Command::new("node")
         .args(["--input-type=module", "-e", script])
