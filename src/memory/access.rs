@@ -102,6 +102,7 @@ impl Image {
         }
     }
 
+    #[inline]
     fn preflight(
         &self,
         address: u64,
@@ -151,14 +152,17 @@ impl Image {
         }
     }
 
+    #[inline]
     fn scalar_after_preflight(&self, address: u64, width: u32, mut index: usize) -> u64 {
         let mapping = &self.mappings[index];
         let relative = address - mapping.base;
+        let offset = mapping.offset as usize + relative as usize;
+        if width == 1 {
+            return u64::from(self.backings[mapping.backing].bytes[offset]);
+        }
         if u64::from(width) <= u64::from(mapping.length) - relative {
-            let offset = mapping.offset as usize + relative as usize;
             let bytes = &self.backings[mapping.backing].bytes;
             return match width {
-                1 => u64::from(bytes[offset]),
                 2 => u64::from(u16::from_le_bytes(
                     bytes[offset..offset + 2].try_into().unwrap(),
                 )),
