@@ -7,7 +7,7 @@ import { chromium } from 'playwright';
 
 const root = resolve('.');
 const html = `<!doctype html><meta charset="utf-8"><title>ring64 execution checks</title>
-<script type="module" src="/build/tests/execution/browser.js"></script>`;
+<script type="module" src="/build/tests/runners/browser.js"></script>`;
 
 const server = createServer(async (request, response) => {
   try {

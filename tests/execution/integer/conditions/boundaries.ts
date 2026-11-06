@@ -1,4 +1,12 @@
-import { createFixture, type Scenario, changed, equal, exit, fault, memory } from '../fixture.js';
+import {
+  createFixture,
+  type Scenario,
+  changed,
+  equal,
+  exit,
+  fault,
+  memory,
+} from '../../../support/fixture.js';
 import { defaultRam, input, logicalExit, noFault } from './fixture.js';
 
 export function boundaryScenarios(core: WebAssembly.Module): Scenario[] {

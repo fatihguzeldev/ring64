@@ -10,7 +10,7 @@ import {
   changed,
   exit,
   fault,
-} from './fixture.js';
+} from '../support/fixture.js';
 
 export function memoryScenarios(core: WebAssembly.Module): Scenario[] {
   const using = createFixture(core);

@@ -1,12 +1,10 @@
-import type { RunResult, State } from '../../../host/index.js';
-import { CODE, equal, exit, initial } from '../fixture.js';
+import type { RunResult, State } from '../../../../host/index.js';
+import { CODE, initial, equal, exit } from '../../../support/fixture.js';
+
+export const defaultRam = { ramBase: 0x4000n, ram: '00' };
 
 export function input(rip = CODE, registers: Record<number, bigint> = {}, flags = 0x8d7n) {
-  return initial(rip, { 3: 0x4010n, ...registers }, flags);
-}
-
-export function frame(word: string, offset = 16, length = 64) {
-  return 'a5'.repeat(offset) + word + 'a5'.repeat(length - offset - word.length / 2);
+  return initial(rip, { 3: 0x1122334400000003n, ...registers }, flags);
 }
 
 export function logicalExit(

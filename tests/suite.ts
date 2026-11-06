@@ -1,12 +1,10 @@
-import { integerScenarios } from './integer.js';
-import { integerConditionsScenarios } from './integer-conditions.js';
-import { integerMemoryScenarios } from './integer-memory.js';
-import { stackAndNearControlFlowScenarios } from './stack-and-near-control-flow/index.js';
-import { addressingScenarios } from './addressing.js';
-import { memoryScenarios } from './memory.js';
-import { controlScenarios } from './control.js';
-import { translationsScenarios } from './translations.js';
-import { embeddingScenarios } from '../embedding/scenarios.js';
+import { integerScenarios } from './execution/integer/index.js';
+import { stackScenarios } from './execution/stack/index.js';
+import { addressingScenarios } from './execution/addressing/index.js';
+import { memoryScenarios } from './execution/memory.js';
+import { controlScenarios } from './execution/control.js';
+import { translationsScenarios } from './execution/translations.js';
+import { embeddingScenarios } from './embedding/scenarios.js';
 
 export async function runScenarios(
   compiler: Uint8Array | WebAssembly.Module,
@@ -17,9 +15,7 @@ export async function runScenarios(
       : await WebAssembly.compile(new Uint8Array(compiler));
   const scenarios = [
     ...integerScenarios(core),
-    ...integerConditionsScenarios(core),
-    ...integerMemoryScenarios(core),
-    ...stackAndNearControlFlowScenarios(core),
+    ...stackScenarios(core),
     ...addressingScenarios(core),
     ...memoryScenarios(core),
     ...controlScenarios(core),

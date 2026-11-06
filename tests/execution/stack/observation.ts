@@ -1,4 +1,13 @@
-import { type Scenario, CODE, changed, equal, exit, fault, hex, memory } from '../fixture.js';
+import {
+  type Scenario,
+  CODE,
+  changed,
+  equal,
+  exit,
+  fault,
+  hex,
+  memory,
+} from '../../support/fixture.js';
 import { PROGRAM, RAM, createStackFixture, input, noFault, stack, word } from './fixture.js';
 
 export function observationScenarios(core: WebAssembly.Module): Scenario[] {

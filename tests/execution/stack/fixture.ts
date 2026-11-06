@@ -1,5 +1,5 @@
 import type { Cpu, Limits, RunResult } from '../../../host/index.js';
-import { CODE, createFixture, initial } from '../fixture.js';
+import { CODE, createFixture, initial } from '../../support/fixture.js';
 
 export const RAM = 'a5'.repeat(64);
 export const FLAGS = [2n, 3n, 6n, 0x12n, 0x42n, 0x82n, 0x802n, 0x8d7n];

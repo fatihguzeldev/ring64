@@ -7,7 +7,7 @@ import {
   exit,
   fault,
   memory,
-} from '../fixture.js';
+} from '../../../support/fixture.js';
 import { defaultRam, input, noFault } from './fixture.js';
 
 // Bit cc records the taken conditions for this literal CF/PF/ZF/SF/OF word.

@@ -1,4 +1,11 @@
-import { createFixture, type Scenario, CODE, changed, exit, memory } from '../fixture.js';
+import {
+  createFixture,
+  type Scenario,
+  CODE,
+  changed,
+  exit,
+  memory,
+} from '../../../support/fixture.js';
 import { frame, input, logicalExit, noFault } from './fixture.js';
 
 export function operandScenarios(core: WebAssembly.Module): Scenario[] {

@@ -7,7 +7,7 @@ import {
   exit,
   fault,
   memory,
-} from '../fixture.js';
+} from '../../../support/fixture.js';
 import { defaultRam, input, logicalExit, noFault } from './fixture.js';
 
 export function logicalScenarios(core: WebAssembly.Module): Scenario[] {

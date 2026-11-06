@@ -8,9 +8,9 @@ import {
   initial,
   changed,
   exit,
-} from './fixture.js';
+} from '../../support/fixture.js';
 
-export function integerScenarios(core: WebAssembly.Module): Scenario[] {
+export function registerScenarios(core: WebAssembly.Module): Scenario[] {
   const using = createFixture(core);
   return [
     {

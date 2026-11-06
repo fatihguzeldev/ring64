@@ -8,7 +8,7 @@ import {
   fault,
   hex,
   memory,
-} from '../fixture.js';
+} from '../../../support/fixture.js';
 import { input, logicalExit, noFault } from './fixture.js';
 
 export function flagScenarios(core: WebAssembly.Module): Scenario[] {

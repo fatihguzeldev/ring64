@@ -11,7 +11,7 @@ import {
   initial,
   changed,
   exit,
-} from './fixture.js';
+} from '../support/fixture.js';
 
 export function translationsScenarios(core: WebAssembly.Module): Scenario[] {
   const using = createFixture(core);

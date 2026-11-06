@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runScenarios } from './scenarios.js';
+import { runScenarios } from '../suite.js';
 
 test('common browser and Node scenarios execute real generated Wasm', async () => {
   const bytes = new Uint8Array(await readFile(new URL('../../build/ring64.wasm', import.meta.url)));

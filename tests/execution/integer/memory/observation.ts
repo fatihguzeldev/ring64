@@ -8,7 +8,7 @@ import {
   fault,
   hex,
   memory,
-} from '../fixture.js';
+} from '../../../support/fixture.js';
 import { frame, input, logicalExit, noFault } from './fixture.js';
 
 export function observationScenarios(core: WebAssembly.Module): Scenario[] {

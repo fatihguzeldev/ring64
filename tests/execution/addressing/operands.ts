@@ -8,7 +8,7 @@ import {
   memory,
   changed,
   exit,
-} from '../fixture.js';
+} from '../../support/fixture.js';
 import { input, noFault, defaultRam } from './fixture.js';
 
 export function addressingOperandScenarios(core: WebAssembly.Module): Scenario[] {

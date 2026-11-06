@@ -11,7 +11,7 @@ import {
   changed,
   exit,
   fault,
-} from './fixture.js';
+} from '../support/fixture.js';
 
 export function controlScenarios(core: WebAssembly.Module): Scenario[] {
   const using = createFixture(core);

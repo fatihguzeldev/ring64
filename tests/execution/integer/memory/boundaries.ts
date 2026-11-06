@@ -7,7 +7,7 @@ import {
   exit,
   fault,
   memory,
-} from '../fixture.js';
+} from '../../../support/fixture.js';
 import { frame, input, noFault } from './fixture.js';
 
 export function boundaryScenarios(core: WebAssembly.Module): Scenario[] {

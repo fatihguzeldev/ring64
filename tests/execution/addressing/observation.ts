@@ -11,7 +11,7 @@ import {
   changed,
   exit,
   fault,
-} from '../fixture.js';
+} from '../../support/fixture.js';
 import { input, noFault, defaultRam } from './fixture.js';
 
 export function addressingObservationScenarios(core: WebAssembly.Module): Scenario[] {

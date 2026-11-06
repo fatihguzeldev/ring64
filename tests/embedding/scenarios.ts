@@ -15,7 +15,7 @@ import {
   exit,
   throws,
   rejects,
-} from '../execution/fixture.js';
+} from '../support/fixture.js';
 
 export function embeddingScenarios(core: WebAssembly.Module): Scenario[] {
   const using = createFixture(core);
