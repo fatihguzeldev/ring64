@@ -196,7 +196,7 @@ fn wide_carry_arithmetic_matches_mathematical_signed_and_unsigned_ranges() {
                         let of = signed_result < -(sign as i128) || signed_result >= sign as i128;
                         let flags = 2
                             + u64::from(cf)
-                            + 4 * u64::from((r as u8).count_ones() % 2 == 0)
+                            + 4 * u64::from((r as u8).count_ones().is_multiple_of(2))
                             + 16 * u64::from(af)
                             + 64 * u64::from(r == 0)
                             + 128 * u64::from(r & sign != 0)

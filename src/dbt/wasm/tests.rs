@@ -1,5 +1,6 @@
 mod addressing;
 mod arithmetic_bits;
+mod bits;
 mod conditions;
 mod counts;
 mod data_widths;
