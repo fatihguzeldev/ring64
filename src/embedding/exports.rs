@@ -7,6 +7,8 @@ use crate::x86::state::State;
 
 use super::layout::{DATA, FETCH, INVALID, RESOURCE, RunState, TARGET, UNSUPPORTED};
 
+mod mapped;
+
 struct Core {
     image: Image,
     state: Box<UnsafeCell<RunState>>,
@@ -150,15 +152,23 @@ pub extern "C" fn core_compile(
 ) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         bridge.output.clear();
-        let core = bridge.core.as_ref().unwrap();
+        let core = bridge.core.as_mut().unwrap();
         let limits = Limits { max_instructions, max_source_bytes, max_artifact_bytes };
         match dbt::compile(&core.image, pc, limits) {
             Ok(artifact) => {
+                let owner = match core.image.register_source(artifact.source_ranges.iter().map(|range| (range.start, range.length))) {
+                    Ok(owner) => owner,
+                    Err(_) => return RESOURCE,
+                };
                 bridge.info = serde_json::to_vec(&serde_json::json!({
                     "entries": artifact.entries.iter().map(|pc| format!("0x{pc:x}")).collect::<Vec<_>>(),
                     "instructionCount": artifact.instruction_count,
                     "blockCount": artifact.block_count,
                     "sourceBytes": artifact.source_bytes,
+                    "owner": format!("0x{owner:x}"),
+                    "dependencies": artifact.source_ranges.iter().map(|range| serde_json::json!({
+                        "start": format!("0x{:x}", range.start), "length": range.length,
+                    })).collect::<Vec<_>>(),
                 })).unwrap();
                 bridge.output = artifact.bytes;
                 0
@@ -204,7 +214,13 @@ pub extern "C" fn core_store(address: u64, width: u32, value: u64) -> i32 {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
         match core.image.write(address, width, value) {
-            Ok(()) => 1,
+            Ok(()) => {
+                if core.image.active_changed() {
+                    2
+                } else {
+                    1
+                }
+            }
             Err(fault) => {
                 core.fault = Some(fault);
                 0

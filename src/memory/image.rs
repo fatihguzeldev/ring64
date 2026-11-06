@@ -148,13 +148,13 @@ impl Image {
         Ok(image)
     }
 
-    pub fn add_backing(&mut self, id: String, bytes: Vec<u8>) -> Result<(), MemoryError> {
+    pub(crate) fn check_backing(&self, id: &str, length: usize) -> Result<(), MemoryError> {
         if id.is_empty() || self.backings.iter().any(|backing| backing.id == id) {
             return Err(MemoryError::Invalid(
                 "backing name must be nonempty and unique",
             ));
         }
-        if bytes.is_empty() || u32::try_from(bytes.len()).is_err() {
+        if length == 0 || u32::try_from(length).is_err() {
             return Err(MemoryError::Invalid(
                 "backing bytes must be nonempty and fit wasm32",
             ));
@@ -165,10 +165,15 @@ impl Image {
             .map(|backing| backing.bytes.len() as u64)
             .sum();
         if self.backings.len() >= self.limits.max_backings as usize
-            || total + bytes.len() as u64 > u64::from(self.limits.max_backing_bytes)
+            || total + length as u64 > u64::from(self.limits.max_backing_bytes)
         {
             return Err(MemoryError::Capacity("backing capacity exceeded"));
         }
+        Ok(())
+    }
+
+    pub fn add_backing(&mut self, id: String, bytes: Vec<u8>) -> Result<(), MemoryError> {
+        self.check_backing(&id, bytes.len())?;
         self.backings
             .try_reserve(1)
             .map_err(|_| MemoryError::Capacity("backing allocation refused"))?;
@@ -196,6 +201,11 @@ impl Image {
             }
         }
         Ok(())
+    }
+
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn mapping_capacity(&self) -> usize {
+        self.limits.max_mappings as usize
     }
 
     pub fn set_mappings(&mut self, inputs: Vec<MappingInput>) -> Result<(), MemoryError> {

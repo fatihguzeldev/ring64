@@ -154,3 +154,86 @@ fn wide_arithmetic_failure_is_private_and_reset_by_each_division() {
     assert_eq!(core_multiply_high(u64::MAX, 2, 0), 1);
     assert_eq!(core_multiply_high(u64::MAX, 2, 1), u64::MAX);
 }
+
+fn mapped_input(config: serde_json::Value, bytes: &[u8]) -> u32 {
+    let metadata = serde_json::to_vec(&config).unwrap();
+    let length = metadata.len() as u32;
+    BRIDGE.with_borrow_mut(|bridge| {
+        bridge.input = metadata;
+        bridge.input.extend_from_slice(bytes);
+    });
+    length
+}
+
+fn mapped_configuration() -> serde_json::Value {
+    serde_json::json!({
+        "memoryLimits": { "maxBackingBytes": 64, "maxBackings": 4, "maxMappings": 8 },
+        "backings": [{ "id": "bytes", "length": 8 }],
+        "mappings": [
+            { "base": "0x1000", "backing": "bytes", "offset": 0, "length": 8,
+              "permissions": { "read": false, "write": false, "execute": true } },
+            { "base": "0x4000", "backing": "bytes", "offset": 0, "length": 8,
+              "permissions": { "read": true, "write": true, "execute": false } }
+        ],
+    })
+}
+
+#[test]
+fn mapped_exports_register_sources_and_report_active_write_status() {
+    let config = mapped_configuration();
+    let length = mapped_input(config.clone(), &[0xb8, 1, 0, 0, 0, 0xa5, 0xa5, 0xa5]);
+    assert_eq!(mapped::core_init_mapped(0x1000, length), 0);
+    assert_eq!(core_probe(0x1000), DISPATCH);
+    assert_eq!(core_read_memory(0x1000, 1), 1);
+    assert_eq!(core_compile(0x1000, 64, 128, 65536), DISPATCH);
+    let info: serde_json::Value =
+        BRIDGE.with_borrow(|bridge| serde_json::from_slice(&bridge.info).unwrap());
+    let owner =
+        u64::from_str_radix(info["owner"].as_str().unwrap().trim_start_matches("0x"), 16).unwrap();
+    assert_eq!(
+        info["dependencies"],
+        serde_json::json!([{ "start": "0x1000", "length": 5 }])
+    );
+    assert_eq!(mapped::core_validity(owner), 1);
+    assert_eq!(mapped::core_activate(owner), 1);
+    assert_eq!(core_store(0x4007, 1, 0x77), 1);
+    assert_eq!(mapped::core_validity(owner), 1);
+    assert_eq!(core_store(0x4000, 1, 0xb9), 2);
+    assert_eq!(mapped::core_validity(owner), 0);
+    assert_eq!(core_access_failed(), 0);
+    mapped::core_release(owner);
+    assert_eq!(mapped::core_activate(owner), 0);
+    let length = mapped_input(serde_json::json!({ "id": "extra" }), &[0x11, 0x22]);
+    assert_eq!(mapped::core_add_backing(length), 0);
+    mapped_input(serde_json::json!("extra"), &[]);
+    assert_eq!(mapped::core_remove_backing(), 0);
+    mapped_input(serde_json::json!([]), &[]);
+    assert_eq!(mapped::core_set_mappings(), 0);
+    assert_eq!(core_probe(0x1000), FETCH);
+    mapped_input(serde_json::json!("bytes"), &[]);
+    assert_eq!(mapped::core_remove_backing(), 0);
+}
+
+#[test]
+fn rejected_mapped_exports_preserve_storage_and_owner_validity() {
+    let config = mapped_configuration();
+    let length = mapped_input(config, &[0xb8, 1, 0, 0, 0, 0xa5, 0xa5, 0xa5]);
+    assert_eq!(mapped::core_init_mapped(0x1000, length), 0);
+    assert_eq!(core_compile(0x1000, 64, 128, 65536), DISPATCH);
+    let owner = 1;
+    mapped_input(serde_json::json!("bytes"), &[]);
+    assert_eq!(mapped::core_remove_backing(), 1);
+    let length = mapped_input(serde_json::json!({ "id": "large" }), &[0x22; 64]);
+    assert_eq!(mapped::core_add_backing(length), 2);
+    mapped_input(
+        serde_json::json!([{
+            "base": "0x1000", "backing": "missing", "offset": 0, "length": 8,
+            "permissions": { "read": true, "write": true, "execute": true }
+        }]),
+        &[],
+    );
+    assert_eq!(mapped::core_set_mappings(), 1);
+    assert_eq!(mapped::core_validity(owner), 1);
+    assert_eq!(core_load(0x4000, 8), 0xa5a5_a500_0000_01b8);
+    assert_eq!(core_probe(0x1000), DISPATCH);
+}
