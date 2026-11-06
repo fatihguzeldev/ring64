@@ -281,3 +281,54 @@ fn backing_watch_flags_follow_first_last_owner_and_backing_recreation() {
     image.release(replacement);
     assert!(!image.backings[0].has_sources);
 }
+
+#[test]
+fn two_checked_mapping_indices_cover_alternating_regions_and_table_changes() {
+    let mut image = image(vec![
+        mapping(0x1000, 0, 1, 3),
+        mapping(0x2000, 1, 1, 3),
+        mapping(0x3000, 2, 1, 3),
+    ]);
+    assert_eq!(image.read(0x1000, 1), Ok(0xb8));
+    assert_eq!(image.read(0x2000, 1), Ok(1));
+    for _ in 0..32 {
+        assert_eq!(image.read_for_write(0x1000, 1), Ok(0xb8));
+        assert_eq!(
+            (image.last_mapping.get(), image.previous_mapping.get()),
+            (0, 1)
+        );
+        assert_eq!(image.read_for_write(0x2000, 1), Ok(1));
+        assert_eq!(
+            (image.last_mapping.get(), image.previous_mapping.get()),
+            (1, 0)
+        );
+    }
+    let before = (image.last_mapping.get(), image.previous_mapping.get());
+    assert!(image.set_mappings(vec![mapping(0x1000, 8, 1, 3)]).is_err());
+    assert_eq!(
+        (image.last_mapping.get(), image.previous_mapping.get()),
+        before
+    );
+    assert_eq!(image.read(0x3000, 1), Ok(2));
+    assert_eq!(
+        (image.last_mapping.get(), image.previous_mapping.get()),
+        (2, 1)
+    );
+    image
+        .set_mappings(vec![mapping(0x1000, 3, 1, 1), mapping(0x2000, 4, 1, 3)])
+        .unwrap();
+    assert_eq!(
+        (image.last_mapping.get(), image.previous_mapping.get()),
+        (usize::MAX, usize::MAX)
+    );
+    assert_eq!(image.read(0x2000, 1), Ok(4));
+    assert_eq!(image.read(0x1000, 1), Ok(3));
+    assert_eq!(
+        image.read_for_write(0x1000, 1).unwrap_err().cause,
+        Cause::Permission
+    );
+    assert_eq!(image.read(0x3000, 1).unwrap_err().cause, Cause::Unmapped);
+    image.set_mappings(vec![]).unwrap();
+    assert_eq!(image.read(0x1000, 1).unwrap_err().cause, Cause::Unmapped);
+    assert_eq!(image.read(0x2000, 1).unwrap_err().cause, Cause::Unmapped);
+}

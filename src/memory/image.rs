@@ -48,6 +48,7 @@ pub struct Image {
     limits: MemoryLimits,
     pub(super) validity: Validity,
     pub(super) last_mapping: Cell<usize>,
+    pub(super) previous_mapping: Cell<usize>,
 }
 
 #[derive(Debug)]
@@ -144,6 +145,7 @@ impl Image {
             limits,
             validity: Validity::default(),
             last_mapping: Cell::new(usize::MAX),
+            previous_mapping: Cell::new(usize::MAX),
         };
         for (id, bytes) in backings {
             image.add_backing(id, bytes)?;
@@ -254,6 +256,7 @@ impl Image {
         self.validity.mapping_change(&self.backings, &mappings);
         self.mappings = mappings;
         self.last_mapping.set(usize::MAX);
+        self.previous_mapping.set(usize::MAX);
         self.refresh_watchers();
         Ok(())
     }
@@ -263,6 +266,7 @@ impl Image {
             .map(|index| &self.mappings[index])
     }
 
+    #[inline]
     pub(super) fn locate_index(&self, address: u64) -> Option<usize> {
         let cached = self.last_mapping.get();
         if let Some(mapping) = self.mappings.get(cached)
@@ -271,7 +275,22 @@ impl Image {
         {
             return Some(cached);
         }
+        let previous = self.previous_mapping.get();
+        if let Some(mapping) = self.mappings.get(previous)
+            && address >= mapping.base
+            && address - mapping.base < u64::from(mapping.length)
+        {
+            self.previous_mapping.set(cached);
+            self.last_mapping.set(previous);
+            return Some(previous);
+        }
+        self.locate_uncached(address)
+    }
+
+    #[cold]
+    fn locate_uncached(&self, address: u64) -> Option<usize> {
         let index = locate_index(&self.mappings, address)?;
+        self.previous_mapping.set(self.last_mapping.get());
         self.last_mapping.set(index);
         Some(index)
     }
