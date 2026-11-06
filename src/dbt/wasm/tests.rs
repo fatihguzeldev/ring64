@@ -1,6 +1,7 @@
 mod addressing;
 mod arithmetic_bits;
 mod conditions;
+mod counts;
 mod data_widths;
 mod integer_memory;
 mod logical;
