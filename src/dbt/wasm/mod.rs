@@ -1,4 +1,5 @@
 mod control;
+mod counts;
 mod data;
 mod entry_lookup;
 mod integer;
@@ -99,6 +100,12 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             || matches!(
                 instruction.operation,
                 Operation::Unary {
+                    dst: Location::Memory(_),
+                    ..
+                } | Operation::Shift {
+                    dst: Location::Memory(_),
+                    ..
+                } | Operation::DoubleShift {
                     dst: Location::Memory(_),
                     ..
                 }
@@ -208,6 +215,26 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             Operation::Unary { kind, dst, width } => {
                 emitter.unary(kind, dst, width, instruction.next_pc, exit_depth)
             }
+            Operation::Shift {
+                kind,
+                dst,
+                count,
+                width,
+            } => emitter.shift(kind, dst, count, width, instruction.next_pc, exit_depth),
+            Operation::DoubleShift {
+                kind,
+                dst,
+                src,
+                count,
+                width,
+            } => emitter.double_shift(
+                kind,
+                dst,
+                (src, count),
+                width,
+                instruction.next_pc,
+                exit_depth,
+            ),
             Operation::Carry { kind } => emitter.carry(kind),
             Operation::Lahf => emitter.lahf(),
             Operation::Sahf => emitter.sahf(),

@@ -137,6 +137,29 @@ pub enum Carry {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Count {
+    Immediate(u8),
+    Cl,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Shift {
+    Rol,
+    Ror,
+    Rcl,
+    Rcr,
+    Shl,
+    Shr,
+    Sar,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DoubleShift {
+    Left,
+    Right,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryAluOperands {
     MemoryFirst(DataOperand),
     RegisterFirst(RegisterView),
@@ -207,6 +230,19 @@ pub enum Operation {
     },
     Lahf,
     Sahf,
+    Shift {
+        kind: Shift,
+        dst: Location,
+        count: Count,
+        width: Width,
+    },
+    DoubleShift {
+        kind: DoubleShift,
+        dst: Location,
+        src: RegisterView,
+        count: Count,
+        width: Width,
+    },
     Extend {
         dst: RegisterView,
         src: Location,

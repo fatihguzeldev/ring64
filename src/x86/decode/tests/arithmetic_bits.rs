@@ -1,7 +1,8 @@
-use super::{DecodeError, at, missing, operation};
+use super::{at, missing, operation, DecodeError};
 use crate::memory::{Access, Cause, Fault};
 use crate::x86::instruction::{
-    Address, AddressBase, Carry, Location, Operation, RegisterView as R, Unary, Width,
+    Address, AddressBase, Carry, Count, DoubleShift, Location, Operation, RegisterView as R, Shift,
+    Unary, Width,
 };
 
 #[test]
@@ -208,6 +209,254 @@ fn unary_memory_forms_require_complete_sib_displacements_before_execution() {
                 let mut bytes = prefix.to_vec();
                 bytes.extend([opcode, 0x84 | selector << 3, 0xad, 0, 0, 0, 0x80]);
                 assert_required_bytes(&bytes);
+            }
+        }
+    }
+}
+
+#[test]
+fn shift_rotate_and_double_shift_encodings_are_admitted() {
+    for bytes in [
+        &[0xd0, 0xe0][..],
+        &[0x66, 0xd3, 0xd0][..],
+        &[0x48, 0xc1, 0xf8, 0xff][..],
+        &[0x0f, 0xa4, 0xc8, 1][..],
+        &[0x66, 0x4f, 0x0f, 0xad, 0xc8][..],
+    ] {
+        assert!(at(0x1000, bytes).is_ok(), "{bytes:02x?}");
+    }
+}
+
+#[test]
+fn group_two_forms_cover_all_views_counts_and_selector_ignores() {
+    for (selector, kind) in [
+        (0, Shift::Rol),
+        (1, Shift::Ror),
+        (2, Shift::Rcl),
+        (3, Shift::Rcr),
+        (4, Shift::Shl),
+        (5, Shift::Shr),
+        (7, Shift::Sar),
+    ] {
+        for operand16 in [false, true] {
+            for rex in std::iter::once(None).chain((0x40..=0x4f).map(Some)) {
+                let mut prefix = Vec::new();
+                if operand16 {
+                    prefix.push(0x66);
+                }
+                prefix.extend(rex);
+                let wide = if rex.is_some_and(|value| value & 8 != 0) {
+                    Width::W64
+                } else if operand16 {
+                    Width::W16
+                } else {
+                    Width::W32
+                };
+                for (opcode, count) in [
+                    (0xc0, Count::Immediate(255)),
+                    (0xc1, Count::Immediate(255)),
+                    (0xd0, Count::Immediate(1)),
+                    (0xd1, Count::Immediate(1)),
+                    (0xd2, Count::Cl),
+                    (0xd3, Count::Cl),
+                ] {
+                    let width = if opcode & 1 == 0 { Width::W8 } else { wide };
+                    for low in 0..8 {
+                        let bank = low | rex.map_or(0, |value| (value & 1) << 3);
+                        let dst = if width == Width::W8 && rex.is_none() && low >= 4 {
+                            R::high_byte(low - 4)
+                        } else {
+                            R::low(bank)
+                        };
+                        let mut bytes = prefix.clone();
+                        bytes.extend([opcode, 0xc0 | selector << 3 | low]);
+                        if opcode <= 0xc1 {
+                            bytes.push(255);
+                        }
+                        assert_eq!(
+                            operation(&bytes),
+                            Operation::Shift {
+                                kind,
+                                dst: Location::Register(dst),
+                                count,
+                                width
+                            },
+                            "{bytes:02x?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn double_shifts_keep_every_source_and_destination_bank_at_selected_width() {
+    for operand16 in [false, true] {
+        for rex in std::iter::once(None).chain((0x40..=0x4f).map(Some)) {
+            let mut prefix = Vec::new();
+            if operand16 {
+                prefix.push(0x66);
+            }
+            prefix.extend(rex);
+            let width = if rex.is_some_and(|value| value & 8 != 0) {
+                Width::W64
+            } else if operand16 {
+                Width::W16
+            } else {
+                Width::W32
+            };
+            for (opcode, kind, count) in [
+                (0xa4, DoubleShift::Left, Count::Immediate(255)),
+                (0xa5, DoubleShift::Left, Count::Cl),
+                (0xac, DoubleShift::Right, Count::Immediate(255)),
+                (0xad, DoubleShift::Right, Count::Cl),
+            ] {
+                for reg in 0..8 {
+                    for rm in 0..8 {
+                        let mut bytes = prefix.clone();
+                        bytes.extend([0x0f, opcode, 0xc0 | (reg << 3) | rm]);
+                        if opcode & 1 == 0 {
+                            bytes.push(255);
+                        }
+                        assert_eq!(
+                            operation(&bytes),
+                            Operation::DoubleShift {
+                                kind,
+                                dst: Location::Register(R::low(
+                                    rm | rex.map_or(0, |value| (value & 1) << 3)
+                                )),
+                                src: R::low(reg | rex.map_or(0, |value| (value & 4) << 1)),
+                                count,
+                                width,
+                            },
+                            "{bytes:02x?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn count_memory_forms_keep_full_address_terms_and_count_source() {
+    for operand16 in [false, true] {
+        for rex in std::iter::once(None).chain((0x40..=0x4f).map(Some)) {
+            let mut prefix = Vec::new();
+            if operand16 {
+                prefix.push(0x66);
+            }
+            prefix.extend(rex);
+            let wide = if rex.is_some_and(|value| value & 8 != 0) {
+                Width::W64
+            } else if operand16 {
+                Width::W16
+            } else {
+                Width::W32
+            };
+            let address = Address {
+                base: AddressBase::Register(3 | rex.map_or(0, |value| (value & 1) << 3)),
+                index: None,
+                displacement: -128,
+            };
+            for (selector, kind) in [
+                (0, Shift::Rol),
+                (1, Shift::Ror),
+                (2, Shift::Rcl),
+                (3, Shift::Rcr),
+                (4, Shift::Shl),
+                (5, Shift::Shr),
+                (7, Shift::Sar),
+            ] {
+                for (opcode, count) in [
+                    (0xc0, Count::Immediate(255)),
+                    (0xc1, Count::Immediate(255)),
+                    (0xd0, Count::Immediate(1)),
+                    (0xd1, Count::Immediate(1)),
+                    (0xd2, Count::Cl),
+                    (0xd3, Count::Cl),
+                ] {
+                    let mut bytes = prefix.clone();
+                    bytes.extend([opcode, 0x43 | selector << 3, 0x80]);
+                    if opcode <= 0xc1 {
+                        bytes.push(255);
+                    }
+                    assert_eq!(
+                        operation(&bytes),
+                        Operation::Shift {
+                            kind,
+                            dst: Location::Memory(address),
+                            count,
+                            width: if opcode & 1 == 0 { Width::W8 } else { wide },
+                        },
+                        "{bytes:02x?}"
+                    );
+                }
+            }
+            for (opcode, kind, count) in [
+                (0xa4, DoubleShift::Left, Count::Immediate(255)),
+                (0xa5, DoubleShift::Left, Count::Cl),
+                (0xac, DoubleShift::Right, Count::Immediate(255)),
+                (0xad, DoubleShift::Right, Count::Cl),
+            ] {
+                let mut bytes = prefix.clone();
+                bytes.extend([0x0f, opcode, 0x4b, 0x80]);
+                if opcode & 1 == 0 {
+                    bytes.push(255);
+                }
+                assert_eq!(
+                    operation(&bytes),
+                    Operation::DoubleShift {
+                        kind,
+                        dst: Location::Memory(address),
+                        src: R::low(1 | rex.map_or(0, |value| (value & 4) << 1)),
+                        count,
+                        width: wide,
+                    },
+                    "{bytes:02x?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn count_encodings_require_every_address_and_immediate_byte_in_order() {
+    for prefix in [&[][..], &[0x66][..], &[0x4f][..], &[0x66, 0x4f][..]] {
+        for opcode in [0xc0, 0xc1, 0xd0, 0xd1, 0xd2, 0xd3] {
+            for selector in [0, 1, 2, 3, 4, 5, 7] {
+                let mut bytes = prefix.to_vec();
+                bytes.extend([opcode, 0x84 | selector << 3, 0xad, 0, 0, 0, 0x80]);
+                if opcode <= 0xc1 {
+                    bytes.push(255);
+                }
+                assert_required_bytes(&bytes);
+            }
+        }
+        for opcode in [0xa4, 0xa5, 0xac, 0xad] {
+            let mut bytes = prefix.to_vec();
+            bytes.extend([0x0f, opcode, 0x8c, 0xad, 0, 0, 0, 0x80]);
+            if opcode & 1 == 0 {
+                bytes.push(255);
+            }
+            assert_required_bytes(&bytes);
+        }
+    }
+}
+
+#[test]
+fn group_two_selector_six_is_unsupported_before_address_or_count_bytes() {
+    for prefix in [&[][..], &[0x66][..], &[0x4f][..], &[0x66, 0x4f][..]] {
+        for opcode in [0xc0, 0xc1, 0xd0, 0xd1, 0xd2, 0xd3] {
+            for mode in 0..4 {
+                let mut bytes = prefix.to_vec();
+                bytes.extend([opcode, (mode << 6) | (6 << 3) | 4]);
+                assert_eq!(
+                    at(0x1000, &bytes),
+                    Err(DecodeError::Unsupported),
+                    "{bytes:02x?}"
+                );
             }
         }
     }

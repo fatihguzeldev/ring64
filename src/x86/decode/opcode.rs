@@ -1,7 +1,7 @@
 use crate::memory::Fault;
 use crate::x86::instruction::{
-    Address, AddressBase, Alu, Carry, Condition, DataOperand, Location, MemoryAluOperands, Operand,
-    Operation, RegisterView, Unary, Width,
+    Address, AddressBase, Alu, Carry, Condition, Count, DataOperand, DoubleShift, Location,
+    MemoryAluOperands, Operand, Operation, RegisterView, Shift, Unary, Width,
 };
 
 use super::{DecodeError, cursor::Cursor, operand::ModRm, prefix::Prefixes};
@@ -257,6 +257,32 @@ where
         }),
         0x9f => Ok(Operation::Lahf),
         0x9e => Ok(Operation::Sahf),
+        0xc0 | 0xc1 | 0xd0..=0xd3 => {
+            let width = byte_or_wide(opcode, wide);
+            let operands = ModRm::read(cursor, rex)?;
+            let kind = match operands.selector {
+                0 => Shift::Rol,
+                1 => Shift::Ror,
+                2 => Shift::Rcl,
+                3 => Shift::Rcr,
+                4 => Shift::Shl,
+                5 => Shift::Shr,
+                7 => Shift::Sar,
+                _ => return Err(DecodeError::Unsupported),
+            };
+            let dst = operands.location(cursor, rex, width)?;
+            let count = match opcode {
+                0xc0 | 0xc1 => Count::Immediate(cursor.byte()?),
+                0xd0 | 0xd1 => Count::Immediate(1),
+                _ => Count::Cl,
+            };
+            Ok(Operation::Shift {
+                kind,
+                dst,
+                count,
+                width,
+            })
+        }
         0xa8 | 0xa9 => {
             let width = byte_or_wide(opcode, wide);
             Ok(alu_to(
@@ -372,6 +398,26 @@ where
     let rex = prefixes.rex;
     let width = prefixes.width();
     match opcode {
+        0xa4 | 0xa5 | 0xac | 0xad => {
+            let operands = ModRm::read(cursor, rex)?;
+            let dst = operands.location(cursor, rex, width)?;
+            let count = if opcode & 1 == 0 {
+                Count::Immediate(cursor.byte()?)
+            } else {
+                Count::Cl
+            };
+            Ok(Operation::DoubleShift {
+                kind: if opcode & 8 == 0 {
+                    DoubleShift::Left
+                } else {
+                    DoubleShift::Right
+                },
+                dst,
+                src: rex.view(operands.register, width),
+                count,
+                width,
+            })
+        }
         0xb6 | 0xb7 | 0xbe | 0xbf => {
             let source_width = byte_or_wide(opcode, Width::W16);
             if source_width == Width::W16 && width == Width::W16 {
