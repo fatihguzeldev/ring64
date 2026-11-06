@@ -246,3 +246,38 @@ fn cached_mapping_never_bypasses_domain_checks_or_selects_a_nearby_span() {
         Cause::Noncanonical
     );
 }
+
+#[test]
+fn backing_watch_flags_follow_first_last_owner_and_backing_recreation() {
+    let mut image = image(vec![mapping(0x1000, 0, 8, 7)]);
+    assert!(!image.backings[0].has_sources);
+    image.write(0x1000, 1, 0xb9).unwrap();
+    let first = image.register_source([(0x1000, 2)]).unwrap();
+    assert!(image.backings[0].has_sources);
+    let second = image.register_source([(0x1002, 2)]).unwrap();
+    image.release(first);
+    assert!(image.backings[0].has_sources);
+    image.release(second);
+    assert!(!image.backings[0].has_sources);
+    let third = image.register_source([(0x1000, 1)]).unwrap();
+    image.activate(third);
+    image.write(0x1000, 1, 0xba).unwrap();
+    assert!(!image.owner_valid(third));
+    assert!(image.active_changed());
+    image.set_mappings(vec![]).unwrap();
+    assert!(!image.backings[0].has_sources);
+    image.remove_backing("bytes").unwrap();
+    image.add_backing("bytes".into(), vec![0xb8; 8]).unwrap();
+    assert!(!image.backings[0].has_sources);
+    image.set_mappings(vec![mapping(0x1000, 0, 8, 7)]).unwrap();
+    let replacement = image.register_source([(0x1000, 1)]).unwrap();
+    assert!(image.backings[0].has_sources);
+    image.activate(replacement);
+    image.write(0x1000, 1, 0xbb).unwrap();
+    assert!(!image.owner_valid(replacement));
+    assert!(image.active_changed());
+    image.release(third);
+    assert!(!image.backings[0].has_sources);
+    image.release(replacement);
+    assert!(!image.backings[0].has_sources);
+}

@@ -182,6 +182,7 @@ impl Image {
         );
         self.validity.next = next;
         self.validity.rebuild_sources();
+        self.refresh_watchers();
         Ok(owner)
     }
 
@@ -212,6 +213,16 @@ impl Image {
             self.validity.active_invalid = false;
         }
         self.validity.rebuild_sources();
+        self.refresh_watchers();
+    }
+
+    pub(super) fn refresh_watchers(&mut self) {
+        for backing in &mut self.backings {
+            backing.has_sources = self
+                .validity
+                .sources
+                .contains_key(&(Rc::as_ptr(&backing.incarnation) as usize));
+        }
     }
 }
 

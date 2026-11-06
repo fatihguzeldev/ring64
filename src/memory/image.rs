@@ -55,6 +55,7 @@ pub(super) struct Backing {
     pub(super) id: String,
     pub(super) bytes: Vec<u8>,
     pub(super) incarnation: Rc<()>,
+    pub(super) has_sources: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -184,6 +185,7 @@ impl Image {
             id,
             bytes,
             incarnation: Rc::new(()),
+            has_sources: false,
         });
         Ok(())
     }
@@ -252,6 +254,7 @@ impl Image {
         self.validity.mapping_change(&self.backings, &mappings);
         self.mappings = mappings;
         self.last_mapping.set(usize::MAX);
+        self.refresh_watchers();
         Ok(())
     }
 

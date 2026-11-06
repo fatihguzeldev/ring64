@@ -38,8 +38,10 @@ impl Image {
         if u64::from(width) <= u64::from(mapping.length) - relative {
             let offset = mapping.offset as usize + relative as usize;
             let backing = &mut self.backings[mapping.backing];
-            self.validity
-                .write(&backing.incarnation, offset as u32, width);
+            if backing.has_sources {
+                self.validity
+                    .write(&backing.incarnation, offset as u32, width);
+            }
             match width {
                 1 => backing.bytes[offset] = value as u8,
                 2 => {
@@ -89,8 +91,10 @@ impl Image {
             let offset = mapping.offset as usize + (cursor as u64 - mapping.base) as usize;
             let count = (end.min(mapping.end()) - cursor) as usize;
             let backing = &mut self.backings[mapping.backing];
-            self.validity
-                .write(&backing.incarnation, offset as u32, count as u32);
+            if backing.has_sources {
+                self.validity
+                    .write(&backing.incarnation, offset as u32, count as u32);
+            }
             backing.bytes[offset..offset + count].copy_from_slice(&bytes[source..source + count]);
             source += count;
             cursor += count as u128;
