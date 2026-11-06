@@ -1,0 +1,638 @@
+import { type Scenario, CODE, changed, equal, exit, fault, memory } from '../fixture.js';
+import { FLAGS, PROGRAM, RAM, createStackFixture, input, noFault, stack } from './fixture.js';
+
+export function boundaryScenarios(core: WebAssembly.Module): Scenario[] {
+  const using = createStackFixture(core);
+  return [
+    {
+      name: 'stack and dynamic-target failures preserve each incoming flag and all partial effects',
+      run: async () => {
+        const rows = [
+          {
+            code: 'ffd0',
+            registers: { 0: 0x800000000000n, 4: 0x7000n },
+            address: 0x800000000000n,
+            access: 'execute',
+            cause: 'noncanonical',
+            failing: 0x800000000000n,
+          },
+          {
+            code: 'ffd0',
+            registers: { 0: 0x1010n, 4: 0x7000n },
+            address: 0x6ff8n,
+            access: 'write',
+            cause: 'unmapped',
+            failing: 0x6ff8n,
+          },
+          {
+            code: '50',
+            registers: { 4: 0x1008n },
+            address: 0x1000n,
+            access: 'write',
+            cause: 'permission',
+            failing: 0x1000n,
+          },
+          ...['c3', 'c2ffff'].flatMap((code) => [
+            {
+              code,
+              registers: { 4: 0x7000n },
+              address: 0x7000n,
+              access: 'read' as const,
+              cause: 'unmapped' as const,
+              failing: 0x7000n,
+            },
+            {
+              code,
+              top: 0x800000000000n,
+              registers: {},
+              address: 0x800000000000n,
+              access: 'execute' as const,
+              cause: 'noncanonical' as const,
+              failing: 0x800000000000n,
+            },
+          ]),
+          {
+            code: '47ffe4',
+            registers: { 12: 0x800000000000n, 4: 0x7000n },
+            address: 0x800000000000n,
+            access: 'execute',
+            cause: 'noncanonical',
+            failing: 0x800000000000n,
+          },
+          {
+            code: '50',
+            registers: { 4: 1n },
+            address: 0xfffffffffffffff9n,
+            access: 'write',
+            cause: 'address-range',
+            failing: 0x10000000000000000n,
+          },
+          {
+            code: '58',
+            registers: { 4: 0x7ffffffffffcn },
+            address: 0x7ffffffffffcn,
+            access: 'read',
+            cause: 'noncanonical',
+            failing: 0x800000000000n,
+          },
+        ] as const;
+        for (const row of rows) {
+          const original = 'top' in row ? stack(row.top) : RAM;
+          await using(
+            row.code,
+            async (cpu) => {
+              for (const flags of FLAGS) {
+                const before = input(CODE, row.registers, flags);
+                cpu.setState(before);
+                const result = await cpu.run({ budget: 1n });
+                exit(
+                  result,
+                  row.access === 'execute' ? 'target-fault' : 'data-fault',
+                  1n,
+                  0n,
+                  before,
+                );
+                fault(result, {
+                  instructionPc: CODE,
+                  address: row.address,
+                  width: row.access === 'execute' ? 0 : 8,
+                  access: row.access,
+                  cause: row.cause,
+                  failingAddress: row.failing,
+                });
+                if (flags !== FLAGS[0])
+                  equal(
+                    result.resources.compilations,
+                    0,
+                    'faulting artifact retains fresh imported flags',
+                  );
+                memory(cpu, 0x4000n, original);
+                memory(cpu, CODE, row.code);
+              }
+            },
+            { ram: original },
+          );
+        }
+      },
+    },
+    {
+      name: 'stack writes validate the complete span before touching an accessible prefix',
+      run: async () => {
+        for (const row of [
+          {
+            code: '50',
+            pc: CODE,
+            sp: 0x4008n,
+            ramBase: 0x4000n,
+            ram: 'a5'.repeat(4),
+            address: 0x4000n,
+            access: 'write',
+            cause: 'unmapped',
+            failing: 0x4004n,
+          },
+          {
+            code: '58',
+            pc: CODE,
+            sp: 0x4000n,
+            ramBase: 0x4000n,
+            ram: 'a5'.repeat(4),
+            address: 0x4000n,
+            access: 'read',
+            cause: 'unmapped',
+            failing: 0x4004n,
+          },
+          {
+            code: '50',
+            pc: 0x4004n,
+            sp: 0x4008n,
+            ramBase: 0x4000n,
+            ram: 'a5'.repeat(4),
+            address: 0x4000n,
+            access: 'write',
+            cause: 'permission',
+            failing: 0x4004n,
+          },
+          {
+            code: 'ffd0',
+            pc: 0x4004n,
+            sp: 0x4008n,
+            ramBase: 0x4000n,
+            ram: 'a5'.repeat(4),
+            address: 0x4000n,
+            access: 'write',
+            cause: 'permission',
+            failing: 0x4004n,
+          },
+          {
+            code: '50',
+            pc: CODE,
+            sp: 0x800000000004n,
+            ramBase: 0x4000n,
+            ram: RAM,
+            address: 0x7ffffffffffcn,
+            access: 'write',
+            cause: 'noncanonical',
+            failing: 0x800000000000n,
+          },
+          {
+            code: 'c3',
+            pc: CODE,
+            sp: 0xfffffffffffffffen,
+            ramBase: 0x4000n,
+            ram: RAM,
+            address: 0xfffffffffffffffen,
+            access: 'read',
+            cause: 'address-range',
+            failing: 0x10000000000000000n,
+          },
+        ] as const) {
+          await using(
+            row.code,
+            async (cpu) => {
+              const before = input(row.pc, { 0: 0x1010n, 4: row.sp });
+              cpu.setState(before);
+              const result = await cpu.run({ budget: 1n });
+              exit(result, 'data-fault', 1n, 0n, before);
+              fault(result, {
+                instructionPc: row.pc,
+                address: row.address,
+                width: 8,
+                access: row.access,
+                cause: row.cause,
+                failingAddress: row.failing,
+              });
+              memory(cpu, row.ramBase, row.ram);
+              memory(cpu, row.pc, row.code);
+            },
+            { codeBase: row.pc, ramBase: row.ramBase, ram: row.ram },
+          );
+        }
+      },
+    },
+    {
+      name: 'POP and RET accept readable RX and adjacent spans without requiring write permission',
+      run: async () => {
+        for (const code of ['581010000000000000', 'c31010000000000000', '58101000', 'c3101000']) {
+          const adjacent = code.length === 8;
+          const original = adjacent ? '00'.repeat(5) + 'a5'.repeat(8) : RAM;
+          const ramBase = adjacent ? 0x1004n : 0x4000n;
+          await using(
+            code,
+            async (cpu) => {
+              const before = input(CODE, { 4: 0x1001n });
+              cpu.setState(before);
+              const result = await cpu.run({ budget: 1n });
+              exit(
+                result,
+                'budget',
+                1n,
+                1n,
+                changed(
+                  before,
+                  code.startsWith('58') ? 0x1001n : 0x1010n,
+                  code.startsWith('58') ? { 0: 0x1010n, 4: 0x1009n } : { 4: 0x1009n },
+                ),
+              );
+              noFault(result);
+              memory(cpu, CODE, code);
+              memory(cpu, ramBase, original);
+            },
+            { ramBase, ram: original },
+          );
+        }
+      },
+    },
+    {
+      name: 'high unaligned and wrapping stack pointers validate only the bytes actually accessed',
+      run: async () => {
+        for (const row of [
+          {
+            code: '50',
+            base: 0xffff800000004000n,
+            length: 64,
+            offset: 24,
+            sp: 0xffff800000004020n,
+            after: 0xffff800000004018n,
+            push: true,
+          },
+          {
+            code: '58',
+            base: 0xffff800000004000n,
+            length: 64,
+            offset: 32,
+            sp: 0xffff800000004020n,
+            after: 0xffff800000004028n,
+            push: false,
+          },
+          {
+            code: 'c3',
+            base: 0xffff800000004000n,
+            length: 64,
+            offset: 32,
+            sp: 0xffff800000004020n,
+            after: 0xffff800000004028n,
+            push: false,
+          },
+          {
+            code: '50',
+            base: 0x4000n,
+            length: 32,
+            offset: 3,
+            sp: 0x400bn,
+            after: 0x4003n,
+            push: true,
+          },
+          {
+            code: '58',
+            base: 0x4000n,
+            length: 32,
+            offset: 3,
+            sp: 0x4003n,
+            after: 0x400bn,
+            push: false,
+          },
+          {
+            code: 'c3',
+            base: 0x4000n,
+            length: 32,
+            offset: 3,
+            sp: 0x4003n,
+            after: 0x400bn,
+            push: false,
+          },
+          {
+            code: '50',
+            base: 0xfffffffffffffff8n,
+            length: 8,
+            offset: 0,
+            sp: 0n,
+            after: 0xfffffffffffffff8n,
+            push: true,
+          },
+          {
+            code: '58',
+            base: 0xfffffffffffffff8n,
+            length: 8,
+            offset: 0,
+            sp: 0xfffffffffffffff8n,
+            after: 0n,
+            push: false,
+          },
+          {
+            code: 'c3',
+            base: 0xfffffffffffffff8n,
+            length: 8,
+            offset: 0,
+            sp: 0xfffffffffffffff8n,
+            after: 0n,
+            push: false,
+          },
+          {
+            code: 'c2ffff',
+            base: 0xfffffffffffffff8n,
+            length: 8,
+            offset: 0,
+            sp: 0xfffffffffffffff8n,
+            after: 0xffffn,
+            push: false,
+          },
+          {
+            code: '58',
+            base: 0x7ffffffffff8n,
+            length: 8,
+            offset: 0,
+            sp: 0x7ffffffffff8n,
+            after: 0x800000000000n,
+            push: false,
+          },
+          {
+            code: 'c3',
+            base: 0x7ffffffffff8n,
+            length: 8,
+            offset: 0,
+            sp: 0x7ffffffffff8n,
+            after: 0x800000000000n,
+            push: false,
+          },
+          {
+            code: 'c20100',
+            base: 0x7ffffffffff8n,
+            length: 8,
+            offset: 0,
+            sp: 0x7ffffffffff8n,
+            after: 0x800000000001n,
+            push: false,
+          },
+        ]) {
+          const original = row.push
+            ? 'a5'.repeat(row.length)
+            : stack(0x1010n, row.offset, row.length);
+          await using(
+            row.code,
+            async (cpu) => {
+              const before = input(CODE, { 0: 0xfedcba9876543210n, 4: row.sp });
+              cpu.setState(before);
+              const result = await cpu.run({ budget: 1n });
+              exit(
+                result,
+                'budget',
+                1n,
+                1n,
+                changed(
+                  before,
+                  row.code.startsWith('c') ? 0x1010n : CODE + 1n,
+                  row.code === '58' ? { 0: 0x1010n, 4: row.after } : { 4: row.after },
+                ),
+              );
+              noFault(result);
+              memory(
+                cpu,
+                row.base,
+                row.push ? stack(0xfedcba9876543210n, row.offset, row.length) : original,
+              );
+              memory(cpu, CODE, row.code);
+            },
+            { ramBase: row.base, ram: original },
+          );
+        }
+      },
+    },
+    {
+      name: 'complete near-CALL bytes can end at u64 max but required bytes never wrap',
+      run: async () => {
+        await using(
+          '4fe800000000',
+          async (cpu) => {
+            const before = input(0xfffffffffffffffan);
+            cpu.setState(before);
+            const result = await cpu.run({ budget: 1n });
+            exit(result, 'budget', 1n, 1n, changed(before, 0n, { 4: 0x4018n }));
+            noFault(result);
+            memory(cpu, 0x4000n, stack(0n, 24));
+            memory(cpu, before.rip, '4fe800000000');
+          },
+          { codeBase: 0xfffffffffffffffan },
+        );
+        await using(
+          '4fe8000000',
+          async (cpu) => {
+            const before = input(0xfffffffffffffffbn, { 4: 0x7000n });
+            cpu.setState(before);
+            const result = await cpu.run({ budget: 1n });
+            exit(result, 'fetch-fault', 1n, 0n, before);
+            fault(result, {
+              instructionPc: before.rip,
+              address: before.rip,
+              width: 6,
+              access: 'execute',
+              cause: 'address-range',
+              failingAddress: 0x10000000000000000n,
+            });
+            memory(cpu, 0x4000n, RAM);
+            memory(cpu, before.rip, '4fe8000000');
+          },
+          { codeBase: 0xfffffffffffffffbn },
+        );
+        for (const [code, targetFailure] of [
+          ['e80b000000', true],
+          ['e800000000', false],
+        ] as const) {
+          await using(
+            code,
+            async (cpu) => {
+              const before = input(0x7ffffffffff0n, { 4: 0x7000n });
+              cpu.setState(before);
+              const result = await cpu.run({ budget: 1n });
+              exit(result, targetFailure ? 'target-fault' : 'data-fault', 1n, 0n, before);
+              fault(result, {
+                instructionPc: before.rip,
+                address: targetFailure ? 0x800000000000n : 0x6ff8n,
+                width: targetFailure ? 0 : 8,
+                access: targetFailure ? 'execute' : 'write',
+                cause: targetFailure ? 'noncanonical' : 'unmapped',
+                failingAddress: targetFailure ? 0x800000000000n : 0x6ff8n,
+              });
+              memory(cpu, 0x4000n, RAM);
+              memory(cpu, before.rip, code);
+            },
+            { codeBase: 0x7ffffffffff0n },
+          );
+        }
+      },
+    },
+    {
+      name: 'new stack encodings fetch every required byte before operand checks and reject excluded forms',
+      run: async () => {
+        for (const instruction of ['6a80', '6800000080', 'e80b000000', 'c2ffff', 'ffd0', 'ffe4'])
+          for (const prefix of ['', '4f']) {
+            const complete = prefix + instruction;
+            for (let bytes = 1; bytes < complete.length / 2; bytes++) {
+              const code = complete.slice(0, bytes * 2);
+              await using(code, async (cpu) => {
+                const before = input(CODE, { 0: 0x800000000000n, 4: 0x7000n, 12: 0x800000000000n });
+                cpu.setState(before);
+                const result = await cpu.run({ budget: 1n });
+                exit(result, 'fetch-fault', 1n, 0n, before);
+                fault(result, {
+                  instructionPc: CODE,
+                  address: CODE + BigInt(bytes),
+                  width: 1,
+                  access: 'execute',
+                  cause: 'unmapped',
+                  failingAddress: CODE + BigInt(bytes),
+                });
+                memory(cpu, CODE, code);
+                memory(cpu, 0x4000n, RAM);
+              });
+            }
+          }
+        for (const code of [
+          'ff10',
+          'ff14',
+          'ff15',
+          'ff20',
+          'ff24',
+          'ffc0',
+          'ffc8',
+          'ffd8',
+          'ffe8',
+          'fff0',
+          'fff8',
+          '8f',
+          '8fc0',
+          '6650',
+          '6758',
+          'f050',
+          'f2c3',
+          'f3c3',
+          '404050',
+          '9a',
+          'ca',
+          'cb',
+          'c8',
+          'c9',
+          '9c',
+          '9d',
+        ]) {
+          await using(code, async (cpu) => {
+            const before = input(CODE, { 0: 0x800000000000n, 4: 0x7000n });
+            cpu.setState(before);
+            const result = await cpu.run({ budget: 1n });
+            exit(result, 'unsupported', 1n, 0n, before);
+            noFault(result);
+            equal(result.resources.compilations, 0, 'unsupported form does not compile');
+            memory(cpu, CODE, code);
+            memory(cpu, 0x4000n, RAM);
+          });
+        }
+      },
+    },
+    {
+      name: 'budget and stop precede stack and target diagnostics without installing an artifact',
+      run: async () => {
+        for (const code of [
+          '50',
+          '58',
+          '6a80',
+          '6800000080',
+          'e80b000000',
+          'ffd0',
+          'ffe0',
+          'c3',
+          'c2ffff',
+        ]) {
+          await using(code, async (cpu) => {
+            const before = input(CODE, { 0: 0x800000000000n, 4: 0x7000n });
+            cpu.setState(before);
+            for (const gate of [
+              { budget: 0n, reason: 'budget' },
+              { budget: 1n, reason: 'stop' },
+            ]) {
+              const result = await cpu.run({ budget: gate.budget, stop: CODE });
+              exit(result, gate.reason, gate.budget, 0n, before);
+              noFault(result);
+              equal(result.resources.compilations, 0, 'initial gate prevents translation');
+              equal(result.resources.nativeEntries, 0, 'initial gate prevents generated execution');
+              memory(cpu, CODE, code);
+              memory(cpu, 0x4000n, RAM);
+            }
+          });
+        }
+      },
+    },
+    {
+      name: 'completed CALL and RET retain their stack effects across translation refusal and resume',
+      run: async () => {
+        for (const returning of [false, true]) {
+          const original = returning ? stack(0x1005n, 24) : RAM;
+          await using(
+            PROGRAM,
+            async (cpu) => {
+              const before = input(returning ? 0x1015n : CODE, returning ? { 4: 0x4018n } : {});
+              cpu.setState(before);
+              const refused = await cpu.run({ budget: 2n });
+              const after = changed(before, returning ? 0x1005n : 0x1010n, {
+                4: returning ? 0x4020n : 0x4018n,
+              });
+              exit(refused, 'resource-limit', 2n, 1n, after);
+              noFault(refused);
+              equal(refused.resources.compilations, 1, 'one translation admitted before transfer');
+              memory(cpu, 0x4000n, stack(0x1005n, 24));
+              const resumed = await cpu.run({ budget: 1n });
+              exit(
+                resumed,
+                'budget',
+                1n,
+                1n,
+                changed(after, returning ? 0x100an : 0x1015n, returning ? { 1: 1n } : { 2: 2n }),
+              );
+              noFault(resumed);
+              memory(cpu, 0x4000n, stack(0x1005n, 24));
+              memory(cpu, CODE, PROGRAM);
+            },
+            { ram: original, limits: { maxInstructions: 1, maxTranslationsPerRun: 1 } },
+          );
+        }
+      },
+    },
+    {
+      name: 'reached stack decode failures beat translation caps while unexecuted stack effects stay absent',
+      run: async () => {
+        for (const suffix of ['50', 'c3', 'e800', 'ff', '8f']) {
+          const code = 'b802000000' + suffix;
+          await using(
+            code,
+            async (cpu) => {
+              const before = input(CODE, { 4: 0x7000n });
+              cpu.setState(before);
+              const result = await cpu.run({ budget: 3n });
+              const reason =
+                suffix === '50' || suffix === 'c3'
+                  ? 'resource-limit'
+                  : suffix === '8f'
+                    ? 'unsupported'
+                    : 'fetch-fault';
+              const after = changed(before, 0x1005n, { 0: 2n });
+              exit(result, reason, 3n, 1n, after);
+              equal(result.resources.compilations, 1, 'only the completed prefix was translated');
+              if (reason === 'fetch-fault') {
+                const missing = CODE + BigInt(code.length / 2);
+                fault(result, {
+                  instructionPc: 0x1005n,
+                  address: missing,
+                  width: 1,
+                  access: 'execute',
+                  cause: 'unmapped',
+                  failingAddress: missing,
+                });
+              } else noFault(result);
+              memory(cpu, CODE, code);
+              memory(cpu, 0x4000n, RAM);
+            },
+            { limits: { maxInstructions: 1, maxTranslationsPerRun: 1 } },
+          );
+        }
+      },
+    },
+  ];
+}
