@@ -2,6 +2,7 @@ import { registerScenarios } from './registers.js';
 import { integerConditionsScenarios } from './conditions/index.js';
 import { integerMemoryScenarios } from './memory/index.js';
 import { scalarDataScenarios } from './data/index.js';
+import { integerArithmeticScenarios } from './arithmetic/index.js';
 
 export function integerScenarios(core: WebAssembly.Module) {
   return [
@@ -9,5 +10,6 @@ export function integerScenarios(core: WebAssembly.Module) {
     ...integerConditionsScenarios(core),
     ...integerMemoryScenarios(core),
     ...scalarDataScenarios(core),
+    ...integerArithmeticScenarios(core),
   ];
 }
