@@ -209,3 +209,60 @@ fn false_setcc_writes_one_byte_without_a_read_import() {
     ]);
     run_cases(vec![packet]);
 }
+
+#[test]
+fn all_byte_add_sub_pairs_preserve_aliases_and_match_independent_flag_definitions() {
+    let modules =
+        [[0x00, 0xc4], [0x28, 0xc4]].map(|code| compiled_fixture(0x1000, &code, 0x1000).bytes);
+    let input = json!({ "layout": RunState::descriptor(), "modules": modules });
+    let script = r#"
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const {layout:l,modules}=JSON.parse(fs.readFileSync(0,'utf8'));
+const parity=Array.from({length:256},(_,v)=>v.toString(2).replaceAll('0','').length%2===0);
+const signed=v=>v<128?v:v-256;
+const guard=0x1122334455660000n;
+for(const [operation,bytes] of modules.entries()) {
+ const memory=new WebAssembly.Memory({initial:1}),d=new DataView(memory.buffer);
+ const forbidden=()=>{throw new Error('register arithmetic accessed memory')};
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(bytes),{env:{
+  memory,load:forbidden,store:forbidden,access_failed:forbidden
+ }});
+ for(let i=1;i<16;i++)d.setBigUint64(l.registers+8*i,0x1122334400000000n+BigInt(i),true);
+ for(let left=0;left<256;left++)for(let right=0;right<256;right++) {
+  const wide=operation===0?left+right:left-right;
+  const result=(wide+256)%256;
+  const signedResult=operation===0?signed(left)+signed(right):signed(left)-signed(right);
+  const carry=operation===0?wide>255:left<right;
+  const auxiliary=operation===0?(left%16+right%16)>15:left%16<right%16;
+  const overflow=signedResult < -128 || signedResult > 127;
+  const flags=2+Number(carry)+4*Number(parity[result])+16*Number(auxiliary)
+   +64*Number(result===0)+128*Number(result>=128)+2048*Number(overflow);
+  d.setBigUint64(l.registers,guard+(BigInt(left)<<8n)+BigInt(right),true);
+  d.setBigUint64(l.flags,0x8d7n,true);d.setBigUint64(l.rip,0x1000n,true);
+  const reason=instance.exports.run(0,1n,0n,0,0);
+  const context=`operation ${operation}, AH=${left}, AL=${right}`;
+  assert.equal(reason,1,context);
+  assert.equal(d.getBigUint64(l.registers,true),guard+(BigInt(result)<<8n)+BigInt(right),context);
+  assert.equal(d.getBigUint64(l.flags,true),BigInt(flags),context);
+  assert.equal(d.getBigUint64(l.rip,true),0x1002n,context);
+  assert.equal(d.getBigUint64(l.remaining,true),0n,context);
+ }
+ for(let i=1;i<16;i++)assert.equal(d.getBigUint64(l.registers+8*i,true),0x1122334400000000n+BigInt(i));
+}
+"#;
+    let mut child = Command::new("node")
+        .args(["--input-type=module", "-e", script])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    serde_json::to_writer(child.stdin.take().unwrap(), &input).unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
