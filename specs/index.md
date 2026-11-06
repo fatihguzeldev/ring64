@@ -7,6 +7,7 @@
 - [stack and near control flow](stack-and-near-control-flow/spec.md): 64-bit push/pop, near call/ret and register-indirect transfers.
 - [scalar data and widths](scalar-data-and-widths/spec.md): register views, scalar operand forms, extensions, setcc and cmovcc.
 - [integer arithmetic and bits](integer-arithmetic-and-bits/spec.md): carry/unary arithmetic, flag transfers, shifts/rotates and classic bit operations.
+- [multiply and divide](multiply-and-divide/spec.md): signed/unsigned products, quotient/remainder pairs and precise divide errors.
 
 ## scope
 
