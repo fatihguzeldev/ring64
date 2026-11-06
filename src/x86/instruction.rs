@@ -246,7 +246,16 @@ mod tests {
 
     #[test]
     fn operand_widths_match_the_selected_data_forms() {
-        assert_eq!((Width::W32.bits(), Width::W32.bytes()), (32, 4));
-        assert_eq!((Width::W64.bits(), Width::W64.bytes()), (64, 8));
+        for (width, bits, bytes, mask) in [
+            (Width::W8, 8, 1, 0xff),
+            (Width::W16, 16, 2, 0xffff),
+            (Width::W32, 32, 4, 0xffff_ffff),
+            (Width::W64, 64, 8, u64::MAX),
+        ] {
+            assert_eq!(
+                (width.bits(), width.bytes(), width.mask()),
+                (bits, bytes, mask)
+            );
+        }
     }
 }
