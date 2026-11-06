@@ -11,6 +11,7 @@ mod arithmetic_bits;
 mod conditions;
 mod integer_memory;
 mod logical;
+mod multiply_divide;
 mod scalar_data;
 mod stack;
 
