@@ -4,7 +4,7 @@ use crate::x86::instruction::{
     Location, MemoryAluOperands, Operand, Operation, RegisterView, Shift, Unary, Width,
 };
 
-use super::{cursor::Cursor, operand::ModRm, prefix::Prefixes, DecodeError};
+use super::{DecodeError, cursor::Cursor, operand::ModRm, prefix::Prefixes};
 
 pub(super) fn refine<F>(
     opcode: u8,
@@ -328,11 +328,7 @@ where
 }
 
 fn byte_or_wide(opcode: u8, wide: Width) -> Width {
-    if opcode & 1 == 0 {
-        Width::W8
-    } else {
-        wide
-    }
+    if opcode & 1 == 0 { Width::W8 } else { wide }
 }
 
 fn immediate<F>(cursor: &mut Cursor<F>, width: Width, short: bool) -> Result<u64, DecodeError>

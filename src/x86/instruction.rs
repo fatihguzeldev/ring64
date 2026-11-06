@@ -52,11 +52,7 @@ impl RegisterView {
     }
 
     pub fn shift(self) -> u32 {
-        if self.high_byte {
-            8
-        } else {
-            0
-        }
+        if self.high_byte { 8 } else { 0 }
     }
 }
 

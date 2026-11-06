@@ -1,4 +1,4 @@
-use super::{at, missing, operation, DecodeError};
+use super::{DecodeError, at, missing, operation};
 use crate::memory::{Access, Cause, Fault};
 use crate::x86::instruction::{
     Address, AddressBase, Bit, BitIndex, Carry, Count, DoubleShift, Location, Operation,
