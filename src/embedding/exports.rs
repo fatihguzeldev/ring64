@@ -6,7 +6,7 @@ use crate::x86::decode::{self, DecodeError};
 use crate::x86::instruction::Operation;
 use crate::x86::state::State;
 
-use super::layout::{FETCH, INVALID, RESOURCE, RunState, TARGET, UNSUPPORTED};
+use super::layout::{DATA, FETCH, INVALID, RESOURCE, RunState, TARGET, UNSUPPORTED};
 
 struct Core {
     image: Image,
@@ -114,7 +114,11 @@ pub extern "C" fn core_import_state() -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_clear_fault() {
-    BRIDGE.with_borrow_mut(|bridge| bridge.core.as_mut().unwrap().fault = None);
+    BRIDGE.with_borrow_mut(|bridge| {
+        let core = bridge.core.as_mut().unwrap();
+        core.fault = None;
+        unsafe { (*core.state.get()).target = 0 };
+    });
 }
 
 #[unsafe(no_mangle)]
@@ -215,33 +219,30 @@ pub extern "C" fn core_access_failed() -> i32 {
 pub extern "C" fn core_fault_info(reason: i32) {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_ref().unwrap();
-        let target_fault = if reason == TARGET {
-            // this diagnostic runs after the generated invocation has returned.
-            let rip = unsafe { (*core.state.get()).rip };
-            match decode::decode(rip, |address| core.image.fetch(address)) {
-                Ok(instruction) => match instruction.operation {
-                    Operation::Jump { target } | Operation::Jcc { target, .. } => Some(Fault {
-                        address: target,
-                        width: 0,
-                        access: Access::Execute,
-                        cause: Cause::Noncanonical,
-                        failing: u128::from(target),
-                    }),
-                    _ => None,
-                },
-                Err(_) => None,
+        let fault = match reason {
+            DATA | FETCH => core.fault.as_ref().map(fault_json),
+            TARGET => {
+                // Generated execution has returned. Existing static branches do
+                // not write the runtime target transport.
+                let state = unsafe { &*core.state.get() };
+                let target = match decode::decode(state.rip, |address| core.image.fetch(address)) {
+                    Ok(instruction) => match instruction.operation {
+                        Operation::Jump { target } | Operation::Jcc { target, .. } => target,
+                        _ => state.target,
+                    },
+                    Err(_) => state.target,
+                };
+                Some(fault_json(&Fault {
+                    address: target,
+                    width: 0,
+                    access: Access::Execute,
+                    cause: Cause::Noncanonical,
+                    failing: u128::from(target),
+                }))
             }
-        } else {
-            None
+            _ => None,
         };
-        bridge.info = serde_json::to_vec(
-            &core
-                .fault
-                .as_ref()
-                .or(target_fault.as_ref())
-                .map(fault_json),
-        )
-        .unwrap();
+        bridge.info = serde_json::to_vec(&fault).unwrap();
     })
 }
 
@@ -303,3 +304,6 @@ pub extern "C" fn core_info_len() -> u32 {
 pub extern "C" fn core_dispose() {
     BRIDGE.with_borrow_mut(|bridge| *bridge = Bridge::default());
 }
+
+#[cfg(test)]
+mod tests;
