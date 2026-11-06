@@ -77,7 +77,7 @@ fn generated_mov_addresses_match_literal_memory_calls() {
                     pc,
                     next_pc,
                     operation: Operation::Load {
-                        dst: 0,
+                        dst: RegisterView::low(0),
                         address: Address {
                             base,
                             index: index.map(|(register, scale)| AddressIndex { register, scale }),
@@ -155,7 +155,7 @@ fn generated_mov_addresses_match_literal_memory_calls() {
                 pc: 0x1000,
                 next_pc: 0x1005,
                 operation: Operation::Store {
-                    src: source,
+                    src: DataOperand::Register(RegisterView::low(source)),
                     address: Address {
                         base: Register(base),
                         index: Some(AddressIndex {

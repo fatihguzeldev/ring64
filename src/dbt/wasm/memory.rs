@@ -1,10 +1,10 @@
 use super::{ADDRESS, Emitter, GPR, RESULT, VALUE};
 use crate::embedding::layout::DATA;
-use crate::x86::instruction::{Address, AddressBase, Width};
+use crate::x86::instruction::{Address, AddressBase, DataOperand, RegisterView, Width};
 use wasm_encoder::{BlockType, Instruction as Op};
 
 impl Emitter {
-    fn address(&mut self, address: Address, next_pc: u64) {
+    pub(super) fn address(&mut self, address: Address, next_pc: u64) {
         let has_base = if let AddressBase::Register(base) = address.base {
             self.op(Op::LocalGet(GPR + u32::from(base)));
             true
@@ -34,15 +34,15 @@ impl Emitter {
         }
     }
 
-    pub(super) fn lea(&mut self, dst: u8, address: Address, width: Width, next_pc: u64) {
+    pub(super) fn lea(&mut self, dst: RegisterView, address: Address, width: Width, next_pc: u64) {
         self.address(address, next_pc);
         self.narrow(width);
-        self.op(Op::LocalSet(GPR + u32::from(dst)));
+        self.write_register(dst, width);
     }
 
     pub(super) fn load(
         &mut self,
-        dst: u8,
+        dst: RegisterView,
         address: Address,
         width: Width,
         next_pc: u64,
@@ -51,7 +51,7 @@ impl Emitter {
         self.load_value(address, width, next_pc, false, exit_depth);
         self.op(Op::LocalGet(VALUE));
         self.narrow(width);
-        self.op(Op::LocalSet(GPR + u32::from(dst)));
+        self.write_register(dst, width);
     }
 
     pub(super) fn load_value(
@@ -87,7 +87,7 @@ impl Emitter {
 
     pub(super) fn store(
         &mut self,
-        src: u8,
+        src: DataOperand,
         address: Address,
         width: Width,
         next_pc: u64,
@@ -97,7 +97,7 @@ impl Emitter {
         self.op(Op::LocalSet(ADDRESS))
             .op(Op::LocalGet(ADDRESS))
             .op(Op::I32Const(i32::from(width.bytes())));
-        self.register(src, width);
+        self.data_operand(src, width);
         self.op(Op::Call(1))
             .op(Op::I32Eqz)
             .op(Op::If(BlockType::Empty));

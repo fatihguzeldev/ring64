@@ -168,7 +168,11 @@ fn new_condition_coverage_keeps_prefixed_and_other_branch_families_unsupported()
     for opcode in [0xe0, 0xe1, 0xe2, 0xe3] {
         assert_eq!(at(0x1000, &[opcode, 0]), Err(DecodeError::Unsupported));
     }
-    for second in (0x40..=0x4f).chain(0x90..=0x9f).chain([0x7f]) {
-        assert_eq!(at(0x1000, &[0x0f, second]), Err(DecodeError::Unsupported));
+    for second in (0x40..=0x4f).chain(0x90..=0x9f) {
+        assert_eq!(
+            at(0x1000, &[0x0f, second]),
+            Err(DecodeError::Fetch(missing(0x1002)))
+        );
     }
+    assert_eq!(at(0x1000, &[0x0f, 0x7f]), Err(DecodeError::Unsupported));
 }

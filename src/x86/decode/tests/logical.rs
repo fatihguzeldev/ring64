@@ -1,7 +1,7 @@
 use super::{at, missing, operation};
 use crate::memory::{Access, Cause, Fault};
 use crate::x86::decode::{self, DecodeError};
-use crate::x86::instruction::{Alu, Operand, Operation, Width};
+use crate::x86::instruction::{Alu, DataOperand as Operand, Operation, RegisterView, Width};
 
 use Alu::{And, Or, Test, Xor};
 use Operand::{Immediate, Register};
@@ -10,7 +10,7 @@ use Width::{W32, W64};
 fn alu(kind: Alu, dst: u8, src: Operand, width: Width) -> Operation {
     Operation::Alu {
         kind,
-        dst,
+        dst: RegisterView::low(dst),
         src,
         width,
     }
@@ -19,14 +19,38 @@ fn alu(kind: Alu, dst: u8, src: Operand, width: Width) -> Operation {
 #[test]
 fn register_logical_literals_are_admitted_with_complete_instruction_boundaries() {
     for (bytes, expected) in [
-        (&[0x45, 0x21, 0xc8][..], alu(And, 8, Register(9), W32)),
-        (&[0x45, 0x23, 0xc1][..], alu(And, 8, Register(9), W32)),
-        (&[0x4d, 0x09, 0xc8][..], alu(Or, 8, Register(9), W64)),
-        (&[0x4d, 0x0b, 0xc1][..], alu(Or, 8, Register(9), W64)),
-        (&[0x4d, 0x31, 0xc8][..], alu(Xor, 8, Register(9), W64)),
-        (&[0x4d, 0x33, 0xc1][..], alu(Xor, 8, Register(9), W64)),
-        (&[0x85, 0xc0][..], alu(Test, 0, Register(0), W32)),
-        (&[0x45, 0x85, 0xc0][..], alu(Test, 8, Register(8), W32)),
+        (
+            &[0x45, 0x21, 0xc8][..],
+            alu(And, 8, Register(RegisterView::low(9)), W32),
+        ),
+        (
+            &[0x45, 0x23, 0xc1][..],
+            alu(And, 8, Register(RegisterView::low(9)), W32),
+        ),
+        (
+            &[0x4d, 0x09, 0xc8][..],
+            alu(Or, 8, Register(RegisterView::low(9)), W64),
+        ),
+        (
+            &[0x4d, 0x0b, 0xc1][..],
+            alu(Or, 8, Register(RegisterView::low(9)), W64),
+        ),
+        (
+            &[0x4d, 0x31, 0xc8][..],
+            alu(Xor, 8, Register(RegisterView::low(9)), W64),
+        ),
+        (
+            &[0x4d, 0x33, 0xc1][..],
+            alu(Xor, 8, Register(RegisterView::low(9)), W64),
+        ),
+        (
+            &[0x85, 0xc0][..],
+            alu(Test, 0, Register(RegisterView::low(0)), W32),
+        ),
+        (
+            &[0x45, 0x85, 0xc0][..],
+            alu(Test, 8, Register(RegisterView::low(8)), W32),
+        ),
         (&[0x48, 0x83, 0xc8, 0][..], alu(Or, 0, Immediate(0), W64)),
         (
             &[0x48, 0x83, 0xe0, 0x80][..],
@@ -84,7 +108,7 @@ fn logical_register_directions_keep_all_banks_aliases_and_ignored_rex_x() {
                     for ignored_x in [0, 2] {
                         assert_eq!(
                             operation(&[rex | ignored_x, opcode, modrm]),
-                            alu(kind, dst, Register(src), width)
+                            alu(kind, dst, Register(RegisterView::low(src)), width)
                         );
                     }
                 }
@@ -218,26 +242,42 @@ fn unsupported_logical_selectors_do_not_request_operand_tails() {
 }
 
 #[test]
-fn logical_coverage_keeps_other_widths_prefixes_and_accumulator_forms_unsupported() {
-    for prefix in [
-        0x66, 0x67, 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65, 0xf0, 0xf2, 0xf3,
-    ] {
+fn logical_extensions_admit_byte_and_accumulator_forms_but_keep_other_prefixes_unsupported() {
+    for prefix in [0x67, 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65, 0xf0, 0xf2, 0xf3] {
         assert_eq!(
             at(0x1000, &[prefix, 0x45, 0x21, 0xc8]),
             Err(DecodeError::Unsupported)
         );
     }
     for opcode in [0x20, 0x22, 0x08, 0x0a, 0x30, 0x32, 0x84, 0x80, 0xf6] {
-        assert_eq!(
-            at(0x1000, &[0x4f, opcode, 0xc0, 0xff]),
-            Err(DecodeError::Unsupported)
-        );
+        assert!(matches!(
+            at(0x1000, &[0x4f, opcode, 0xc0, 0xff]).unwrap().operation,
+            Operation::Alu {
+                width: Width::W8,
+                ..
+            }
+        ));
     }
     for opcode in [0x25, 0x0d, 0x35, 0xa9] {
         for prefix in [None, Some(0x48)] {
             let mut bytes = prefix.into_iter().collect::<Vec<_>>();
             bytes.extend([opcode, 0, 0, 0, 0]);
-            assert_eq!(at(0x1000, &bytes), Err(DecodeError::Unsupported));
+            let kind = match opcode {
+                0x25 => And,
+                0x0d => Or,
+                0x35 => Xor,
+                0xa9 => Test,
+                _ => unreachable!(),
+            };
+            assert_eq!(
+                operation(&bytes),
+                alu(
+                    kind,
+                    0,
+                    Immediate(0),
+                    if prefix.is_some() { W64 } else { W32 }
+                )
+            );
         }
     }
     assert_eq!(

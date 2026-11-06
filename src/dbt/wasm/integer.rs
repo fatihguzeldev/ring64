@@ -1,11 +1,17 @@
 use super::{Emitter, FLAGS, GPR, LHS, RESULT, RHS};
-use crate::x86::instruction::{Alu, Operand, Width};
+use crate::x86::instruction::{Alu, DataOperand, Operand, RegisterView, Width};
 use wasm_encoder::Instruction as Op;
 
 impl Emitter {
     pub(super) fn narrow(&mut self, width: Width) {
-        if width == Width::W32 {
-            self.op(Op::I32WrapI64).op(Op::I64ExtendI32U);
+        match width {
+            Width::W8 | Width::W16 => {
+                self.op(Op::I64Const(width.mask() as i64)).op(Op::I64And);
+            }
+            Width::W32 => {
+                self.op(Op::I32WrapI64).op(Op::I64ExtendI32U);
+            }
+            Width::W64 => {}
         }
     }
 
@@ -24,23 +30,56 @@ impl Emitter {
         }
     }
 
-    pub(super) fn integer(&mut self, kind: Alu, dst: u8, src: Operand, width: Width) {
+    pub(super) fn data_register(&mut self, register: RegisterView, width: Width) {
+        self.op(Op::LocalGet(GPR + u32::from(register.bank)));
+        if register.high_byte {
+            self.op(Op::I64Const(i64::from(register.shift())))
+                .op(Op::I64ShrU);
+        }
+        self.narrow(width);
+    }
+
+    pub(super) fn data_operand(&mut self, operand: DataOperand, width: Width) {
+        match operand {
+            DataOperand::Register(register) => self.data_register(register, width),
+            DataOperand::Immediate(value) => {
+                self.op(Op::I64Const(value as i64));
+                self.narrow(width);
+            }
+        }
+    }
+
+    pub(super) fn write_register(&mut self, register: RegisterView, width: Width) {
+        if matches!(width, Width::W8 | Width::W16) {
+            let shift = register.shift();
+            if shift != 0 {
+                self.op(Op::I64Const(i64::from(shift))).op(Op::I64Shl);
+            }
+            self.op(Op::LocalGet(GPR + u32::from(register.bank)))
+                .op(Op::I64Const(!(width.mask() << shift) as i64))
+                .op(Op::I64And)
+                .op(Op::I64Or);
+        }
+        self.op(Op::LocalSet(GPR + u32::from(register.bank)));
+    }
+
+    pub(super) fn integer(&mut self, kind: Alu, dst: RegisterView, src: DataOperand, width: Width) {
         match kind {
             Alu::And | Alu::Or | Alu::Xor | Alu::Test => self.logical(kind, dst, src, width),
             Alu::Add | Alu::Sub | Alu::Cmp => self.arithmetic(kind, dst, src, width),
         }
     }
 
-    fn arithmetic(&mut self, kind: Alu, dst: u8, src: Operand, width: Width) {
-        self.register(dst, width);
+    fn arithmetic(&mut self, kind: Alu, dst: RegisterView, src: DataOperand, width: Width) {
+        self.data_register(dst, width);
         self.op(Op::LocalSet(LHS));
-        self.operand(src, width);
+        self.data_operand(src, width);
         self.op(Op::LocalSet(RHS));
         self.arithmetic_result(kind, width);
         self.arithmetic_flags(kind, width);
         if kind != Alu::Cmp {
-            self.op(Op::LocalGet(RESULT))
-                .op(Op::LocalSet(GPR + u32::from(dst)));
+            self.op(Op::LocalGet(RESULT));
+            self.write_register(dst, width);
         }
     }
 
@@ -114,14 +153,14 @@ impl Emitter {
             .op(Op::LocalSet(FLAGS));
     }
 
-    fn logical(&mut self, kind: Alu, dst: u8, src: Operand, width: Width) {
-        self.register(dst, width);
-        self.operand(src, width);
+    fn logical(&mut self, kind: Alu, dst: RegisterView, src: DataOperand, width: Width) {
+        self.data_register(dst, width);
+        self.data_operand(src, width);
         self.logical_result(kind);
         self.logical_flags(width);
         if kind != Alu::Test {
-            self.op(Op::LocalGet(RESULT))
-                .op(Op::LocalSet(GPR + u32::from(dst)));
+            self.op(Op::LocalGet(RESULT));
+            self.write_register(dst, width);
         }
     }
 

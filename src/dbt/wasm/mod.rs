@@ -1,4 +1,5 @@
 mod control;
+mod data;
 mod entry_lookup;
 mod integer;
 mod integer_memory;
@@ -144,8 +145,8 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         emitter.gates(exit_depth);
         match instruction.operation {
             Operation::Mov { dst, src, width } => {
-                emitter.operand(src, width);
-                emitter.op(Op::LocalSet(GPR + u32::from(dst)));
+                emitter.data_operand(src, width);
+                emitter.write_register(dst, width);
             }
             Operation::Alu {
                 kind,
@@ -181,6 +182,30 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 address,
                 width,
             } => emitter.lea(dst, address, width, instruction.next_pc),
+            Operation::Extend {
+                dst,
+                src,
+                source_width,
+                width,
+                signed,
+            } => emitter.extend(
+                dst,
+                src,
+                (source_width, width),
+                signed,
+                instruction.next_pc,
+                exit_depth,
+            ),
+            Operation::SignHigh { width } => emitter.sign_high(width),
+            Operation::Setcc { dst, condition } => {
+                emitter.setcc(dst, condition, instruction.next_pc, exit_depth);
+            }
+            Operation::Cmov {
+                dst,
+                src,
+                width,
+                condition,
+            } => emitter.cmov(dst, src, width, condition, instruction.next_pc, exit_depth),
             Operation::Push { src } => emitter.push(src, exit_depth),
             Operation::Pop { dst } => emitter.pop(dst, exit_depth),
             Operation::Call { target } => {

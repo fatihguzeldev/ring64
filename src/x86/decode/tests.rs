@@ -2,13 +2,15 @@ use crate::memory::{Access, Cause, Fault};
 
 use super::{DecodeError, decode};
 use crate::x86::instruction::{
-    Address, AddressBase, Alu, Condition, Instruction, Operand, Operation, Width,
+    Address, AddressBase, Alu, Condition, DataOperand as Operand, Instruction, Operation,
+    RegisterView, Width,
 };
 
 mod addressing;
 mod conditions;
 mod integer_memory;
 mod logical;
+mod scalar_data;
 mod stack;
 
 fn missing(address: u64) -> Fault {
@@ -44,7 +46,7 @@ fn immediate_moves_preserve_raw_bits_and_use_the_opcode_register_extension() {
     assert_eq!(
         operation(&[0xb8, 0xef, 0xcd, 0xab, 0x89]),
         Operation::Mov {
-            dst: 0,
+            dst: RegisterView::low(0),
             src: Operand::Immediate(0x89ab_cdef),
             width: Width::W32,
         }
@@ -52,7 +54,7 @@ fn immediate_moves_preserve_raw_bits_and_use_the_opcode_register_extension() {
     assert_eq!(
         operation(&[0x41, 0xbf, 0xff, 0xff, 0xff, 0xff]),
         Operation::Mov {
-            dst: 15,
+            dst: RegisterView::low(15),
             src: Operand::Immediate(0xffff_ffff),
             width: Width::W32,
         }
@@ -60,7 +62,7 @@ fn immediate_moves_preserve_raw_bits_and_use_the_opcode_register_extension() {
     assert_eq!(
         operation(&[0x4f, 0xb8, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11]),
         Operation::Mov {
-            dst: 8,
+            dst: RegisterView::low(8),
             src: Operand::Immediate(0x1122_3344_5566_7788),
             width: Width::W64,
         }
@@ -73,8 +75,8 @@ fn register_moves_decode_both_directions_and_default_width_with_rex() {
         assert_eq!(
             operation(bytes),
             Operation::Mov {
-                dst: 0,
-                src: Operand::Register(2),
+                dst: RegisterView::low(0),
+                src: Operand::Register(RegisterView::low(2)),
                 width: Width::W32
             }
         );
@@ -82,16 +84,16 @@ fn register_moves_decode_both_directions_and_default_width_with_rex() {
     assert_eq!(
         operation(&[0x45, 0x89, 0xc8]),
         Operation::Mov {
-            dst: 8,
-            src: Operand::Register(9),
+            dst: RegisterView::low(8),
+            src: Operand::Register(RegisterView::low(9)),
             width: Width::W32
         }
     );
     assert_eq!(
         operation(&[0x4d, 0x8b, 0xc1]),
         Operation::Mov {
-            dst: 8,
-            src: Operand::Register(9),
+            dst: RegisterView::low(8),
+            src: Operand::Register(RegisterView::low(9)),
             width: Width::W64
         }
     );
@@ -111,8 +113,8 @@ fn register_arithmetic_decodes_each_operation_at_both_widths() {
             operation(bytes),
             Operation::Alu {
                 kind,
-                dst: 0,
-                src: Operand::Register(2),
+                dst: RegisterView::low(0),
+                src: Operand::Register(RegisterView::low(2)),
                 width
             }
         );
@@ -121,8 +123,8 @@ fn register_arithmetic_decodes_each_operation_at_both_widths() {
         operation(&[0x45, 0x39, 0xc8]),
         Operation::Alu {
             kind: Alu::Cmp,
-            dst: 8,
-            src: Operand::Register(9),
+            dst: RegisterView::low(8),
+            src: Operand::Register(RegisterView::low(9)),
             width: Width::W32,
         }
     );
@@ -188,7 +190,7 @@ fn arithmetic_immediates_are_signed_to_the_operand_width() {
             operation(bytes),
             Operation::Alu {
                 kind,
-                dst: 0,
+                dst: RegisterView::low(0),
                 src: Operand::Immediate(value),
                 width
             }
@@ -202,7 +204,7 @@ fn rex_r_does_not_extend_an_opcode_group_selector() {
         operation(&[0x4c, 0x83, 0xc0, 1]),
         Operation::Alu {
             kind: Alu::Add,
-            dst: 0,
+            dst: RegisterView::low(0),
             src: Operand::Immediate(1),
             width: Width::W64,
         }
@@ -211,7 +213,7 @@ fn rex_r_does_not_extend_an_opcode_group_selector() {
         operation(&[0x45, 0x81, 0xef, 0xff, 0xff, 0xff, 0xff]),
         Operation::Alu {
             kind: Alu::Sub,
-            dst: 15,
+            dst: RegisterView::low(15),
             src: Operand::Immediate(0xffff_ffff),
             width: Width::W32,
         }
@@ -223,7 +225,7 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
     assert_eq!(
         operation(&[0x8b, 3]),
         Operation::Load {
-            dst: 0,
+            dst: RegisterView::low(0),
             address: Address {
                 base: AddressBase::Register(3),
                 index: None,
@@ -235,7 +237,7 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
     assert_eq!(
         operation(&[0x48, 0x89, 3]),
         Operation::Store {
-            src: 0,
+            src: Operand::Register(RegisterView::low(0)),
             address: Address {
                 base: AddressBase::Register(3),
                 index: None,
@@ -247,7 +249,7 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
     assert_eq!(
         operation(&[0x45, 0x8b, 0x45, 0]),
         Operation::Load {
-            dst: 8,
+            dst: RegisterView::low(8),
             address: Address {
                 base: AddressBase::Register(13),
                 index: None,
@@ -259,7 +261,7 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
     assert_eq!(
         operation(&[0x4d, 0x89, 0x45, 0xfc]),
         Operation::Store {
-            src: 8,
+            src: Operand::Register(RegisterView::low(8)),
             address: Address {
                 base: AddressBase::Register(13),
                 index: None,
@@ -271,7 +273,7 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
     assert_eq!(
         operation(&[0x4a, 0x8b, 0x83, 0, 0, 0, 0x80]),
         Operation::Load {
-            dst: 0,
+            dst: RegisterView::low(0),
             address: Address {
                 base: AddressBase::Register(3),
                 index: None,
@@ -283,7 +285,7 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
     assert_eq!(
         operation(&[0x89, 0xbd, 0xff, 0xff, 0xff, 0x7f]),
         Operation::Store {
-            src: 7,
+            src: Operand::Register(RegisterView::low(7)),
             address: Address {
                 base: AddressBase::Register(5),
                 index: None,
@@ -295,7 +297,7 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
     assert_eq!(
         operation(&[0x8b, 0x43, 0x80]),
         Operation::Load {
-            dst: 0,
+            dst: RegisterView::low(0),
             address: Address {
                 base: AddressBase::Register(3),
                 index: None,
@@ -307,7 +309,7 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
     assert_eq!(
         operation(&[0x8b, 0x43, 0x7f]),
         Operation::Load {
-            dst: 0,
+            dst: RegisterView::low(0),
             address: Address {
                 base: AddressBase::Register(3),
                 index: None,
@@ -361,7 +363,6 @@ fn relative_targets_use_the_following_pc_and_signed_displacements() {
 fn valid_forms_outside_the_subset_are_unsupported_without_operand_effects() {
     for bytes in [
         &[0x83, 0xd0, 1][..], // ADC is not an implemented group selector.
-        &[0x66, 0x89, 0xc0][..],
         &[0x67, 0x8b, 3][..],
         &[0x48, 0xeb, 0][..],
         &[0x48, 0x0f, 0x85, 0, 0, 0, 0][..],
@@ -444,7 +445,7 @@ fn overlapping_entries_are_independently_decoded_at_the_requested_pc() {
             pc: 0x1000,
             next_pc: 0x1005,
             operation: Operation::Mov {
-                dst: 0,
+                dst: RegisterView::low(0),
                 src: Operand::Immediate(0x3b9),
                 width: Width::W32
             }
@@ -456,7 +457,7 @@ fn overlapping_entries_are_independently_decoded_at_the_requested_pc() {
             pc: 0x1001,
             next_pc: 0x1006,
             operation: Operation::Mov {
-                dst: 1,
+                dst: RegisterView::low(1),
                 src: Operand::Immediate(3),
                 width: Width::W32
             }
@@ -475,7 +476,7 @@ fn integrated_literal_has_the_declared_instruction_boundaries_and_loop_target() 
             0,
             5,
             Operation::Mov {
-                dst: 0,
+                dst: RegisterView::low(0),
                 src: Operand::Immediate(0),
                 width: Width::W32,
             },
@@ -484,7 +485,7 @@ fn integrated_literal_has_the_declared_instruction_boundaries_and_loop_target() 
             5,
             10,
             Operation::Mov {
-                dst: 1,
+                dst: RegisterView::low(1),
                 src: Operand::Immediate(3),
                 width: Width::W32,
             },
@@ -494,8 +495,8 @@ fn integrated_literal_has_the_declared_instruction_boundaries_and_loop_target() 
             13,
             Operation::Alu {
                 kind: Alu::Add,
-                dst: 0,
-                src: Operand::Register(1),
+                dst: RegisterView::low(0),
+                src: Operand::Register(RegisterView::low(1)),
                 width: Width::W64,
             },
         ),
@@ -504,7 +505,7 @@ fn integrated_literal_has_the_declared_instruction_boundaries_and_loop_target() 
             17,
             Operation::Alu {
                 kind: Alu::Sub,
-                dst: 1,
+                dst: RegisterView::low(1),
                 src: Operand::Immediate(1),
                 width: Width::W64,
             },
@@ -521,7 +522,7 @@ fn integrated_literal_has_the_declared_instruction_boundaries_and_loop_target() 
             19,
             22,
             Operation::Store {
-                src: 0,
+                src: Operand::Register(RegisterView::low(0)),
                 address: Address {
                     base: AddressBase::Register(3),
                     index: None,

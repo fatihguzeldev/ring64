@@ -1,4 +1,4 @@
-use super::{Emitter, GPR, LHS, RESULT, RHS, VALUE};
+use super::{Emitter, LHS, RESULT, RHS, VALUE};
 use crate::x86::instruction::{Address, Alu, MemoryAluOperands, Width};
 use wasm_encoder::Instruction as Op;
 
@@ -20,11 +20,11 @@ impl Emitter {
                 self.op(Op::LocalGet(VALUE));
                 self.narrow(width);
                 self.op(Op::LocalSet(LHS));
-                self.operand(source, width);
+                self.data_operand(source, width);
                 self.op(Op::LocalSet(RHS));
             }
             MemoryAluOperands::RegisterFirst(register) => {
-                self.register(register, width);
+                self.data_register(register, width);
                 self.op(Op::LocalSet(LHS)).op(Op::LocalGet(VALUE));
                 self.narrow(width);
                 self.op(Op::LocalSet(RHS));
@@ -48,8 +48,8 @@ impl Emitter {
         if let MemoryAluOperands::RegisterFirst(register) = operands
             && kind.writes_result()
         {
-            self.op(Op::LocalGet(RESULT))
-                .op(Op::LocalSet(GPR + u32::from(register)));
+            self.op(Op::LocalGet(RESULT));
+            self.write_register(register, width);
         }
     }
 }

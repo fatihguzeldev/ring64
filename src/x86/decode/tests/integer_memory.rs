@@ -2,7 +2,8 @@ use super::{at, missing, operation};
 use crate::memory::{Access, Cause, Fault};
 use crate::x86::decode::{self, DecodeError};
 use crate::x86::instruction::{
-    Address, AddressBase, AddressIndex, Alu, MemoryAluOperands, Operand, Operation, Width,
+    Address, AddressBase, AddressIndex, Alu, DataOperand as Operand, MemoryAluOperands, Operation,
+    RegisterView, Width,
 };
 
 use Alu::{Add, And, Cmp, Or, Sub, Test, Xor};
@@ -22,19 +23,19 @@ fn alu(kind: Alu, address: Address, operands: MemoryAluOperands, width: Width) -
 #[test]
 fn memory_integer_opcode_directions_keep_the_first_read_operand() {
     for (opcode, kind, operands) in [
-        (0x01, Add, MemoryFirst(Register(1))),
-        (0x03, Add, RegisterFirst(1)),
-        (0x29, Sub, MemoryFirst(Register(1))),
-        (0x2b, Sub, RegisterFirst(1)),
-        (0x39, Cmp, MemoryFirst(Register(1))),
-        (0x3b, Cmp, RegisterFirst(1)),
-        (0x21, And, MemoryFirst(Register(1))),
-        (0x23, And, RegisterFirst(1)),
-        (0x09, Or, MemoryFirst(Register(1))),
-        (0x0b, Or, RegisterFirst(1)),
-        (0x31, Xor, MemoryFirst(Register(1))),
-        (0x33, Xor, RegisterFirst(1)),
-        (0x85, Test, MemoryFirst(Register(1))),
+        (0x01, Add, MemoryFirst(Register(RegisterView::low(1)))),
+        (0x03, Add, RegisterFirst(RegisterView::low(1))),
+        (0x29, Sub, MemoryFirst(Register(RegisterView::low(1)))),
+        (0x2b, Sub, RegisterFirst(RegisterView::low(1))),
+        (0x39, Cmp, MemoryFirst(Register(RegisterView::low(1)))),
+        (0x3b, Cmp, RegisterFirst(RegisterView::low(1))),
+        (0x21, And, MemoryFirst(Register(RegisterView::low(1)))),
+        (0x23, And, RegisterFirst(RegisterView::low(1))),
+        (0x09, Or, MemoryFirst(Register(RegisterView::low(1)))),
+        (0x0b, Or, RegisterFirst(RegisterView::low(1))),
+        (0x31, Xor, MemoryFirst(Register(RegisterView::low(1)))),
+        (0x33, Xor, RegisterFirst(RegisterView::low(1))),
+        (0x85, Test, MemoryFirst(Register(RegisterView::low(1)))),
     ] {
         let address = Address {
             base: AddressBase::Register(3),
@@ -79,9 +80,9 @@ fn memory_integer_register_fields_keep_all_banks_and_address_aliases() {
                         }
                         bytes.push(0);
                         let operands = if register_first {
-                            RegisterFirst(register)
+                            RegisterFirst(RegisterView::low(register))
                         } else {
-                            MemoryFirst(Register(register))
+                            MemoryFirst(Register(RegisterView::low(register)))
                         };
                         assert_eq!(
                             operation(&bytes),
@@ -168,7 +169,7 @@ fn memory_integer_addresses_keep_sib_specials_displacements_and_aliases() {
                 scale: 4,
             }),
             -8,
-            MemoryFirst(Register(9)),
+            MemoryFirst(Register(RegisterView::low(9))),
             W64,
         ),
         (
@@ -177,7 +178,7 @@ fn memory_integer_addresses_keep_sib_specials_displacements_and_aliases() {
             AddressBase::None,
             None,
             -2147483648,
-            RegisterFirst(0),
+            RegisterFirst(RegisterView::low(0)),
             W64,
         ),
         (
@@ -189,7 +190,7 @@ fn memory_integer_addresses_keep_sib_specials_displacements_and_aliases() {
                 scale: 8,
             }),
             -4,
-            RegisterFirst(0),
+            RegisterFirst(RegisterView::low(0)),
             W64,
         ),
         (
@@ -198,7 +199,7 @@ fn memory_integer_addresses_keep_sib_specials_displacements_and_aliases() {
             AddressBase::Register(12),
             None,
             0,
-            MemoryFirst(Register(9)),
+            MemoryFirst(Register(RegisterView::low(9))),
             W64,
         ),
         (
@@ -210,7 +211,7 @@ fn memory_integer_addresses_keep_sib_specials_displacements_and_aliases() {
                 scale: 8,
             }),
             0,
-            MemoryFirst(Register(0)),
+            MemoryFirst(Register(RegisterView::low(0))),
             W64,
         ),
         (
@@ -222,7 +223,7 @@ fn memory_integer_addresses_keep_sib_specials_displacements_and_aliases() {
                 scale: 1,
             }),
             -128,
-            MemoryFirst(Register(0)),
+            MemoryFirst(Register(RegisterView::low(0))),
             W64,
         ),
         (
@@ -231,7 +232,7 @@ fn memory_integer_addresses_keep_sib_specials_displacements_and_aliases() {
             AddressBase::Register(3),
             None,
             2147483647,
-            RegisterFirst(0),
+            RegisterFirst(RegisterView::low(0)),
             W32,
         ),
         (
@@ -430,22 +431,35 @@ fn memory_integer_tail_fetches_preserve_fault_metadata_and_byte_order() {
 }
 
 #[test]
-fn memory_extension_keeps_new_register_directions_and_other_encodings_unsupported() {
+fn width_extension_admits_byte_memory_and_register_directions_but_keeps_other_prefixes_unsupported()
+{
     for opcode in [0x03, 0x2b, 0x3b] {
         for prefix in [None, Some(0x40), Some(0x4f)] {
             let mut bytes: Vec<_> = prefix.into_iter().collect();
             bytes.extend([opcode, 0xff]);
             let pc = u64::MAX - bytes.len() as u64 + 1;
+            let bank = if prefix == Some(0x4f) { 15 } else { 7 };
+            let width = if prefix == Some(0x4f) { W64 } else { W32 };
+            let kind = match opcode {
+                0x03 => Add,
+                0x2b => Sub,
+                0x3b => Cmp,
+                _ => unreachable!(),
+            };
+            let decoded = at(pc, &bytes).unwrap();
+            assert_eq!(decoded.next_pc, 0);
             assert_eq!(
-                at(pc, &bytes),
-                Err(DecodeError::Unsupported),
-                "{bytes:02x?}"
+                decoded.operation,
+                Operation::Alu {
+                    kind,
+                    dst: RegisterView::low(bank),
+                    src: Register(RegisterView::low(bank)),
+                    width,
+                }
             );
         }
     }
-    for prefix in [
-        0x66, 0x67, 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65, 0xf0, 0xf2, 0xf3,
-    ] {
+    for prefix in [0x67, 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65, 0xf0, 0xf2, 0xf3] {
         assert_eq!(
             at(0x1000, &[prefix, 0x48, 0x01, 0x03]),
             Err(DecodeError::Unsupported)
@@ -454,10 +468,13 @@ fn memory_extension_keeps_new_register_directions_and_other_encodings_unsupporte
     for opcode in [
         0x00, 0x02, 0x28, 0x2a, 0x38, 0x3a, 0x20, 0x22, 0x08, 0x0a, 0x30, 0x32, 0x84, 0x80, 0xf6,
     ] {
-        assert_eq!(
-            at(0x1000, &[0x4f, opcode, 0x03, 0xff]),
-            Err(DecodeError::Unsupported)
-        );
+        assert!(matches!(
+            at(0x1000, &[0x4f, opcode, 0x03, 0xff]).unwrap().operation,
+            Operation::MemoryAlu {
+                width: Width::W8,
+                ..
+            }
+        ));
     }
     assert_eq!(
         at(0x1000, &[0x48, 0x49, 0x01, 0x03]),

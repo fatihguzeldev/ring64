@@ -19,8 +19,8 @@ where
     F: FnMut(u64) -> Result<u8, Fault>,
 {
     let mut cursor = cursor::Cursor::new(pc, read);
-    let (rex, opcode) = prefix::read(&mut cursor)?;
-    let operation = opcode::refine(opcode, rex, &mut cursor)?;
+    let (prefixes, opcode) = prefix::read(&mut cursor)?;
+    let operation = opcode::refine(opcode, prefixes, &mut cursor)?;
     Ok(Instruction {
         pc,
         next_pc: cursor.next_pc(),

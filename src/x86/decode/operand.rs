@@ -1,5 +1,5 @@
 use crate::memory::Fault;
-use crate::x86::instruction::{Address, AddressBase, AddressIndex};
+use crate::x86::instruction::{Address, AddressBase, AddressIndex, Location, Width};
 
 use super::{DecodeError, cursor::Cursor, prefix::Rex};
 
@@ -12,6 +12,22 @@ pub(super) struct ModRm {
 }
 
 impl ModRm {
+    pub(super) fn location<F>(
+        &self,
+        cursor: &mut Cursor<F>,
+        rex: Rex,
+        width: Width,
+    ) -> Result<Location, DecodeError>
+    where
+        F: FnMut(u64) -> Result<u8, Fault>,
+    {
+        if self.mode == 3 {
+            Ok(Location::Register(rex.view(self.rm, width)))
+        } else {
+            Ok(Location::Memory(self.address(cursor, rex)?))
+        }
+    }
+
     pub(super) fn read<F>(cursor: &mut Cursor<F>, rex: Rex) -> Result<Self, DecodeError>
     where
         F: FnMut(u64) -> Result<u8, Fault>,

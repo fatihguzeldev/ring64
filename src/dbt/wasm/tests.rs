@@ -1,5 +1,6 @@
 mod addressing;
 mod conditions;
+mod data_widths;
 mod integer_memory;
 mod logical;
 mod routing;
@@ -7,7 +8,9 @@ mod stack;
 
 use super::*;
 use crate::embedding::layout::RunState;
-use crate::x86::instruction::{Alu, Condition, Instruction, Operand, Operation, Width};
+use crate::x86::instruction::{
+    Alu, Condition, DataOperand, Instruction, Operand, Operation, RegisterView, Width,
+};
 use serde_json::{Value, json};
 use std::process::{Command, Stdio};
 
@@ -25,8 +28,8 @@ fn emits_a_valid_module() {
         pc: 0x1000,
         next_pc: 0x1005,
         operation: Operation::Mov {
-            dst: 0,
-            src: Operand::Immediate(7),
+            dst: RegisterView::low(0),
+            src: DataOperand::Immediate(7),
             width: Width::W32,
         },
     }]));
@@ -86,7 +89,7 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             Alu::Cmp,
             Width::W32,
             8,
-            Operand::Register(9),
+            DataOperand::Register(RegisterView::low(9)),
             vec![(8, 0x1122334400000000), (9, 0xaabbccdd00000001)],
             vec![],
             0x97,
@@ -95,7 +98,7 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             Alu::Add,
             Width::W64,
             0,
-            Operand::Immediate(u64::MAX),
+            DataOperand::Immediate(u64::MAX),
             vec![(0, 0)],
             vec![(0, u64::MAX)],
             0x86,
@@ -104,7 +107,7 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             Alu::Sub,
             Width::W64,
             0,
-            Operand::Immediate(u64::MAX),
+            DataOperand::Immediate(u64::MAX),
             vec![(0, 0)],
             vec![(0, 1)],
             0x13,
@@ -113,7 +116,7 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             Alu::Add,
             Width::W64,
             0,
-            Operand::Immediate(1),
+            DataOperand::Immediate(1),
             vec![(0, u64::MAX)],
             vec![(0, 0)],
             0x57,
@@ -122,7 +125,7 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             Alu::Add,
             Width::W64,
             0,
-            Operand::Immediate(1),
+            DataOperand::Immediate(1),
             vec![(0, i64::MAX as u64)],
             vec![(0, 1 << 63)],
             0x896,
@@ -131,7 +134,7 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             Alu::Sub,
             Width::W32,
             0,
-            Operand::Immediate(1),
+            DataOperand::Immediate(1),
             vec![(0, 0x1234567800000000)],
             vec![(0, 0xffffffff)],
             0x97,
@@ -140,7 +143,7 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             Alu::Add,
             Width::W32,
             0,
-            Operand::Register(0),
+            DataOperand::Register(RegisterView::low(0)),
             vec![(0, 0x1234567880000000)],
             vec![(0, 0)],
             0x847,
@@ -152,7 +155,7 @@ fn generated_integer_and_control_paths_match_independent_literals() {
                 next_pc: 0x1003,
                 operation: Operation::Alu {
                     kind,
-                    dst,
+                    dst: RegisterView::low(dst),
                     src,
                     width,
                 },
@@ -170,8 +173,8 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             next_pc: 0x1004,
             operation: Operation::Alu {
                 kind: Alu::Sub,
-                dst: 1,
-                src: Operand::Immediate(1),
+                dst: RegisterView::low(1),
+                src: DataOperand::Immediate(1),
                 width: Width::W64,
             },
         },
@@ -187,8 +190,8 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             pc: 0x1006,
             next_pc: 0x100c,
             operation: Operation::Mov {
-                dst: 8,
-                src: Operand::Immediate(42),
+                dst: RegisterView::low(8),
+                src: DataOperand::Immediate(42),
                 width: Width::W32,
             },
         },
@@ -248,8 +251,8 @@ fn generated_integer_and_control_paths_match_independent_literals() {
         pc: 0x1000,
         next_pc: 0x1005,
         operation: Operation::Mov {
-            dst: 0,
-            src: Operand::Immediate(7),
+            dst: RegisterView::low(0),
+            src: DataOperand::Immediate(7),
             width: Width::W32,
         },
     }];
@@ -275,8 +278,8 @@ fn generated_integer_and_control_paths_match_independent_literals() {
             pc: u64::MAX - 4,
             next_pc: 0,
             operation: Operation::Mov {
-                dst: 0,
-                src: Operand::Immediate(0),
+                dst: RegisterView::low(0),
+                src: DataOperand::Immediate(0),
                 width: Width::W32,
             },
         }],

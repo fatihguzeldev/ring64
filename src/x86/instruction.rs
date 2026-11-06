@@ -1,5 +1,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Width {
+    W8,
+    W16,
     W32,
     W64,
 }
@@ -7,6 +9,8 @@ pub enum Width {
 impl Width {
     pub fn bits(self) -> u32 {
         match self {
+            Self::W8 => 8,
+            Self::W16 => 16,
             Self::W32 => 32,
             Self::W64 => 64,
         }
@@ -15,13 +19,60 @@ impl Width {
     pub fn bytes(self) -> u8 {
         (self.bits() / 8) as u8
     }
+
+    pub fn mask(self) -> u64 {
+        match self {
+            Self::W64 => u64::MAX,
+            _ => (1u64 << self.bits()) - 1,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RegisterView {
+    pub bank: u8,
+    pub high_byte: bool,
+}
+
+impl RegisterView {
+    pub const fn low(bank: u8) -> Self {
+        assert!(bank < 16);
+        Self {
+            bank,
+            high_byte: false,
+        }
+    }
+
+    pub const fn high_byte(bank: u8) -> Self {
+        assert!(bank < 4);
+        Self {
+            bank,
+            high_byte: true,
+        }
+    }
+
+    pub fn shift(self) -> u32 {
+        if self.high_byte { 8 } else { 0 }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operand {
     Register(u8),
-    /// The operand-width bit pattern, zero-extended to u64 for W32.
     Immediate(u64),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DataOperand {
+    Register(RegisterView),
+    /// the operand-width bit pattern, zero-extended to u64.
+    Immediate(u64),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Location {
+    Register(RegisterView),
+    Memory(Address),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,8 +119,8 @@ impl Alu {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryAluOperands {
-    MemoryFirst(Operand),
-    RegisterFirst(u8),
+    MemoryFirst(DataOperand),
+    RegisterFirst(RegisterView),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,30 +146,30 @@ pub enum Condition {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
     Mov {
-        dst: u8,
-        src: Operand,
+        dst: RegisterView,
+        src: DataOperand,
         width: Width,
     },
     Lea {
-        dst: u8,
+        dst: RegisterView,
         address: Address,
         width: Width,
     },
     Load {
-        dst: u8,
+        dst: RegisterView,
         address: Address,
         width: Width,
     },
     Store {
-        src: u8,
+        src: DataOperand,
         address: Address,
         width: Width,
     },
     Alu {
         kind: Alu,
         /// First register operand; Cmp and Test do not write it.
-        dst: u8,
-        src: Operand,
+        dst: RegisterView,
+        src: DataOperand,
         width: Width,
     },
     MemoryAlu {
@@ -126,6 +177,26 @@ pub enum Operation {
         address: Address,
         operands: MemoryAluOperands,
         width: Width,
+    },
+    Extend {
+        dst: RegisterView,
+        src: Location,
+        source_width: Width,
+        width: Width,
+        signed: bool,
+    },
+    SignHigh {
+        width: Width,
+    },
+    Setcc {
+        dst: Location,
+        condition: Condition,
+    },
+    Cmov {
+        dst: RegisterView,
+        src: Location,
+        width: Width,
+        condition: Condition,
     },
     Push {
         src: Operand,
