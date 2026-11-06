@@ -78,7 +78,7 @@ impl Emitter {
         self.op(Op::End).op(Op::End);
     }
 
-    fn signed(&mut self, width: Width) {
+    pub(super) fn signed(&mut self, width: Width) {
         match width {
             Width::W8 => {
                 self.op(Op::I64Extend8S);

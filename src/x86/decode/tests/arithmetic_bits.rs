@@ -1,8 +1,8 @@
 use super::{at, missing, operation, DecodeError};
 use crate::memory::{Access, Cause, Fault};
 use crate::x86::instruction::{
-    Address, AddressBase, Carry, Count, DoubleShift, Location, Operation, RegisterView as R, Shift,
-    Unary, Width,
+    Address, AddressBase, Bit, BitIndex, Carry, Count, DoubleShift, Location, Operation,
+    RegisterView as R, Shift, Unary, Width,
 };
 
 #[test]
@@ -459,5 +459,276 @@ fn group_two_selector_six_is_unsupported_before_address_or_count_bytes() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn bit_test_family_is_admitted() {
+    for bytes in [
+        &[0x0f, 0xa3, 0xc8][..],
+        &[0x66, 0x0f, 0xba, 0x23, 0xff][..],
+        &[0x4f, 0x0f, 0xbb, 0x03][..],
+    ] {
+        assert!(at(0x1000, bytes).is_ok(), "{bytes:02x?}");
+    }
+}
+
+#[test]
+fn bit_scan_forms_are_admitted() {
+    for bytes in [
+        &[0x0f, 0xbc, 0xc1][..],
+        &[0x66, 0x0f, 0xbd, 0x03][..],
+        &[0x48, 0x0f, 0xbc, 0xc0][..],
+    ] {
+        assert!(at(0x1000, bytes).is_ok(), "{bytes:02x?}");
+    }
+}
+
+#[test]
+fn byte_swap_forms_are_admitted_at_defined_widths() {
+    for bytes in [
+        &[0x0f, 0xc8][..],
+        &[0x48, 0x0f, 0xcf][..],
+        &[0x66, 0x4f, 0x0f, 0xc8][..],
+    ] {
+        assert!(at(0x1000, bytes).is_ok(), "{bytes:02x?}");
+    }
+}
+
+fn wide_prefix_cases() -> Vec<(Vec<u8>, Width, u8, u8)> {
+    let mut cases = Vec::new();
+    for operand16 in [false, true] {
+        for rex in std::iter::once(None).chain((0x40..=0x4f).map(Some)) {
+            let mut prefix = Vec::new();
+            if operand16 {
+                prefix.push(0x66);
+            }
+            prefix.extend(rex);
+            let width = if rex.is_some_and(|byte| byte >= 0x48) {
+                Width::W64
+            } else if operand16 {
+                Width::W16
+            } else {
+                Width::W32
+            };
+            let reg_extension = match rex {
+                Some(0x44..=0x47 | 0x4c..=0x4f) => 8,
+                _ => 0,
+            };
+            let base_extension = u8::from(rex.is_some_and(|byte| byte % 2 != 0)) * 8;
+            cases.push((prefix, width, reg_extension, base_extension));
+        }
+    }
+    cases
+}
+
+#[test]
+fn bit_register_indices_keep_both_encoded_register_banks_and_memory_addresses() {
+    for (prefix, width, reg_extension, base_extension) in wide_prefix_cases() {
+        for (opcode, kind) in [
+            (0xa3, Bit::Test),
+            (0xab, Bit::Set),
+            (0xb3, Bit::Reset),
+            (0xbb, Bit::Complement),
+        ] {
+            for register in 0..8 {
+                for rm in 0..8 {
+                    let mut bytes = prefix.clone();
+                    bytes.extend([0x0f, opcode, 0xc0 | register << 3 | rm]);
+                    assert_eq!(
+                        operation(&bytes),
+                        Operation::Bit {
+                            kind,
+                            dst: Location::Register(R::low(rm + base_extension)),
+                            index: BitIndex::Register(R::low(register + reg_extension)),
+                            width,
+                        },
+                        "{bytes:02x?}"
+                    );
+                }
+                let mut bytes = prefix.clone();
+                bytes.extend([0x0f, opcode, 0x43 | register << 3, 0x80]);
+                assert_eq!(
+                    operation(&bytes),
+                    Operation::Bit {
+                        kind,
+                        dst: Location::Memory(Address {
+                            base: AddressBase::Register(3 + base_extension),
+                            index: None,
+                            displacement: -128,
+                        }),
+                        index: BitIndex::Register(R::low(register + reg_extension)),
+                        width,
+                    },
+                    "{bytes:02x?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn bit_immediates_preserve_raw_bytes_and_ignore_the_selector_rex_extension() {
+    for (prefix, width, _, base_extension) in wide_prefix_cases() {
+        for (selector, kind) in [
+            (4, Bit::Test),
+            (5, Bit::Set),
+            (6, Bit::Reset),
+            (7, Bit::Complement),
+        ] {
+            for index in [0, 16, 32, 64, 255] {
+                for rm in 0..8 {
+                    let mut bytes = prefix.clone();
+                    bytes.extend([0x0f, 0xba, 0xc0 | selector << 3 | rm, index]);
+                    assert_eq!(
+                        operation(&bytes),
+                        Operation::Bit {
+                            kind,
+                            dst: Location::Register(R::low(rm + base_extension)),
+                            index: BitIndex::Immediate(index),
+                            width,
+                        },
+                        "{bytes:02x?}"
+                    );
+                }
+                let mut bytes = prefix.clone();
+                bytes.extend([0x0f, 0xba, 0x43 | selector << 3, 0x80, index]);
+                assert_eq!(
+                    operation(&bytes),
+                    Operation::Bit {
+                        kind,
+                        dst: Location::Memory(Address {
+                            base: AddressBase::Register(3 + base_extension),
+                            index: None,
+                            displacement: -128,
+                        }),
+                        index: BitIndex::Immediate(index),
+                        width,
+                    },
+                    "{bytes:02x?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn bit_scans_keep_selected_source_and_destination_widths_without_byte_aliases() {
+    for (prefix, width, reg_extension, base_extension) in wide_prefix_cases() {
+        for (opcode, reverse) in [(0xbc, false), (0xbd, true)] {
+            for register in 0..8 {
+                for rm in 0..8 {
+                    let mut bytes = prefix.clone();
+                    bytes.extend([0x0f, opcode, 0xc0 | register << 3 | rm]);
+                    assert_eq!(
+                        operation(&bytes),
+                        Operation::Scan {
+                            reverse,
+                            dst: R::low(register + reg_extension),
+                            src: Location::Register(R::low(rm + base_extension)),
+                            width,
+                        },
+                        "{bytes:02x?}"
+                    );
+                }
+                let mut bytes = prefix.clone();
+                bytes.extend([0x0f, opcode, 0x43 | register << 3, 0x80]);
+                assert_eq!(
+                    operation(&bytes),
+                    Operation::Scan {
+                        reverse,
+                        dst: R::low(register + reg_extension),
+                        src: Location::Memory(Address {
+                            base: AddressBase::Register(3 + base_extension),
+                            index: None,
+                            displacement: -128,
+                        }),
+                        width,
+                    },
+                    "{bytes:02x?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn byte_swap_uses_the_opcode_base_extension_and_excludes_undefined_word_forms() {
+    for (prefix, width, _, base_extension) in wide_prefix_cases() {
+        for low in 0..8 {
+            let mut bytes = prefix.clone();
+            bytes.extend([0x0f, 0xc8 + low]);
+            if width == Width::W16 {
+                assert_eq!(at(0x1000, &bytes), Err(DecodeError::Unsupported));
+            } else {
+                assert_eq!(
+                    operation(&bytes),
+                    Operation::Bswap {
+                        dst: R::low(low + base_extension),
+                        width,
+                    },
+                    "{bytes:02x?}"
+                );
+                assert_required_bytes(&bytes);
+            }
+        }
+    }
+}
+
+#[test]
+fn bit_and_scan_encodings_complete_every_address_tail_and_immediate_before_execution() {
+    for prefix in [&[][..], &[0x66][..], &[0x4f][..], &[0x66, 0x4f][..]] {
+        for opcode in [0xa3, 0xab, 0xb3, 0xbb, 0xbc, 0xbd] {
+            let mut bytes = prefix.to_vec();
+            bytes.extend([0x0f, opcode, 0x8c, 0xad, 0, 0, 0, 0x80]);
+            assert_required_bytes(&bytes);
+        }
+        for selector in 4..8 {
+            let mut bytes = prefix.to_vec();
+            bytes.extend([0x0f, 0xba, 0x84 | selector << 3, 0xad, 0, 0, 0, 0x80, 255]);
+            assert_required_bytes(&bytes);
+        }
+    }
+    let bytes = [0x66, 0x44, 0x0f, 0xba, 0x35, 0, 0, 0, 0, 255];
+    assert_eq!(
+        operation(&bytes),
+        Operation::Bit {
+            kind: Bit::Reset,
+            dst: Location::Memory(Address {
+                base: AddressBase::NextPc,
+                index: None,
+                displacement: 0,
+            }),
+            index: BitIndex::Immediate(255),
+            width: Width::W16,
+        }
+    );
+    assert_required_bytes(&bytes);
+}
+
+#[test]
+fn bit_family_exclusions_stop_at_the_deciding_prefix_or_selector() {
+    for prefix in [&[][..], &[0x66][..], &[0x4f][..], &[0x66, 0x4f][..]] {
+        for selector in 0..4 {
+            for mode in 0..4 {
+                let mut bytes = prefix.to_vec();
+                bytes.extend([0x0f, 0xba, mode << 6 | selector << 3 | 4]);
+                assert_eq!(
+                    at(0x1000, &bytes),
+                    Err(DecodeError::Unsupported),
+                    "{bytes:02x?}"
+                );
+            }
+        }
+    }
+    for bytes in [
+        &[0xf3][..],
+        &[0x66, 0xf3][..],
+        &[0x48, 0xf3][..],
+        &[0xf0, 0x0f, 0xab][..],
+        &[0xf3, 0x0f, 0xbc][..],
+        &[0xf3, 0x0f, 0xbd][..],
+    ] {
+        assert_eq!(at(0x1000, bytes), Err(DecodeError::Unsupported));
     }
 }

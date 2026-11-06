@@ -1,3 +1,4 @@
+mod bits;
 mod control;
 mod counts;
 mod data;
@@ -97,6 +98,8 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         matches!(instruction.operation,
             Operation::MemoryAlu { kind, operands: MemoryAluOperands::MemoryFirst(_), .. }
                 if kind.writes_result())
+            || matches!(instruction.operation,
+                Operation::Bit { kind, dst:Location::Memory(_), .. } if kind.writes_result())
             || matches!(
                 instruction.operation,
                 Operation::Unary {
@@ -238,6 +241,19 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             Operation::Carry { kind } => emitter.carry(kind),
             Operation::Lahf => emitter.lahf(),
             Operation::Sahf => emitter.sahf(),
+            Operation::Bit {
+                kind,
+                dst,
+                index,
+                width,
+            } => emitter.bit(kind, dst, index, width, instruction.next_pc, exit_depth),
+            Operation::Scan {
+                reverse,
+                dst,
+                src,
+                width,
+            } => emitter.scan(reverse, dst, src, width, instruction.next_pc, exit_depth),
+            Operation::Bswap { dst, width } => emitter.bswap(dst, width),
             Operation::Setcc { dst, condition } => {
                 emitter.setcc(dst, condition, instruction.next_pc, exit_depth);
             }

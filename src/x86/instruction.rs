@@ -52,7 +52,11 @@ impl RegisterView {
     }
 
     pub fn shift(self) -> u32 {
-        if self.high_byte { 8 } else { 0 }
+        if self.high_byte {
+            8
+        } else {
+            0
+        }
     }
 }
 
@@ -160,6 +164,26 @@ pub enum DoubleShift {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Bit {
+    Test,
+    Set,
+    Reset,
+    Complement,
+}
+
+impl Bit {
+    pub fn writes_result(self) -> bool {
+        self != Self::Test
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BitIndex {
+    Register(RegisterView),
+    Immediate(u8),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryAluOperands {
     MemoryFirst(DataOperand),
     RegisterFirst(RegisterView),
@@ -241,6 +265,22 @@ pub enum Operation {
         dst: Location,
         src: RegisterView,
         count: Count,
+        width: Width,
+    },
+    Bit {
+        kind: Bit,
+        dst: Location,
+        index: BitIndex,
+        width: Width,
+    },
+    Scan {
+        reverse: bool,
+        dst: RegisterView,
+        src: Location,
+        width: Width,
+    },
+    Bswap {
+        dst: RegisterView,
         width: Width,
     },
     Extend {

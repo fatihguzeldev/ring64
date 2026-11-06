@@ -63,8 +63,12 @@ impl Emitter {
         exit_depth: u32,
     ) {
         self.address(address, next_pc);
-        self.op(Op::LocalSet(ADDRESS))
-            .op(Op::LocalGet(ADDRESS))
+        self.op(Op::LocalSet(ADDRESS));
+        self.load_address_value(width, for_write, exit_depth);
+    }
+
+    pub(super) fn load_address_value(&mut self, width: Width, for_write: bool, exit_depth: u32) {
+        self.op(Op::LocalGet(ADDRESS))
             .op(Op::I32Const(i32::from(width.bytes())))
             .op(Op::Call(if for_write { 3 } else { 0 }))
             .op(Op::LocalSet(VALUE))

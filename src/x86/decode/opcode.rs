@@ -1,10 +1,10 @@
 use crate::memory::Fault;
 use crate::x86::instruction::{
-    Address, AddressBase, Alu, Carry, Condition, Count, DataOperand, DoubleShift, Location,
-    MemoryAluOperands, Operand, Operation, RegisterView, Shift, Unary, Width,
+    Address, AddressBase, Alu, Bit, BitIndex, Carry, Condition, Count, DataOperand, DoubleShift,
+    Location, MemoryAluOperands, Operand, Operation, RegisterView, Shift, Unary, Width,
 };
 
-use super::{DecodeError, cursor::Cursor, operand::ModRm, prefix::Prefixes};
+use super::{cursor::Cursor, operand::ModRm, prefix::Prefixes, DecodeError};
 
 pub(super) fn refine<F>(
     opcode: u8,
@@ -328,7 +328,11 @@ where
 }
 
 fn byte_or_wide(opcode: u8, wide: Width) -> Width {
-    if opcode & 1 == 0 { Width::W8 } else { wide }
+    if opcode & 1 == 0 {
+        Width::W8
+    } else {
+        wide
+    }
 }
 
 fn immediate<F>(cursor: &mut Cursor<F>, width: Width, short: bool) -> Result<u64, DecodeError>
@@ -398,6 +402,56 @@ where
     let rex = prefixes.rex;
     let width = prefixes.width();
     match opcode {
+        0xa3 | 0xab | 0xb3 | 0xbb => {
+            let operands = ModRm::read(cursor, rex)?;
+            Ok(Operation::Bit {
+                kind: match opcode {
+                    0xa3 => Bit::Test,
+                    0xab => Bit::Set,
+                    0xb3 => Bit::Reset,
+                    0xbb => Bit::Complement,
+                    _ => unreachable!(),
+                },
+                dst: operands.location(cursor, rex, width)?,
+                index: BitIndex::Register(rex.view(operands.register, width)),
+                width,
+            })
+        }
+        0xba => {
+            let operands = ModRm::read(cursor, rex)?;
+            let kind = match operands.selector {
+                4 => Bit::Test,
+                5 => Bit::Set,
+                6 => Bit::Reset,
+                7 => Bit::Complement,
+                _ => return Err(DecodeError::Unsupported),
+            };
+            let dst = operands.location(cursor, rex, width)?;
+            Ok(Operation::Bit {
+                kind,
+                dst,
+                index: BitIndex::Immediate(cursor.byte()?),
+                width,
+            })
+        }
+        0xbc | 0xbd => {
+            let operands = ModRm::read(cursor, rex)?;
+            Ok(Operation::Scan {
+                reverse: opcode == 0xbd,
+                dst: rex.view(operands.register, width),
+                src: operands.location(cursor, rex, width)?,
+                width,
+            })
+        }
+        0xc8..=0xcf => {
+            if width == Width::W16 {
+                return Err(DecodeError::Unsupported);
+            }
+            Ok(Operation::Bswap {
+                dst: rex.view((opcode - 0xc8) | rex.base_extension(), width),
+                width,
+            })
+        }
         0xa4 | 0xa5 | 0xac | 0xad => {
             let operands = ModRm::read(cursor, rex)?;
             let dst = operands.location(cursor, rex, width)?;
