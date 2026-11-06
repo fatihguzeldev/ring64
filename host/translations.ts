@@ -18,6 +18,7 @@ export class Translations {
   constructor(
     readonly maxArtifacts: number,
     readonly maxBytes: number,
+    readonly release: (artifact: Artifact) => void = () => {},
   ) {}
 
   get(pc: bigint): InstalledEntry | undefined {
@@ -41,11 +42,7 @@ export class Translations {
     ) {
       const oldest = this.#artifacts.keys().next().value;
       if (!oldest) throw new Error('cache accounting failed');
-      this.#artifacts.delete(oldest);
-      this.#bytes -= oldest.metadata.byteLength;
-      for (const pc of oldest.metadata.entries) {
-        if (this.#entries.get(pc)?.artifact === oldest) this.#entries.delete(pc);
-      }
+      this.remove(oldest);
     }
     this.#artifacts.set(artifact, true);
     this.#bytes += artifact.metadata.byteLength;
@@ -66,9 +63,22 @@ export class Translations {
     }));
   }
 
+  private remove(artifact: Artifact): void {
+    this.#artifacts.delete(artifact);
+    this.#bytes -= artifact.metadata.byteLength;
+    for (const pc of artifact.metadata.entries) {
+      if (this.#entries.get(pc)?.artifact === artifact) this.#entries.delete(pc);
+    }
+    this.release(artifact);
+  }
+
+  prune(valid: (artifact: Artifact) => boolean): void {
+    for (const artifact of this.#artifacts.keys()) {
+      if (!valid(artifact)) this.remove(artifact);
+    }
+  }
+
   clear(): void {
-    this.#entries.clear();
-    this.#artifacts.clear();
-    this.#bytes = 0;
+    for (const artifact of this.#artifacts.keys()) this.remove(artifact);
   }
 }

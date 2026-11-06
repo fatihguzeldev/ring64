@@ -130,3 +130,35 @@ test('inspection returns owned metadata and clear releases all entry ownership',
   assert.deepEqual(cache.inspect(), []);
   assert.deepEqual(cache.resources(), { cachedArtifacts: 0, cachedBytes: 0 });
 });
+
+test('invalidation removes a complete owner without erasing a newer overlapping binding', () => {
+  const released: Artifact[] = [];
+  const cache = new Translations(3, 100, (owner) => released.push(owner));
+  const old = artifact([1n, 2n], 10);
+  const newer = artifact([2n, 3n], 20);
+  cache.install(old);
+  cache.install(newer);
+  cache.prune((owner) => owner !== old);
+  assert.equal(cache.get(1n), undefined);
+  assert.equal(cache.get(2n)?.artifact, newer);
+  assert.equal(cache.get(3n)?.artifact, newer);
+  assert.deepEqual(cache.resources(), { cachedArtifacts: 1, cachedBytes: 20 });
+  assert.deepEqual(released, [old]);
+  cache.prune(() => true);
+  assert.deepEqual(released, [old]);
+  cache.clear();
+  assert.deepEqual(released, [old, newer]);
+});
+
+test('count eviction releases dependency ownership exactly once', () => {
+  const released: Artifact[] = [];
+  const cache = new Translations(1, 100, (owner) => released.push(owner));
+  const first = artifact([1n], 10);
+  const second = artifact([2n], 20);
+  cache.install(first);
+  cache.install(second);
+  assert.deepEqual(released, [first]);
+  cache.clear();
+  cache.clear();
+  assert.deepEqual(released, [first, second]);
+});
