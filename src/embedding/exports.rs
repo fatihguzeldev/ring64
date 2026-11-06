@@ -11,6 +11,7 @@ struct Core {
     image: Image,
     state: Box<UnsafeCell<RunState>>,
     fault: Option<Fault>,
+    divide_failed: bool,
 }
 
 #[derive(Default)]
@@ -73,6 +74,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             image,
             state,
             fault: None,
+            divide_failed: false,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
         0
@@ -107,6 +109,7 @@ pub extern "C" fn core_import_state() -> i32 {
         // this foreign-mutable buffer survives the call back into generated wasm.
         unsafe { (&mut *core.state.get()).import(state) };
         core.fault = None;
+        core.divide_failed = false;
         0
     })
 }
@@ -116,6 +119,7 @@ pub extern "C" fn core_clear_fault() {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
+        core.divide_failed = false;
         unsafe { (*core.state.get()).target = 0 };
     });
 }
@@ -212,6 +216,25 @@ pub extern "C" fn core_store(address: u64, width: u32, value: u64) -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn core_access_failed() -> i32 {
     BRIDGE.with_borrow(|bridge| i32::from(bridge.core.as_ref().unwrap().fault.is_some()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_multiply_high(left: u64, right: u64, signed: i32) -> u64 {
+    super::arithmetic::multiply_high(left, right, signed != 0)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_divide(high: u64, low: u64, divisor: u64, signed: i32) -> u64 {
+    let result = super::arithmetic::divide(high, low, divisor, signed != 0);
+    BRIDGE.with_borrow_mut(|bridge| {
+        bridge.core.as_mut().unwrap().divide_failed = result.is_none();
+    });
+    result.unwrap_or(0)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_divide_failed() -> i32 {
+    BRIDGE.with_borrow(|bridge| i32::from(bridge.core.as_ref().unwrap().divide_failed))
 }
 
 #[unsafe(no_mangle)]

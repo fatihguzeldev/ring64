@@ -134,3 +134,23 @@ fn importing_state_cannot_import_a_stale_runtime_target() {
     });
     assert_eq!(metadata(STOP), serde_json::Value::Null);
 }
+
+#[test]
+fn wide_arithmetic_failure_is_private_and_reset_by_each_division() {
+    initialize(0x1000, &[0x90]);
+    assert_eq!(core_divide_failed(), 0);
+    assert_eq!(core_load(0x7000, 8), 0);
+    assert_eq!(core_divide(2, 0, 2, 0), 0);
+    assert_eq!(core_divide_failed(), 1);
+    assert_eq!(metadata(DIVIDE_ERROR), serde_json::Value::Null);
+    assert_eq!(metadata(DATA)["address"], "0x7000");
+    assert_eq!(core_divide(1, 0, 2, 0), 1 << 63);
+    assert_eq!(core_divide_failed(), 0);
+    assert_eq!(core_divide(1 << 63, 0, u64::MAX, 1), 0);
+    assert_eq!(core_divide_failed(), 1);
+    core_clear_fault();
+    assert_eq!(core_divide_failed(), 0);
+    assert_eq!(core_access_failed(), 0);
+    assert_eq!(core_multiply_high(u64::MAX, 2, 0), 1);
+    assert_eq!(core_multiply_high(u64::MAX, 2, 1), u64::MAX);
+}

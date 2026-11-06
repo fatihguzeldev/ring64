@@ -60,6 +60,9 @@ type CoreExports = WebAssembly.Exports & {
   core_load_for_write(address: bigint, width: number): bigint;
   core_store(address: bigint, width: number, value: bigint): number;
   core_access_failed(): number;
+  core_multiply_high(left: bigint, right: bigint, signed: number): bigint;
+  core_divide(high: bigint, low: bigint, divisor: bigint, signed: number): bigint;
+  core_divide_failed(): number;
   core_fault_info(reason: number): void;
   core_read_memory(address: bigint, length: number): number;
   core_write_memory(address: bigint): number;
@@ -305,6 +308,9 @@ export class Core {
         load_for_write: this.#exports.core_load_for_write,
         store: this.#exports.core_store,
         access_failed: this.#exports.core_access_failed,
+        multiply_high: this.#exports.core_multiply_high,
+        divide: this.#exports.core_divide,
+        divide_failed: this.#exports.core_divide_failed,
       },
     });
     if (typeof instance.exports.run !== 'function')
