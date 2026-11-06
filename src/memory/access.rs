@@ -9,20 +9,29 @@ impl Image {
     }
 
     pub fn read(&self, address: u64, width: u32) -> Result<u64, Fault> {
-        assert!(matches!(width, 4 | 8), "scalar access width must be 4 or 8");
+        assert!(
+            matches!(width, 1 | 2 | 4 | 8),
+            "unsupported scalar access width"
+        );
         self.preflight(address, width, Access::Read)?;
         Ok(self.scalar_after_preflight(address, width))
     }
 
     pub fn read_for_write(&self, address: u64, width: u32) -> Result<u64, Fault> {
-        assert!(matches!(width, 4 | 8), "scalar access width must be 4 or 8");
+        assert!(
+            matches!(width, 1 | 2 | 4 | 8),
+            "unsupported scalar access width"
+        );
         // In this fixed image, every writable span is also readable.
         self.preflight(address, width, Access::Write)?;
         Ok(self.scalar_after_preflight(address, width))
     }
 
     pub fn write(&mut self, address: u64, width: u32, value: u64) -> Result<(), Fault> {
-        assert!(matches!(width, 4 | 8), "scalar access width must be 4 or 8");
+        assert!(
+            matches!(width, 1 | 2 | 4 | 8),
+            "unsupported scalar access width"
+        );
         self.write_bytes(address, &value.to_le_bytes()[..width as usize])
     }
 
@@ -102,6 +111,7 @@ mod tests {
     use super::super::{Access, Cause};
     use super::*;
 
+    mod narrow;
     mod read_for_write;
 
     #[test]
