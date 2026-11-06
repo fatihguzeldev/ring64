@@ -8,6 +8,7 @@
 - [scalar data and widths](scalar-data-and-widths/spec.md): register views, scalar operand forms, extensions, setcc and cmovcc.
 - [integer arithmetic and bits](integer-arithmetic-and-bits/spec.md): carry/unary arithmetic, flag transfers, shifts/rotates and classic bit operations.
 - [multiply and divide](multiply-and-divide/spec.md): signed/unsigned products, quotient/remainder pairs and precise divide errors.
+- [memory map and code validity](memory-map-and-code-validity/spec.md): private mappings, backing aliases, permissions and code invalidation after host or guest writes.
 
 ## scope
 
