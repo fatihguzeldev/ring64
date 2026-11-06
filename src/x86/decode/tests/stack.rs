@@ -282,7 +282,8 @@ fn required_stack_immediate_bytes_keep_the_memory_owners_fault_metadata() {
 fn unsupported_ff_forms_stop_at_modrm_without_fetching_an_address() {
     for prefix in std::iter::once(None).chain((0x40..=0x4f).map(Some)) {
         for modrm in 0..=255 {
-            if modrm >> 6 == 3 && matches!((modrm >> 3) & 7, 2 | 4) {
+            let selector = (modrm >> 3) & 7;
+            if selector <= 1 || (modrm >> 6 == 3 && matches!(selector, 2 | 4)) {
                 continue;
             }
             let mut bytes: Vec<_> = prefix.into_iter().collect();

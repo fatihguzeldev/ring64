@@ -122,6 +122,21 @@ impl Alu {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unary {
+    Inc,
+    Dec,
+    Not,
+    Neg,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Carry {
+    Clear,
+    Set,
+    Complement,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryAluOperands {
     MemoryFirst(DataOperand),
     RegisterFirst(RegisterView),
@@ -182,6 +197,16 @@ pub enum Operation {
         operands: MemoryAluOperands,
         width: Width,
     },
+    Unary {
+        kind: Unary,
+        dst: Location,
+        width: Width,
+    },
+    Carry {
+        kind: Carry,
+    },
+    Lahf,
+    Sahf,
     Extend {
         dst: RegisterView,
         src: Location,

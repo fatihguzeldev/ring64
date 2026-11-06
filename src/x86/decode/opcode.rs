@@ -1,7 +1,7 @@
 use crate::memory::Fault;
 use crate::x86::instruction::{
-    Address, AddressBase, Alu, Condition, DataOperand, Location, MemoryAluOperands, Operand,
-    Operation, RegisterView, Width,
+    Address, AddressBase, Alu, Carry, Condition, DataOperand, Location, MemoryAluOperands, Operand,
+    Operation, RegisterView, Unary, Width,
 };
 
 use super::{DecodeError, cursor::Cursor, operand::ModRm, prefix::Prefixes};
@@ -17,7 +17,7 @@ where
     let rex = prefixes.rex;
     let wide = prefixes.width();
     if prefixes.operand16
-        && matches!(opcode, 0x50..=0x5f | 0x68 | 0x6a | 0x70..=0x7f | 0xc2 | 0xc3 | 0xe8 | 0xe9 | 0xeb | 0xff)
+        && matches!(opcode, 0x50..=0x5f | 0x68 | 0x6a | 0x70..=0x7f | 0xc2 | 0xc3 | 0xe8 | 0xe9 | 0xeb)
     {
         return Err(DecodeError::Unsupported);
     }
@@ -43,7 +43,18 @@ where
         }
         0xff => {
             let operands = ModRm::read(cursor, rex)?;
-            if operands.mode != 3 {
+            if operands.selector <= 1 {
+                return Ok(Operation::Unary {
+                    kind: if operands.selector == 0 {
+                        Unary::Inc
+                    } else {
+                        Unary::Dec
+                    },
+                    dst: operands.location(cursor, rex, wide)?,
+                    width: wide,
+                });
+            }
+            if prefixes.operand16 || operands.mode != 3 {
                 return Err(DecodeError::Unsupported);
             }
             match operands.selector {
@@ -195,10 +206,21 @@ where
             };
             let operands = ModRm::read(cursor, rex)?;
             let kind = if matches!(opcode, 0xf6 | 0xf7) {
-                if operands.selector != 0 {
-                    return Err(DecodeError::Unsupported);
+                match operands.selector {
+                    0 => Alu::Test,
+                    2 | 3 => {
+                        return Ok(Operation::Unary {
+                            kind: if operands.selector == 2 {
+                                Unary::Not
+                            } else {
+                                Unary::Neg
+                            },
+                            dst: operands.location(cursor, rex, width)?,
+                            width,
+                        });
+                    }
+                    _ => return Err(DecodeError::Unsupported),
                 }
-                Alu::Test
             } else {
                 selector_kind(operands.selector).ok_or(DecodeError::Unsupported)?
             };
@@ -211,6 +233,30 @@ where
                 width,
             ))
         }
+        0xfe => {
+            let operands = ModRm::read(cursor, rex)?;
+            if operands.selector > 1 {
+                return Err(DecodeError::Unsupported);
+            }
+            Ok(Operation::Unary {
+                kind: if operands.selector == 0 {
+                    Unary::Inc
+                } else {
+                    Unary::Dec
+                },
+                dst: operands.location(cursor, rex, Width::W8)?,
+                width: Width::W8,
+            })
+        }
+        0xf8 | 0xf9 | 0xf5 => Ok(Operation::Carry {
+            kind: match opcode {
+                0xf8 => Carry::Clear,
+                0xf9 => Carry::Set,
+                _ => Carry::Complement,
+            },
+        }),
+        0x9f => Ok(Operation::Lahf),
+        0x9e => Ok(Operation::Sahf),
         0xa8 | 0xa9 => {
             let width = byte_or_wide(opcode, wide);
             Ok(alu_to(

@@ -227,3 +227,146 @@ fn wide_carry_arithmetic_matches_mathematical_signed_and_unsigned_ranges() {
     }
     run_cases(cases);
 }
+
+#[test]
+fn unary_and_status_transfers_apply_partial_writes_and_preserve_actual_flags() {
+    let mut cases = Vec::new();
+    for (code, input, flags, expected, result_flags) in [
+        (
+            vec![0xfe, 0xc4],
+            vec![(0, 0x112233445566ff88)],
+            0x8d7,
+            vec![(0, 0x1122334455660088)],
+            0x57,
+        ),
+        (
+            vec![0x66, 0xff, 0xc8],
+            vec![(0, 0x1122334455668000)],
+            2,
+            vec![(0, 0x1122334455667fff)],
+            0x816,
+        ),
+        (
+            vec![0xf6, 0xd4],
+            vec![(0, 0x1122334455667788)],
+            0x8d7,
+            vec![(0, 0x1122334455668888)],
+            0x8d7,
+        ),
+        (
+            vec![0xf6, 0xd8],
+            vec![(0, 0x1122334455667780)],
+            0x8d7,
+            vec![],
+            0x883,
+        ),
+        (vec![0xf8], vec![], 0x8d7, vec![], 0x8d6),
+        (vec![0xf9], vec![], 0x8d6, vec![], 0x8d7),
+        (vec![0xf5], vec![], 0x8d7, vec![], 0x8d6),
+        (
+            vec![0x4f, 0x9f],
+            vec![(0, 0x1122334455667788)],
+            0x8d7,
+            vec![(0, 0x112233445566d788)],
+            0x8d7,
+        ),
+        (
+            vec![0x4f, 0x9e],
+            vec![(0, 0x1122334455660088)],
+            0x8d7,
+            vec![],
+            0x802,
+        ),
+    ] {
+        cases.push(literal(&code, &input, flags, &expected, result_flags));
+    }
+    run_cases(cases);
+}
+
+#[test]
+fn every_byte_unary_result_and_flag_preservation_matches_signed_ranges() {
+    let modules = [[0xfe, 0xc4], [0xfe, 0xcc], [0xf6, 0xd4], [0xf6, 0xdc]]
+        .map(|code| compiled_fixture(0x1000, &code, 0x1000).bytes);
+    let input = json!({"layout":RunState::descriptor(),"modules":modules});
+    let script = r#"
+import fs from 'node:fs';import assert from 'node:assert/strict';
+const {layout:l,modules}=JSON.parse(fs.readFileSync(0,'utf8'));
+const guard=0x1122334455660088n, signed=x=>x<128?x:x-256;
+for(const [op,bytes] of modules.entries()){
+ const memory=new WebAssembly.Memory({initial:1}),d=new DataView(memory.buffer);
+ const forbidden=()=>{throw new Error('unary register operation accessed memory')};
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(bytes),{env:{memory,load:forbidden,store:forbidden,access_failed:forbidden}});
+ for(let i=1;i<16;i++)d.setBigUint64(l.registers+8*i,0x1122334400000000n+BigInt(i),true);
+ for(const incoming of [2,3,0x8d6,0x8d7])for(let a=0;a<256;a++){
+  const result=op===0?(a+1)%256:op===1?(a+255)%256:op===2?255-a:(256-a)%256;
+  let expected=incoming;
+  if(op!==2){
+   const sv=op===0?signed(a)+1:op===1?signed(a)-1:-signed(a);
+   const cf=op===3?Number(a!==0):incoming&1;
+   const af=op===0?a%16===15:a%16!==0&&op===3||op===1&&a%16===0;
+   const parity=result.toString(2).replaceAll('0','').length%2===0;
+   expected=2+cf+4*Number(parity)+16*Number(af)+64*Number(result===0)+128*Number(result>=128)+2048*Number(sv < -128 || sv>127);
+  }
+  d.setBigUint64(l.registers,guard+(BigInt(a)<<8n),true);d.setBigUint64(l.flags,BigInt(incoming),true);d.setBigUint64(l.rip,0x1000n,true);
+  assert.equal(instance.exports.run(0,1n,0n,0,0),1,`op${op} a${a}`);
+  assert.equal(d.getBigUint64(l.registers,true),guard+(BigInt(result)<<8n),`result op${op} a${a}`);
+  assert.equal(d.getBigUint64(l.flags,true),BigInt(expected),`flags op${op} a${a} incoming${incoming}`);
+ }
+ for(let i=1;i<16;i++)assert.equal(d.getBigUint64(l.registers+8*i,true),0x1122334400000000n+BigInt(i));
+}
+"#;
+    let mut child = Command::new("node")
+        .args(["--input-type=module", "-e", script])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    serde_json::to_writer(child.stdin.take().unwrap(), &input).unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn unary_memory_failures_never_commit_partial_flags() {
+    let mut cases = Vec::new();
+    for (code, value, result, flags) in [
+        (vec![0xf6, 0x1b], "0", "0", 0x46),
+        (vec![0xf6, 0x13], "0", "ff", 0x8d7),
+        (vec![0xfe, 0x03], "7f", "80", 0x893),
+    ] {
+        let artifact = compiled_fixture(0x1000, &code, 0x1000);
+        for (read_fails, store_fails) in [(true, false), (false, true), (false, false)] {
+            let failed = read_fails || store_fails;
+            let mut packet = execution_case(
+                &artifact.bytes,
+                &artifact.entries,
+                &[(3, 0x100004000)],
+                0x8d7,
+                0x1000,
+                1,
+                (
+                    &[],
+                    if failed { 0x8d7 } else { flags },
+                    if failed { 0x1000 } else { 0x1002 },
+                    if failed { 6 } else { 1 },
+                    u64::from(failed),
+                ),
+            );
+            let mut accesses = vec![
+                json!({"kind":"load_for_write","args":["100004000",1],"result":value}),
+                json!({"kind":"access_failed","args":[],"result":u32::from(read_fails)}),
+            ];
+            if !read_fails {
+                accesses.push(json!({"kind":"store","args":["100004000",1,result],"result":u32::from(!store_fails)}));
+            }
+            packet["accesses"] = json!(accesses);
+            cases.push(packet);
+        }
+    }
+    run_cases(cases);
+}

@@ -6,6 +6,7 @@ mod integer_memory;
 mod memory;
 mod stack;
 mod state;
+mod unary;
 
 use std::collections::BTreeMap;
 use wasm_encoder::{
@@ -15,7 +16,7 @@ use wasm_encoder::{
 
 use super::unit::Unit;
 use crate::embedding::layout::DISPATCH;
-use crate::x86::instruction::{MemoryAluOperands, Operation};
+use crate::x86::instruction::{Location, MemoryAluOperands, Operation};
 
 const ENTRY_INDEX: u32 = 4;
 const GPR: u32 = 5;
@@ -95,6 +96,13 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         matches!(instruction.operation,
             Operation::MemoryAlu { kind, operands: MemoryAluOperands::MemoryFirst(_), .. }
                 if kind.writes_result())
+            || matches!(
+                instruction.operation,
+                Operation::Unary {
+                    dst: Location::Memory(_),
+                    ..
+                }
+            )
     });
     if write_intent {
         imports.import("env", "load_for_write", EntityType::Function(0));
@@ -197,6 +205,12 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 exit_depth,
             ),
             Operation::SignHigh { width } => emitter.sign_high(width),
+            Operation::Unary { kind, dst, width } => {
+                emitter.unary(kind, dst, width, instruction.next_pc, exit_depth)
+            }
+            Operation::Carry { kind } => emitter.carry(kind),
+            Operation::Lahf => emitter.lahf(),
+            Operation::Sahf => emitter.sahf(),
             Operation::Setcc { dst, condition } => {
                 emitter.setcc(dst, condition, instruction.next_pc, exit_depth);
             }
