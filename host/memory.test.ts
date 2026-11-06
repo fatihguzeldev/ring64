@@ -162,3 +162,33 @@ test('empty mapped layout accepts a raw entry checked only on reached fetch', ()
   assert.equal(input.entry, 0x800000000000n);
   assert.deepEqual(input.backings, []);
 });
+
+test('array record counts reject malformed proxy lengths before capture', () => {
+  for (const count of [NaN, -1, '0', 0n, Infinity, 0.5, undefined, null, false, 0x100000000]) {
+    const entries = new Proxy([], {
+      get(target, property, receiver) {
+        if (property === 'length') return count;
+        return Reflect.get(target, property, receiver) as unknown;
+      },
+    });
+    assert.throws(() => captureMappings(entries, limits), TypeError);
+    assert.throws(() => captureBackings(entries, limits), TypeError);
+    const backings = [
+      {
+        id: 'unreached',
+        get bytes(): Uint8Array {
+          return assert.fail('malformed mapping count must reject before backing capture');
+        },
+      },
+    ];
+    assert.throws(
+      () =>
+        captureInitialMemory({
+          memory: { backings, mappings: entries },
+          entry: 0n,
+          memoryLimits: limits,
+        }),
+      TypeError,
+    );
+  }
+});

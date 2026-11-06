@@ -90,6 +90,7 @@ export function captureBackings(
 ): MemoryBackingInput[] {
   if (!Array.isArray(input)) throw new TypeError('backings must be an array');
   const count = input.length;
+  byteLength(count, 'backing count');
   let total = 0;
   for (const length of existing.values()) total += length;
   capacity(total, existing.size + count, limits);
@@ -123,6 +124,7 @@ export function captureBackings(
 export function captureMappings(input: MemoryMapping[], limits: MemoryLimits): MemoryMapping[] {
   if (!Array.isArray(input)) throw new TypeError('mappings must be an array');
   const count = input.length;
+  byteLength(count, 'mapping count');
   if (count > limits.maxMappings) throw new RangeError('mapping capacity exceeded');
   const result: MemoryMapping[] = [];
   for (let index = 0; index < count; index++) {
@@ -191,8 +193,9 @@ export function captureInitialMemory(options: MemoryOptions): InitialMemory {
     const mappingInput = memory.mappings;
     // Both record counts are bounded before either table is captured.
     if (!Array.isArray(mappingInput)) throw new TypeError('mappings must be an array');
-    if (mappingInput.length > memoryLimits.maxMappings)
-      throw new RangeError('mapping capacity exceeded');
+    const mappingCount = mappingInput.length;
+    byteLength(mappingCount, 'mapping count');
+    if (mappingCount > memoryLimits.maxMappings) throw new RangeError('mapping capacity exceeded');
     backings = captureBackings(backingInput, memoryLimits);
     mappings = captureMappings(mappingInput, memoryLimits);
   } else {
