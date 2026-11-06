@@ -25,6 +25,7 @@ pub(super) struct Validity {
     active: Option<u64>,
     active_invalid: bool,
     sources: BTreeMap<usize, Vec<(u32, u64)>>,
+    completed_write: Option<(usize, u32, u64)>,
 }
 
 impl Default for Validity {
@@ -35,12 +36,14 @@ impl Default for Validity {
             active: None,
             active_invalid: false,
             sources: BTreeMap::new(),
+            completed_write: None,
         }
     }
 }
 
 impl Validity {
     fn rebuild_sources(&mut self) {
+        self.completed_write = None;
         self.sources.clear();
         for owner in self.owners.values().filter(|owner| owner.valid) {
             for source in &owner.sources {
@@ -71,7 +74,13 @@ impl Validity {
 
     pub(super) fn write(&mut self, incarnation: &Rc<()>, offset: u32, length: u32) {
         let end = u64::from(offset) + u64::from(length);
-        let Some(ranges) = self.sources.get(&(Rc::as_ptr(incarnation) as usize)) else {
+        let identity = Rc::as_ptr(incarnation) as usize;
+        if self.completed_write.is_some_and(|(backing, start, limit)| {
+            backing == identity && offset >= start && end <= limit
+        }) {
+            return;
+        }
+        let Some(ranges) = self.sources.get(&identity) else {
             return;
         };
         let index = ranges.partition_point(|range| u64::from(range.0) < end);
@@ -90,8 +99,9 @@ impl Validity {
                 }
             }
         }
-        // Keep this conservative union until cold registration/release/remapping.
-        // A guest store neither allocates bookkeeping nor scans source-free owners.
+        // Every live owner overlapping this span is now invalid; until source
+        // registration/remapping/release, writing within it cannot affect another.
+        self.completed_write = Some((identity, offset, end));
     }
 
     pub(super) fn mapping_change(&mut self, backings: &[Backing], mappings: &[Mapping]) {
@@ -244,6 +254,61 @@ mod tests {
         assert_eq!(image.validity.sources[&key], [(0, 4)]);
         image.release(first);
         assert!(image.validity.sources.is_empty());
+    }
+
+    #[test]
+    fn repeated_source_writes_cache_only_a_span_without_live_dependencies() {
+        use super::super::{MappingInput, Permissions};
+        let mut image = Image::new(0x1000, vec![0; 32], 0x4000, vec![0; 8]).unwrap();
+        let permissions = Permissions {
+            read: true,
+            write: true,
+            execute: true,
+        };
+        let mappings = vec![
+            MappingInput {
+                base: 0x1000,
+                backing: "code".into(),
+                offset: 0,
+                length: 32,
+                permissions,
+            },
+            MappingInput {
+                base: 0x4000,
+                backing: "ram".into(),
+                offset: 0,
+                length: 8,
+                permissions,
+            },
+        ];
+        image.set_mappings(mappings.clone()).unwrap();
+        let active = image.register_source([(0x1000, 4)]).unwrap();
+        let other = image.register_source([(0x1010, 4)]).unwrap();
+        let separate = image.register_source([(0x4000, 4)]).unwrap();
+        image.activate(active);
+        image.write(0x1010, 4, 7).unwrap();
+        assert!(!image.owner_valid(other));
+        assert!(image.owner_valid(active));
+        let completed = image.validity.completed_write;
+        assert!(completed.is_some());
+        for _ in 0..32 {
+            image.write(0x1011, 1, 8).unwrap();
+        }
+        assert_eq!(image.validity.completed_write, completed);
+        assert!(!image.active_changed());
+        // A matching backing offset in another incarnation is never cached out.
+        image.write(0x4000, 4, 9).unwrap();
+        assert!(!image.owner_valid(separate));
+        let replacement = image.register_source([(0x1010, 4)]).unwrap();
+        assert!(image.validity.completed_write.is_none());
+        image.write(0x1011, 1, 10).unwrap();
+        assert!(!image.owner_valid(replacement));
+        image.release(replacement);
+        assert!(image.validity.completed_write.is_none());
+        image.write(0x1011, 1, 11).unwrap();
+        image.set_mappings(mappings).unwrap();
+        assert!(image.validity.completed_write.is_none());
+        assert!(image.owner_valid(active));
     }
 
     #[test]
