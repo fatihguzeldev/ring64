@@ -1,11 +1,10 @@
 use super::address::check_span;
-use super::image::Kind;
 use super::{Access, Cause, Fault, Image};
 
 impl Image {
     pub fn fetch(&self, address: u64) -> Result<u8, Fault> {
-        self.preflight(address, 1, Access::Execute)?;
-        Ok(self.code.bytes[(address - self.code.base) as usize])
+        self.preflight(address, 1, Access::Execute, false)?;
+        Ok(self.byte_after_preflight(address))
     }
 
     pub fn read(&self, address: u64, width: u32) -> Result<u64, Fault> {
@@ -13,7 +12,7 @@ impl Image {
             matches!(width, 1 | 2 | 4 | 8),
             "unsupported scalar access width"
         );
-        self.preflight(address, width, Access::Read)?;
+        self.preflight(address, width, Access::Read, false)?;
         Ok(self.scalar_after_preflight(address, width))
     }
 
@@ -22,8 +21,7 @@ impl Image {
             matches!(width, 1 | 2 | 4 | 8),
             "unsupported scalar access width"
         );
-        // In this fixed image, every writable span is also readable.
-        self.preflight(address, width, Access::Write)?;
+        self.preflight(address, width, Access::Write, true)?;
         Ok(self.scalar_after_preflight(address, width))
     }
 
@@ -36,17 +34,17 @@ impl Image {
     }
 
     pub fn read_bytes(&self, address: u64, length: u32) -> Result<Vec<u8>, Fault> {
-        self.preflight(address, length, Access::Read)?;
+        self.preflight(address, length, Access::Read, false)?;
         let mut output = Vec::with_capacity(length as usize);
         let mut cursor = u128::from(address);
         let end = cursor + u128::from(length);
         while cursor < end {
-            let (_, span) = self
+            let mapping = self
                 .locate(cursor as u64)
-                .expect("preflight proved a readable span");
-            let offset = (cursor as u64 - span.base) as usize;
-            let count = (end.min(span.end()) - cursor) as usize;
-            output.extend_from_slice(&span.bytes[offset..offset + count]);
+                .expect("preflight proved a readable mapping");
+            let offset = mapping.offset as usize + (cursor as u64 - mapping.base) as usize;
+            let count = (end.min(mapping.end()) - cursor) as usize;
+            output.extend_from_slice(&self.backings[mapping.backing].bytes[offset..offset + count]);
             cursor += count as u128;
         }
         Ok(output)
@@ -54,15 +52,28 @@ impl Image {
 
     pub fn write_bytes(&mut self, address: u64, bytes: &[u8]) -> Result<(), Fault> {
         let width = u32::try_from(bytes.len()).expect("memory copy length exceeds u32");
-        self.preflight(address, width, Access::Write)?;
-        if !bytes.is_empty() {
-            let offset = (address - self.ram.base) as usize;
-            self.ram.bytes[offset..offset + bytes.len()].copy_from_slice(bytes);
+        self.preflight(address, width, Access::Write, false)?;
+        let mut cursor = u128::from(address);
+        let end = cursor + u128::from(width);
+        let mut source = 0;
+        while cursor < end {
+            let mapping = self
+                .locate(cursor as u64)
+                .expect("preflight proved a writable mapping");
+            let offset = mapping.offset as usize + (cursor as u64 - mapping.base) as usize;
+            let count = (end.min(mapping.end()) - cursor) as usize;
+            let index = mapping.backing;
+            let backing = &mut self.backings[index];
+            self.validity
+                .write(&backing.incarnation, offset as u32, count as u32);
+            backing.bytes[offset..offset + count].copy_from_slice(&bytes[source..source + count]);
+            source += count;
+            cursor += count as u128;
         }
         Ok(())
     }
 
-    fn preflight(&self, address: u64, width: u32, access: Access) -> Result<(), Fault> {
+    fn preflight(&self, address: u64, width: u32, access: Access, rmw: bool) -> Result<(), Fault> {
         check_span(address, width, access)?;
         let mut cursor = u128::from(address);
         let end = cursor + u128::from(width);
@@ -74,18 +85,18 @@ impl Image {
                 cause,
                 failing: cursor,
             };
-            let (kind, span) = self
+            let mapping = self
                 .locate(cursor as u64)
                 .ok_or_else(|| failure(Cause::Unmapped))?;
             let permitted = match access {
-                Access::Read => true,
-                Access::Write => kind == Kind::Ram,
-                Access::Execute => kind == Kind::Code,
+                Access::Read => mapping.permissions.read,
+                Access::Write => mapping.permissions.write && (!rmw || mapping.permissions.read),
+                Access::Execute => mapping.permissions.execute,
             };
             if !permitted {
                 return Err(failure(Cause::Permission));
             }
-            cursor = end.min(span.end());
+            cursor = end.min(mapping.end());
         }
         Ok(())
     }
@@ -99,10 +110,11 @@ impl Image {
     }
 
     fn byte_after_preflight(&self, address: u64) -> u8 {
-        let (_, span) = self
+        let mapping = self
             .locate(address)
-            .expect("preflight proved a readable span");
-        span.bytes[(address - span.base) as usize]
+            .expect("preflight proved a readable mapping");
+        self.backings[mapping.backing].bytes
+            [mapping.offset as usize + (address - mapping.base) as usize]
     }
 }
 
