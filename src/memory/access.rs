@@ -33,7 +33,29 @@ impl Image {
             matches!(width, 1 | 2 | 4 | 8),
             "unsupported scalar access width"
         );
-        self.write_bytes(address, &value.to_le_bytes()[..width as usize])
+        let first = self.preflight(address, width, Access::Write, false)?;
+        let mapping = &self.mappings[first];
+        let relative = address - mapping.base;
+        if u64::from(width) <= u64::from(mapping.length) - relative {
+            let offset = mapping.offset as usize + relative as usize;
+            let backing = &mut self.backings[mapping.backing];
+            self.validity
+                .write(&backing.incarnation, offset as u32, width);
+            match width {
+                1 => backing.bytes[offset] = value as u8,
+                2 => {
+                    backing.bytes[offset..offset + 2].copy_from_slice(&(value as u16).to_le_bytes())
+                }
+                4 => {
+                    backing.bytes[offset..offset + 4].copy_from_slice(&(value as u32).to_le_bytes())
+                }
+                8 => backing.bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes()),
+                _ => unreachable!(),
+            }
+        } else {
+            self.write_after_preflight(address, &value.to_le_bytes()[..width as usize], first);
+        }
+        Ok(())
     }
 
     pub fn read_bytes(&self, address: u64, length: u32) -> Result<Vec<u8>, Fault> {
@@ -54,9 +76,14 @@ impl Image {
 
     pub fn write_bytes(&mut self, address: u64, bytes: &[u8]) -> Result<(), Fault> {
         let width = u32::try_from(bytes.len()).expect("memory copy length exceeds u32");
-        let mut index = self.preflight(address, width, Access::Write, false)?;
+        let first = self.preflight(address, width, Access::Write, false)?;
+        self.write_after_preflight(address, bytes, first);
+        Ok(())
+    }
+
+    fn write_after_preflight(&mut self, address: u64, bytes: &[u8], mut index: usize) {
         let mut cursor = u128::from(address);
-        let end = cursor + u128::from(width);
+        let end = cursor + bytes.len() as u128;
         let mut source = 0;
         while cursor < end {
             let mapping = &self.mappings[index];
@@ -70,7 +97,6 @@ impl Image {
             cursor += count as u128;
             index += 1;
         }
-        Ok(())
     }
 
     fn preflight(
@@ -122,6 +148,23 @@ impl Image {
     }
 
     fn scalar_after_preflight(&self, address: u64, width: u32, mut index: usize) -> u64 {
+        let mapping = &self.mappings[index];
+        let relative = address - mapping.base;
+        if u64::from(width) <= u64::from(mapping.length) - relative {
+            let offset = mapping.offset as usize + relative as usize;
+            let bytes = &self.backings[mapping.backing].bytes;
+            return match width {
+                1 => u64::from(bytes[offset]),
+                2 => u64::from(u16::from_le_bytes(
+                    bytes[offset..offset + 2].try_into().unwrap(),
+                )),
+                4 => u64::from(u32::from_le_bytes(
+                    bytes[offset..offset + 4].try_into().unwrap(),
+                )),
+                8 => u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap()),
+                _ => unreachable!(),
+            };
+        }
         let mut bytes = [0u8; 8];
         let mut cursor = u128::from(address);
         let end = cursor + u128::from(width);
