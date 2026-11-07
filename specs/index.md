@@ -13,6 +13,7 @@
 - [string and repeated execution](string-and-repeated-execution/spec.md): memory strings, DF, bounded repetition, partial progress and restart after faults or code changes.
 - [near control and stack](near-control-and-stack/spec.md): memory-indirect transfers, explicit stack-memory operands, frame teardown and counter branches.
 - [scalar exchange and locked rmw](scalar-exchange-and-locked-rmw/spec.md): exchange, compare-exchange, LOCK legality and checked RMW publication in private memory.
+- [simd integer and data](simd-integer-and-data/spec.md): raw XMM state, legacy packed integers, bit-preserving moves and checked wide memory.
 
 ## scope
 
