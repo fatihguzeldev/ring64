@@ -68,14 +68,13 @@ impl Emitter {
                 .op(Op::LocalSet(FLAGS));
         } else if instruction.destination_is_gpr() {
             self.op(Op::LocalGet(result)).op(Op::I64x2ExtractLane(0));
-            self.write_register(
-                RegisterView::low(instruction.dst),
-                if instruction.op.integer64 {
-                    Width::W64
-                } else {
-                    Width::W32
-                },
-            );
+            let width = if instruction.op.integer64 {
+                Width::W64
+            } else {
+                Width::W32
+            };
+            self.narrow(width);
+            self.write_register(RegisterView::low(instruction.dst), width);
         } else {
             let destination = self.xmm(instruction.dst);
             self.op(Op::LocalGet(result)).op(Op::LocalSet(destination));

@@ -1,4 +1,5 @@
 use super::*;
+mod boundaries;
 use crate::x86::context::Segment;
 use crate::x86::float::{Format, Kind, Op as Numeric};
 use crate::x86::instruction::{
@@ -257,4 +258,127 @@ fn float_models_do_not_inflate_scalar_translation_records_or_add_unselected_nume
             }
         }
     }
+}
+
+#[test]
+fn numeric_gpr_views_and_comparison_flags_publish_only_the_selected_projection() {
+    let a = 0x0123456789abcdeffedcba9876543210u128;
+    let b = 0xaaaaaaaa55555555bbbbbbbb66666666u128;
+    let value = 0x9876543210fedcba1122334480000000u128;
+    let mut cases = vec![];
+    for format in [Format::F32, Format::F64] {
+        for integer64 in [false, true] {
+            let mut from = numeric(Kind::IntToFloat);
+            from.format = format;
+            from.integer64 = integer64;
+            let mut p = packet(
+                vec![Operation::Float(FloatInstruction {
+                    op: from,
+                    dst: 8,
+                    src: Location::Register(RegisterView::low(1)),
+                })],
+                &[(8, a)],
+                &[(8, value)],
+                1,
+                1,
+            );
+            p["accesses"] = json!([{"kind":"float","args":[from.encode(),format!("{:x}",a as u64),format!("{:x}",a>>64),if integer64{"1122334400000001"}else{"1"},"0"],"result":{"reason":0,"value":format!("{value:x}")}}]);
+            cases.push(p);
+            for kind in [Kind::FloatToInt, Kind::TruncToInt] {
+                let mut to = from;
+                to.kind = kind;
+                let mut p = packet(
+                    vec![Operation::Float(FloatInstruction {
+                        op: to,
+                        dst: 8,
+                        src: Location::Register(RegisterView::low(1)),
+                    })],
+                    &[(1, b)],
+                    &[],
+                    1,
+                    1,
+                );
+                p["expected"]["registers"][8] = json!(format!(
+                    "{:x}",
+                    if integer64 {
+                        value as u64
+                    } else {
+                        value as u32 as u64
+                    }
+                ));
+                p["accesses"] = json!([{"kind":"float","args":[to.encode(),"0","0",format!("{:x}",b as u64),format!("{:x}",b>>64)],"result":{"reason":0,"value":format!("{value:x}")}}]);
+                cases.push(p);
+            }
+        }
+    }
+    for kind in [Kind::Comi, Kind::Ucomi] {
+        for reason in [0, 13] {
+            for alias in [false, true] {
+                let op = numeric(kind);
+                let src = if alias { 0 } else { 1 };
+                let rhs = if alias { a } else { b };
+                let mut p = packet(
+                    vec![Operation::Float(FloatInstruction {
+                        op,
+                        dst: 0,
+                        src: Location::Register(RegisterView::low(src)),
+                    })],
+                    &[(0, a), (1, b)],
+                    &[],
+                    if reason == 0 { 1 } else { 13 },
+                    if reason == 0 { 1 } else { 0 },
+                );
+                if reason == 0 {
+                    p["expected"]["flags"] = json!("447");
+                }
+                p["accesses"] = json!([{"kind":"float","args":[op.encode(),format!("{:x}",a as u64),format!("{:x}",a>>64),format!("{:x}",rhs as u64),format!("{:x}",rhs>>64)],"result":{"reason":reason,"value":"45"}}]);
+                cases.push(p);
+            }
+        }
+    }
+    run_cases(cases);
+}
+
+#[test]
+fn numeric_memory_sources_use_actual_declared_spans_before_calling_the_numeric_authority() {
+    let raw = 0x0123456789abcdeffedcba9876543210u128;
+    let address = Address {
+        base: AddressBase::Register(0),
+        ..Address::default()
+    };
+    let mut cases = vec![];
+    for (kind, format, scalar, integer64, width) in [
+        (Kind::Add, Format::F32, true, false, 4),
+        (Kind::Add, Format::F64, true, false, 8),
+        (Kind::Add, Format::F32, false, false, 16),
+        (Kind::FloatConvert, Format::F32, false, false, 8),
+        (Kind::FloatConvert, Format::F64, false, false, 16),
+        (Kind::IntToFloat, Format::F64, false, false, 8),
+        (Kind::IntToFloat, Format::F32, true, true, 8),
+    ] {
+        let op = Numeric {
+            kind,
+            format,
+            scalar,
+            integer64,
+            predicate: 0,
+        };
+        let mut p = packet(
+            vec![Operation::Float(FloatInstruction {
+                op,
+                dst: 0,
+                src: Location::Memory(address),
+            })],
+            &[(0, raw)],
+            &[(0, raw)],
+            1,
+            1,
+        );
+        p["accesses"] = json!([
+            {"kind":"vector_load","args":["1122334400000000",width,Segment::Ds as u32,if width==16{16}else{1}],"result":"1122334455667788"},
+            {"kind":"float","args":[op.encode(),format!("{:x}",raw as u64),format!("{:x}",raw>>64),"1122334455667788","0"],"result":{"reason":0,"value":format!("{raw:x}")}}
+        ]);
+        cases.push(p);
+    }
+    run_cases(cases);
 }
