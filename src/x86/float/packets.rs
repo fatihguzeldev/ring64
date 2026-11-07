@@ -251,3 +251,71 @@ fn directed_overflow_to_maximum_finite_still_reports_overflow() {
     assert_eq!(r.value, 0x7f7fffff);
     assert_eq!(r.mxcsr, 0x3faa);
 }
+
+#[test]
+fn narrowing_uses_unbounded_precision_for_tininess_even_when_result_is_normal() {
+    // Intel vol. 1 §11.5.2.5: tininess follows rounding to 24 significant bits
+    // with an unbounded exponent, before rounding to the bounded binary32 format.
+    // The first input is exactly 2^-126 - 2^-150: tiny at 24-bit precision,
+    // although bounded nearest-even rounding returns the minimum normal value.
+    // The second is 2^-126 - 2^-151: its unbounded nearest-even result is normal.
+    let results = [0x00800000, 0x007fffff, 0x00800000, 0x007fffff];
+    for (input, masked, unmasked, flushed) in [
+        (
+            0x380fffffe0000000u64,
+            [48, 48, 48, 48],
+            [16, 16, 16, 16],
+            [0, 0, 0, 0],
+        ),
+        (
+            0x380ffffff0000000,
+            [32, 48, 32, 48],
+            [32, 48, 32, 48],
+            [0x00800000, 0, 0x00800000, 0],
+        ),
+    ] {
+        for negative in [false, true] {
+            for rc in 0..4 {
+                // Negation exchanges downward and upward rounding.
+                let index = if negative { [0, 2, 1, 3][rc] } else { rc };
+                for control in [0x1f80, 0x1780, 0x9f80, 0x9780, 0x0f80, 0x0780] {
+                    for sticky in [0, 0x3f] {
+                        let mxcsr = control | ((rc as u32) << 13) | sticky;
+                        let raised = if control & 0x800 != 0 {
+                            masked[index]
+                        } else {
+                            unmasked[index]
+                        };
+                        let trapped = raised & !(mxcsr >> 7) & 0x3f != 0;
+                        let sign = if negative { 0x80000000 } else { 0 };
+                        let bits = if control & 0x8800 == 0x8800 {
+                            flushed[index]
+                        } else {
+                            results[index]
+                        } | sign;
+                        let left = 0x112233445566778899aabbccdeadbeefu128;
+                        assert_eq!(
+                            eval(
+                                op(Kind::FloatConvert, Format::F64, true),
+                                left,
+                                (input | if negative { 1 << 63 } else { 0 }) as u128,
+                                mxcsr,
+                            ),
+                            Outcome {
+                                value: if trapped {
+                                    left
+                                } else {
+                                    (left & !0xffffffff) | bits
+                                },
+                                mxcsr: mxcsr | raised,
+                                raised,
+                                stage: trapped.then_some(Stage::PostComputation),
+                            },
+                            "input={input:x} negative={negative} mxcsr={mxcsr:x}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
