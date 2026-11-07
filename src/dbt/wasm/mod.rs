@@ -215,9 +215,7 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 } | Operation::CompareExchange {
                     dst: Location::Memory(_),
                     ..
-                } | Operation::CompareExchange8b {
-                    ..
-                }
+                } | Operation::CompareExchange8b { .. }
             )
     });
     if write_intent {

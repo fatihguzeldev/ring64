@@ -83,13 +83,14 @@ impl Emitter {
         self.op(Op::I64Or);
     }
 
-    pub(super) fn compare_exchange8b(
-        &mut self,
-        address: Address,
-        next_pc: u64,
-        exit_depth: u32,
-    ) {
-        self.read_location(Location::Memory(address), Width::W64, next_pc, true, exit_depth);
+    pub(super) fn compare_exchange8b(&mut self, address: Address, next_pc: u64, exit_depth: u32) {
+        self.read_location(
+            Location::Memory(address),
+            Width::W64,
+            next_pc,
+            true,
+            exit_depth,
+        );
         self.op(Op::LocalGet(LHS)).op(Op::LocalSet(RHS));
         self.pair32(2, 0);
         self.op(Op::LocalSet(LHS));
