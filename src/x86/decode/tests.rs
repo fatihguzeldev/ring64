@@ -11,6 +11,7 @@ mod arithmetic_bits;
 mod conditions;
 mod integer_memory;
 mod logical;
+mod modes;
 mod multiply_divide;
 mod scalar_data;
 mod stack;
@@ -231,7 +232,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
             address: Address {
                 base: AddressBase::Register(3),
                 index: None,
-                displacement: 0
+                displacement: 0,
+                ..Address::default()
             },
             width: Width::W32
         }
@@ -243,7 +245,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
             address: Address {
                 base: AddressBase::Register(3),
                 index: None,
-                displacement: 0
+                displacement: 0,
+                ..Address::default()
             },
             width: Width::W64
         }
@@ -255,7 +258,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
             address: Address {
                 base: AddressBase::Register(13),
                 index: None,
-                displacement: 0
+                displacement: 0,
+                ..Address::default()
             },
             width: Width::W32
         }
@@ -267,7 +271,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
             address: Address {
                 base: AddressBase::Register(13),
                 index: None,
-                displacement: -4
+                displacement: -4,
+                ..Address::default()
             },
             width: Width::W64
         }
@@ -279,7 +284,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
             address: Address {
                 base: AddressBase::Register(3),
                 index: None,
-                displacement: -2_147_483_648
+                displacement: -2_147_483_648,
+                ..Address::default()
             },
             width: Width::W64
         }
@@ -291,7 +297,9 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
             address: Address {
                 base: AddressBase::Register(5),
                 index: None,
-                displacement: 2_147_483_647
+                displacement: 2_147_483_647,
+                segment: crate::x86::context::Segment::Ss,
+                ..Address::default()
             },
             width: Width::W32
         }
@@ -303,7 +311,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
             address: Address {
                 base: AddressBase::Register(3),
                 index: None,
-                displacement: -128
+                displacement: -128,
+                ..Address::default()
             },
             width: Width::W32
         }
@@ -315,7 +324,8 @@ fn memory_operands_keep_the_full_base_identity_and_signed_displacement() {
             address: Address {
                 base: AddressBase::Register(3),
                 index: None,
-                displacement: 127
+                displacement: 127,
+                ..Address::default()
             },
             width: Width::W32
         }
@@ -363,15 +373,7 @@ fn relative_targets_use_the_following_pc_and_signed_displacements() {
 
 #[test]
 fn valid_forms_outside_the_subset_are_unsupported_without_operand_effects() {
-    for bytes in [
-        &[0x82, 0xd0, 1][..],
-        &[0x67, 0x8b, 3][..],
-        &[0x48, 0xeb, 0][..],
-        &[0x48, 0x0f, 0x85, 0, 0, 0, 0][..],
-        &[0x48, 0x49, 0x89, 0xc0][..],
-        &[0xf4][..],
-        &[0x0f, 0xc0, 0xc0][..],
-    ] {
+    for bytes in [&[0x82, 0xd0, 1][..], &[0xf4][..], &[0x0f, 0xc0, 0xc0][..]] {
         assert_eq!(
             at(0x1000, bytes),
             Err(DecodeError::Unsupported),
@@ -529,6 +531,7 @@ fn integrated_literal_has_the_declared_instruction_boundaries_and_loop_target() 
                     base: AddressBase::Register(3),
                     index: None,
                     displacement: 0,
+                    ..Address::default()
                 },
                 width: Width::W64,
             },

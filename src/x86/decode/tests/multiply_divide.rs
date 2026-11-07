@@ -146,11 +146,17 @@ fn every_family_keeps_its_memory_source_and_complete_rip_relative_length() {
     for (prefix, wide, rex) in prefixes() {
         let src = Location::Memory(Address {
             base: AddressBase::Register(5 | rex.map_or(0, |value| (value & 1) << 3)),
+            segment: if rex.is_some_and(|value| value & 1 != 0) {
+                crate::x86::context::Segment::Ds
+            } else {
+                crate::x86::context::Segment::Ss
+            },
             index: Some(AddressIndex {
                 register: 5 | rex.map_or(0, |value| (value & 2) << 2),
                 scale: 4,
             }),
             displacement: i64::from(i32::MIN),
+            ..Address::default()
         });
         for (opcode, width) in [(0xf6, Width::W8), (0xf7, wide)] {
             for selector in 4..8 {
@@ -194,6 +200,7 @@ fn every_family_keeps_its_memory_source_and_complete_rip_relative_length() {
                         base: AddressBase::NextPc,
                         index: None,
                         displacement: -16,
+                        ..Address::default()
                     }),
                     immediate,
                     width: wide,
@@ -325,22 +332,7 @@ fn excluded_group_one_still_stops_before_every_hypothetical_address_tail() {
 
 #[test]
 fn new_forms_keep_unsupported_prefix_frontiers_without_requesting_an_opcode() {
-    for prefix in [
-        &[0x26][..],
-        &[0x2e][..],
-        &[0x36][..],
-        &[0x3e][..],
-        &[0x64][..],
-        &[0x65][..],
-        &[0x67][..],
-        &[0xf0][..],
-        &[0xf2][..],
-        &[0xf3][..],
-        &[0x66, 0x66][..],
-        &[0x48, 0x66][..],
-        &[0x48, 0x49][..],
-        &[0x66, 0x48, 0x49][..],
-    ] {
+    for prefix in [&[0xf0][..], &[0xf2][..], &[0xf3][..]] {
         for suffix in [
             &[0xf6, 0xe4][..],
             &[0x0f, 0xaf, 0xc1][..],

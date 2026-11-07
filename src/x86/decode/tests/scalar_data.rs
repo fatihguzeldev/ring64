@@ -35,6 +35,7 @@ fn base_address() -> Address {
         base: AddressBase::Register(3),
         index: None,
         displacement: 0,
+        ..Address::default()
     }
 }
 
@@ -454,10 +455,6 @@ fn unsupported_scalar_forms_and_invalid_lea_stop_before_unneeded_fields() {
     use crate::x86::decode::decode;
     for bytes in [
         &[0x82][..],
-        &[0x67][..],
-        &[0x66, 0x66][..],
-        &[0x48, 0x66][..],
-        &[0x48, 0x49][..],
         &[0x66, 0x0f, 0xbf][..],
         &[0x66, 0x44, 0x0f, 0xb7][..],
         &[0xc7, 0x0c][..],
@@ -465,9 +462,6 @@ fn unsupported_scalar_forms_and_invalid_lea_stop_before_unneeded_fields() {
         &[0x48, 0x82][..],
         &[0xf6, 0x0c][..],
         &[0x66, 0xf7, 0x0c][..],
-        &[0x66, 0x50][..],
-        &[0x66, 0xe8][..],
-        &[0x48, 0x0f, 0x85][..],
     ] {
         let mut reads = Vec::new();
         let result = decode(0x1000, |pc| {
@@ -565,6 +559,7 @@ fn moffs_addresses_are_always_full_width_and_accumulator_selection_ignores_rex_f
         base: AddressBase::None,
         index: None,
         displacement: 0x100004000,
+        ..Address::default()
     };
     for (prefix, wide) in [
         (&[][..], Width::W32),

@@ -99,6 +99,7 @@ fn unary_forms_cover_every_width_bank_high_byte_and_ignored_selector_extension()
                                 ),
                                 index: None,
                                 displacement: -128,
+                                ..Address::default()
                             }),
                             width,
                         },
@@ -139,7 +140,7 @@ fn implicit_status_operations_ignore_all_rex_fields_and_operand_override() {
 }
 
 #[test]
-fn ff_selects_the_family_before_rejecting_transfer_prefixes_or_address_tails() {
+fn ff_selects_transfer_family_before_requesting_unsupported_address_tails() {
     for bytes in [
         &[0x66, 0xff][..],
         &[0x66, 0x4f, 0xff][..],
@@ -156,11 +157,25 @@ fn ff_selects_the_family_before_rejecting_transfer_prefixes_or_address_tails() {
             for mode in 0..4 {
                 let mut bytes = prefix.to_vec();
                 bytes.extend([0xff, (mode << 6) | (selector << 3) | 4]);
-                assert_eq!(
-                    at(0x1000, &bytes),
-                    Err(DecodeError::Unsupported),
-                    "{bytes:02x?}"
-                );
+                if mode == 3 && matches!(selector, 2 | 4) {
+                    let decoded = at(0x1000, &bytes).unwrap();
+                    assert!(matches!(
+                        decoded.operation,
+                        Operation::Call {
+                            width: Width::W64,
+                            ..
+                        } | Operation::JumpRegister {
+                            width: Width::W64,
+                            ..
+                        }
+                    ));
+                } else {
+                    assert_eq!(
+                        at(0x1000, &bytes),
+                        Err(DecodeError::Unsupported),
+                        "{bytes:02x?}"
+                    );
+                }
             }
         }
     }
@@ -359,6 +374,7 @@ fn count_memory_forms_keep_full_address_terms_and_count_source() {
                 base: AddressBase::Register(3 | rex.map_or(0, |value| (value & 1) << 3)),
                 index: None,
                 displacement: -128,
+                ..Address::default()
             };
             for (selector, kind) in [
                 (0, Shift::Rol),
@@ -556,6 +572,7 @@ fn bit_register_indices_keep_both_encoded_register_banks_and_memory_addresses() 
                             base: AddressBase::Register(3 + base_extension),
                             index: None,
                             displacement: -128,
+                            ..Address::default()
                         }),
                         index: BitIndex::Register(R::low(register + reg_extension)),
                         width,
@@ -601,6 +618,7 @@ fn bit_immediates_preserve_raw_bytes_and_ignore_the_selector_rex_extension() {
                             base: AddressBase::Register(3 + base_extension),
                             index: None,
                             displacement: -128,
+                            ..Address::default()
                         }),
                         index: BitIndex::Immediate(index),
                         width,
@@ -642,6 +660,7 @@ fn bit_scans_keep_selected_source_and_destination_widths_without_byte_aliases() 
                             base: AddressBase::Register(3 + base_extension),
                             index: None,
                             displacement: -128,
+                            ..Address::default()
                         }),
                         width,
                     },
@@ -698,6 +717,7 @@ fn bit_and_scan_encodings_complete_every_address_tail_and_immediate_before_execu
                 base: AddressBase::NextPc,
                 index: None,
                 displacement: 0,
+                ..Address::default()
             }),
             index: BitIndex::Immediate(255),
             width: Width::W16,

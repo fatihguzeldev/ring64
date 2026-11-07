@@ -238,7 +238,7 @@ fn unsupported_logical_selectors_do_not_request_operand_tails() {
 
 #[test]
 fn logical_extensions_admit_byte_and_accumulator_forms_but_keep_other_prefixes_unsupported() {
-    for prefix in [0x67, 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65, 0xf0, 0xf2, 0xf3] {
+    for prefix in [0xf0, 0xf2, 0xf3] {
         assert_eq!(
             at(0x1000, &[prefix, 0x45, 0x21, 0xc8]),
             Err(DecodeError::Unsupported)
@@ -276,7 +276,7 @@ fn logical_extensions_admit_byte_and_accumulator_forms_but_keep_other_prefixes_u
         }
     }
     assert_eq!(
-        at(0x1000, &[0x48, 0x49, 0x21, 0xc0]),
-        Err(DecodeError::Unsupported)
+        operation(&[0x48, 0x49, 0x21, 0xc0]),
+        alu(And, 8, Register(RegisterView::low(0)), W64)
     );
 }

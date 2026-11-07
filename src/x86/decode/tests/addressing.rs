@@ -13,6 +13,12 @@ fn address(base: AddressBase, index: Option<(u8, u8)>, displacement: i64) -> Add
         base,
         index: index.map(|(register, scale)| AddressIndex { register, scale }),
         displacement,
+        segment: if matches!(base, AddressBase::Register(4 | 5)) {
+            crate::x86::context::Segment::Ss
+        } else {
+            crate::x86::context::Segment::Ds
+        },
+        ..Address::default()
     }
 }
 
@@ -247,9 +253,8 @@ fn every_required_sib_and_displacement_byte_keeps_its_fetch_failure() {
 }
 
 #[test]
-fn new_address_forms_do_not_admit_other_prefixes() {
+fn address_forms_keep_lock_and_rep_prefixes_outside_coverage() {
     for bytes in [
-        &[0x67, 0x8b, 0x04][..],
         &[0xf0, 0x8b, 0x04][..],
         &[0xf2, 0x8b, 0x04][..],
         &[0xf3, 0x8b, 0x04][..],
@@ -316,7 +321,7 @@ fn lea_fetches_each_required_byte_and_keeps_unsupported_prefix_frontiers() {
             );
         }
     }
-    for prefix in [0x67, 0xf0, 0xf2, 0xf3] {
+    for prefix in [0xf0, 0xf2, 0xf3] {
         assert_eq!(
             at(0x1000, &[prefix, 0x8d, 0xc4]),
             Err(DecodeError::Unsupported)
@@ -328,7 +333,7 @@ fn lea_fetches_each_required_byte_and_keeps_unsupported_prefix_frontiers() {
     }
     assert_eq!(
         at(0x1000, &[0x48, 0x49, 0x8d, 0xc4]),
-        Err(DecodeError::Unsupported)
+        Err(DecodeError::Invalid)
     );
 }
 

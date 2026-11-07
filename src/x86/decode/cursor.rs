@@ -1,21 +1,22 @@
-use crate::memory::{Access, Cause, Fault};
-
 use super::DecodeError;
+use crate::memory::{Access, Cause, Fault};
 
 pub(super) struct Cursor<F> {
     pc: u64,
     consumed: u32,
+    long64: bool,
     read: F,
 }
 
 impl<F> Cursor<F>
 where
-    F: FnMut(u64) -> Result<u8, Fault>,
+    F: FnMut(u64) -> Result<u8, DecodeError>,
 {
-    pub(super) fn new(pc: u64, read: F) -> Self {
+    pub(super) fn new(pc: u64, long64: bool, read: F) -> Self {
         Self {
             pc,
             consumed: 0,
+            long64,
             read,
         }
     }
@@ -24,7 +25,7 @@ where
         if self.consumed == 15 {
             return Err(DecodeError::Invalid);
         }
-        // Instruction bytes cannot wrap even though the completed next PC can.
+        // Required bytes never wrap; a completed next IP may wrap independently.
         let address = u128::from(self.pc) + u128::from(self.consumed);
         if address > u128::from(u64::MAX) {
             return Err(DecodeError::Fetch(Fault {
@@ -35,7 +36,7 @@ where
                 failing: 1u128 << 64,
             }));
         }
-        let byte = (self.read)(address as u64).map_err(DecodeError::Fetch)?;
+        let byte = (self.read)(address as u64)?;
         self.consumed += 1;
         Ok(byte)
     }
@@ -49,6 +50,11 @@ where
     }
 
     pub(super) fn next_pc(&self) -> u64 {
-        self.pc.wrapping_add(u64::from(self.consumed))
+        let next = self.pc.wrapping_add(u64::from(self.consumed));
+        if self.long64 {
+            next
+        } else {
+            u64::from(next as u32)
+        }
     }
 }

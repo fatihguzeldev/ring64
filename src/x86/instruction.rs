@@ -1,3 +1,5 @@
+use super::context::Segment;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Width {
     W8,
@@ -95,6 +97,20 @@ pub struct Address {
     pub base: AddressBase,
     pub index: Option<AddressIndex>,
     pub displacement: i64,
+    pub size: Width,
+    pub segment: Segment,
+}
+
+impl Default for Address {
+    fn default() -> Self {
+        Self {
+            base: AddressBase::None,
+            index: None,
+            displacement: 0,
+            size: Width::W64,
+            segment: Segment::Ds,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -317,19 +333,24 @@ pub enum Operation {
     },
     Push {
         src: Operand,
+        width: Width,
     },
     Pop {
         dst: u8,
+        width: Width,
     },
     Call {
         /// Absolute guest target, also for a decoded relative CALL.
         target: Operand,
+        width: Width,
     },
     JumpRegister {
         target: u8,
+        width: Width,
     },
     Return {
         cleanup: u16,
+        width: Width,
     },
     Jump {
         target: u64,
@@ -345,6 +366,13 @@ pub struct Instruction {
     pub pc: u64,
     pub next_pc: u64,
     pub operation: Operation,
+}
+
+impl Instruction {
+    pub fn encoded_len(&self) -> u32 {
+        // Lengths are at most 15; low32 keeps both EIP32 and RIP64 wrap exact.
+        self.next_pc.wrapping_sub(self.pc) as u32
+    }
 }
 
 #[cfg(test)]

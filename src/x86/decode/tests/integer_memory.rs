@@ -41,6 +41,7 @@ fn memory_integer_opcode_directions_keep_the_first_read_operand() {
             base: AddressBase::Register(3),
             index: None,
             displacement: 0,
+            ..Address::default()
         };
         for (prefix, width) in [(None, W32), (Some(0x40), W32), (Some(0x48), W64)] {
             let mut bytes: Vec<_> = prefix.into_iter().collect();
@@ -90,8 +91,14 @@ fn memory_integer_register_fields_keep_all_banks_and_address_aliases() {
                                 kind,
                                 Address {
                                     base: AddressBase::Register(base),
+                                    segment: if matches!(base, 4 | 5) {
+                                        crate::x86::context::Segment::Ss
+                                    } else {
+                                        crate::x86::context::Segment::Ds
+                                    },
                                     index: None,
                                     displacement: 0,
+                                    ..Address::default()
                                 },
                                 operands,
                                 width
@@ -144,6 +151,7 @@ fn memory_integer_immediates_keep_selectors_and_signed_width_patterns() {
                                     base: AddressBase::Register(13),
                                     index: None,
                                     displacement: 0,
+                                    ..Address::default()
                                 },
                                 MemoryFirst(Immediate(expected)),
                                 width
@@ -275,8 +283,14 @@ fn memory_integer_addresses_keep_sib_specials_displacements_and_aliases() {
                 kind,
                 Address {
                     base,
+                    segment: if matches!(base, AddressBase::Register(4 | 5)) {
+                        crate::x86::context::Segment::Ss
+                    } else {
+                        crate::x86::context::Segment::Ds
+                    },
                     index,
-                    displacement
+                    displacement,
+                    ..Address::default()
                 },
                 operands,
                 width
@@ -305,6 +319,7 @@ fn rip_relative_memory_immediates_keep_the_completed_next_pc_and_domain_wrap() {
                 base: AddressBase::NextPc,
                 index: None,
                 displacement: 0,
+                ..Address::default()
             },
             MemoryFirst(Immediate(immediate)),
             width,
@@ -455,7 +470,7 @@ fn width_extension_admits_byte_memory_and_register_directions_but_keeps_other_pr
             );
         }
     }
-    for prefix in [0x67, 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65, 0xf0, 0xf2, 0xf3] {
+    for prefix in [0xf0, 0xf2, 0xf3] {
         assert_eq!(
             at(0x1000, &[prefix, 0x48, 0x01, 0x03]),
             Err(DecodeError::Unsupported)
@@ -473,7 +488,15 @@ fn width_extension_admits_byte_memory_and_register_directions_but_keeps_other_pr
         ));
     }
     assert_eq!(
-        at(0x1000, &[0x48, 0x49, 0x01, 0x03]),
-        Err(DecodeError::Unsupported)
+        operation(&[0x48, 0x49, 0x01, 0x03]),
+        alu(
+            Add,
+            Address {
+                base: AddressBase::Register(11),
+                ..Address::default()
+            },
+            MemoryFirst(Register(RegisterView::low(0))),
+            W64
+        )
     );
 }

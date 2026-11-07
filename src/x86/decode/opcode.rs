@@ -1,4 +1,4 @@
-use crate::memory::Fault;
+use crate::x86::context::{Mode, Segment};
 use crate::x86::instruction::{
     Address, AddressBase, Alu, Bit, BitIndex, Carry, Condition, Count, DataOperand, DoubleShift,
     Location, MemoryAluOperands, Operand, Operation, RegisterView, Shift, Unary, Width,
@@ -12,32 +12,42 @@ pub(super) fn refine<F>(
     cursor: &mut Cursor<F>,
 ) -> Result<Operation, DecodeError>
 where
-    F: FnMut(u64) -> Result<u8, Fault>,
+    F: FnMut(u64) -> Result<u8, DecodeError>,
 {
     let rex = prefixes.rex;
     let wide = prefixes.width();
-    if prefixes.operand16
-        && matches!(opcode, 0x50..=0x5f | 0x68 | 0x6a | 0x70..=0x7f | 0xc2 | 0xc3 | 0xe8 | 0xe9 | 0xeb)
-    {
-        return Err(DecodeError::Unsupported);
-    }
+    let stack_width = prefixes.stack_width();
+    let near_width = prefixes.near_width();
     match opcode {
         0x50..=0x57 => Ok(Operation::Push {
             src: Operand::Register((opcode - 0x50) | rex.base_extension()),
+            width: stack_width,
         }),
         0x58..=0x5f => Ok(Operation::Pop {
             dst: (opcode - 0x58) | rex.base_extension(),
+            width: stack_width,
         }),
         0x68 | 0x6a => Ok(Operation::Push {
-            src: Operand::Immediate(if opcode == 0x6a {
-                cursor.byte()? as i8 as i64 as u64
+            src: Operand::Immediate(immediate(cursor, stack_width, opcode == 0x6a)?),
+            width: stack_width,
+        }),
+        0x40..=0x4f => Ok(Operation::Unary {
+            kind: if opcode < 0x48 {
+                Unary::Inc
             } else {
-                cursor.unsigned(4)? as u32 as i32 as i64 as u64
-            }),
+                Unary::Dec
+            },
+            dst: Location::Register(RegisterView::low(opcode & 7)),
+            width: wide,
+        }),
+        0x60 | 0x61 => Err(if prefixes.long64 {
+            DecodeError::Invalid
+        } else {
+            DecodeError::Unsupported
         }),
         0x69 | 0x6b => {
             let operands = ModRm::read(cursor, rex)?;
-            let src = operands.location(cursor, rex, wide)?;
+            let src = operands.location(cursor, prefixes, wide)?;
             Ok(Operation::Imul {
                 dst: rex.view(operands.register, wide),
                 src,
@@ -46,9 +56,12 @@ where
             })
         }
         0xe8 => {
-            let displacement = cursor.unsigned(4)? as u32 as i32 as i64;
+            let displacement = relative_displacement(cursor, near_width)?;
             Ok(Operation::Call {
-                target: Operand::Immediate(cursor.next_pc().wrapping_add(displacement as u64)),
+                target: Operand::Immediate(
+                    cursor.next_pc().wrapping_add(displacement as u64) & near_width.mask(),
+                ),
+                width: near_width,
             })
         }
         0xff => {
@@ -60,26 +73,32 @@ where
                     } else {
                         Unary::Dec
                     },
-                    dst: operands.location(cursor, rex, wide)?,
+                    dst: operands.location(cursor, prefixes, wide)?,
                     width: wide,
                 });
             }
-            if prefixes.operand16 || operands.mode != 3 {
+            if operands.mode != 3 {
                 return Err(DecodeError::Unsupported);
             }
             match operands.selector {
                 2 => Ok(Operation::Call {
                     target: Operand::Register(operands.rm),
+                    width: near_width,
                 }),
                 4 => Ok(Operation::JumpRegister {
                     target: operands.rm,
+                    width: near_width,
                 }),
                 _ => Err(DecodeError::Unsupported),
             }
         }
-        0xc3 => Ok(Operation::Return { cleanup: 0 }),
+        0xc3 => Ok(Operation::Return {
+            cleanup: 0,
+            width: near_width,
+        }),
         0xc2 => Ok(Operation::Return {
             cleanup: cursor.unsigned(2)? as u16,
+            width: near_width,
         }),
         0xb0..=0xbf => {
             let (start, width) = if opcode < 0xb8 {
@@ -97,7 +116,7 @@ where
             let width = byte_or_wide(opcode, wide);
             let operands = ModRm::read(cursor, rex)?;
             let register = rex.view(operands.register, width);
-            let location = operands.location(cursor, rex, width)?;
+            let location = operands.location(cursor, prefixes, width)?;
             if opcode & 2 == 0 {
                 Ok(move_to(location, DataOperand::Register(register), width))
             } else {
@@ -121,7 +140,7 @@ where
             if operands.selector != 0 {
                 return Err(DecodeError::Unsupported);
             }
-            let destination = operands.location(cursor, rex, width)?;
+            let destination = operands.location(cursor, prefixes, width)?;
             let value = immediate(cursor, width, false)?;
             Ok(move_to(destination, DataOperand::Immediate(value), width))
         }
@@ -130,7 +149,9 @@ where
             let address = Address {
                 base: AddressBase::None,
                 index: None,
-                displacement: cursor.unsigned(8)? as i64,
+                displacement: cursor.unsigned(prefixes.address_width().bytes())? as i64,
+                size: prefixes.address_width(),
+                segment: prefixes.segment_override.unwrap_or(Segment::Ds),
             };
             if opcode & 2 == 0 {
                 Ok(Operation::Load {
@@ -153,7 +174,7 @@ where
             }
             Ok(Operation::Lea {
                 dst: rex.view(operands.register, wide),
-                address: operands.address(cursor, rex)?,
+                address: operands.address(cursor, prefixes)?,
                 width: wide,
             })
         }
@@ -183,7 +204,7 @@ where
             }
             let operands = ModRm::read(cursor, rex)?;
             let register = rex.view(operands.register, width);
-            let location = operands.location(cursor, rex, width)?;
+            let location = operands.location(cursor, prefixes, width)?;
             if opcode & 2 == 0 || kind == Alu::Test {
                 Ok(alu_to(
                     location,
@@ -225,21 +246,21 @@ where
                             } else {
                                 Unary::Neg
                             },
-                            dst: operands.location(cursor, rex, width)?,
+                            dst: operands.location(cursor, prefixes, width)?,
                             width,
                         });
                     }
                     4 | 5 => {
                         return Ok(Operation::Multiply {
                             signed: operands.selector == 5,
-                            src: operands.location(cursor, rex, width)?,
+                            src: operands.location(cursor, prefixes, width)?,
                             width,
                         });
                     }
                     6 | 7 => {
                         return Ok(Operation::Divide {
                             signed: operands.selector == 7,
-                            src: operands.location(cursor, rex, width)?,
+                            src: operands.location(cursor, prefixes, width)?,
                             width,
                         });
                     }
@@ -248,7 +269,7 @@ where
             } else {
                 selector_kind(operands.selector).ok_or(DecodeError::Unsupported)?
             };
-            let destination = operands.location(cursor, rex, width)?;
+            let destination = operands.location(cursor, prefixes, width)?;
             let value = immediate(cursor, width, opcode == 0x83)?;
             Ok(alu_to(
                 destination,
@@ -268,7 +289,7 @@ where
                 } else {
                     Unary::Dec
                 },
-                dst: operands.location(cursor, rex, Width::W8)?,
+                dst: operands.location(cursor, prefixes, Width::W8)?,
                 width: Width::W8,
             })
         }
@@ -294,7 +315,7 @@ where
                 7 => Shift::Sar,
                 _ => return Err(DecodeError::Unsupported),
             };
-            let dst = operands.location(cursor, rex, width)?;
+            let dst = operands.location(cursor, prefixes, width)?;
             let count = match opcode {
                 0xc0 | 0xc1 => Count::Immediate(cursor.byte()?),
                 0xd0 | 0xd1 => Count::Immediate(1),
@@ -317,11 +338,18 @@ where
             ))
         }
         0x63 => {
+            if !prefixes.long64 {
+                return Err(if matches!(prefixes.mode, Mode::Real | Mode::Virtual8086) {
+                    DecodeError::Invalid
+                } else {
+                    DecodeError::Unsupported
+                });
+            }
             let source_width = if wide == Width::W64 { Width::W32 } else { wide };
             let operands = ModRm::read(cursor, rex)?;
             Ok(Operation::Extend {
                 dst: rex.view(operands.register, wide),
-                src: operands.location(cursor, rex, source_width)?,
+                src: operands.location(cursor, prefixes, source_width)?,
                 source_width,
                 width: wide,
                 signed: true,
@@ -341,12 +369,7 @@ where
         }),
         0x99 => Ok(Operation::SignHigh { width: wide }),
         0x0f => two_byte(cursor.byte()?, prefixes, cursor),
-        0xeb | 0xe9 | 0x70..=0x7f => {
-            if rex.present {
-                return Err(DecodeError::Unsupported);
-            }
-            branch(opcode, cursor)
-        }
+        0xeb | 0xe9 | 0x70..=0x7f => branch(opcode, prefixes, cursor),
         _ => Err(DecodeError::Unsupported),
     }
 }
@@ -357,7 +380,7 @@ fn byte_or_wide(opcode: u8, wide: Width) -> Width {
 
 fn immediate<F>(cursor: &mut Cursor<F>, width: Width, short: bool) -> Result<u64, DecodeError>
 where
-    F: FnMut(u64) -> Result<u8, Fault>,
+    F: FnMut(u64) -> Result<u8, DecodeError>,
 {
     let value = if short {
         cursor.byte()? as i8 as i64 as u64
@@ -417,7 +440,7 @@ fn two_byte<F>(
     cursor: &mut Cursor<F>,
 ) -> Result<Operation, DecodeError>
 where
-    F: FnMut(u64) -> Result<u8, Fault>,
+    F: FnMut(u64) -> Result<u8, DecodeError>,
 {
     let rex = prefixes.rex;
     let width = prefixes.width();
@@ -426,7 +449,7 @@ where
             let operands = ModRm::read(cursor, rex)?;
             Ok(Operation::Imul {
                 dst: rex.view(operands.register, width),
-                src: operands.location(cursor, rex, width)?,
+                src: operands.location(cursor, prefixes, width)?,
                 immediate: None,
                 width,
             })
@@ -441,7 +464,7 @@ where
                     0xbb => Bit::Complement,
                     _ => unreachable!(),
                 },
-                dst: operands.location(cursor, rex, width)?,
+                dst: operands.location(cursor, prefixes, width)?,
                 index: BitIndex::Register(rex.view(operands.register, width)),
                 width,
             })
@@ -455,7 +478,7 @@ where
                 7 => Bit::Complement,
                 _ => return Err(DecodeError::Unsupported),
             };
-            let dst = operands.location(cursor, rex, width)?;
+            let dst = operands.location(cursor, prefixes, width)?;
             Ok(Operation::Bit {
                 kind,
                 dst,
@@ -468,7 +491,7 @@ where
             Ok(Operation::Scan {
                 reverse: opcode == 0xbd,
                 dst: rex.view(operands.register, width),
-                src: operands.location(cursor, rex, width)?,
+                src: operands.location(cursor, prefixes, width)?,
                 width,
             })
         }
@@ -483,7 +506,7 @@ where
         }
         0xa4 | 0xa5 | 0xac | 0xad => {
             let operands = ModRm::read(cursor, rex)?;
-            let dst = operands.location(cursor, rex, width)?;
+            let dst = operands.location(cursor, prefixes, width)?;
             let count = if opcode & 1 == 0 {
                 Count::Immediate(cursor.byte()?)
             } else {
@@ -509,7 +532,7 @@ where
             let operands = ModRm::read(cursor, rex)?;
             Ok(Operation::Extend {
                 dst: rex.view(operands.register, width),
-                src: operands.location(cursor, rex, source_width)?,
+                src: operands.location(cursor, prefixes, source_width)?,
                 source_width,
                 width,
                 signed: opcode & 8 != 0,
@@ -519,7 +542,7 @@ where
             let operands = ModRm::read(cursor, rex)?;
             Ok(Operation::Cmov {
                 dst: rex.view(operands.register, width),
-                src: operands.location(cursor, rex, width)?,
+                src: operands.location(cursor, prefixes, width)?,
                 width,
                 condition: condition(opcode),
             })
@@ -527,25 +550,41 @@ where
         0x90..=0x9f => {
             let operands = ModRm::read(cursor, rex)?;
             Ok(Operation::Setcc {
-                dst: operands.location(cursor, rex, Width::W8)?,
+                dst: operands.location(cursor, prefixes, Width::W8)?,
                 condition: condition(opcode),
             })
         }
-        0x80..=0x8f if !rex.present && !prefixes.operand16 => branch(opcode, cursor),
+        0x80..=0x8f => branch(opcode, prefixes, cursor),
         _ => Err(DecodeError::Unsupported),
     }
 }
 
-fn branch<F>(opcode: u8, cursor: &mut Cursor<F>) -> Result<Operation, DecodeError>
+fn relative_displacement<F>(cursor: &mut Cursor<F>, width: Width) -> Result<i64, DecodeError>
 where
-    F: FnMut(u64) -> Result<u8, Fault>,
+    F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    Ok(if width == Width::W16 {
+        i64::from(cursor.unsigned(2)? as u16 as i16)
+    } else {
+        i64::from(cursor.unsigned(4)? as u32 as i32)
+    })
+}
+
+fn branch<F>(
+    opcode: u8,
+    prefixes: Prefixes,
+    cursor: &mut Cursor<F>,
+) -> Result<Operation, DecodeError>
+where
+    F: FnMut(u64) -> Result<u8, DecodeError>,
+{
+    let width = prefixes.near_width();
     let displacement = if matches!(opcode, 0xeb | 0x70..=0x7f) {
         i64::from(cursor.byte()? as i8)
     } else {
-        i64::from(cursor.unsigned(4)? as u32 as i32)
+        relative_displacement(cursor, width)?
     };
-    let target = cursor.next_pc().wrapping_add(displacement as u64);
+    let target = cursor.next_pc().wrapping_add(displacement as u64) & width.mask();
     if matches!(opcode, 0xe9 | 0xeb) {
         Ok(Operation::Jump { target })
     } else {

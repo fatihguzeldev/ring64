@@ -1,4 +1,5 @@
 use crate::memory::Fault;
+use crate::x86::context::{ExecutionContext, SegmentFault};
 
 use super::instruction::Instruction;
 
@@ -12,14 +13,28 @@ pub enum DecodeError {
     Unsupported,
     Invalid,
     Fetch(Fault),
+    Segment(SegmentFault),
 }
 
-pub fn decode<F>(pc: u64, read: F) -> Result<Instruction, DecodeError>
+pub fn decode<F>(pc: u64, mut read: F) -> Result<Instruction, DecodeError>
 where
     F: FnMut(u64) -> Result<u8, Fault>,
 {
-    let mut cursor = cursor::Cursor::new(pc, read);
-    let (prefixes, opcode) = prefix::read(&mut cursor)?;
+    decode_with_context(pc, &ExecutionContext::default(), |address| {
+        read(address).map_err(DecodeError::Fetch)
+    })
+}
+
+pub fn decode_with_context<F>(
+    pc: u64,
+    context: &ExecutionContext,
+    read: F,
+) -> Result<Instruction, DecodeError>
+where
+    F: FnMut(u64) -> Result<u8, DecodeError>,
+{
+    let mut cursor = cursor::Cursor::new(pc, context.is_long64(), read);
+    let (prefixes, opcode) = prefix::read(&mut cursor, context)?;
     let operation = opcode::refine(opcode, prefixes, &mut cursor)?;
     Ok(Instruction {
         pc,

@@ -9,51 +9,117 @@ use Operation::{Call, JumpRegister, Pop, Push, Return};
 #[test]
 fn stack_and_near_transfer_literals_require_their_complete_encodings() {
     for (bytes, expected) in [
-        (&[0x50][..], Push { src: Register(0) }),
-        (&[0x54][..], Push { src: Register(4) }),
-        (&[0x4f, 0x54][..], Push { src: Register(12) }),
-        (&[0x58][..], Pop { dst: 0 }),
-        (&[0x5c][..], Pop { dst: 4 }),
-        (&[0x4f, 0x5c][..], Pop { dst: 12 }),
+        (
+            &[0x50][..],
+            Push {
+                src: Register(0),
+                width: crate::x86::instruction::Width::W64,
+            },
+        ),
+        (
+            &[0x54][..],
+            Push {
+                src: Register(4),
+                width: crate::x86::instruction::Width::W64,
+            },
+        ),
+        (
+            &[0x4f, 0x54][..],
+            Push {
+                src: Register(12),
+                width: crate::x86::instruction::Width::W64,
+            },
+        ),
+        (
+            &[0x58][..],
+            Pop {
+                dst: 0,
+                width: crate::x86::instruction::Width::W64,
+            },
+        ),
+        (
+            &[0x5c][..],
+            Pop {
+                dst: 4,
+                width: crate::x86::instruction::Width::W64,
+            },
+        ),
+        (
+            &[0x4f, 0x5c][..],
+            Pop {
+                dst: 12,
+                width: crate::x86::instruction::Width::W64,
+            },
+        ),
         (
             &[0x4f, 0x6a, 0x80][..],
             Push {
                 src: Immediate(0xffff_ffff_ffff_ff80),
+
+                width: crate::x86::instruction::Width::W64,
             },
         ),
         (
             &[0x47, 0x68, 0, 0, 0, 0x80][..],
             Push {
                 src: Immediate(0xffff_ffff_8000_0000),
+
+                width: crate::x86::instruction::Width::W64,
             },
         ),
         (
             &[0xe8, 0x0b, 0, 0, 0][..],
             Call {
                 target: Immediate(0x1010),
+
+                width: crate::x86::instruction::Width::W64,
             },
         ),
         (
             &[0x4f, 0xe8, 0, 0, 0, 0][..],
             Call {
                 target: Immediate(0x1006),
+
+                width: crate::x86::instruction::Width::W64,
             },
         ),
         (
             &[0xff, 0xd0][..],
             Call {
                 target: Register(0),
+
+                width: crate::x86::instruction::Width::W64,
             },
         ),
         (
             &[0x47, 0xff, 0xd4][..],
             Call {
                 target: Register(12),
+
+                width: crate::x86::instruction::Width::W64,
             },
         ),
-        (&[0x47, 0xff, 0xe4][..], JumpRegister { target: 12 }),
-        (&[0xc3][..], Return { cleanup: 0 }),
-        (&[0x4f, 0xc2, 0, 0x80][..], Return { cleanup: 0x8000 }),
+        (
+            &[0x47, 0xff, 0xe4][..],
+            JumpRegister {
+                target: 12,
+                width: crate::x86::instruction::Width::W64,
+            },
+        ),
+        (
+            &[0xc3][..],
+            Return {
+                cleanup: 0,
+                width: crate::x86::instruction::Width::W64,
+            },
+        ),
+        (
+            &[0x4f, 0xc2, 0, 0x80][..],
+            Return {
+                cleanup: 0x8000,
+                width: crate::x86::instruction::Width::W64,
+            },
+        ),
     ] {
         assert_eq!(operation(bytes), expected, "{bytes:02x?}");
     }
@@ -69,16 +135,32 @@ fn stack_registers_and_indirect_targets_use_rex_b_for_every_bank() {
                     vec![0x50 + low],
                     Push {
                         src: Register(register),
+
+                        width: crate::x86::instruction::Width::W64,
                     },
                 ),
-                (vec![0x58 + low], Pop { dst: register }),
+                (
+                    vec![0x58 + low],
+                    Pop {
+                        dst: register,
+                        width: crate::x86::instruction::Width::W64,
+                    },
+                ),
                 (
                     vec![0xff, 0xd0 | low],
                     Call {
                         target: Register(register),
+
+                        width: crate::x86::instruction::Width::W64,
                     },
                 ),
-                (vec![0xff, 0xe0 | low], JumpRegister { target: register }),
+                (
+                    vec![0xff, 0xe0 | low],
+                    JumpRegister {
+                        target: register,
+                        width: crate::x86::instruction::Width::W64,
+                    },
+                ),
             ] {
                 let mut bytes: Vec<_> = prefix.into_iter().collect();
                 bytes.extend(tail);
@@ -107,7 +189,8 @@ fn push_immediates_sign_extend_to_64_bits_independently_of_every_rex_field() {
             assert_eq!(
                 operation(&bytes),
                 Push {
-                    src: Immediate(expected)
+                    src: Immediate(expected),
+                    width: crate::x86::instruction::Width::W64,
                 },
                 "{bytes:02x?}"
             );
@@ -139,7 +222,8 @@ fn relative_calls_add_signed_rel32_to_the_complete_next_pc() {
                         prefixed
                     } else {
                         unprefixed
-                    })
+                    }),
+                    width: crate::x86::instruction::Width::W64,
                 },
                 "{bytes:02x?}"
             );
@@ -174,7 +258,8 @@ fn relative_calls_add_signed_rel32_to_the_complete_next_pc() {
                 pc,
                 next_pc: next,
                 operation: Call {
-                    target: Immediate(target)
+                    target: Immediate(target),
+                    width: crate::x86::instruction::Width::W64,
                 }
             },
             "{bytes:02x?} at {pc:x}"
@@ -187,7 +272,13 @@ fn return_cleanup_is_unsigned_16_bit_and_never_rex_width_dependent() {
     for prefix in std::iter::once(None).chain((0x40..=0x4f).map(Some)) {
         let mut plain: Vec<_> = prefix.into_iter().collect();
         plain.push(0xc3);
-        assert_eq!(operation(&plain), Return { cleanup: 0 });
+        assert_eq!(
+            operation(&plain),
+            Return {
+                cleanup: 0,
+                width: crate::x86::instruction::Width::W64,
+            }
+        );
         for (raw, expected) in [
             ([0, 0], 0),
             ([0xff, 0x7f], 0x7fff),
@@ -199,7 +290,10 @@ fn return_cleanup_is_unsigned_16_bit_and_never_rex_width_dependent() {
             bytes.extend(raw);
             assert_eq!(
                 operation(&bytes),
-                Return { cleanup: expected },
+                Return {
+                    cleanup: expected,
+                    width: crate::x86::instruction::Width::W64,
+                },
                 "{bytes:02x?}"
             );
         }
@@ -323,7 +417,7 @@ fn alternate_pop_encodings_remain_unsupported_without_a_modrm_fetch() {
 }
 
 #[test]
-fn stack_admission_keeps_legacy_prefixes_and_old_branch_prefixes_outside_coverage() {
+fn stack_and_branches_admit_ignored_prefixes_and_keep_lock_rep_unsupported() {
     for tail in [
         &[0x50][..],
         &[0x58][..],
@@ -335,16 +429,17 @@ fn stack_admission_keeps_legacy_prefixes_and_old_branch_prefixes_outside_coverag
         &[0xc3][..],
         &[0xc2, 0, 0x80][..],
     ] {
-        for prefix in [
-            0x66, 0x67, 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65, 0xf0, 0xf2, 0xf3,
-        ] {
+        for prefix in [0xf0, 0xf2, 0xf3] {
             let mut bytes = vec![prefix, 0x4f];
             bytes.extend_from_slice(tail);
             assert_eq!(at(0x1000, &bytes), Err(DecodeError::Unsupported));
         }
         let mut bytes = vec![0x48, 0x4f];
         bytes.extend_from_slice(tail);
-        assert_eq!(at(0x1000, &bytes), Err(DecodeError::Unsupported));
+        assert_eq!(
+            at(0x1000, &bytes).unwrap().next_pc,
+            0x1000 + bytes.len() as u64
+        );
     }
     for prefix in 0x40..=0x4f {
         for tail in [
@@ -355,7 +450,12 @@ fn stack_admission_keeps_legacy_prefixes_and_old_branch_prefixes_outside_coverag
         ] {
             let mut bytes = vec![prefix];
             bytes.extend_from_slice(tail);
-            assert_eq!(at(0x1000, &bytes), Err(DecodeError::Unsupported));
+            let instruction = at(0x1000, &bytes).unwrap();
+            assert_eq!(instruction.next_pc, 0x1000 + bytes.len() as u64);
+            assert!(matches!(
+                instruction.operation,
+                Operation::Jump { .. } | Operation::Jcc { .. }
+            ));
         }
     }
 }

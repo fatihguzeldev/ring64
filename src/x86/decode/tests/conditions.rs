@@ -149,10 +149,8 @@ fn every_jcc_requires_each_encoded_displacement_byte_without_wrapping_fetches() 
 }
 
 #[test]
-fn new_condition_coverage_keeps_prefixed_and_other_branch_families_unsupported() {
-    let prefixes = (0x40..=0x4f).chain([
-        0x66, 0x67, 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65, 0xf0, 0xf2, 0xf3,
-    ]);
+fn condition_coverage_keeps_lock_rep_and_other_branch_families_unsupported() {
+    let prefixes = [0xf0, 0xf2, 0xf3];
     for prefix in prefixes {
         for (short, near, _) in CONDITIONS {
             assert_eq!(
