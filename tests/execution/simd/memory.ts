@@ -20,6 +20,45 @@ const rw = { read: true, write: true, execute: false };
 export function memoryScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     {
+      name: 'SIMD failed narrow loads and partial inserts preserve nonzero destination upper bits',
+      async run() {
+        for (const [code, width] of [
+          ['f30f1000', 4],
+          ['f20f1000', 8],
+          ['660f6e00', 4],
+          ['66480f6e00', 8],
+          ['f30f7e00', 8],
+          ['660fc400ff', 2],
+        ] as const)
+          for (const available of [0, width - 1])
+            await using(
+              compiler,
+              code,
+              LONG,
+              async (cpu) => {
+                const raw = banks(),
+                  before = input(0x1000n, { 0: 0x6001n }, 0xcd7n);
+                cpu.setState(before);
+                cpu.setXmmState(raw);
+                const result = await cpu.run({ budget: 1n, repeatBudget: 0n });
+                outcome(result, 'data-fault', 1n, 0n, 0n, 0n, before);
+                fault(result, {
+                  instructionPc: 0x1000n,
+                  address: 0x6001n,
+                  width,
+                  access: 'read',
+                  cause: 'unmapped',
+                  failingAddress: 0x6001n + BigInt(available),
+                  segment: 'ds',
+                });
+                xmm(cpu, raw);
+                if (available) memory(cpu, 0x6001n, 'ab'.repeat(available));
+              },
+              { data: available ? [{ base: 0x6001n, bytes: 'ab'.repeat(available) }] : [] },
+            );
+      },
+    },
+    {
       name: 'SIMD wide and narrow transfers obey mode address width and exact guarded memory spans',
       async run() {
         for (const p of profiles)
