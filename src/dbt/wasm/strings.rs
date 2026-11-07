@@ -1,5 +1,6 @@
 use super::{
-    ADDRESS, ENTRY_FLAGS, Emitter, FLAGS, LHS, REPEAT_REMAINING, RESULT, RHS, STORE_STATUS, VALUE,
+    ADDRESS, DIRECTION, ENTRY_FLAGS, Emitter, FLAGS, LHS, REPEAT_REMAINING, RESULT, RHS,
+    STORE_STATUS, VALUE,
 };
 use crate::embedding::layout::{DISPATCH, REPEAT_BUDGET};
 use crate::x86::context::Segment;
@@ -8,10 +9,8 @@ use wasm_encoder::{BlockType, Instruction as Op};
 
 impl Emitter {
     pub(super) fn direction(&mut self, set: bool) {
-        self.op(Op::LocalGet(FLAGS))
-            .op(Op::I64Const(if set { 0x400 } else { !0x400 }))
-            .op(if set { Op::I64Or } else { Op::I64And })
-            .op(Op::LocalSet(FLAGS));
+        self.op(Op::I64Const(if set { 0x400 } else { 0 }))
+            .op(Op::LocalSet(DIRECTION));
     }
 
     pub(super) fn string(
@@ -149,9 +148,7 @@ impl Emitter {
         self.register(register, address_width);
         self.op(Op::I64Const(-(i64::from(width.bytes()))))
             .op(Op::I64Const(i64::from(width.bytes())))
-            .op(Op::LocalGet(FLAGS))
-            .op(Op::I64Const(0x400))
-            .op(Op::I64And)
+            .op(Op::LocalGet(DIRECTION))
             .op(Op::I32WrapI64)
             .op(Op::Select)
             .op(Op::I64Add);

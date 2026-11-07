@@ -253,6 +253,74 @@ fn repeated_comparison_fault_restores_its_own_entry_flags() {
     run_cases(vec![p]);
 }
 
+#[test]
+fn descending_comparison_suspensions_merge_direction_with_predecessor_status() {
+    let instructions = vec![
+        Instruction {
+            pc: 0x1000,
+            next_pc: 0x1001,
+            operation: Operation::Direction { set: true },
+        },
+        Instruction {
+            pc: 0x1001,
+            next_pc: 0x1003,
+            operation: Operation::Alu {
+                kind: Alu::Add,
+                dst: RegisterView::low(0),
+                src: DataOperand::Immediate(1),
+                width: Width::W8,
+            },
+        },
+        Instruction {
+            pc: 0x1003,
+            next_pc: 0x1005,
+            ..string(StringKind::Cmps, Width::W8, Repeat::WhileEqual)
+        },
+    ];
+    let first_pair = vec![
+        json!({"kind":"load","args":["4002",1],"result":"5"}),
+        json!({"kind":"access_failed","args":[],"result":0}),
+        json!({"kind":"load","args":["5002",1],"result":"5"}),
+        json!({"kind":"access_failed","args":[],"result":0}),
+    ];
+    let mut cases = vec![];
+    for (quota, count, pointer, reason, repeat_remaining) in
+        [(1, 2, 0x4001, 11, 0), (3, 1, 0x4000, DATA as u32, 1)]
+    {
+        let mut p = case(
+            instructions.clone(),
+            &[(0, 0x7f), (1, 3), (6, 0x4002), (7, 0x5002)],
+            2,
+            0x1000,
+            3,
+            (
+                &[(0, 0x80), (1, count), (6, pointer), (7, pointer + 0x1000)],
+                0xc92,
+                0x1003,
+                reason,
+                1,
+            ),
+        );
+        let mut accesses = first_pair.clone();
+        if quota == 3 {
+            accesses.extend([
+                json!({"kind":"load","args":["4001",1],"result":"6"}),
+                json!({"kind":"access_failed","args":[],"result":0}),
+                json!({"kind":"load","args":["5001",1],"result":"6"}),
+                json!({"kind":"access_failed","args":[],"result":0}),
+                json!({"kind":"load","args":["4000",1],"result":"0"}),
+                json!({"kind":"access_failed","args":[],"result":1}),
+            ]);
+            p["faultSegment"] = json!(Segment::Ds as u32);
+        }
+        p["accesses"] = json!(accesses);
+        p["repeatBudget"] = json!(quota.to_string());
+        p["expected"]["repeatRemaining"] = json!(repeat_remaining.to_string());
+        cases.push(p);
+    }
+    run_cases(cases);
+}
+
 fn context(mode: &str, default32: bool) -> crate::x86::context::ExecutionContext {
     if mode == "long64" {
         return crate::x86::context::ExecutionContext::from_json(&json!({

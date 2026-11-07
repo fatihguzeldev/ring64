@@ -74,7 +74,7 @@ impl Emitter {
             self.write_location(dst, width, exit_depth);
         }
         self.op(Op::LocalGet(FLAGS))
-            .op(Op::I64Const(0x442))
+            .op(Op::I64Const(0x42))
             .op(Op::I64And)
             .op(Op::LocalGet(VALUE))
             .op(Op::I64Or)
@@ -105,11 +105,7 @@ impl Emitter {
         }
         self.write_register(dst, width);
         self.op(Op::End)
-            .op(Op::LocalGet(FLAGS))
-            .op(Op::I64Const(0x400))
-            .op(Op::I64And)
             .op(Op::I64Const(2))
-            .op(Op::I64Or)
             .op(Op::LocalGet(LHS))
             .op(Op::I64Popcnt)
             .op(Op::I64Const(1))

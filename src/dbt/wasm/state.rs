@@ -1,4 +1,4 @@
-use super::{Emitter, FLAGS, GPR, REMAINING, REPEAT_REMAINING, RIP};
+use super::{DIRECTION, Emitter, FLAGS, GPR, REMAINING, REPEAT_REMAINING, RIP};
 use crate::embedding::layout::RunState;
 use std::mem::{offset_of, size_of};
 use wasm_encoder::{Instruction as Op, MemArg};
@@ -28,6 +28,15 @@ impl Emitter {
                 .op(Op::I64Load(memory(offset)))
                 .op(Op::LocalSet(local));
         }
+        // Keep direction independent from arithmetic status producers.
+        self.op(Op::LocalGet(FLAGS))
+            .op(Op::I64Const(0x400))
+            .op(Op::I64And)
+            .op(Op::LocalSet(DIRECTION))
+            .op(Op::LocalGet(FLAGS))
+            .op(Op::I64Const(!0x400))
+            .op(Op::I64And)
+            .op(Op::LocalSet(FLAGS));
         self.op(Op::LocalGet(1)).op(Op::LocalSet(REMAINING));
         if self.has_repeat {
             self.op(Op::LocalGet(0))
@@ -49,9 +58,11 @@ impl Emitter {
             (RIP, offset_of!(RunState, rip)),
             (REMAINING, offset_of!(RunState, remaining)),
         ] {
-            self.op(Op::LocalGet(0))
-                .op(Op::LocalGet(local))
-                .op(Op::I64Store(memory(offset)));
+            self.op(Op::LocalGet(0)).op(Op::LocalGet(local));
+            if local == FLAGS {
+                self.op(Op::LocalGet(DIRECTION)).op(Op::I64Or);
+            }
+            self.op(Op::I64Store(memory(offset)));
         }
         if self.has_repeat {
             self.op(Op::LocalGet(0))

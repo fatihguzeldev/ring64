@@ -36,8 +36,9 @@ const RESULT: u32 = 28;
 const ADDRESS: u32 = 29;
 const VALUE: u32 = 30;
 const STORE_STATUS: u32 = 31;
-const REPEAT_REMAINING: u32 = 32;
-const ENTRY_FLAGS: u32 = 33;
+const DIRECTION: u32 = 32;
+const REPEAT_REMAINING: u32 = 33;
+const ENTRY_FLAGS: u32 = 34;
 
 struct Emitter {
     body: Function,
@@ -259,6 +260,7 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         (2, ValType::I32),
         (5, ValType::I64),
         (1, ValType::I32),
+        (1, ValType::I64),
     ];
     if has_repeat {
         locals.push((2, ValType::I64));
