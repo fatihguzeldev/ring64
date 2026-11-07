@@ -313,7 +313,7 @@ fn artifact_entry_indices_and_forward_edges_match_literal_boundaries() {
         let conditional = compiled_fixture(
             base,
             &[
-                0x75, 10, 0xb8, 17, 0, 0, 0, 0xb9, 34, 0, 0, 0, 0xba, 51, 0, 0, 0, 0x90,
+                0x75, 10, 0xb8, 17, 0, 0, 0, 0xb9, 34, 0, 0, 0, 0xba, 51, 0, 0, 0, 0xf4,
             ],
             base,
         );
@@ -347,7 +347,7 @@ fn artifact_entry_indices_and_forward_edges_match_literal_boundaries() {
         let forward_jump = compiled_fixture(
             base,
             &[
-                0x75, 2, 0xeb, 10, 0xb8, 17, 0, 0, 0, 0xb9, 34, 0, 0, 0, 0xba, 51, 0, 0, 0, 0x90,
+                0x75, 2, 0xeb, 10, 0xb8, 17, 0, 0, 0, 0xb9, 34, 0, 0, 0, 0xba, 51, 0, 0, 0, 0xf4,
             ],
             base,
         );
@@ -375,7 +375,7 @@ fn artifact_entry_indices_and_forward_edges_match_literal_boundaries() {
         ));
 
         for flags in [2, 0x42] {
-            let next = compiled_fixture(base, &[0x75, 0, 0xb8, 7, 0, 0, 0, 0x90], base);
+            let next = compiled_fixture(base, &[0x75, 0, 0xb8, 7, 0, 0, 0, 0xf4], base);
             cases.push(execution_case(
                 &next.bytes,
                 &next.entries,
@@ -413,7 +413,7 @@ fn artifact_entry_indices_and_forward_edges_match_literal_boundaries() {
         ));
 
         // Overlapping instruction entries have distinct indices and effects.
-        let overlapping = compiled_fixture(base, &[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0, 0x90], base);
+        let overlapping = compiled_fixture(base, &[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0, 0xf4], base);
         assert_eq!(overlapping.entries, [base, base + 2, base + 3]);
         for (entry, expected, next) in [(2, vec![(0, 0x3b9)], 7), (3, vec![(1, 3)], 8)] {
             cases.push(execution_case(

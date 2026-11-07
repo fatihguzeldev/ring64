@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn overlapping_entries_count_distinct_source_bytes() {
-        let code = image(&[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0, 0x90]);
+        let code = image(&[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0, 0xf4]);
         let unit = discover(&code, 0x1000, limits()).unwrap();
         assert_eq!(
             unit.instructions.iter().map(|i| i.pc).collect::<Vec<_>>(),
