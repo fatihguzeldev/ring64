@@ -413,7 +413,7 @@ fn artifact_entry_indices_and_forward_edges_match_literal_boundaries() {
         ));
 
         // Overlapping instruction entries have distinct indices and effects.
-        let overlapping = compiled_fixture(base, &[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0, 0xf4], base);
+        let overlapping = compiled_fixture(base, &[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0, 0x60], base);
         assert_eq!(overlapping.entries, [base, base + 2, base + 3]);
         for (entry, expected, next) in [(2, vec![(0, 0x3b9)], 7), (3, vec![(1, 3)], 8)] {
             cases.push(execution_case(
