@@ -37,11 +37,11 @@ async function mockedCore(
   statePointer = 8192,
   memory = new WebAssembly.Memory({ initial: 1 }),
   missing?: string,
+  inputPointer = 512,
 ) {
   let disposed = 0;
   let imported = 0;
   let inputLength = 0;
-  const inputPointer = 512;
   const infoPointer = 4096;
   const json = new TextEncoder().encode(JSON.stringify(descriptor));
   new Uint8Array(memory.buffer, infoPointer, json.length).set(json);
@@ -170,7 +170,7 @@ test('unsigned wasm32 XMM transport supports an extent ending at private memory 
   const memory = new WebAssembly.Memory({ initial: 32769 });
   const pointer = memory.buffer.byteLength - layout.size;
   assert.ok(pointer > 0x7fffffff);
-  const fixture = await mockedCore(layout, pointer, memory);
+  const fixture = await mockedCore(layout, pointer, memory, undefined, pointer - 512);
   assert.ok(fixture.core);
   const bank = Array.from({ length: 16 }, (_, index) => BigInt(index) << 120n);
   fixture.core.setXmmState(bank);

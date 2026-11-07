@@ -160,3 +160,53 @@ fn wide_store_checks_every_byte_before_writing_and_aggregates_source_invalidatio
     core_clear_fault();
     assert_eq!(metadata(ALIGNMENT), serde_json::Value::Null);
 }
+
+#[test]
+fn xmm_import_clears_only_successful_diagnostics_and_preserves_live_execution_ownership() {
+    initialize(0x1000, &[0xb8, 1, 0, 0, 0]);
+    assert_eq!(core_compile(0x1000, 8, 128, 65536), DISPATCH);
+    assert_eq!(
+        vector::core_vector_load(0x7001, 16, Segment::Fs as u32, 16),
+        0
+    );
+    BRIDGE.with_borrow_mut(|bridge| {
+        let core = bridge.core.as_mut().unwrap();
+        core.divide_failed = true;
+        let state = unsafe { &mut *core.state.get() };
+        state.registers = [0x0123456789abcdef; 16];
+        state.flags = 0xcd7;
+        state.rip = 0x1000;
+        state.remaining = 19;
+        state.repeat_remaining = 7;
+        state.target = 0x800000000000;
+        bridge.input = vec![0xaa; 255];
+    });
+    assert_eq!(vector::core_import_xmm(), 1);
+    assert_eq!(context::core_access_reason(), ALIGNMENT);
+    assert_eq!(core_divide_failed(), 1);
+    assert_eq!(metadata(TARGET)["address"], "0x800000000000");
+    BRIDGE.with_borrow_mut(|bridge| bridge.input = vec![0xaa; 256]);
+    assert_eq!(vector::core_import_xmm(), 0);
+    assert_eq!(metadata(ALIGNMENT), serde_json::Value::Null);
+    assert_eq!(metadata(DATA), serde_json::Value::Null);
+    assert_eq!(metadata(SEGMENT), serde_json::Value::Null);
+    assert_eq!(core_divide_failed(), 0);
+    assert_eq!(mapped::core_validity(1), 1);
+    assert_eq!(context::core_context_version(), 0);
+    assert_eq!(core_load(0x4000, 8), 0xa5a5a5a5a5a5a5a5);
+    BRIDGE.with_borrow(|bridge| {
+        let state = unsafe { &*bridge.core.as_ref().unwrap().state.get() };
+        assert_eq!(state.registers, [0x0123456789abcdef; 16]);
+        assert_eq!(
+            (
+                state.flags,
+                state.rip,
+                state.remaining,
+                state.repeat_remaining,
+                state.target
+            ),
+            (0xcd7, 0x1000, 19, 7, 0)
+        );
+        assert_eq!(state.xmm, [[0xaa; 16]; 16]);
+    });
+}
