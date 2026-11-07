@@ -268,6 +268,89 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
       },
     },
     {
+      name: 'memory CALL routes fresh targets into retained middle entries with current count and ZF',
+      async run() {
+        await using(
+          compiler,
+          'ff10f5e1fb',
+          LONG,
+          async (cpu) => {
+            const before = input(0x1000n, { 0: 0x6000n, 1: 2n, 4: 0x4020n }, 0xcd7n);
+            cpu.setState(before);
+            outcome(
+              await cpu.run({ budget: 1n, repeatBudget: 0n }),
+              'budget',
+              1n,
+              1n,
+              changed(before, 0x1002n, { 4: 0x4018n }),
+            );
+            const owner = cpu.inspectTranslations()[0]!.owner;
+            for (const row of [
+              {
+                target: 0x1002n,
+                count: 2n,
+                flags: 0xcd7n,
+                rip: 0x1003n,
+                nextCount: 2n,
+                nextFlags: 0xcd6n,
+              },
+              {
+                target: 0x1003n,
+                count: 2n,
+                flags: 0xcd7n,
+                rip: 0x1000n,
+                nextCount: 1n,
+                nextFlags: 0xcd7n,
+              },
+              {
+                target: 0x1003n,
+                count: 2n,
+                flags: 0xc97n,
+                rip: 0x1005n,
+                nextCount: 1n,
+                nextFlags: 0xc97n,
+              },
+              {
+                target: 0x1003n,
+                count: 1n,
+                flags: 0xcd7n,
+                rip: 0x1005n,
+                nextCount: 0n,
+                nextFlags: 0xcd7n,
+              },
+            ]) {
+              cpu.writeMemory(0x6000n, hex(bytes(row.target, 8)));
+              const fresh = input(0x1000n, { 0: 0x6000n, 1: row.count, 4: 0x4020n }, row.flags);
+              cpu.setState(fresh);
+              const result = await cpu.run({ budget: 2n, repeatBudget: 0n });
+              outcome(
+                result,
+                'budget',
+                2n,
+                2n,
+                changed(fresh, row.rip, { 1: row.nextCount, 4: 0x4018n }, row.nextFlags),
+              );
+              equal(result.resources.compilations, 0, 'middle entries reuse the retained artifact');
+              equal(
+                result.resources.nativeEntries,
+                1,
+                'memory CALL and its middle target share one invocation',
+              );
+              equal(result.resources.dispatches, 0, 'retained target needs no host dispatch');
+              equal(cpu.inspectTranslations()[0]!.owner, owner, 'pointer changes retain the owner');
+              memory(cpu, 0x4010n, 'a5'.repeat(8) + '0210000000000000' + 'a5'.repeat(16));
+            }
+          },
+          {
+            data: [
+              { base: 0x6000n, bytes: bytes(0x1002n, 8) },
+              { base: 0x4010n, bytes: 'a5'.repeat(32) },
+            ],
+          },
+        );
+      },
+    },
+    {
       name: 'counter target faults roll back counts while untaken branches do not validate that target',
       async run() {
         for (const code of ['e20a', 'e10a', 'e00a', 'e30a']) {
