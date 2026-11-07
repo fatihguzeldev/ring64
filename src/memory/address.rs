@@ -30,7 +30,7 @@ pub fn canonical48(address: u64) -> bool {
     address <= LOW_CANONICAL_END || address >= HIGH_CANONICAL_START
 }
 
-pub(super) fn check_span(address: u64, width: u32, access: Access) -> Result<(), Fault> {
+pub(crate) fn check_span(address: u64, width: u32, access: Access) -> Result<(), Fault> {
     match span_failure(address, u128::from(width)) {
         Some((cause, failing)) => Err(Fault {
             address,
