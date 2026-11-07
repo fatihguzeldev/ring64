@@ -72,6 +72,7 @@ type CoreExports = WebAssembly.Exports & {
   core_segmented_load(offset: bigint, width: number, segment: number): bigint;
   core_segmented_load_for_write(offset: bigint, width: number, segment: number): bigint;
   core_segmented_store(offset: bigint, width: number, value: bigint, segment: number): number;
+  core_segmented_access_failed(): number;
   core_access_reason(): number;
   core_target_check(target: bigint): number;
   core_state_ptr(): number;
@@ -233,6 +234,7 @@ export class Core {
       'core_segmented_load',
       'core_segmented_load_for_write',
       'core_segmented_store',
+      'core_segmented_access_failed',
       'core_access_reason',
       'core_target_check',
       'core_state_ptr',
@@ -403,6 +405,7 @@ export class Core {
         segmented_load: this.#exports.core_segmented_load,
         segmented_load_for_write: this.#exports.core_segmented_load_for_write,
         segmented_store: this.#exports.core_segmented_store,
+        segmented_access_failed: this.#exports.core_segmented_access_failed,
         access_reason: this.#exports.core_access_reason,
         target_check: this.#exports.core_target_check,
         multiply_high: this.#exports.core_multiply_high,

@@ -464,6 +464,7 @@ for (const [index,c] of cases.entries()) {
  const load_for_write=(address,width)=>BigInt('0x'+access('load_for_write',[bits(address),width]));
  const store=(address,width,value)=>access('store',[bits(address),width,bits(value)]);
  const access_failed=()=>access('access_failed',[]);
+ const segmented_access_failed=()=>access('segmented_access_failed',[]);
  const segmented_load=(address,width,segment)=>BigInt('0x'+access('segmented_load',[bits(address),width,segment]));
  const segmented_load_for_write=(address,width,segment)=>BigInt('0x'+access('segmented_load_for_write',[bits(address),width,segment]));
  const segmented_store=(address,width,value,segment)=>access('segmented_store',[bits(address),width,bits(value),segment]);
@@ -472,7 +473,7 @@ for (const [index,c] of cases.entries()) {
  const multiply_high=(a,b,signed)=>BigInt('0x'+access('multiply_high',[bits(a),bits(b),signed]));
  const divide=(high,low,divisor,signed)=>BigInt('0x'+access('divide',[bits(high),bits(low),bits(divisor),signed]));
  const divide_failed=()=>access('divide_failed',[]);
- const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed}});
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const snapshot=reason=>{
   const flags=d.getBigUint64(l.flags,true);

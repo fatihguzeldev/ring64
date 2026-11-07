@@ -167,7 +167,15 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         },
         EntityType::Function(1),
     );
-    imports.import("env", "access_failed", EntityType::Function(2));
+    imports.import(
+        "env",
+        if segmented {
+            "segmented_access_failed"
+        } else {
+            "access_failed"
+        },
+        EntityType::Function(2),
+    );
     let write_intent = unit.instructions.iter().any(|instruction| {
         matches!(instruction.operation,
             Operation::MemoryAlu { kind, operands: MemoryAluOperands::MemoryFirst(_), .. }

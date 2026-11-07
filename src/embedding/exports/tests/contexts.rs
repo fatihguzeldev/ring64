@@ -80,7 +80,7 @@ fn segment_failures_precede_mapping_and_repair_does_not_keep_stale_faults() {
         core_segmented_load_for_write(0x7000, 4, Segment::Ds as u32),
         0
     );
-    assert_eq!(core_access_failed(), 1);
+    assert_eq!(core_segmented_access_failed(), 1);
     assert_eq!(core_access_reason(), SEGMENT);
     assert_eq!(
         metadata(SEGMENT),
@@ -98,9 +98,41 @@ fn segment_failures_precede_mapping_and_repair_does_not_keep_stale_faults() {
         core_segmented_load(0x4000, 4, Segment::Ds as u32),
         0xa5a5a5a5
     );
-    assert_eq!(core_access_failed(), 0);
+    assert_eq!(core_segmented_access_failed(), 0);
     assert_eq!(metadata(SEGMENT), serde_json::Value::Null);
     assert_eq!(metadata(DATA), serde_json::Value::Null);
+}
+
+#[test]
+fn raw_status_ignores_segment_failures_while_segmented_status_covers_both() {
+    initialize(0x1000, &[0xf5]);
+    let mut ctx = protected();
+    ctx["segments"]["ds"]["usable"] = serde_json::json!(false);
+    assert_eq!(set_context(ctx), 0);
+    assert_eq!(core_segmented_load(0x7000, 4, Segment::Ds as u32), 0);
+    assert_eq!(core_access_failed(), 0);
+    assert_eq!(core_segmented_access_failed(), 1);
+
+    core_clear_fault();
+    assert_eq!(core_access_failed(), 0);
+    assert_eq!(core_segmented_access_failed(), 0);
+    assert_eq!(core_load(0x7000, 4), 0);
+    assert_eq!(core_access_failed(), 1);
+    assert_eq!(core_segmented_access_failed(), 1);
+    assert_eq!(core_load(0x4000, 4), 0xa5a5a5a5);
+    assert_eq!(core_access_failed(), 0);
+    assert_eq!(core_segmented_access_failed(), 0);
+
+    assert_eq!(set_context(protected()), 0);
+    assert_eq!(core_segmented_load(0x7000, 4, Segment::Ds as u32), 0);
+    assert_eq!(core_access_failed(), 1);
+    assert_eq!(core_segmented_access_failed(), 1);
+    assert_eq!(
+        core_segmented_load(0x4000, 4, Segment::Ds as u32),
+        0xa5a5a5a5
+    );
+    assert_eq!(core_access_failed(), 0);
+    assert_eq!(core_segmented_access_failed(), 0);
 }
 
 #[test]

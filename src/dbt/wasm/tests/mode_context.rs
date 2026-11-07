@@ -87,7 +87,7 @@ fn offsets_are_truncated_before_segment_helpers_or_long64_bases() {
     );
     p["accesses"] = json!([
         {"kind":"segmented_load","args":["20",4,4],"result":"deadbeef"},
-        {"kind":"access_failed","args":[],"result":0}]);
+        {"kind":"segmented_access_failed","args":[],"result":0}]);
     cases.push(p);
 
     let long = ExecutionContext::from_json(
@@ -195,7 +195,7 @@ fn stack_slots_and_pointer_widths_remain_independent_including_pop_sp_aliases() 
         let offset = old & if stack32 { 0xffffffff } else { 0xffff };
         p["accesses"] = json!([
             {"kind":"segmented_load","args":[format!("{offset:x}"),width.bytes(),1],"result":format!("{loaded:x}")},
-            {"kind":"access_failed","args":[],"result":0}]);
+            {"kind":"segmented_access_failed","args":[],"result":0}]);
         cases.push(p);
     }
     run_cases(cases);
@@ -216,7 +216,7 @@ fn segmented_failures_and_target_checks_precede_architectural_commit() {
         );
         p["accesses"] = json!([
             {"kind":"segmented_load","args":["5678",4,1],"result":"0"},
-            {"kind":"access_failed","args":[],"result":1},
+            {"kind":"segmented_access_failed","args":[],"result":1},
             {"kind":"access_reason","args":[],"result":reason}]);
         cases.push(p);
     }
@@ -249,10 +249,34 @@ fn segmented_failures_and_target_checks_precede_architectural_commit() {
     );
     p["accesses"] = json!([
         {"kind":"segmented_load","args":["ffff",2,1],"result":"2345"},
-        {"kind":"access_failed","args":[],"result":0},
+        {"kind":"segmented_access_failed","args":[],"result":0},
         {"kind":"target_check","args":["2345"],"result":1}]);
     cases.push(p);
     run_cases(cases);
+}
+
+#[test]
+fn zero_count_segmented_rmw_uses_combined_status_before_any_commit() {
+    let mut p = packet(
+        context(true, false),
+        Operation::Shift {
+            kind: crate::x86::instruction::Shift::Shl,
+            dst: Location::Memory(Address {
+                base: AddressBase::Register(3),
+                size: Width::W16,
+                ..Address::default()
+            }),
+            count: crate::x86::instruction::Count::Immediate(0),
+            width: Width::W32,
+        },
+        &[(3, 0xaabbccddffff7000)],
+        (&[], 0x8d7, 0x1000, SEGMENT as u32, 2),
+    );
+    p["accesses"] = json!([
+        {"kind":"segmented_load_for_write","args":["7000",4,2],"result":"0"},
+        {"kind":"segmented_access_failed","args":[],"result":1},
+        {"kind":"access_reason","args":[],"result":SEGMENT}]);
+    run_cases(vec![p]);
 }
 
 #[test]

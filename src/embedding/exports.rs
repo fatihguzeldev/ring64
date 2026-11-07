@@ -267,6 +267,11 @@ pub extern "C" fn core_store(address: u64, width: u32, value: u64) -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_access_failed() -> i32 {
+    BRIDGE.with_borrow(|bridge| i32::from(bridge.core.as_ref().unwrap().fault.is_some()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_segmented_access_failed() -> i32 {
     BRIDGE.with_borrow(|bridge| {
         let core = bridge.core.as_ref().unwrap();
         i32::from(core.fault.is_some() || core.segment_fault.is_some())
