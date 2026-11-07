@@ -301,7 +301,7 @@ mod tests {
         );
 
         let overlapping = discover(
-            &image(&[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0, 0xf4]),
+            &image(&[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0xf4, 0xf4]),
             0x1000,
             limits(),
         )
