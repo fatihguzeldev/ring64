@@ -12,6 +12,7 @@ mod stack;
 mod state;
 mod strings;
 mod unary;
+mod vector;
 
 use std::collections::BTreeMap;
 use wasm_encoder::{
@@ -56,6 +57,12 @@ struct Emitter {
     segment: Segment,
     access_reason: Option<u32>,
     target_check: Option<u32>,
+    vector_registers: [Option<u32>; 16],
+    vector_written: u16,
+    vector_temporaries: Option<[u32; 3]>,
+    vector_load: Option<u32>,
+    vector_store: Option<u32>,
+    vector_access_reason: Option<u32>,
 }
 
 impl Emitter {
@@ -66,6 +73,7 @@ impl Emitter {
 }
 
 pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
+    let vector_banks = vector::Banks::for_unit(unit);
     let has_repeat = unit
         .instructions
         .iter()
@@ -151,6 +159,30 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         types.ty().function(
             [ValType::I64, ValType::I64, ValType::I64, ValType::I32],
             [ValType::I64],
+        );
+        next_type += 1;
+        index
+    });
+    let vector_load_type = vector_banks.loads.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [ValType::I64, ValType::I32, ValType::I32, ValType::I32],
+            [ValType::I32],
+        );
+        next_type += 1;
+        index
+    });
+    let vector_store_type = vector_banks.stores.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [
+                ValType::I64,
+                ValType::I32,
+                ValType::I32,
+                ValType::I32,
+                ValType::I32,
+            ],
+            [ValType::I32],
         );
         index
     });
@@ -260,6 +292,28 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let vector_load = vector_load_type.map(|index| {
+        imports.import("env", "vector_load", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let vector_store = vector_store_type.map(|index| {
+        imports.import("env", "vector_store", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let vector_access_reason = if vector_banks.loads || vector_banks.stores {
+        Some(access_reason.unwrap_or_else(|| {
+            imports.import("env", "access_reason", EntityType::Function(2));
+            let function = run_index;
+            run_index += 1;
+            function
+        }))
+    } else {
+        None
+    };
     let mut functions = FunctionSection::new();
     functions.function(3);
     if dynamic_targets {
@@ -277,6 +331,18 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     if has_repeat {
         locals.push((2, ValType::I64));
     }
+    let mut vector_registers = [None; 16];
+    let mut next_local = 33 + 2 * u32::from(has_repeat);
+    for (bank, local) in vector_registers.iter_mut().enumerate() {
+        if vector_banks.used & (1 << bank) != 0 {
+            *local = Some(next_local);
+            next_local += 1;
+        }
+    }
+    let vector_temporaries = (vector_banks.used != 0).then(|| {
+        locals.push((vector_banks.used.count_ones() + 3, ValType::V128));
+        [next_local, next_local + 1, next_local + 2]
+    });
     let mut emitter = Emitter {
         current_index: 0,
         entry_lookup: dynamic_targets.then_some(run_index + 1),
@@ -290,6 +356,12 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         segment: Segment::Ds,
         access_reason,
         target_check,
+        vector_registers,
+        vector_written: vector_banks.written,
+        vector_temporaries,
+        vector_load,
+        vector_store,
+        vector_access_reason,
         body: Function::new(locals),
         entries: unit
             .instructions
@@ -327,6 +399,7 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         emitter.gates(exit_depth);
         match instruction.operation {
             Operation::Nop => {}
+            Operation::Vector(vector) => emitter.vector(vector, instruction.next_pc, exit_depth),
             Operation::Exchange { dst, src, width } => {
                 emitter.exchange(dst, src, width, instruction.next_pc, exit_depth)
             }

@@ -43,6 +43,15 @@ impl Emitter {
                 .op(Op::I64Load(memory(offset_of!(RunState, repeat_remaining))))
                 .op(Op::LocalSet(REPEAT_REMAINING));
         }
+        for bank in 0..16 {
+            if let Some(local) = self.vector_registers[bank] {
+                self.op(Op::LocalGet(0))
+                    .op(Op::V128Load(super::vector::memory(
+                        offset_of!(RunState, xmm) + bank * 16,
+                    )))
+                    .op(Op::LocalSet(local));
+            }
+        }
     }
 
     pub(super) fn publish_state(&mut self) {
@@ -68,6 +77,16 @@ impl Emitter {
             self.op(Op::LocalGet(0))
                 .op(Op::LocalGet(REPEAT_REMAINING))
                 .op(Op::I64Store(memory(offset_of!(RunState, repeat_remaining))));
+        }
+        for bank in 0..16 {
+            if self.vector_written & (1 << bank) != 0 {
+                let local = self.vector_registers[bank].expect("published XMM bank");
+                self.op(Op::LocalGet(0))
+                    .op(Op::LocalGet(local))
+                    .op(Op::V128Store(super::vector::memory(
+                        offset_of!(RunState, xmm) + bank * 16,
+                    )));
+            }
         }
     }
 }

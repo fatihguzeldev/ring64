@@ -15,6 +15,7 @@ mod near_stack;
 mod routing;
 mod stack;
 mod strings;
+mod vector;
 
 use super::*;
 use crate::embedding::layout::RunState;
@@ -458,6 +459,9 @@ for (const [index,c] of cases.entries()) {
  c.registers.forEach((v,i)=>d.setBigUint64(l.registers+8*i,BigInt('0x'+v),true));
  d.setBigUint64(l.flags,BigInt('0x'+c.flags),true); d.setBigUint64(l.rip,BigInt('0x'+c.pc),true);
  if(c.repeatBudget!==undefined)d.setBigUint64(l.repeatRemaining,BigInt(c.repeatBudget),true);
+ const xmmOffset=l.xmm??176,scratch=l.vectorScratch??432;
+ const read128=pointer=>(d.getBigUint64(pointer,true)|(d.getBigUint64(pointer+8,true)<<64n)).toString(16);
+ if(c.xmm)c.xmm.forEach((v,i)=>{const bits=BigInt('0x'+v);d.setBigUint64(xmmOffset+16*i,BigInt.asUintN(64,bits),true);d.setBigUint64(xmmOffset+16*i+8,bits>>64n,true)});
  let accessIndex=0;
  const access=(kind,args)=>{
   const expected=c.accesses?.[accessIndex++];assert(expected,'unexpected '+kind+' import');
@@ -478,7 +482,9 @@ for (const [index,c] of cases.entries()) {
  const multiply_high=(a,b,signed)=>BigInt('0x'+access('multiply_high',[bits(a),bits(b),signed]));
  const divide=(high,low,divisor,signed)=>BigInt('0x'+access('divide',[bits(high),bits(low),bits(divisor),signed]));
  const divide_failed=()=>access('divide_failed',[]);
- const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed}});
+ const vector_load=(address,width,segment,alignment)=>{const value=access('vector_load',[bits(address),width,segment,alignment]);if(value===null)return 0;const v=BigInt('0x'+value);d.setBigUint64(scratch,BigInt.asUintN(64,v),true);d.setBigUint64(scratch+8,v>>64n,true);return scratch};
+ const vector_store=(address,width,segment,alignment,pointer)=>access('vector_store',[bits(address),width,segment,alignment,read128(pointer)]);
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const snapshot=reason=>{
   const flags=d.getBigUint64(l.flags,true);
@@ -487,6 +493,7 @@ for (const [index,c] of cases.entries()) {
   return {registers:Array.from({length:16},(_,i)=>d.getBigUint64(l.registers+8*i,true).toString(16)),
    flags:flags.toString(16),pc:d.getBigUint64(l.rip,true).toString(16),
    reason,remaining:d.getBigUint64(l.remaining,true).toString(),
+   ...(c.xmm===undefined?{}:{xmm:Array.from({length:16},(_,i)=>read128(xmmOffset+16*i))}),
    ...(c.repeatBudget===undefined?{}:{repeatRemaining:d.getBigUint64(l.repeatRemaining,true).toString()})};
  };
  const entryIndex=c.entries.indexOf(c.pc);assert(entryIndex>=0,'entry must belong to the artifact');
