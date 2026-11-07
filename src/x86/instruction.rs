@@ -62,6 +62,7 @@ impl RegisterView {
 pub enum Operand {
     Register(u8),
     Immediate(u64),
+    Memory(Address),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -239,6 +240,14 @@ pub enum Condition {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CountCondition {
+    Always,
+    Equal,
+    NotEqual,
+    Zero,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
     Direction {
         set: bool,
@@ -366,6 +375,13 @@ pub enum Operation {
         dst: u8,
         width: Width,
     },
+    PopMemory {
+        address: Address,
+        width: Width,
+    },
+    Leave {
+        width: Width,
+    },
     Call {
         /// Absolute guest target, also for a decoded relative CALL.
         target: Operand,
@@ -373,6 +389,10 @@ pub enum Operation {
     },
     JumpRegister {
         target: u8,
+        width: Width,
+    },
+    JumpMemory {
+        address: Address,
         width: Width,
     },
     Return {
@@ -384,6 +404,11 @@ pub enum Operation {
     },
     Jcc {
         condition: Condition,
+        target: u64,
+    },
+    CountBranch {
+        condition: CountCondition,
+        count_width: Width,
         target: u64,
     },
 }

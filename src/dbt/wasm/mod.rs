@@ -74,8 +74,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             i.operation,
             Operation::Return { .. }
                 | Operation::JumpRegister { .. }
+                | Operation::JumpMemory { .. }
                 | Operation::Call {
-                    target: crate::x86::instruction::Operand::Register(_),
+                    target: crate::x86::instruction::Operand::Register(_)
+                        | crate::x86::instruction::Operand::Memory(_),
                     ..
                 }
         )
@@ -443,14 +445,24 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 width,
                 condition,
             } => emitter.cmov(dst, src, width, condition, instruction.next_pc, exit_depth),
-            Operation::Push { src, width } => emitter.push(src, width, exit_depth),
+            Operation::Push { src, width } => {
+                emitter.push(src, width, instruction.next_pc, exit_depth)
+            }
             Operation::Pop { dst, width } => emitter.pop(dst, width, exit_depth),
+            Operation::PopMemory { address, width } => {
+                emitter.pop_memory(address, width, instruction.next_pc, exit_depth)
+            }
+            Operation::Leave { width } => emitter.leave(width, exit_depth),
             Operation::Call { target, width } => {
                 emitter.call(target, width, instruction.next_pc, loop_depth, exit_depth);
                 continue;
             }
             Operation::JumpRegister { target, width } => {
                 emitter.jump_register(target, width, exit_depth);
+                continue;
+            }
+            Operation::JumpMemory { address, width } => {
+                emitter.jump_memory(address, width, instruction.next_pc, exit_depth);
                 continue;
             }
             Operation::Return { cleanup, width } => {
@@ -466,6 +478,13 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 emitter.op(Op::If(BlockType::Empty));
                 emitter.target(target, loop_depth + 1, exit_depth + 1);
                 emitter.op(Op::End);
+            }
+            Operation::CountBranch {
+                condition,
+                count_width,
+                target,
+            } => {
+                emitter.count_branch(condition, count_width, target, loop_depth, exit_depth);
             }
         }
         emitter.commit(instruction.next_pc);

@@ -10,6 +10,7 @@ mod integer_memory;
 mod logical;
 mod mode_context;
 mod multiply_divide;
+mod near_stack;
 mod routing;
 mod stack;
 mod strings;

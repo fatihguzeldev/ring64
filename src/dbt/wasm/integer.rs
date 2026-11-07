@@ -20,12 +20,22 @@ impl Emitter {
         self.narrow(width);
     }
 
-    pub(super) fn operand(&mut self, operand: Operand, width: Width) {
+    pub(super) fn operand(
+        &mut self,
+        operand: Operand,
+        width: Width,
+        next_pc: u64,
+        exit_depth: u32,
+    ) {
         match operand {
             Operand::Register(register) => self.register(register, width),
             Operand::Immediate(value) => {
                 self.op(Op::I64Const(value as i64));
                 self.narrow(width);
+            }
+            Operand::Memory(address) => {
+                self.load_value(address, width, next_pc, false, exit_depth);
+                self.op(Op::LocalGet(VALUE));
             }
         }
     }
@@ -50,6 +60,11 @@ impl Emitter {
     }
 
     pub(super) fn write_register(&mut self, register: RegisterView, width: Width) {
+        self.merge_register(register, width);
+        self.op(Op::LocalSet(GPR + u32::from(register.bank)));
+    }
+
+    pub(super) fn merge_register(&mut self, register: RegisterView, width: Width) {
         if matches!(width, Width::W8 | Width::W16)
             || (width == Width::W32 && !self.context.is_long64())
         {
@@ -62,7 +77,6 @@ impl Emitter {
                 .op(Op::I64And)
                 .op(Op::I64Or);
         }
-        self.op(Op::LocalSet(GPR + u32::from(register.bank)));
     }
 
     pub(super) fn integer(&mut self, kind: Alu, dst: RegisterView, src: DataOperand, width: Width) {

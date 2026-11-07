@@ -69,7 +69,7 @@ pub(crate) fn discover_with_context(
                     pending.push_back(target);
                 }
             }
-            Operation::Jcc { target, .. } => {
+            Operation::Jcc { target, .. } | Operation::CountBranch { target, .. } => {
                 pending.push_back(instruction.next_pc);
                 if !context.is_long64() || canonical48(target) {
                     pending.push_back(target);
@@ -83,7 +83,9 @@ pub(crate) fn discover_with_context(
                     pending.push_back(target);
                 }
             }
-            Operation::JumpRegister { .. } | Operation::Return { .. } => {}
+            Operation::JumpRegister { .. }
+            | Operation::JumpMemory { .. }
+            | Operation::Return { .. } => {}
             _ => pending.push_back(instruction.next_pc),
         }
         instructions.insert(pc, instruction);
@@ -97,7 +99,7 @@ pub(crate) fn discover_with_context(
             Operation::Jump { target } => {
                 leaders.insert(target);
             }
-            Operation::Jcc { target, .. } => {
+            Operation::Jcc { target, .. } | Operation::CountBranch { target, .. } => {
                 leaders.insert(target);
                 leaders.insert(instruction.next_pc);
             }

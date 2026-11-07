@@ -6,15 +6,32 @@ use wasm_encoder::{BlockType, Instruction as Op, MemArg};
 
 impl Emitter {
     pub(super) fn address(&mut self, address: Address, next_pc: u64) {
+        self.address_with_stack(address, next_pc, None);
+    }
+
+    pub(super) fn address_with_stack(
+        &mut self,
+        address: Address,
+        next_pc: u64,
+        pending_stack: Option<u32>,
+    ) {
         self.segment = address.segment;
         let has_base = if let AddressBase::Register(base) = address.base {
-            self.op(Op::LocalGet(GPR + u32::from(base)));
+            self.op(Op::LocalGet(if base == 4 {
+                pending_stack.unwrap_or(GPR + 4)
+            } else {
+                GPR + u32::from(base)
+            }));
             true
         } else {
             false
         };
         if let Some(index) = address.index {
-            self.op(Op::LocalGet(GPR + u32::from(index.register)));
+            self.op(Op::LocalGet(if index.register == 4 {
+                pending_stack.unwrap_or(GPR + 4)
+            } else {
+                GPR + u32::from(index.register)
+            }));
             if index.scale != 1 {
                 self.op(Op::I64Const(i64::from(index.scale.trailing_zeros())))
                     .op(Op::I64Shl);

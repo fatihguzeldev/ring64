@@ -1,8 +1,8 @@
-use super::{ENTRY, Emitter, FLAGS, REASON, REMAINING, RHS, RIP, STORE_STATUS};
+use super::{ENTRY, Emitter, FLAGS, REASON, REMAINING, RESULT, RHS, RIP, STORE_STATUS, VALUE};
 use crate::embedding::layout::{BUDGET, DISPATCH, RunState, SEGMENT, STOP, TARGET};
 use crate::memory::canonical48;
 use crate::x86::context::Segment;
-use crate::x86::instruction::{Condition, Width};
+use crate::x86::instruction::{Address, Condition, CountCondition, RegisterView, Width};
 use wasm_encoder::{BlockType, Instruction as Op, MemArg};
 
 impl Emitter {
@@ -69,6 +69,61 @@ impl Emitter {
         self.op(Op::LocalSet(RHS));
         self.check_runtime_target(exit_depth);
         self.commit_runtime_target(exit_depth);
+    }
+
+    pub(super) fn jump_memory(
+        &mut self,
+        address: Address,
+        width: Width,
+        next_pc: u64,
+        exit_depth: u32,
+    ) {
+        self.load_value(address, width, next_pc, false, exit_depth);
+        self.op(Op::LocalGet(VALUE)).op(Op::LocalSet(RHS));
+        self.check_runtime_target(exit_depth);
+        self.commit_runtime_target(exit_depth);
+    }
+
+    pub(super) fn count_branch(
+        &mut self,
+        condition: CountCondition,
+        width: Width,
+        target: u64,
+        loop_depth: u32,
+        exit_depth: u32,
+    ) {
+        self.register(1, width);
+        if condition != CountCondition::Zero {
+            self.op(Op::I64Const(1)).op(Op::I64Sub);
+            self.narrow(width);
+            self.op(Op::LocalTee(RESULT));
+        }
+        self.op(Op::I64Eqz);
+        if condition != CountCondition::Zero {
+            self.op(Op::I32Eqz);
+        }
+        if matches!(condition, CountCondition::Equal | CountCondition::NotEqual) {
+            self.condition(if condition == CountCondition::Equal {
+                Condition::Equal
+            } else {
+                Condition::NotEqual
+            });
+            self.op(Op::I32And);
+        }
+        self.op(Op::If(BlockType::Empty));
+        if self.check_static_target(target, exit_depth + 1) {
+            if condition != CountCondition::Zero {
+                self.op(Op::LocalGet(RESULT));
+                self.write_register(RegisterView::low(1), width);
+            }
+            self.commit(target);
+            self.route(target, loop_depth + 1, exit_depth + 1);
+        }
+        self.op(Op::End);
+        if condition != CountCondition::Zero {
+            self.op(Op::LocalGet(RESULT));
+            self.write_register(RegisterView::low(1), width);
+        }
     }
 
     pub(super) fn condition(&mut self, condition: Condition) {
