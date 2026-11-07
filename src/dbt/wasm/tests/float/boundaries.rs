@@ -131,3 +131,39 @@ fn mxcsr_code_stores_retire_before_budget_stop_dispatch_and_failed_stores_leave_
     }
     run_cases(cases);
 }
+
+#[test]
+fn memory_to_integer_numeric_units_need_scratch_temporaries_without_xmm_banks() {
+    let address = Address {
+        base: AddressBase::Register(0),
+        ..Address::default()
+    };
+    let mut cases = vec![];
+    for kind in [Kind::FloatToInt, Kind::TruncToInt] {
+        for format in [Format::F32, Format::F64] {
+            for integer64 in [false, true] {
+                let mut op = numeric(kind);
+                op.format = format;
+                op.integer64 = integer64;
+                let mut p = packet(
+                    vec![Operation::Float(FloatInstruction {
+                        op,
+                        dst: 0,
+                        src: Location::Memory(address),
+                    })],
+                    &[],
+                    &[],
+                    1,
+                    1,
+                );
+                p["expected"]["registers"][0] = json!("7fffffff");
+                p["accesses"] = json!([
+                    {"kind":"vector_load","args":["1122334400000000",if format==Format::F32{4}else{8},Segment::Ds as u32,1],"result":"12345678"},
+                    {"kind":"float","args":[op.encode(),"0","0","12345678","0"],"result":{"reason":0,"value":"7fffffff"}}
+                ]);
+                cases.push(p);
+            }
+        }
+    }
+    run_cases(cases);
+}

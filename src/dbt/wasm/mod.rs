@@ -404,7 +404,7 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             next_local += 1;
         }
     }
-    let vector_temporaries = (vector_banks.used != 0).then(|| {
+    let vector_temporaries = (vector_banks.used != 0 || has_float).then(|| {
         locals.push((vector_banks.used.count_ones() + 3, ValType::V128));
         [next_local, next_local + 1, next_local + 2]
     });
