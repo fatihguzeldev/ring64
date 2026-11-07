@@ -73,7 +73,7 @@ export function reuseScenarios(compiler: WebAssembly.Module): Scenario[] {
         for (const scalar of [false, true])
           await using(
             compiler,
-            scalar ? '660fefc164488b03' : '660fefc1660f6f13',
+            scalar ? '660fefc164488b03660f6f13' : '660fefc1660f6f13',
             LONG,
             async (cpu) => {
               const before = input(0x1000n, { 3: 0x6000n }, 0xcd7n),
