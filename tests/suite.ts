@@ -11,6 +11,7 @@ import { stringScenarios } from './execution/strings/index.js';
 import { nearControlScenarios } from './execution/near-control/index.js';
 import { exchangeScenarios } from './execution/exchange/index.js';
 import { simdScenarios } from './execution/simd/index.js';
+import { floatingScenarios } from './execution/floating/index.js';
 
 export async function runScenarios(
   compiler: Uint8Array | WebAssembly.Module,
@@ -33,6 +34,7 @@ export async function runScenarios(
     ...nearControlScenarios(core),
     ...exchangeScenarios(core),
     ...simdScenarios(core),
+    ...floatingScenarios(core),
   ];
   const passed: string[] = [];
   for (const { name, run } of scenarios) {
