@@ -25,6 +25,7 @@ pub(crate) fn discover_with_context(
     let mut instructions = BTreeMap::new();
     let mut source = BTreeSet::new();
     let mut linear_source = BTreeSet::new();
+    let identity_source = context.is_long64();
     while let Some(pc) = pending.pop_front() {
         if instructions.len() >= limits.max_instructions as usize {
             break;
@@ -33,17 +34,25 @@ pub(crate) fn discover_with_context(
             continue;
         }
         let mut fetched = Vec::new();
-        let Ok(instruction) = decode_with_context(pc, context, |offset| {
-            let linear = context
-                .translate(offset, 1, Segment::Cs, Access::Execute, false)
-                .map_err(|failure| match failure {
-                    AccessFailure::Segment(fault) => DecodeError::Segment(fault),
-                    AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
-                })?;
-            let byte = image.fetch(linear).map_err(DecodeError::Fetch)?;
-            fetched.push((offset, linear));
-            Ok(byte)
-        }) else {
+        let decoded = if identity_source {
+            // Long64 CS offsets are linear; fetch already checks the full byte span.
+            decode_with_context(pc, context, |address| {
+                image.fetch(address).map_err(DecodeError::Fetch)
+            })
+        } else {
+            decode_with_context(pc, context, |offset| {
+                let linear = context
+                    .translate(offset, 1, Segment::Cs, Access::Execute, false)
+                    .map_err(|failure| match failure {
+                        AccessFailure::Segment(fault) => DecodeError::Segment(fault),
+                        AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
+                    })?;
+                let byte = image.fetch(linear).map_err(DecodeError::Fetch)?;
+                fetched.push(linear);
+                Ok(byte)
+            })
+        };
+        let Ok(instruction) = decoded else {
             // A future diagnostic is a frontier, never an early guest exit.
             continue;
         };
@@ -57,7 +66,7 @@ pub(crate) fn discover_with_context(
             continue;
         }
         source.extend(bytes);
-        linear_source.extend(fetched.into_iter().map(|(_, linear)| linear));
+        linear_source.extend(fetched);
         match instruction.operation {
             Operation::Jump { target } => {
                 if !context.is_long64() || canonical48(target) {
@@ -106,7 +115,11 @@ pub(crate) fn discover_with_context(
         }
     }
     let mut source_ranges: Vec<SourceRange> = Vec::new();
-    for address in &linear_source {
+    for address in if identity_source {
+        &source
+    } else {
+        &linear_source
+    } {
         if let Some(last) = source_ranges.last_mut()
             && u128::from(last.start) + u128::from(last.length) == u128::from(*address)
         {
@@ -333,6 +346,29 @@ mod tests {
             }]
         );
         assert_eq!(unit.context, context(0x8000));
+    }
+
+    #[test]
+    fn long64_segment_bases_do_not_redirect_instruction_sources() {
+        let image = image(&[0x64, 0xb8, 1, 0, 0, 0, 0xf5]);
+        let context = ExecutionContext::from_json(&json!({
+            "mode":"long64","fsBase":"0x100000000","gsBase":"0xffff800000000000"
+        }))
+        .unwrap();
+        let unit = discover_with_context(&image, &context, 0x1000, limits()).unwrap();
+        assert_eq!(
+            unit.instructions.iter().map(|i| i.pc).collect::<Vec<_>>(),
+            [0x1000, 0x1006]
+        );
+        assert_eq!(unit.source_bytes, 7);
+        assert_eq!(
+            unit.source_ranges,
+            [SourceRange {
+                start: 0x1000,
+                length: 7
+            }]
+        );
+        assert_eq!(unit.context, context);
     }
 
     #[test]
