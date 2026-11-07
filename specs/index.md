@@ -12,6 +12,7 @@
 - [mode context and decoding](mode-context-and-decoding/spec.md): imported execution contexts, size/segment rules and context-dependent code reuse.
 - [string and repeated execution](string-and-repeated-execution/spec.md): memory strings, DF, bounded repetition, partial progress and restart after faults or code changes.
 - [near control and stack](near-control-and-stack/spec.md): memory-indirect transfers, explicit stack-memory operands, frame teardown and counter branches.
+- [scalar exchange and locked rmw](scalar-exchange-and-locked-rmw/spec.md): exchange, compare-exchange, LOCK legality and checked RMW publication in private memory.
 
 ## scope
 
@@ -28,7 +29,7 @@
 | exceptions, interrupts and delivery    | fault/trap records, handler frames, nested delivery faults, returns, irq/nmi, interrupt inhibition, debug state and halt/wakeup.                                                                                                         | `architectural-effects-and-restart`, `event-delivery-and-returns`, `interrupt-debug-and-halt`  |
 | x87 and mmx                            | raw extended state, stack/tags/control/status, arithmetic, conversions and special functions, pending exceptions, mmx aliases and state images. numeric results and stack effects follow each instruction's commit rules.                | `x87-state-and-execution`, `mmx-and-numeric-state-images`                                      |
 | simd and extended state                | sse/sse2 integer and floating-point operations, vector aliases, lane rules, mxcsr, enable controls and save/restore. avx and wider extensions each require instruction coverage, lane behavior and matching control/state-image support. | `simd-integer-and-data`, `simd-floating-point-and-controls`, `extended-state-save-and-restore` |
-| atomics and memory ordering            | atomic/rmw operations, lock legality, fences, alignment and split accesses. parallel vcpus require ordering and atomicity rules for every conflicting ordinary and atomic access.                                                        | `atomic-memory-operations`                                                                     |
+| atomics and memory ordering            | atomic/rmw operations, lock legality, fences, alignment and split accesses. parallel vcpus require ordering and atomicity rules for every conflicting ordinary and atomic access.                                                        | `scalar-exchange-and-locked-rmw`, `atomic-memory-operations`                                   |
 | system and privileged operations       | control/debug registers, msrs, cpuid, system transfers, i/o, clocks and processor controls. reported capabilities must match instruction, memory, event and numeric behavior.                                                            | `system-state-and-identity`                                                                    |
 
 ## dependencies
