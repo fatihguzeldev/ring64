@@ -4,6 +4,7 @@ mod counts;
 mod data;
 mod entry_lookup;
 mod exchange;
+mod float;
 mod integer;
 mod integer_memory;
 mod memory;
@@ -63,6 +64,9 @@ struct Emitter {
     vector_load: Option<u32>,
     vector_store: Option<u32>,
     vector_access_reason: Option<u32>,
+    float: Option<u32>,
+    load_mxcsr: Option<u32>,
+    store_mxcsr: Option<u32>,
 }
 
 impl Emitter {
@@ -184,6 +188,41 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             ],
             [ValType::I32],
         );
+        next_type += 1;
+        index
+    });
+    let has_float = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Float(_)));
+    let load_mxcsr_used = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Mxcsr { store: false, .. }));
+    let store_mxcsr_used = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Mxcsr { store: true, .. }));
+    let float_type = has_float.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [
+                ValType::I32,
+                ValType::I64,
+                ValType::I64,
+                ValType::I64,
+                ValType::I64,
+            ],
+            [ValType::I32],
+        );
+        next_type += 1;
+        index
+    });
+    let mxcsr_type = (load_mxcsr_used || store_mxcsr_used).then(|| {
+        let index = next_type;
+        types
+            .ty()
+            .function([ValType::I64, ValType::I32], [ValType::I32]);
         index
     });
     let mut imports = ImportSection::new();
@@ -304,7 +343,33 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         run_index += 1;
         function
     });
-    let vector_access_reason = if vector_banks.loads || vector_banks.stores {
+    let float = float_type.map(|index| {
+        imports.import("env", "float", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let load_mxcsr = load_mxcsr_used.then(|| {
+        imports.import(
+            "env",
+            "load_mxcsr",
+            EntityType::Function(mxcsr_type.unwrap()),
+        );
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let store_mxcsr = store_mxcsr_used.then(|| {
+        imports.import(
+            "env",
+            "store_mxcsr",
+            EntityType::Function(mxcsr_type.unwrap()),
+        );
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let vector_access_reason = if vector_banks.loads || vector_banks.stores || store_mxcsr_used {
         Some(access_reason.unwrap_or_else(|| {
             imports.import("env", "access_reason", EntityType::Function(2));
             let function = run_index;
@@ -362,6 +427,9 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         vector_load,
         vector_store,
         vector_access_reason,
+        float,
+        load_mxcsr,
+        store_mxcsr,
         body: Function::new(locals),
         entries: unit
             .instructions
@@ -399,6 +467,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         emitter.gates(exit_depth);
         match instruction.operation {
             Operation::Nop => {}
+            Operation::Float(float) => emitter.float(float, instruction.next_pc, exit_depth),
+            Operation::Mxcsr { address, store } => {
+                emitter.mxcsr(address, store, instruction.next_pc, exit_depth)
+            }
             Operation::Vector(vector) => emitter.vector(vector, instruction.next_pc, exit_depth),
             Operation::Exchange { dst, src, width } => {
                 emitter.exchange(dst, src, width, instruction.next_pc, exit_depth)

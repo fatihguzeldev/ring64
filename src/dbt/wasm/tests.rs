@@ -7,6 +7,7 @@ mod counts;
 mod data_widths;
 mod df;
 mod exchange;
+mod float;
 mod integer_memory;
 mod logical;
 mod mode_context;
@@ -460,6 +461,7 @@ for (const [index,c] of cases.entries()) {
  d.setBigUint64(l.flags,BigInt('0x'+c.flags),true); d.setBigUint64(l.rip,BigInt('0x'+c.pc),true);
  if(c.repeatBudget!==undefined)d.setBigUint64(l.repeatRemaining,BigInt(c.repeatBudget),true);
  const xmmOffset=l.xmm??176,scratch=l.vectorScratch??432;
+ if(c.mxcsr!==undefined)d.setUint32(l.mxcsr,Number(c.mxcsr),true);
  const read128=pointer=>(d.getBigUint64(pointer,true)|(d.getBigUint64(pointer+8,true)<<64n)).toString(16);
  if(c.xmm)c.xmm.forEach((v,i)=>{const bits=BigInt('0x'+v);d.setBigUint64(xmmOffset+16*i,BigInt.asUintN(64,bits),true);d.setBigUint64(xmmOffset+16*i+8,bits>>64n,true)});
  let accessIndex=0;
@@ -484,7 +486,10 @@ for (const [index,c] of cases.entries()) {
  const divide_failed=()=>access('divide_failed',[]);
  const vector_load=(address,width,segment,alignment)=>{const value=access('vector_load',[bits(address),width,segment,alignment]);if(value===null)return 0;const v=BigInt('0x'+value);d.setBigUint64(scratch,BigInt.asUintN(64,v),true);d.setBigUint64(scratch+8,v>>64n,true);return scratch};
  const vector_store=(address,width,segment,alignment,pointer)=>access('vector_store',[bits(address),width,segment,alignment,read128(pointer)]);
- const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store}});
+ const float=(op,leftlo,lefthi,rightlo,righthi)=>{const result=access('float',[op,bits(leftlo),bits(lefthi),bits(rightlo),bits(righthi)]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);if(result.value!==undefined){const value=BigInt('0x'+result.value);d.setBigUint64(scratch,BigInt.asUintN(64,value),true);d.setBigUint64(scratch+8,value>>64n,true)}return result.reason};
+ const load_mxcsr=(address,segment)=>{const result=access('load_mxcsr',[bits(address),segment]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);return result.reason};
+ const store_mxcsr=(address,segment)=>access('store_mxcsr',[bits(address),segment,d.getUint32(l.mxcsr,true)]);
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store,float,load_mxcsr,store_mxcsr}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const snapshot=reason=>{
   const flags=d.getBigUint64(l.flags,true);
@@ -493,6 +498,7 @@ for (const [index,c] of cases.entries()) {
   return {registers:Array.from({length:16},(_,i)=>d.getBigUint64(l.registers+8*i,true).toString(16)),
    flags:flags.toString(16),pc:d.getBigUint64(l.rip,true).toString(16),
    reason,remaining:d.getBigUint64(l.remaining,true).toString(),
+   ...(c.mxcsr===undefined?{}:{mxcsr:d.getUint32(l.mxcsr,true)}),
    ...(c.xmm===undefined?{}:{xmm:Array.from({length:16},(_,i)=>read128(xmmOffset+16*i))}),
    ...(c.repeatBudget===undefined?{}:{repeatRemaining:d.getBigUint64(l.repeatRemaining,true).toString()})};
  };

@@ -24,12 +24,31 @@ impl Banks {
             stores: false,
         };
         for instruction in &unit.instructions {
+            if let Operation::Float(float) = instruction.operation {
+                if float.writes_flags() {
+                    banks.read(float.dst);
+                } else if !float.destination_is_gpr() {
+                    banks.write(float.dst);
+                }
+                match float.src {
+                    Location::Register(src) if !float.source_is_gpr() => banks.read(src.bank),
+                    Location::Memory(_) => banks.loads = true,
+                    _ => {}
+                }
+                continue;
+            }
             let Operation::Vector(vector) = instruction.operation else {
                 continue;
             };
             use VectorInstruction::*;
             match vector {
                 Move {
+                    register,
+                    operand,
+                    store,
+                    ..
+                }
+                | HalfMove {
                     register,
                     operand,
                     store,
@@ -94,15 +113,15 @@ pub(super) fn memory(offset: usize) -> MemArg {
 }
 
 impl Emitter {
-    fn xmm(&self, bank: u8) -> u32 {
+    pub(super) fn xmm(&self, bank: u8) -> u32 {
         self.vector_registers[usize::from(bank)].expect("selected XMM bank")
     }
-    fn vector_temps(&self) -> [u32; 3] {
+    pub(super) fn vector_temps(&self) -> [u32; 3] {
         self.vector_temporaries
             .expect("vector instruction has temporaries")
     }
 
-    fn vector_failure(&mut self, exit_depth: u32) {
+    pub(super) fn vector_failure(&mut self, exit_depth: u32) {
         self.op(Op::Call(
             self.vector_access_reason.expect("vector access reason"),
         ))
@@ -110,7 +129,7 @@ impl Emitter {
         .op(Op::Br(exit_depth));
     }
 
-    fn vector_load_value(
+    pub(super) fn vector_load_value(
         &mut self,
         address: Address,
         bytes: u8,
@@ -133,7 +152,7 @@ impl Emitter {
             .op(Op::V128Load(memory(0)));
     }
 
-    fn vector_operand(
+    pub(super) fn vector_operand(
         &mut self,
         operand: VectorOperand,
         bytes: u8,
@@ -186,6 +205,48 @@ impl Emitter {
         let [left, right, result] = self.vector_temps();
         use VectorInstruction::*;
         match instruction {
+            HalfMove {
+                register,
+                operand,
+                high,
+                store,
+            } => {
+                if store {
+                    self.op(Op::LocalGet(self.xmm(register)));
+                    if high {
+                        self.op(Op::LocalGet(self.xmm(register)))
+                            .op(Op::I8x16Shuffle(std::array::from_fn(|i| {
+                                if i < 8 { (i + 8) as u8 } else { i as u8 }
+                            })));
+                    }
+                    self.op(Op::LocalSet(right));
+                    let VectorOperand::Memory(address) = operand else {
+                        unreachable!("half stores are memory-only")
+                    };
+                    self.vector_store_value(address, 8, false, right, next_pc, exit_depth);
+                } else {
+                    self.vector_operand(operand, 8, false, next_pc, exit_depth);
+                    let destination = self.xmm(register);
+                    self.op(Op::LocalSet(right))
+                        .op(Op::LocalGet(destination))
+                        .op(Op::LocalGet(right))
+                        .op(Op::I8x16Shuffle(std::array::from_fn(|i| {
+                            if high && i >= 8 {
+                                16 + (i - 8) as u8
+                            } else if !high && i < 8 {
+                                16 + i as u8
+                                    + if matches!(operand, VectorOperand::Register(_)) {
+                                        8
+                                    } else {
+                                        0
+                                    }
+                            } else {
+                                i as u8
+                            }
+                        })))
+                        .op(Op::LocalSet(destination));
+                }
+            }
             Move {
                 register,
                 operand,
