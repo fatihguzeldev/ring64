@@ -17,6 +17,14 @@ export function dataBoundaryScenarios(core: WebAssembly.Module): Scenario[] {
       name: 'scalar data required encoding bytes precede unusable addresses and false conditions',
       run: async () => {
         const packets = [
+          '67b001',
+          '26b001',
+          '6666b001',
+          '4040b001',
+          '4866b001',
+          '664166b001',
+          '480f8400000000',
+          '667400',
           'b480',
           '40b480',
           '66b80080',
@@ -72,25 +80,7 @@ export function dataBoundaryScenarios(core: WebAssembly.Module): Scenario[] {
     {
       name: 'scalar unsupported prefixes maps and selectors stop before speculative address tails',
       run: async () => {
-        const codes = [
-          '67',
-          '26',
-          'f0',
-          'f2',
-          'f3',
-          '6666',
-          '4040',
-          '4866',
-          '664166',
-          '660fbf',
-          '660fb7',
-          '66400fbf',
-          '82',
-          '480f84',
-          '6674',
-          '6650',
-          '6648c3',
-        ];
+        const codes = ['f0', 'f2', 'f3', '660fbf', '660fb7', '66400fbf', '82'];
         for (const opcode of ['c6', 'c7'])
           for (let selector = 1; selector < 8; selector++)
             codes.push('6644' + opcode + modrm(selector, 4, 0));

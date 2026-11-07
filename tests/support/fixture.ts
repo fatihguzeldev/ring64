@@ -83,8 +83,19 @@ export function exit(
   state(actual.state, expected);
 }
 
-export function fault(actual: Execution, expected: NonNullable<Execution['fault']>): void {
+type FaultExpectation = Omit<NonNullable<Execution['fault']>, 'segment'> & {
+  segment?: NonNullable<Execution['fault']>['segment'];
+};
+
+export function fault(actual: Execution, expected: FaultExpectation): void {
   check(actual.fault, 'missing access failure metadata');
+  equal(actual.segmentFault, undefined, 'exclusive access diagnostic');
+  check(
+    ['cs', 'ss', 'ds', 'es', 'fs', 'gs'].includes(actual.fault.segment),
+    'missing selected segment',
+  );
+  if (expected.segment !== undefined)
+    equal(actual.fault.segment, expected.segment, 'fault segment');
   for (const key of [
     'instructionPc',
     'address',

@@ -93,6 +93,26 @@ export function decodeScenarios(core: WebAssembly.Module): Scenario[] {
               });
             }
           }
+        for (const code of ['6650', '6758', '404050'])
+          await using(code, async (cpu) => {
+            const before = input(CODE, { 0: 0x1122334455667788n });
+            cpu.setState(before);
+            const popped = code === '6758';
+            const pointer = popped ? 0x4028n : code === '6650' ? 0x401en : 0x4018n;
+            const result = await cpu.run({ budget: 1n });
+            exit(
+              result,
+              'budget',
+              1n,
+              1n,
+              changed(before, CODE + BigInt(code.length / 2), {
+                4: pointer,
+                ...(popped ? { 0: 0xa5a5a5a5a5a5a5a5n } : {}),
+              }),
+            );
+            noFault(result);
+            if (!popped) memory(cpu, pointer, code === '6650' ? '8877' : '8877665544332211');
+          });
         for (const code of [
           'ff10',
           'ff14',
@@ -107,12 +127,9 @@ export function decodeScenarios(core: WebAssembly.Module): Scenario[] {
           'fff8',
           '8f',
           '8fc0',
-          '6650',
-          '6758',
           'f050',
           'f2c3',
           'f3c3',
-          '404050',
           '9a',
           'ca',
           'cb',

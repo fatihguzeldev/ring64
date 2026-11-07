@@ -187,16 +187,7 @@ export function controlScenarios(core: WebAssembly.Module): Scenario[] {
     {
       name: 'unsupported encodings and reached truncation remain controlled outcomes',
       run: async () => {
-        for (const code of [
-          'f4',
-          '8f',
-          '67498b0500000000',
-          '67498b0424',
-          'f70b',
-          '66f7c8',
-          '4889',
-          '4883c0',
-        ]) {
+        for (const code of ['f4', '8f', 'f70b', '66f7c8', '4889', '4883c0']) {
           await using(code, async (cpu) => {
             const input = initial();
             cpu.setState(input);

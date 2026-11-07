@@ -290,15 +290,19 @@ export function conditionScenarios(core: WebAssembly.Module): Scenario[] {
               },
               defaultRam,
             );
-        for (const code of [
-          '407400',
-          '480f8400000000',
-          '667400',
-          '677400',
-          'e300',
-          '0fc1c0',
-          '0fb1c0',
-        ])
+        for (const code of ['407400', '480f8400000000', '667400', '677400'])
+          await using(
+            code,
+            async (cpu) => {
+              const before = input();
+              cpu.setState(before);
+              const result = await cpu.run({ budget: 1n });
+              exit(result, 'budget', 1n, 1n, changed(before, CODE + BigInt(code.length / 2)));
+              noFault(result);
+            },
+            defaultRam,
+          );
+        for (const code of ['e300', '0fc1c0', '0fb1c0'])
           await using(
             code,
             async (cpu) => {

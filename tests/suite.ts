@@ -6,6 +6,7 @@ import { mappedMemoryScenarios } from './execution/mapped-memory/index.js';
 import { controlScenarios } from './execution/control.js';
 import { translationsScenarios } from './execution/translations.js';
 import { embeddingScenarios } from './embedding/scenarios.js';
+import { modeScenarios } from './execution/modes/index.js';
 
 export async function runScenarios(
   compiler: Uint8Array | WebAssembly.Module,
@@ -23,6 +24,7 @@ export async function runScenarios(
     ...controlScenarios(core),
     ...translationsScenarios(core),
     ...embeddingScenarios(core),
+    ...modeScenarios(core),
   ];
   const passed: string[] = [];
   for (const { name, run } of scenarios) {

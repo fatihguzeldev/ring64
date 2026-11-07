@@ -303,10 +303,25 @@ export function logicalScenarios(core: WebAssembly.Module): Scenario[] {
               defaultRam,
             );
           }
+        await using(
+          '6721c0',
+          async (cpu) => {
+            const before = input(CODE, { 0: 0x1122334400000001n });
+            cpu.setState(before);
+            logicalExit(
+              await cpu.run({ budget: 1n }),
+              'budget',
+              1n,
+              1n,
+              changed(before, CODE + 3n, { 0: 1n }, 2n),
+            );
+            memory(cpu, 0x4000n, '00');
+          },
+          defaultRam,
+        );
         for (const code of [
           'f7c8',
           '66f7c8',
-          '6721c0',
           'f021c0',
           'f608',
           'f7c9',

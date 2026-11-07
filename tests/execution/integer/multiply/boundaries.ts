@@ -15,7 +15,13 @@ export function multiplyBoundaryScenarios(core: WebAssembly.Module): Scenario[] 
     {
       name: 'multiply and divide fetch complete admitted address tails and immediates before arithmetic or source checks',
       run: async () => {
-        const packets: string[] = [];
+        const packets: string[] = [
+          '676bc001',
+          '2669c001000000',
+          '6666f7e0',
+          '4848f7e0',
+          '4866f7e0',
+        ];
         for (const width of [8, 16, 32, 64])
           for (const selector of [4, 5, 6, 7])
             packets.push(
@@ -64,19 +70,7 @@ export function multiplyBoundaryScenarios(core: WebAssembly.Module): Scenario[] 
     {
       name: 'multiply and divide keep excluded prefixes and F6 F7 selector one access free',
       run: async () => {
-        for (const code of [
-          'f60c',
-          'f70c',
-          '664ff60c',
-          '664ff70c',
-          'f048f7f1',
-          'f3660faf',
-          '676b',
-          '2669',
-          '6666f7',
-          '4848f7',
-          '4866f7',
-        ])
+        for (const code of ['f60c', 'f70c', '664ff60c', '664ff70c', 'f048f7f1', 'f3660faf'])
           await using(
             code,
             async (cpu) => {
