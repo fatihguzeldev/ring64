@@ -173,7 +173,8 @@ function writeInput(
   let length = header.length;
   for (const bytes of backings) length += bytes.length;
   if (length > 0xffffffff) throw new RangeError('mapped input exceeds wasm32 capacity');
-  const pointer = exports.core_input(length);
+  // Wasm i32 results carry unsigned wasm32 pointers as signed JS numbers.
+  const pointer = exports.core_input(length) >>> 0;
   const input = new Uint8Array(exports.memory.buffer, pointer, length);
   input.set(header);
   let offset = header.length;
@@ -192,7 +193,7 @@ export class Core {
   private constructor(exports: CoreExports) {
     this.#exports = exports;
     this.#layout = this.info<Layout>();
-    this.#statePointer = exports.core_state_ptr();
+    this.#statePointer = exports.core_state_ptr() >>> 0;
     for (const name of ['size', 'registers', 'flags', 'rip', 'remaining'] as const) {
       if (!Number.isInteger(this.#layout[name]) || this.#layout[name] < 0) {
         throw new Error('core returned an invalid transport layout');
@@ -272,7 +273,11 @@ export class Core {
     const status = exports.core_init_mapped(memory.entry, metadataLength);
     if (status !== 0) {
       const text = new TextDecoder().decode(
-        new Uint8Array(exports.memory.buffer, exports.core_info_ptr(), exports.core_info_len()),
+        new Uint8Array(
+          exports.memory.buffer,
+          exports.core_info_ptr() >>> 0,
+          exports.core_info_len() >>> 0,
+        ),
       );
       exports.core_dispose();
       const error = (JSON.parse(text) as { error: string }).error;
@@ -293,8 +298,8 @@ export class Core {
   private info<T>(): T {
     const bytes = new Uint8Array(
       this.#exports.memory.buffer,
-      this.#exports.core_info_ptr(),
-      this.#exports.core_info_len(),
+      this.#exports.core_info_ptr() >>> 0,
+      this.#exports.core_info_len() >>> 0,
     );
     return JSON.parse(new TextDecoder().decode(bytes)) as T;
   }
@@ -302,8 +307,8 @@ export class Core {
   private output(): Uint8Array {
     return new Uint8Array(
       this.#exports.memory.buffer,
-      this.#exports.core_output_ptr(),
-      this.#exports.core_output_len(),
+      this.#exports.core_output_ptr() >>> 0,
+      this.#exports.core_output_len() >>> 0,
     ).slice();
   }
 
@@ -324,7 +329,7 @@ export class Core {
 
   setState(state: State): void {
     const input = captureState(state);
-    const pointer = this.#exports.core_input(this.#layout.size);
+    const pointer = this.#exports.core_input(this.#layout.size) >>> 0;
     const view = new DataView(this.#exports.memory.buffer, pointer, this.#layout.size);
     for (let index = 0; index < 16; index++) {
       view.setBigUint64(this.#layout.registers + index * 8, input.registers[index]!, true);
@@ -489,7 +494,7 @@ export class Core {
   writeOwnedMemory(address: bigint, input: Uint8Array): void {
     // The host copies caller bytes before its final lifecycle check.
     unsigned64(address, 'address');
-    const pointer = this.#exports.core_input(input.length);
+    const pointer = this.#exports.core_input(input.length) >>> 0;
     new Uint8Array(this.#exports.memory.buffer, pointer, input.length).set(input);
     if (this.#exports.core_write_memory(address) !== 0)
       throw new RangeError(JSON.stringify(this.info()));
