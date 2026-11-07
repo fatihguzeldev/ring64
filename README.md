@@ -13,6 +13,19 @@ npm run check
 
 browser tests use installed chrome on macos. elsewhere, run `npx playwright install chromium` or set `RING64_BROWSER` to a browser executable.
 
+## performance
+
+after building, run the checked synthetic kernels in node or chrome:
+
+```sh
+npm run bench
+npm run bench -- --browser
+```
+
+`--baseline /path/to/built/checkout` compares two builds with alternating sample order. `--iterations`, `--samples` and `--workloads` select the workload; `--help` lists the kernels. each sample checks registers, defined flags, XMM, MXCSR, memory, budgets and translation counts. JSON results in `build/verification` include build hashes, environment, first and later samples, phase timings and generated-code sizes.
+
+timings exclude state setup and output checks. they include `run()` and its state snapshots; FP kernels also include the reset and loop instructions recorded in the results. throughput counts those guest instructions, or completed elements for REP. the budget-one kernel times each call separately and also records the elapsed wall time. these kernels measure private-memory long64 execution, not application performance or native CPU parity. CI runs a small sample to check the kernels; use longer local runs for timings.
+
 ## use
 
 after `npm run build`, this node example executes one guest instruction. the same host module works in a browser with fetched compiler bytes. the runtime must support BigInt and standard fixed128 WebAssembly SIMD, including for scalar guests. `createCpu` checks SIMD support before allocating its Core and rejects unsupported runtimes with `TypeError`.
