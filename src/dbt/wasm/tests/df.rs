@@ -230,3 +230,44 @@ fn inherited_memory_faults_and_retained_entries_preserve_direction() {
     ));
     run_cases(cases);
 }
+
+#[test]
+fn direction_updates_and_status_transfers_merge_the_current_imported_direction() {
+    let mut cases = Vec::new();
+    for (code, flags, result_flags, accumulator, budget) in [
+        (vec![0xfc, 0x9f, 0x9e], 0xcd7, 0x8d7, 0x112233445566d788, 3),
+        (vec![0xfd, 0x9f, 0x9e], 0x8d7, 0xcd7, 0x112233445566d788, 3),
+        (vec![0xfd, 0x31, 0xc0, 0xfc], 0x8d7, 0x46, 0, 3),
+        (vec![0xfc, 0x31, 0xc0, 0xfd], 0xcd7, 0x446, 0, 3),
+    ] {
+        let artifact = compiled_fixture(0x1000, &code, 0x1000);
+        cases.push(execution_case(
+            &artifact.bytes,
+            &artifact.entries,
+            &[(0, 0x1122334455660088)],
+            flags,
+            0x1000,
+            budget,
+            (
+                &[(0, accumulator)],
+                result_flags,
+                0x1000 + code.len() as u64,
+                1,
+                0,
+            ),
+        ));
+    }
+    let artifact = compiled_fixture(0x1000, &[0xfd, 0x31, 0xc0, 0xfc], 0x1000);
+    for flags in [0x8d7, 0xcd7] {
+        cases.push(execution_case(
+            &artifact.bytes,
+            &artifact.entries,
+            &[],
+            flags,
+            0x1003,
+            1,
+            (&[], 0x8d7, 0x1004, 1, 0),
+        ));
+    }
+    run_cases(cases);
+}
