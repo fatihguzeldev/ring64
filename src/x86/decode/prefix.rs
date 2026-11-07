@@ -14,6 +14,8 @@ pub(super) struct Prefixes {
     pub(super) operand_override: bool,
     pub(super) address_override: bool,
     pub(super) segment_override: Option<Segment>,
+    pub(super) repeat: Option<u8>,
+    pub(super) lock: bool,
     pub(super) long64: bool,
     pub(super) mode: Mode,
     default32: bool,
@@ -109,6 +111,8 @@ where
         operand_override: false,
         address_override: false,
         segment_override: None,
+        repeat: None,
+        lock: false,
         long64: context.is_long64(),
         mode: context.mode(),
         default32: context.code32(),
@@ -144,7 +148,20 @@ where
                     present: true,
                 };
             }
-            0xf0 | 0xf2 | 0xf3 => return Err(DecodeError::Unsupported),
+            0xf0 => {
+                if prefixes.lock || prefixes.repeat.is_some() {
+                    return Err(DecodeError::Unsupported);
+                }
+                prefixes.lock = true;
+                prefixes.rex = Rex::default();
+            }
+            0xf2 | 0xf3 => {
+                if prefixes.lock {
+                    return Err(DecodeError::Unsupported);
+                }
+                prefixes.repeat = Some(byte);
+                prefixes.rex = Rex::default();
+            }
             _ => return Ok((prefixes, byte)),
         }
     }

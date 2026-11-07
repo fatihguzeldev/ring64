@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn source_ranges_retain_exact_guest_bytes_without_baking_future_diagnostics() {
-        let mut bytes = vec![0xa5; 32];
+        let mut bytes = vec![0xf4; 32];
         bytes[..2].copy_from_slice(&[0xeb, 14]);
         bytes[16..21].copy_from_slice(&[0xb8, 1, 0, 0, 0]);
         let unit = discover(&image(&bytes), 0x1000, limits()).unwrap();
@@ -301,7 +301,7 @@ mod tests {
         );
 
         let overlapping = discover(
-            &image(&[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0, 0xa5]),
+            &image(&[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0, 0xf4]),
             0x1000,
             limits(),
         )

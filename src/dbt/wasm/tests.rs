@@ -12,6 +12,7 @@ mod mode_context;
 mod multiply_divide;
 mod routing;
 mod stack;
+mod strings;
 
 use super::*;
 use crate::embedding::layout::RunState;
@@ -454,6 +455,7 @@ for (const [index,c] of cases.entries()) {
  const memory=new WebAssembly.Memory({initial:1}); const d=new DataView(memory.buffer);
  c.registers.forEach((v,i)=>d.setBigUint64(l.registers+8*i,BigInt('0x'+v),true));
  d.setBigUint64(l.flags,BigInt('0x'+c.flags),true); d.setBigUint64(l.rip,BigInt('0x'+c.pc),true);
+ if(c.repeatBudget!==undefined)d.setBigUint64(l.repeatRemaining,BigInt(c.repeatBudget),true);
  let accessIndex=0;
  const access=(kind,args)=>{
   const expected=c.accesses?.[accessIndex++];assert(expected,'unexpected '+kind+' import');
@@ -482,7 +484,8 @@ for (const [index,c] of cases.entries()) {
   assert.equal(flags&2n,2n,'reserved flag bit '+index);
   return {registers:Array.from({length:16},(_,i)=>d.getBigUint64(l.registers+8*i,true).toString(16)),
    flags:flags.toString(16),pc:d.getBigUint64(l.rip,true).toString(16),
-   reason,remaining:d.getBigUint64(l.remaining,true).toString()};
+   reason,remaining:d.getBigUint64(l.remaining,true).toString(),
+   ...(c.repeatBudget===undefined?{}:{repeatRemaining:d.getBigUint64(l.repeatRemaining,true).toString()})};
  };
  const entryIndex=c.entries.indexOf(c.pc);assert(entryIndex>=0,'entry must belong to the artifact');
  const reason=instance.exports.run(0,BigInt(c.budget),BigInt('0x'+(c.stop??'0')),c.stop===undefined?0:1,entryIndex);

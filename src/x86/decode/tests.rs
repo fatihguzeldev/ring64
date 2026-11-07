@@ -15,6 +15,7 @@ mod modes;
 mod multiply_divide;
 mod scalar_data;
 mod stack;
+mod strings;
 
 fn missing(address: u64) -> Fault {
     Fault {

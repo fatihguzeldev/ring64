@@ -742,9 +742,6 @@ fn bit_family_exclusions_stop_at_the_deciding_prefix_or_selector() {
         }
     }
     for bytes in [
-        &[0xf3][..],
-        &[0x66, 0xf3][..],
-        &[0x48, 0xf3][..],
         &[0xf0, 0x0f, 0xab][..],
         &[0xf3, 0x0f, 0xbc][..],
         &[0xf3, 0x0f, 0xbd][..],

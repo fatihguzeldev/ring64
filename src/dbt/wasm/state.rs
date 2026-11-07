@@ -1,4 +1,4 @@
-use super::{Emitter, FLAGS, GPR, REMAINING, RIP};
+use super::{Emitter, FLAGS, GPR, REMAINING, REPEAT_REMAINING, RIP};
 use crate::embedding::layout::RunState;
 use std::mem::{offset_of, size_of};
 use wasm_encoder::{Instruction as Op, MemArg};
@@ -29,6 +29,11 @@ impl Emitter {
                 .op(Op::LocalSet(local));
         }
         self.op(Op::LocalGet(1)).op(Op::LocalSet(REMAINING));
+        if self.has_repeat {
+            self.op(Op::LocalGet(0))
+                .op(Op::I64Load(memory(offset_of!(RunState, repeat_remaining))))
+                .op(Op::LocalSet(REPEAT_REMAINING));
+        }
     }
 
     pub(super) fn publish_state(&mut self) {
@@ -47,6 +52,11 @@ impl Emitter {
             self.op(Op::LocalGet(0))
                 .op(Op::LocalGet(local))
                 .op(Op::I64Store(memory(offset)));
+        }
+        if self.has_repeat {
+            self.op(Op::LocalGet(0))
+                .op(Op::LocalGet(REPEAT_REMAINING))
+                .op(Op::I64Store(memory(offset_of!(RunState, repeat_remaining))));
         }
     }
 }

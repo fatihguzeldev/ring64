@@ -1,7 +1,8 @@
 use crate::x86::context::{Mode, Segment};
 use crate::x86::instruction::{
     Address, AddressBase, Alu, Bit, BitIndex, Carry, Condition, Count, DataOperand, DoubleShift,
-    Location, MemoryAluOperands, Operand, Operation, RegisterView, Shift, Unary, Width,
+    Location, MemoryAluOperands, Operand, Operation, RegisterView, Repeat, Shift, StringKind,
+    Unary, Width,
 };
 
 use super::{DecodeError, cursor::Cursor, operand::ModRm, prefix::Prefixes};
@@ -14,11 +15,49 @@ pub(super) fn refine<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    let string_kind = match opcode {
+        0xa4 | 0xa5 => Some(StringKind::Movs),
+        0xaa | 0xab => Some(StringKind::Stos),
+        0xac | 0xad => Some(StringKind::Lods),
+        0xa6 | 0xa7 => Some(StringKind::Cmps),
+        0xae | 0xaf => Some(StringKind::Scas),
+        _ => None,
+    };
+    if prefixes.lock {
+        return Err(if string_kind.is_some() || matches!(opcode, 0xfc | 0xfd) {
+            DecodeError::Invalid
+        } else {
+            DecodeError::Unsupported
+        });
+    }
+    if let Some(kind) = string_kind {
+        let comparison = matches!(kind, StringKind::Cmps | StringKind::Scas);
+        let repeat = match prefixes.repeat {
+            None => Repeat::None,
+            Some(0xf3) if comparison => Repeat::WhileEqual,
+            Some(0xf2) if comparison => Repeat::WhileNotEqual,
+            Some(0xf3) => Repeat::Count,
+            _ => return Err(DecodeError::Unsupported),
+        };
+        return Ok(Operation::String {
+            kind,
+            width: byte_or_wide(opcode, prefixes.width()),
+            address_width: prefixes.address_width(),
+            source_segment: prefixes.segment_override.unwrap_or(Segment::Ds),
+            repeat,
+        });
+    }
+    if prefixes.repeat.is_some() {
+        return Err(DecodeError::Unsupported);
+    }
     let rex = prefixes.rex;
     let wide = prefixes.width();
     let stack_width = prefixes.stack_width();
     let near_width = prefixes.near_width();
     match opcode {
+        0xfc | 0xfd => Ok(Operation::Direction {
+            set: opcode == 0xfd,
+        }),
         0x50..=0x57 => Ok(Operation::Push {
             src: Operand::Register((opcode - 0x50) | rex.base_extension()),
             width: stack_width,

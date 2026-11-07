@@ -153,6 +153,23 @@ pub enum Carry {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StringKind {
+    Movs,
+    Stos,
+    Lods,
+    Cmps,
+    Scas,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Repeat {
+    None,
+    Count,
+    WhileEqual,
+    WhileNotEqual,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Count {
     Immediate(u8),
     Cl,
@@ -223,6 +240,16 @@ pub enum Condition {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
+    Direction {
+        set: bool,
+    },
+    String {
+        kind: StringKind,
+        width: Width,
+        address_width: Width,
+        source_segment: Segment,
+        repeat: Repeat,
+    },
     Mov {
         dst: RegisterView,
         src: DataOperand,

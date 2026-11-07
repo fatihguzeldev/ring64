@@ -58,6 +58,9 @@ impl Emitter {
     }
 
     fn memory_failure(&mut self, exit_depth: u32) {
+        if self.restore_string_flags {
+            self.restore_repeat_flags();
+        }
         if let Some(reason) = self.access_reason {
             self.op(Op::Call(reason))
                 .op(Op::LocalSet(REASON))

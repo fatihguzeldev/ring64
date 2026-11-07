@@ -331,7 +331,7 @@ fn excluded_group_one_still_stops_before_every_hypothetical_address_tail() {
 }
 
 #[test]
-fn new_forms_keep_unsupported_prefix_frontiers_without_requesting_an_opcode() {
+fn new_forms_reject_unsupported_prefixes_after_opcode_before_operands() {
     for prefix in [&[0xf0][..], &[0xf2][..], &[0xf3][..]] {
         for suffix in [
             &[0xf6, 0xe4][..],
@@ -343,13 +343,13 @@ fn new_forms_keep_unsupported_prefix_frontiers_without_requesting_an_opcode() {
             assert_eq!(
                 decode(0x1000, |address| {
                     reads.push(address);
-                    assert!(address < 0x1000 + prefix.len() as u64);
+                    assert!(address <= 0x1000 + prefix.len() as u64);
                     Ok(bytes[(address - 0x1000) as usize])
                 }),
                 Err(DecodeError::Unsupported),
                 "{bytes:02x?}"
             );
-            assert_eq!(reads.len(), prefix.len());
+            assert_eq!(reads.len(), prefix.len() + 1);
         }
     }
 }

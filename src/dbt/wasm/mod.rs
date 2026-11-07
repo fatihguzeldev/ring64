@@ -9,6 +9,7 @@ mod memory;
 mod multiply_divide;
 mod stack;
 mod state;
+mod strings;
 mod unary;
 
 use std::collections::BTreeMap;
@@ -20,7 +21,7 @@ use wasm_encoder::{
 use super::unit::Unit;
 use crate::embedding::layout::DISPATCH;
 use crate::x86::context::{ExecutionContext, Segment};
-use crate::x86::instruction::{Location, MemoryAluOperands, Operation};
+use crate::x86::instruction::{Location, MemoryAluOperands, Operation, Repeat};
 
 const ENTRY_INDEX: u32 = 4;
 const GPR: u32 = 5;
@@ -35,6 +36,8 @@ const RESULT: u32 = 28;
 const ADDRESS: u32 = 29;
 const VALUE: u32 = 30;
 const STORE_STATUS: u32 = 31;
+const REPEAT_REMAINING: u32 = 32;
+const ENTRY_FLAGS: u32 = 33;
 
 struct Emitter {
     body: Function,
@@ -45,6 +48,8 @@ struct Emitter {
     divide: Option<u32>,
     divide_failed: Option<u32>,
     stores: bool,
+    has_repeat: bool,
+    restore_string_flags: bool,
     context: ExecutionContext,
     segment: Segment,
     access_reason: Option<u32>,
@@ -59,6 +64,9 @@ impl Emitter {
 }
 
 pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
+    let has_repeat = unit.instructions.iter().any(|i| {
+        matches!(i.operation, Operation::String { repeat, .. } if repeat != Repeat::None)
+    });
     let dynamic_targets = unit.instructions.iter().any(|i| {
         matches!(
             i.operation,
@@ -245,6 +253,15 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     }
     let mut exports = ExportSection::new();
     exports.export("run", ExportKind::Func, run_index);
+    let mut locals = vec![
+        (19, ValType::I64),
+        (2, ValType::I32),
+        (5, ValType::I64),
+        (1, ValType::I32),
+    ];
+    if has_repeat {
+        locals.push((2, ValType::I64));
+    }
     let mut emitter = Emitter {
         current_index: 0,
         entry_lookup: dynamic_targets.then_some(run_index + 1),
@@ -252,16 +269,13 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         divide,
         divide_failed,
         stores: false,
+        has_repeat,
+        restore_string_flags: false,
         context: unit.context.clone(),
         segment: Segment::Ds,
         access_reason,
         target_check,
-        body: Function::new([
-            (19, ValType::I64),
-            (2, ValType::I32),
-            (5, ValType::I64),
-            (1, ValType::I32),
-        ]),
+        body: Function::new(locals),
         entries: unit
             .instructions
             .iter()
@@ -297,6 +311,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             .op(Op::LocalSet(RIP));
         emitter.gates(exit_depth);
         match instruction.operation {
+            Operation::Direction { set } => emitter.direction(set),
+            Operation::String { kind, width, address_width, source_segment, repeat } => {
+                emitter.string(kind, (width, address_width), source_segment, repeat, exit_depth);
+            }
             Operation::Mov { dst, src, width } => {
                 emitter.data_operand(src, width);
                 emitter.write_register(dst, width);
