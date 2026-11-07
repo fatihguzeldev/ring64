@@ -1,4 +1,6 @@
-use super::{ADDRESS, ENTRY_FLAGS, Emitter, FLAGS, LHS, REPEAT_REMAINING, RESULT, RHS, STORE_STATUS, VALUE};
+use super::{
+    ADDRESS, ENTRY_FLAGS, Emitter, FLAGS, LHS, REPEAT_REMAINING, RESULT, RHS, STORE_STATUS, VALUE,
+};
 use crate::embedding::layout::{DISPATCH, REPEAT_BUDGET};
 use crate::x86::context::Segment;
 use crate::x86::instruction::{Address, AddressBase, Alu, RegisterView, Repeat, StringKind, Width};
@@ -131,12 +133,15 @@ impl Emitter {
     }
 
     fn string_address(&mut self, register: u8, size: Width, segment: Segment) {
-        self.address(Address {
-            base: AddressBase::Register(register),
-            size,
-            segment,
-            ..Address::default()
-        }, 0);
+        self.address(
+            Address {
+                base: AddressBase::Register(register),
+                size,
+                segment,
+                ..Address::default()
+            },
+            0,
+        );
         self.op(Op::LocalSet(ADDRESS));
     }
 
@@ -147,8 +152,7 @@ impl Emitter {
             .op(Op::LocalGet(FLAGS))
             .op(Op::I64Const(0x400))
             .op(Op::I64And)
-            .op(Op::I64Eqz)
-            .op(Op::I32Eqz)
+            .op(Op::I32WrapI64)
             .op(Op::Select)
             .op(Op::I64Add);
         self.narrow(address_width);
