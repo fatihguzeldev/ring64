@@ -18,6 +18,7 @@ mod near_control;
 mod scalar_data;
 mod stack;
 mod strings;
+mod vectors;
 
 fn missing(address: u64) -> Fault {
     Fault {

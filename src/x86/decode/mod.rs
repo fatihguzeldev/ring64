@@ -7,6 +7,7 @@ mod cursor;
 mod opcode;
 mod operand;
 mod prefix;
+mod vector;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {

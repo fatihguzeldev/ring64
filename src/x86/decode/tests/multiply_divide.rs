@@ -341,7 +341,7 @@ fn new_forms_reject_unsupported_prefixes_after_opcode_before_operands() {
             let bytes = [prefix, suffix].concat();
             let mut reads = Vec::new();
             let required = prefix.len()
-                + usize::from(prefix == [0xf0] && matches!(suffix[0], 0xf6 | 0x0f))
+                + usize::from(suffix[0] == 0x0f || prefix == [0xf0] && suffix[0] == 0xf6)
                 + 1;
             assert_eq!(
                 decode(0x1000, |address| {

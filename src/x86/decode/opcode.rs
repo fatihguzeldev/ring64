@@ -102,6 +102,9 @@ where
             repeat,
         });
     }
+    if opcode == 0x0f {
+        return two_byte(cursor.byte()?, prefixes, cursor);
+    }
     if prefixes.repeat.is_some() {
         return Err(DecodeError::Unsupported);
     }
@@ -520,7 +523,6 @@ where
             signed: true,
         }),
         0x99 => Ok(Operation::SignHigh { width: wide }),
-        0x0f => two_byte(cursor.byte()?, prefixes, cursor),
         0xeb | 0xe9 | 0x70..=0x7f => branch(opcode, prefixes, cursor),
         _ => Err(DecodeError::Unsupported),
     }
@@ -594,6 +596,12 @@ fn two_byte<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if let Some(result) = super::vector::refine(opcode, prefixes, cursor) {
+        return result.map(Operation::Vector);
+    }
+    if prefixes.repeat.is_some() {
+        return Err(DecodeError::Unsupported);
+    }
     let rex = prefixes.rex;
     let width = prefixes.width();
     if prefixes.lock

@@ -225,7 +225,6 @@ fn string_prefix_failures_distinguish_invalid_unsupported_fetch_and_length() {
         &[0xf3, 0xfc][..],
         &[0xf2, 0xfd][..],
         &[0xf3, 0x8b][..],
-        &[0xf2, 0x0f][..],
         &[0xf3, 0x6c][..],
         &[0xf3, 0x6f][..],
     ] {
@@ -236,6 +235,7 @@ fn string_prefix_failures_distinguish_invalid_unsupported_fetch_and_length() {
         &[0x48, 0xf2][..],
         &[0xf0][..],
         &[0xf3, 0x64][..],
+        &[0xf2, 0x0f][..],
     ] {
         assert_eq!(
             at(0x1000, bytes),
