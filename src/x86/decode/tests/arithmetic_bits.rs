@@ -157,18 +157,26 @@ fn ff_selects_transfer_family_before_requesting_unsupported_address_tails() {
             for mode in 0..4 {
                 let mut bytes = prefix.to_vec();
                 bytes.extend([0xff, (mode << 6) | (selector << 3) | 4]);
-                if mode == 3 && matches!(selector, 2 | 4) {
-                    let decoded = at(0x1000, &bytes).unwrap();
-                    assert!(matches!(
-                        decoded.operation,
-                        Operation::Call {
-                            width: Width::W64,
-                            ..
-                        } | Operation::JumpRegister {
-                            width: Width::W64,
-                            ..
-                        }
-                    ));
+                if matches!(selector, 2 | 4 | 6) {
+                    if mode == 3 {
+                        let decoded = at(0x1000, &bytes).unwrap();
+                        assert!(matches!(
+                            decoded.operation,
+                            Operation::Call {
+                                width: Width::W64,
+                                ..
+                            } | Operation::JumpRegister {
+                                width: Width::W64,
+                                ..
+                            } | Operation::Push { .. }
+                        ));
+                    } else {
+                        assert_eq!(
+                            at(0x1000, &bytes),
+                            Err(DecodeError::Fetch(missing(0x1000 + bytes.len() as u64))),
+                            "{bytes:02x?}"
+                        );
+                    }
                 } else {
                     assert_eq!(
                         at(0x1000, &bytes),

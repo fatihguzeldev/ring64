@@ -1,13 +1,29 @@
 use crate::x86::context::{Mode, Segment};
 use crate::x86::instruction::{
-    Address, AddressBase, Alu, Bit, BitIndex, Carry, Condition, Count, DataOperand, DoubleShift,
-    Location, MemoryAluOperands, Operand, Operation, RegisterView, Repeat, Shift, StringKind,
-    Unary, Width,
+    Address, AddressBase, Alu, Bit, BitIndex, Carry, Condition, Count, CountCondition, DataOperand,
+    DoubleShift, Location, MemoryAluOperands, Operand, Operation, RegisterView, Repeat, Shift,
+    StringKind, Unary, Width,
 };
 
 use super::{DecodeError, cursor::Cursor, operand::ModRm, prefix::Prefixes};
 
 pub(super) fn refine<F>(
+    opcode: u8,
+    prefixes: Prefixes,
+    cursor: &mut Cursor<F>,
+) -> Result<Operation, DecodeError>
+where
+    F: FnMut(u64) -> Result<u8, DecodeError>,
+{
+    let operation = refine_inner(opcode, prefixes, cursor)?;
+    if prefixes.lock {
+        Err(DecodeError::Invalid)
+    } else {
+        Ok(operation)
+    }
+}
+
+fn refine_inner<F>(
     opcode: u8,
     prefixes: Prefixes,
     cursor: &mut Cursor<F>,
@@ -23,7 +39,9 @@ where
         0xae | 0xaf => Some(StringKind::Scas),
         _ => None,
     };
-    if prefixes.lock {
+    if prefixes.lock
+        && !matches!(opcode, 0x50..=0x5f | 0x68 | 0x6a | 0x8f | 0xc2 | 0xc3 | 0xc9 | 0xe0..=0xe3 | 0xe8 | 0xff)
+    {
         return Err(if string_kind.is_some() || matches!(opcode, 0xfc | 0xfd) {
             DecodeError::Invalid
         } else {
@@ -70,6 +88,23 @@ where
             src: Operand::Immediate(immediate(cursor, stack_width, opcode == 0x6a)?),
             width: stack_width,
         }),
+        0x8f => {
+            let operands = ModRm::read(cursor, rex)?;
+            if operands.selector != 0 {
+                return Err(DecodeError::Unsupported);
+            }
+            Ok(match operands.location(cursor, prefixes, stack_width)? {
+                Location::Register(register) => Operation::Pop {
+                    dst: register.bank,
+                    width: stack_width,
+                },
+                Location::Memory(address) => Operation::PopMemory {
+                    address,
+                    width: stack_width,
+                },
+            })
+        }
+        0xc9 => Ok(Operation::Leave { width: stack_width }),
         0x40..=0x4f => Ok(Operation::Unary {
             kind: if opcode < 0x48 {
                 Unary::Inc
@@ -103,9 +138,25 @@ where
                 width: near_width,
             })
         }
+        0xe0..=0xe3 => {
+            let displacement = i64::from(cursor.byte()? as i8);
+            Ok(Operation::CountBranch {
+                condition: match opcode {
+                    0xe0 => CountCondition::NotEqual,
+                    0xe1 => CountCondition::Equal,
+                    0xe2 => CountCondition::Always,
+                    _ => CountCondition::Zero,
+                },
+                count_width: prefixes.address_width(),
+                target: cursor.next_pc().wrapping_add(displacement as u64) & near_width.mask(),
+            })
+        }
         0xff => {
             let operands = ModRm::read(cursor, rex)?;
             if operands.selector <= 1 {
+                if prefixes.lock {
+                    return Err(DecodeError::Unsupported);
+                }
                 return Ok(Operation::Unary {
                     kind: if operands.selector == 0 {
                         Unary::Inc
@@ -116,17 +167,24 @@ where
                     width: wide,
                 });
             }
-            if operands.mode != 3 {
-                return Err(DecodeError::Unsupported);
-            }
             match operands.selector {
                 2 => Ok(Operation::Call {
-                    target: Operand::Register(operands.rm),
+                    target: stack_operand(operands.location(cursor, prefixes, near_width)?),
                     width: near_width,
                 }),
-                4 => Ok(Operation::JumpRegister {
-                    target: operands.rm,
-                    width: near_width,
+                4 => Ok(match operands.location(cursor, prefixes, near_width)? {
+                    Location::Register(register) => Operation::JumpRegister {
+                        target: register.bank,
+                        width: near_width,
+                    },
+                    Location::Memory(address) => Operation::JumpMemory {
+                        address,
+                        width: near_width,
+                    },
+                }),
+                6 => Ok(Operation::Push {
+                    src: stack_operand(operands.location(cursor, prefixes, stack_width)?),
+                    width: stack_width,
                 }),
                 _ => Err(DecodeError::Unsupported),
             }
@@ -595,6 +653,13 @@ where
         }
         0x80..=0x8f => branch(opcode, prefixes, cursor),
         _ => Err(DecodeError::Unsupported),
+    }
+}
+
+fn stack_operand(location: Location) -> Operand {
+    match location {
+        Location::Register(register) => Operand::Register(register.bank),
+        Location::Memory(address) => Operand::Memory(address),
     }
 }
 

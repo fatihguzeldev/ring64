@@ -13,6 +13,7 @@ mod integer_memory;
 mod logical;
 mod modes;
 mod multiply_divide;
+mod near_control;
 mod scalar_data;
 mod stack;
 mod strings;

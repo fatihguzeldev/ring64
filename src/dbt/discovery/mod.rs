@@ -231,6 +231,34 @@ mod tests {
     }
 
     #[test]
+    fn memory_transfers_never_discover_data_targets_and_count_branches_have_two_edges() {
+        let call = discover(&image(&[0xff, 0x10, 0xc3, 0xf4, 0xf5]), 0x1000, limits()).unwrap();
+        assert_eq!(
+            call.instructions.iter().map(|i| i.pc).collect::<Vec<_>>(),
+            [0x1000, 0x1002]
+        );
+        assert_eq!(call.source_bytes, 3);
+        assert_eq!(call.block_count, 2);
+        let jump = discover(&image(&[0xff, 0x20, 0xf5]), 0x1000, limits()).unwrap();
+        assert_eq!(jump.instructions.len(), 1);
+        assert_eq!(jump.source_bytes, 2);
+        for opcode in 0xe0..=0xe3 {
+            let branch = discover(
+                &image(&[opcode, 2, 0xf5, 0xf4, 0xf5, 0xf4]),
+                0x1000,
+                limits(),
+            )
+            .unwrap();
+            assert_eq!(
+                branch.instructions.iter().map(|i| i.pc).collect::<Vec<_>>(),
+                [0x1000, 0x1002, 0x1004]
+            );
+            assert_eq!(branch.source_bytes, 4);
+            assert_eq!(branch.block_count, 3);
+        }
+    }
+
+    #[test]
     fn discovers_loop_and_fallthrough_without_executing_future_failure() {
         let code = image(&[
             0xb8, 0, 0, 0, 0, 0xb9, 3, 0, 0, 0, 0x48, 0x01, 0xc8, 0x48, 0x83, 0xe9, 1, 0x75, 0xf7,

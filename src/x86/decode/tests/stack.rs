@@ -377,7 +377,7 @@ fn unsupported_ff_forms_stop_at_modrm_without_fetching_an_address() {
     for prefix in std::iter::once(None).chain((0x40..=0x4f).map(Some)) {
         for modrm in 0..=255 {
             let selector = (modrm >> 3) & 7;
-            if selector <= 1 || (modrm >> 6 == 3 && matches!(selector, 2 | 4)) {
+            if matches!(selector, 0 | 1 | 2 | 4 | 6) {
                 continue;
             }
             let mut bytes: Vec<_> = prefix.into_iter().collect();
@@ -399,25 +399,27 @@ fn unsupported_ff_forms_stop_at_modrm_without_fetching_an_address() {
 }
 
 #[test]
-fn alternate_pop_encodings_remain_unsupported_without_a_modrm_fetch() {
+fn alternate_pop_requires_modrm_and_preserves_unknown_selector_frontiers() {
     for prefix in std::iter::once(None).chain((0x40..=0x4f).map(Some)) {
         let mut bytes: Vec<_> = prefix.into_iter().collect();
         bytes.push(0x8f);
-        let pc = u64::MAX - bytes.len() as u64 + 1;
-        assert_eq!(at(pc, &bytes), Err(DecodeError::Unsupported));
-        bytes.push(0xc4);
+        assert_eq!(
+            at(0x1000, &bytes),
+            Err(DecodeError::Fetch(missing(0x1000 + bytes.len() as u64)))
+        );
+        bytes.push(0xcc);
         let mut reads = Vec::new();
         let decoded = decode::decode(0x1000, |address| {
             reads.push(address);
             Ok(bytes[(address - 0x1000) as usize])
         });
         assert_eq!(decoded, Err(DecodeError::Unsupported));
-        assert_eq!(reads.len(), bytes.len() - 1);
+        assert_eq!(reads.len(), bytes.len());
     }
 }
 
 #[test]
-fn stack_and_branches_admit_ignored_prefixes_and_keep_lock_rep_unsupported() {
+fn stack_and_branches_admit_ignored_prefixes_and_reject_lock_rep() {
     for tail in [
         &[0x50][..],
         &[0x58][..],
@@ -432,7 +434,14 @@ fn stack_and_branches_admit_ignored_prefixes_and_keep_lock_rep_unsupported() {
         for prefix in [0xf0, 0xf2, 0xf3] {
             let mut bytes = vec![prefix, 0x4f];
             bytes.extend_from_slice(tail);
-            assert_eq!(at(0x1000, &bytes), Err(DecodeError::Unsupported));
+            assert_eq!(
+                at(0x1000, &bytes),
+                Err(if prefix == 0xf0 {
+                    DecodeError::Invalid
+                } else {
+                    DecodeError::Unsupported
+                })
+            );
         }
         let mut bytes = vec![0x48, 0x4f];
         bytes.extend_from_slice(tail);
