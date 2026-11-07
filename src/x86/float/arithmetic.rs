@@ -38,7 +38,9 @@ fn flags<S: Semantics, W: Semantics>(
     mxcsr: u32,
 ) -> (u64, u32) {
     let mut value = bounded.value.to_bits() as u64;
-    let overflow = bounded.status.contains(Status::OVERFLOW);
+    let overflow = wide.value.is_finite()
+        && !wide.value.is_zero()
+        && wide.value.ilogb() > IeeeFloat::<S>::MAX_EXP;
     let tiny = !wide.value.is_zero()
         && wide.value.is_finite()
         && wide.value.ilogb() < IeeeFloat::<S>::MIN_EXP;

@@ -176,3 +176,9 @@ pub fn eval(op: Op, left: u128, right: u128, mxcsr: u32) -> Outcome {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod packets;
+
+#[cfg(test)]
+mod native_reference;
