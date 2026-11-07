@@ -64,9 +64,10 @@ impl Emitter {
 }
 
 pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
-    let has_repeat = unit.instructions.iter().any(|i| {
-        matches!(i.operation, Operation::String { repeat, .. } if repeat != Repeat::None)
-    });
+    let has_repeat = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::String { repeat, .. } if repeat != Repeat::None));
     let dynamic_targets = unit.instructions.iter().any(|i| {
         matches!(
             i.operation,
@@ -312,8 +313,20 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         emitter.gates(exit_depth);
         match instruction.operation {
             Operation::Direction { set } => emitter.direction(set),
-            Operation::String { kind, width, address_width, source_segment, repeat } => {
-                emitter.string(kind, (width, address_width), source_segment, repeat, exit_depth);
+            Operation::String {
+                kind,
+                width,
+                address_width,
+                source_segment,
+                repeat,
+            } => {
+                emitter.string(
+                    kind,
+                    (width, address_width),
+                    source_segment,
+                    repeat,
+                    exit_depth,
+                );
             }
             Operation::Mov { dst, src, width } => {
                 emitter.data_operand(src, width);
