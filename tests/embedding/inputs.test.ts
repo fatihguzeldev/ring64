@@ -275,3 +275,81 @@ test('a run started while copying a memory input rejects the overlapping write',
     cpu.dispose();
   }
 });
+
+test('run options capture each getter once before applying instruction and repetition limits', async () => {
+  const cpu = await createCpu(options());
+  const reads = { budget: 0, stop: 0, repeatBudget: 0 };
+  try {
+    const result = await cpu.run({
+      get budget() {
+        return ++reads.budget === 1 ? 1n : -1n;
+      },
+      get stop() {
+        reads.stop++;
+        return CODE + 5n;
+      },
+      get repeatBudget() {
+        return ++reads.repeatBudget === 1 ? 0n : -1n;
+      },
+    });
+    assert.deepEqual(reads, { budget: 1, stop: 1, repeatBudget: 1 });
+    assert.equal(result.reason, 'budget');
+    assert.equal(result.retired, 1n);
+    assert.equal(result.repeatIterations, 0n);
+    assert.equal(result.remainingRepeatBudget, 0n);
+    assert.equal(result.state.rip, CODE + 5n);
+  } finally {
+    cpu.dispose();
+  }
+});
+
+for (const field of ['budget', 'stop', 'repeatBudget'] as const) {
+  test(`a nested run from the ${field} getter rejects the outer run without losing nested state`, async () => {
+    const cpu = await createCpu(options());
+    let pending: Promise<RunResult> | undefined;
+    const input = { budget: 0n, stop: CODE + 5n, repeatBudget: 0n };
+    Object.defineProperty(input, field, {
+      get() {
+        pending = cpu.run({ budget: 1n, repeatBudget: 0n });
+        return field === 'stop' ? CODE + 5n : 0n;
+      },
+    });
+    try {
+      await assert.rejects(cpu.run(input), /running/);
+      assert.ok(pending);
+      const result = await pending;
+      assert.equal(result.reason, 'budget');
+      assert.equal(result.retired, 1n);
+      assert.equal(result.state.registers[0], 1n);
+      assert.equal(result.state.rip, CODE + 5n);
+      assert.deepEqual(cpu.readState(), result.state);
+    } finally {
+      await pending;
+      cpu.dispose();
+    }
+  });
+}
+
+test('invalid outer run input preserves successful nested state and memory writes', async () => {
+  const cpu = await createCpu(options());
+  const nestedState = state();
+  nestedState.registers[7] = 0x1234n;
+  try {
+    await assert.rejects(
+      cpu.run({
+        budget: 0n,
+        get repeatBudget() {
+          cpu.setState(nestedState);
+          cpu.writeMemory(RAM, Uint8Array.of(9, 8, 7, 6));
+          return -1n;
+        },
+      }),
+      /repeatBudget must be an unsigned 64-bit bigint/,
+    );
+    assert.deepEqual(cpu.readState(), nestedState);
+    assert.deepEqual(cpu.readMemory(RAM, 4), Uint8Array.of(9, 8, 7, 6));
+    assert.equal((await cpu.run({ budget: 1n, repeatBudget: 0n })).retired, 1n);
+  } finally {
+    cpu.dispose();
+  }
+});

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { createCpu } from '../../host/index.js';
+import { Core, type GeneratedRun } from '../../host/core.js';
 import { LIMITS, initial } from '../support/fixture.js';
 
 const compiler = await WebAssembly.compile(
@@ -56,11 +57,12 @@ async function fixture(
       initializationError
         ? { error: 'fixture initialization rejected' }
         : {
-            size: 168,
+            size: 176,
             registers: 0,
             flags: 128,
             rip: 136,
             remaining: 144,
+            repeatRemaining: 168,
             reasons: ['dispatch', 'budget', 'stop'],
           },
     ),
@@ -86,13 +88,13 @@ async function fixture(
   ];
   const bodies = exports.map((name) => {
     let instructions = constant(values[name] ?? 0);
-    if (name === 'core_import_state') instructions = copy(state, imported, 168);
+    if (name === 'core_import_state') instructions = copy(state, imported, 176);
     if (name === 'core_write_memory') instructions = copy(output, imported, 4);
     if (name === 'core_input' && high === 'later-input') {
       instructions = [
         0x20,
         0,
-        ...constant(168),
+        ...constant(176),
         0x46,
         0x20,
         0,
@@ -184,4 +186,69 @@ test('initialization errors are decoded from unsigned high wasm32 info pointers'
     name: 'TypeError',
     message: 'fixture initialization rejected',
   });
+});
+
+test('native entry seeds repetition transport without changing the generated five-argument ABI', async () => {
+  const input = options(await fixture('state'));
+  const core = await Core.create(input.compiler, {
+    ...input.memory,
+    entry: input.entry,
+    memoryLimits: input.memoryLimits,
+  });
+  // Literal generated probe copies repeat_remaining to RAX and its budget argument to remaining.
+  const body = [
+    0,
+    0x20,
+    0,
+    0x20,
+    0,
+    0x29,
+    3,
+    ...unsigned(168),
+    0x37,
+    3,
+    0,
+    0x20,
+    0,
+    0x20,
+    1,
+    0x37,
+    3,
+    ...unsigned(144),
+    ...constant(1),
+    0x0b,
+  ];
+  const module = await WebAssembly.compile(
+    new Uint8Array([
+      0,
+      97,
+      115,
+      109,
+      1,
+      0,
+      0,
+      0,
+      ...section(1, [1, 0x60, 5, 0x7f, 0x7e, 0x7e, 0x7f, 0x7f, 1, 0x7f]),
+      ...section(2, [1, ...text('env'), ...text('memory'), 2, 0, 0]),
+      ...section(3, [1, 0]),
+      ...section(7, [1, ...text('run'), 0, 0]),
+      ...section(10, [1, ...unsigned(body.length), ...body]),
+    ]),
+  );
+  const generated = core.instantiate(module);
+  const calls: Parameters<GeneratedRun>[] = [];
+  const run: GeneratedRun = (...args) => {
+    calls.push(args);
+    return generated(...args);
+  };
+  try {
+    for (const allowance of [(1n << 64n) - 1n, 0n, 17n]) {
+      assert.equal(core.execute(run, 3, 9n, 0x1234n, allowance), 'budget');
+      assert.equal(core.snapshot().registers[0], allowance);
+      assert.deepEqual(core.current(), { rip: 0n, remaining: 9n, repeatRemaining: allowance });
+    }
+    assert.deepEqual(calls, Array(3).fill([0x8000_1000, 9n, 0x1234n, 1, 3]));
+  } finally {
+    core.dispose();
+  }
 });

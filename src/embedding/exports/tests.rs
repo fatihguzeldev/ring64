@@ -1,5 +1,5 @@
 use super::*;
-use crate::embedding::layout::{BUDGET, DATA, DISPATCH, DIVIDE_ERROR, STOP};
+use crate::embedding::layout::{BUDGET, DATA, DISPATCH, DIVIDE_ERROR, REPEAT_BUDGET, STOP};
 
 fn initialize(code_base: u64, code: &[u8]) {
     BRIDGE.with_borrow_mut(|bridge| {
@@ -32,6 +32,7 @@ fn memory_fault_metadata_only_belongs_to_data_and_fetch_exits() {
         UNSUPPORTED,
         INVALID,
         DIVIDE_ERROR,
+        REPEAT_BUDGET,
     ] {
         assert_eq!(metadata(reason), serde_json::Value::Null, "reason {reason}");
     }
@@ -82,7 +83,15 @@ fn runtime_target_metadata_uses_each_executed_value() {
                 })
             );
         }
-        for reason in [BUDGET, STOP, RESOURCE, UNSUPPORTED, INVALID, DIVIDE_ERROR] {
+        for reason in [
+            BUDGET,
+            STOP,
+            RESOURCE,
+            UNSUPPORTED,
+            INVALID,
+            DIVIDE_ERROR,
+            REPEAT_BUDGET,
+        ] {
             assert_eq!(metadata(reason), serde_json::Value::Null);
         }
     }
@@ -130,6 +139,7 @@ fn importing_state_cannot_import_a_stale_runtime_target() {
         assert_eq!(state.flags, 0x8d7);
         assert_eq!(state.rip, 0x1000);
         assert_eq!(state.remaining, 0);
+        assert_eq!(state.repeat_remaining, 0);
         assert_eq!(state.target, 0);
     });
     assert_eq!(metadata(STOP), serde_json::Value::Null);
@@ -181,7 +191,7 @@ fn mapped_configuration() -> serde_json::Value {
 #[test]
 fn mapped_exports_register_sources_and_report_active_write_status() {
     let config = mapped_configuration();
-    let length = mapped_input(config.clone(), &[0xb8, 1, 0, 0, 0, 0xa5, 0xa5, 0xa5]);
+    let length = mapped_input(config.clone(), &[0xb8, 1, 0, 0, 0, 0xf4, 0xa5, 0xa5]);
     assert_eq!(mapped::core_init_mapped(0x1000, length), 0);
     assert_eq!(core_probe(0x1000), DISPATCH);
     assert_eq!(core_read_memory(0x1000, 1), 1);

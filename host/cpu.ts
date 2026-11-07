@@ -50,6 +50,8 @@ export interface RunResult {
   reason: string;
   retired: bigint;
   remaining: bigint;
+  repeatIterations: bigint;
+  remainingRepeatBudget: bigint;
   state: State;
   fault?: Fault;
   segmentFault?: SegmentFault;
@@ -230,10 +232,18 @@ export class Cpu {
     return this.#cache.inspect();
   }
 
-  async run({ budget, stop }: { budget: bigint; stop?: bigint }): Promise<RunResult> {
+  async run(options: {
+    budget: bigint;
+    stop?: bigint | undefined;
+    repeatBudget?: bigint | undefined;
+  }): Promise<RunResult> {
+    this.requireIdle();
+    const { budget, stop, repeatBudget: suppliedRepeatBudget } = options;
     this.requireIdle();
     unsigned64(budget, 'budget');
     if (stop !== undefined) unsigned64(stop, 'stop');
+    const repeatBudget = suppliedRepeatBudget === undefined ? budget : suppliedRepeatBudget;
+    unsigned64(repeatBudget, 'repeatBudget');
     this.#lifecycle = 'running';
     const began = performance.now();
     const resources = {
@@ -251,6 +261,7 @@ export class Cpu {
       totalMs: 0,
     };
     let remaining = budget;
+    let remainingRepeatBudget = repeatBudget;
     const finish = (reason: string): RunResult => {
       this.pruneTranslations();
       const fault = this.#engine.fault(reason);
@@ -259,6 +270,8 @@ export class Cpu {
         reason,
         retired: budget - remaining,
         remaining,
+        repeatIterations: repeatBudget - remainingRepeatBudget,
+        remainingRepeatBudget,
         state: this.#engine.snapshot(),
         ...(fault ? { fault } : {}),
         ...(segmentFault ? { segmentFault } : {}),
@@ -318,17 +331,30 @@ export class Cpu {
           }
         }
         const before = remaining;
+        const repeatBefore = remainingRepeatBudget;
         const at = performance.now();
         this.#engine.clearFault();
         this.#engine.activate(entry.artifact.metadata.owner);
-        const reason = this.#engine.execute(entry.artifact.run, entry.index, remaining, stop);
+        const reason = this.#engine.execute(
+          entry.artifact.run,
+          entry.index,
+          remaining,
+          stop,
+          remainingRepeatBudget,
+        );
         timings.executionMs += performance.now() - at;
         resources.nativeEntries++;
-        remaining = this.#engine.current().remaining;
+        const current = this.#engine.current();
+        remaining = current.remaining;
+        remainingRepeatBudget = current.repeatRemaining;
         if (
           remaining > before ||
-          (reason === 'dispatch' && remaining === before) ||
-          (reason === 'budget' && remaining !== 0n)
+          remainingRepeatBudget > repeatBefore ||
+          (reason === 'dispatch' &&
+            remaining === before &&
+            remainingRepeatBudget === repeatBefore) ||
+          (reason === 'budget' && remaining !== 0n) ||
+          (reason === 'repeat-budget' && (remainingRepeatBudget !== 0n || remaining === 0n))
         ) {
           throw new Error('generated execution violated its progress contract');
         }

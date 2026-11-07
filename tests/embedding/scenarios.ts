@@ -80,7 +80,7 @@ export function embeddingScenarios(core: WebAssembly.Module): Scenario[] {
         await using('b801000000', async (cpu) => {
           const input = initial();
           cpu.setState(input);
-          for (const flags of [0n, 0x202n, 0x402n, 1n << 64n]) {
+          for (const flags of [0n, 0x202n, 0x1002n, 1n << 64n]) {
             throws(() => cpu.setState({ ...input, flags }), 'invalid imported flags');
             state(cpu.readState(), input);
           }
@@ -97,11 +97,21 @@ export function embeddingScenarios(core: WebAssembly.Module): Scenario[] {
           for (const value of [-1n, 1n << 64n]) {
             await rejects(() => cpu.run({ budget: value }), 'out-of-range budget');
             await rejects(() => cpu.run({ budget: 1n, stop: value }), 'out-of-range stop');
+            await rejects(
+              () => cpu.run({ budget: 0n, repeatBudget: value }),
+              'out-of-range repetition allowance before budget exit',
+            );
+            await rejects(
+              () => cpu.run({ budget: 1n, stop: CODE, repeatBudget: value }),
+              'out-of-range repetition allowance before stop exit',
+            );
             state(cpu.readState(), input);
           }
           const maximum = (1n << 64n) - 1n;
           const result = await cpu.run({ budget: maximum, stop: CODE });
           exit(result, 'stop', maximum, 0n, input);
+          equal(result.repeatIterations, 0n, 'stopped repetition work');
+          equal(result.remainingRepeatBudget, maximum, 'default repetition allowance');
           equal(
             result.resources.compilations,
             0,

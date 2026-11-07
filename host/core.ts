@@ -52,6 +52,7 @@ interface Layout {
   flags: number;
   rip: number;
   remaining: number;
+  repeatRemaining: number;
   reasons: string[];
 }
 
@@ -194,7 +195,14 @@ export class Core {
     this.#exports = exports;
     this.#layout = this.info<Layout>();
     this.#statePointer = exports.core_state_ptr() >>> 0;
-    for (const name of ['size', 'registers', 'flags', 'rip', 'remaining'] as const) {
+    for (const name of [
+      'size',
+      'registers',
+      'flags',
+      'rip',
+      'remaining',
+      'repeatRemaining',
+    ] as const) {
       if (!Number.isInteger(this.#layout[name]) || this.#layout[name] < 0) {
         throw new Error('core returned an invalid transport layout');
       }
@@ -340,11 +348,12 @@ export class Core {
       throw new TypeError(this.info<{ error: string }>().error);
   }
 
-  current(): { rip: bigint; remaining: bigint } {
+  current(): { rip: bigint; remaining: bigint; repeatRemaining: bigint } {
     const view = this.stateView();
     return {
       rip: view.getBigUint64(this.#layout.rip, true),
       remaining: view.getBigUint64(this.#layout.remaining, true),
+      repeatRemaining: view.getBigUint64(this.#layout.repeatRemaining, true),
     };
   }
 
@@ -423,7 +432,14 @@ export class Core {
     return instance.exports.run as GeneratedRun;
   }
 
-  execute(run: GeneratedRun, entryIndex: number, budget: bigint, stop: bigint | undefined): string {
+  execute(
+    run: GeneratedRun,
+    entryIndex: number,
+    budget: bigint,
+    stop: bigint | undefined,
+    repeatBudget: bigint,
+  ): string {
+    this.stateView().setBigUint64(this.#layout.repeatRemaining, repeatBudget, true);
     return this.reason(
       run(this.#statePointer, budget, stop ?? 0n, stop === undefined ? 0 : 1, entryIndex),
     );
