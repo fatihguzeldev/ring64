@@ -6,6 +6,11 @@ use crate::x86::instruction::{
 
 #[derive(Clone, Copy)]
 enum Form {
+    HalfMove {
+        high: bool,
+        store: bool,
+        memory_only: bool,
+    },
     Move {
         bytes: u8,
         merge: bool,
@@ -39,6 +44,22 @@ where
         .repeat
         .or(prefixes.operand_override.then_some(0x66));
     let form = match (mandatory, opcode) {
+        (None | Some(0x66), 0x54..=0x57) => Form::Binary(match opcode {
+            0x54 => B::And,
+            0x55 => B::AndNot,
+            0x56 => B::Or,
+            _ => B::Xor,
+        }),
+        (None | Some(0x66), 0x14 | 0x15) => Form::Binary(if opcode == 0x14 {
+            B::UnpackLow(if mandatory.is_some() { W64 } else { W32 })
+        } else {
+            B::UnpackHigh(if mandatory.is_some() { W64 } else { W32 })
+        }),
+        (None | Some(0x66), 0x12 | 0x13 | 0x16 | 0x17) => Form::HalfMove {
+            high: opcode >= 0x16,
+            store: opcode & 1 != 0,
+            memory_only: mandatory.is_some() || opcode & 1 != 0,
+        },
         (None | Some(0x66), 0x10 | 0x11) => Form::Move {
             bytes: 16,
             merge: false,
@@ -188,6 +209,21 @@ where
     let operands = ModRm::read(cursor, prefixes.rex)?;
     let reg = operands.register;
     Ok(match form {
+        Form::HalfMove {
+            high,
+            store,
+            memory_only,
+        } => {
+            if memory_only && operands.mode == 3 {
+                return Err(DecodeError::Invalid);
+            }
+            V::HalfMove {
+                register: reg,
+                operand: location(&operands, prefixes, cursor)?,
+                high,
+                store,
+            }
+        }
         Form::Move {
             bytes,
             merge,

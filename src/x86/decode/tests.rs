@@ -10,6 +10,7 @@ mod addressing;
 mod arithmetic_bits;
 mod conditions;
 mod exchange;
+mod float;
 mod integer_memory;
 mod logical;
 mod modes;
@@ -568,4 +569,18 @@ fn decoding_an_instruction_does_not_probe_its_future_or_branch_target() {
     .unwrap();
     assert_eq!(instruction.operation, Operation::Jump { target: 0x1081 });
     assert_eq!(reads, [0x1000, 0x1001]);
+}
+
+#[test]
+fn selected_floating_point_and_control_encodings_are_executable() {
+    for code in [
+        &[0x0f, 0x54, 0xc1][..],
+        &[0x0f, 0x12, 0xc1],
+        &[0x66, 0x0f, 0x16, 0x00],
+        &[0x0f, 0xae, 0x10],
+        &[0xf3, 0x0f, 0x58, 0xc1],
+        &[0xf2, 0x0f, 0x2c, 0xc1],
+    ] {
+        assert!(at(0x1000, code).is_ok(), "{code:02x?}");
+    }
 }

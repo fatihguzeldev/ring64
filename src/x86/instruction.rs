@@ -316,6 +316,12 @@ pub enum VectorMask {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VectorInstruction {
+    HalfMove {
+        register: u8,
+        operand: VectorOperand,
+        high: bool,
+        store: bool,
+    },
     Move {
         register: u8,
         operand: VectorOperand,
@@ -368,7 +374,54 @@ pub enum VectorInstruction {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FloatInstruction {
+    pub op: super::float::Op,
+    pub dst: u8,
+    pub src: Location,
+}
+
+impl FloatInstruction {
+    pub fn source_is_gpr(self) -> bool {
+        self.op.scalar && self.op.kind == super::float::Kind::IntToFloat
+    }
+    pub fn destination_is_gpr(self) -> bool {
+        self.op.scalar
+            && matches!(
+                self.op.kind,
+                super::float::Kind::FloatToInt | super::float::Kind::TruncToInt
+            )
+    }
+    pub fn writes_flags(self) -> bool {
+        matches!(
+            self.op.kind,
+            super::float::Kind::Comi | super::float::Kind::Ucomi
+        )
+    }
+    pub fn source_bytes(self) -> u8 {
+        use super::float::{Format, Kind};
+        if self.source_is_gpr() {
+            return if self.op.integer64 { 8 } else { 4 };
+        }
+        if self.op.scalar {
+            return if self.op.format == Format::F32 { 4 } else { 8 };
+        }
+        if self.op.kind == Kind::FloatConvert && self.op.format == Format::F32
+            || self.op.kind == Kind::IntToFloat && self.op.format == Format::F64
+        {
+            8
+        } else {
+            16
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
+    Float(FloatInstruction),
+    Mxcsr {
+        address: Address,
+        store: bool,
+    },
     Vector(VectorInstruction),
     Nop,
     Exchange {

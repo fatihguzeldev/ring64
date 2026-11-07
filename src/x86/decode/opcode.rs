@@ -596,6 +596,9 @@ fn two_byte<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if let Some(result) = super::float::refine(opcode, prefixes, cursor) {
+        return result;
+    }
     if let Some(result) = super::vector::refine(opcode, prefixes, cursor) {
         return result.map(Operation::Vector);
     }
