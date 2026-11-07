@@ -6,6 +6,7 @@ mod conditions;
 mod counts;
 mod data_widths;
 mod df;
+mod exchange;
 mod integer_memory;
 mod logical;
 mod mode_context;

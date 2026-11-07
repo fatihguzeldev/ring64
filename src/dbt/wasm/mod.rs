@@ -3,6 +3,7 @@ mod control;
 mod counts;
 mod data;
 mod entry_lookup;
+mod exchange;
 mod integer;
 mod integer_memory;
 mod memory;
@@ -205,6 +206,17 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 } | Operation::DoubleShift {
                     dst: Location::Memory(_),
                     ..
+                } | Operation::Exchange {
+                    dst: Location::Memory(_),
+                    ..
+                } | Operation::Xadd {
+                    dst: Location::Memory(_),
+                    ..
+                } | Operation::CompareExchange {
+                    dst: Location::Memory(_),
+                    ..
+                } | Operation::CompareExchange8b {
+                    ..
                 }
             )
     });
@@ -316,6 +328,19 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             .op(Op::LocalSet(RIP));
         emitter.gates(exit_depth);
         match instruction.operation {
+            Operation::Nop => {}
+            Operation::Exchange { dst, src, width } => {
+                emitter.exchange(dst, src, width, instruction.next_pc, exit_depth)
+            }
+            Operation::Xadd { dst, src, width } => {
+                emitter.xadd(dst, src, width, instruction.next_pc, exit_depth)
+            }
+            Operation::CompareExchange { dst, src, width } => {
+                emitter.compare_exchange(dst, src, width, instruction.next_pc, exit_depth)
+            }
+            Operation::CompareExchange8b { address } => {
+                emitter.compare_exchange8b(address, instruction.next_pc, exit_depth)
+            }
             Operation::Direction { set } => emitter.direction(set),
             Operation::String {
                 kind,

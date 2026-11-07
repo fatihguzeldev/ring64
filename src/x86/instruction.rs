@@ -249,6 +249,25 @@ pub enum CountCondition {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
+    Nop,
+    Exchange {
+        dst: Location,
+        src: RegisterView,
+        width: Width,
+    },
+    Xadd {
+        dst: Location,
+        src: RegisterView,
+        width: Width,
+    },
+    CompareExchange {
+        dst: Location,
+        src: RegisterView,
+        width: Width,
+    },
+    CompareExchange8b {
+        address: Address,
+    },
     Direction {
         set: bool,
     },
