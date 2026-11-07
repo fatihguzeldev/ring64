@@ -10,6 +10,7 @@
 - [multiply and divide](multiply-and-divide/spec.md): signed/unsigned products, quotient/remainder pairs and precise divide errors.
 - [memory map and code validity](memory-map-and-code-validity/spec.md): private mappings, backing aliases, permissions and code invalidation after host or guest writes.
 - [mode context and decoding](mode-context-and-decoding/spec.md): imported execution contexts, size/segment rules and context-dependent code reuse.
+- [string and repeated execution](string-and-repeated-execution/spec.md): memory strings, DF, bounded repetition, partial progress and restart after faults or code changes.
 
 ## scope
 
