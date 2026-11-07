@@ -14,6 +14,8 @@ fn memory_results_commit_flags_only_after_successful_accesses() {
                 operation: Operation::MemoryAlu {
                     kind: Alu::Add,
                     address: Address {
+                        size: crate::x86::instruction::Width::W64,
+                        segment: crate::x86::context::Segment::Ds,
                         base: AddressBase::Register(3),
                         index: None,
                         displacement: 0,
@@ -57,6 +59,8 @@ fn register_destination_uses_the_incoming_address_and_selected_memory_width() {
             operation: Operation::MemoryAlu {
                 kind: Alu::Xor,
                 address: Address {
+                    size: crate::x86::instruction::Width::W64,
+                    segment: crate::x86::context::Segment::Ds,
                     base: AddressBase::Register(0),
                     index: None,
                     displacement: 0,

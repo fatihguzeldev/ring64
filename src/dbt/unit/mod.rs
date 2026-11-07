@@ -1,7 +1,8 @@
 use super::SourceRange;
-use crate::x86::instruction::Instruction;
+use crate::x86::{context::ExecutionContext, instruction::Instruction};
 
 pub(crate) struct Unit {
+    pub context: ExecutionContext,
     pub instructions: Vec<Instruction>,
     pub block_count: usize,
     pub source_bytes: usize,

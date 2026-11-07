@@ -19,6 +19,7 @@ use wasm_encoder::{
 
 use super::unit::Unit;
 use crate::embedding::layout::DISPATCH;
+use crate::x86::context::{ExecutionContext, Segment};
 use crate::x86::instruction::{Location, MemoryAluOperands, Operation};
 
 const ENTRY_INDEX: u32 = 4;
@@ -44,6 +45,10 @@ struct Emitter {
     divide: Option<u32>,
     divide_failed: Option<u32>,
     stores: bool,
+    context: ExecutionContext,
+    segment: Segment,
+    access_reason: Option<u32>,
+    target_check: Option<u32>,
 }
 
 impl Emitter {
@@ -60,17 +65,30 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             Operation::Return { .. }
                 | Operation::JumpRegister { .. }
                 | Operation::Call {
-                    target: crate::x86::instruction::Operand::Register(_)
+                    target: crate::x86::instruction::Operand::Register(_),
+                    ..
                 }
         )
     });
+    let segmented = !unit.context.is_long64();
+    let target_type = dynamic_targets || segmented;
     let mut types = TypeSection::new();
-    types
-        .ty()
-        .function([ValType::I64, ValType::I32], [ValType::I64]);
-    types
-        .ty()
-        .function([ValType::I64, ValType::I32, ValType::I64], [ValType::I32]);
+    types.ty().function(
+        if segmented {
+            vec![ValType::I64, ValType::I32, ValType::I32]
+        } else {
+            vec![ValType::I64, ValType::I32]
+        },
+        [ValType::I64],
+    );
+    types.ty().function(
+        if segmented {
+            vec![ValType::I64, ValType::I32, ValType::I64, ValType::I32]
+        } else {
+            vec![ValType::I64, ValType::I32, ValType::I64]
+        },
+        [ValType::I32],
+    );
     types.ty().function([], [ValType::I32]);
     types.ty().function(
         [
@@ -82,10 +100,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         ],
         [ValType::I32],
     );
-    if dynamic_targets {
+    if target_type {
         types.ty().function([ValType::I64], [ValType::I32]);
     }
-    let mut next_type = 4 + u32::from(dynamic_targets);
+    let mut next_type = 4 + u32::from(target_type);
     let wide_product = unit.instructions.iter().any(|i| {
         matches!(
             i.operation,
@@ -135,8 +153,20 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             page_size_log2: None,
         }),
     );
-    imports.import("env", "load", EntityType::Function(0));
-    imports.import("env", "store", EntityType::Function(1));
+    imports.import(
+        "env",
+        if segmented { "segmented_load" } else { "load" },
+        EntityType::Function(0),
+    );
+    imports.import(
+        "env",
+        if segmented {
+            "segmented_store"
+        } else {
+            "store"
+        },
+        EntityType::Function(1),
+    );
     imports.import("env", "access_failed", EntityType::Function(2));
     let write_intent = unit.instructions.iter().any(|instruction| {
         matches!(instruction.operation,
@@ -159,7 +189,15 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             )
     });
     if write_intent {
-        imports.import("env", "load_for_write", EntityType::Function(0));
+        imports.import(
+            "env",
+            if segmented {
+                "segmented_load_for_write"
+            } else {
+                "load_for_write"
+            },
+            EntityType::Function(0),
+        );
     }
     let mut run_index = 3 + u32::from(write_intent);
     let multiply_high = multiply_type.map(|index| {
@@ -180,6 +218,18 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let access_reason = segmented.then(|| {
+        imports.import("env", "access_reason", EntityType::Function(2));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let target_check = segmented.then(|| {
+        imports.import("env", "target_check", EntityType::Function(4));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let mut functions = FunctionSection::new();
     functions.function(3);
     if dynamic_targets {
@@ -194,6 +244,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         divide,
         divide_failed,
         stores: false,
+        context: unit.context.clone(),
+        segment: Segment::Ds,
+        access_reason,
+        target_check,
         body: Function::new([
             (19, ValType::I64),
             (2, ValType::I32),
@@ -348,18 +402,18 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 width,
                 condition,
             } => emitter.cmov(dst, src, width, condition, instruction.next_pc, exit_depth),
-            Operation::Push { src } => emitter.push(src, exit_depth),
-            Operation::Pop { dst } => emitter.pop(dst, exit_depth),
-            Operation::Call { target } => {
-                emitter.call(target, instruction.next_pc, loop_depth, exit_depth);
+            Operation::Push { src, width } => emitter.push(src, width, exit_depth),
+            Operation::Pop { dst, width } => emitter.pop(dst, width, exit_depth),
+            Operation::Call { target, width } => {
+                emitter.call(target, width, instruction.next_pc, loop_depth, exit_depth);
                 continue;
             }
-            Operation::JumpRegister { target } => {
-                emitter.jump_register(target, exit_depth);
+            Operation::JumpRegister { target, width } => {
+                emitter.jump_register(target, width, exit_depth);
                 continue;
             }
-            Operation::Return { cleanup } => {
-                emitter.return_stack(cleanup, exit_depth);
+            Operation::Return { cleanup, width } => {
+                emitter.return_stack(cleanup, width, exit_depth);
                 continue;
             }
             Operation::Jump { target } => {

@@ -1,11 +1,13 @@
-use super::{ENTRY, Emitter, FLAGS, GPR, REASON, REMAINING, RHS, RIP, STORE_STATUS};
-use crate::embedding::layout::{BUDGET, DISPATCH, RunState, STOP, TARGET};
+use super::{ENTRY, Emitter, FLAGS, REASON, REMAINING, RHS, RIP, STORE_STATUS};
+use crate::embedding::layout::{BUDGET, DISPATCH, RunState, SEGMENT, STOP, TARGET};
 use crate::memory::canonical48;
-use crate::x86::instruction::Condition;
+use crate::x86::context::Segment;
+use crate::x86::instruction::{Condition, Width};
 use wasm_encoder::{BlockType, Instruction as Op, MemArg};
 
 impl Emitter {
     pub(super) fn target_failure(&mut self, exit_depth: u32) {
+        self.record_fault_segment(Segment::Cs);
         // Runtime targets cannot be recovered by decoding the published RIP.
         self.op(Op::LocalGet(0))
             .op(Op::LocalGet(RHS))
@@ -18,6 +20,15 @@ impl Emitter {
     }
 
     pub(super) fn check_runtime_target(&mut self, exit_depth: u32) {
+        if let Some(check) = self.target_check {
+            self.op(Op::LocalGet(RHS))
+                .op(Op::Call(check))
+                .op(Op::I32Eqz)
+                .op(Op::If(BlockType::Empty));
+            self.exit(SEGMENT, exit_depth + 1);
+            self.op(Op::End);
+            return;
+        }
         self.op(Op::LocalGet(RHS))
             .op(Op::I64Const(16))
             .op(Op::I64Shl)
@@ -53,9 +64,9 @@ impl Emitter {
         self.exit(DISPATCH, exit_depth);
     }
 
-    pub(super) fn jump_register(&mut self, target: u8, exit_depth: u32) {
-        self.op(Op::LocalGet(GPR + u32::from(target)))
-            .op(Op::LocalSet(RHS));
+    pub(super) fn jump_register(&mut self, target: u8, width: Width, exit_depth: u32) {
+        self.register(target, width);
+        self.op(Op::LocalSet(RHS));
         self.check_runtime_target(exit_depth);
         self.commit_runtime_target(exit_depth);
     }
@@ -168,11 +179,23 @@ impl Emitter {
         }
     }
 
-    pub(super) fn target(&mut self, target: u64, loop_depth: u32, exit_depth: u32) {
-        if !canonical48(target) {
+    pub(super) fn check_static_target(&mut self, target: u64, exit_depth: u32) -> bool {
+        if self.context.is_long64() {
+            if !canonical48(target) {
+                self.op(Op::I64Const(target as i64)).op(Op::LocalSet(RHS));
+                self.target_failure(exit_depth);
+                return false;
+            }
+        } else if target > self.context.code_limit() {
             self.op(Op::I64Const(target as i64)).op(Op::LocalSet(RHS));
-            self.target_failure(exit_depth);
-        } else {
+            self.check_runtime_target(exit_depth);
+            return false;
+        }
+        true
+    }
+
+    pub(super) fn target(&mut self, target: u64, loop_depth: u32, exit_depth: u32) {
+        if self.check_static_target(target, exit_depth) {
             self.commit(target);
             self.route(target, loop_depth, exit_depth);
         }

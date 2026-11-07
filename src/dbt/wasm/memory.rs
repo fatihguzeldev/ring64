@@ -1,10 +1,12 @@
-use super::{ADDRESS, Emitter, GPR, RESULT, STORE_STATUS, VALUE};
-use crate::embedding::layout::DATA;
+use super::{ADDRESS, Emitter, GPR, REASON, RESULT, STORE_STATUS, VALUE};
+use crate::embedding::layout::{DATA, RunState};
+use crate::x86::context::Segment;
 use crate::x86::instruction::{Address, AddressBase, DataOperand, RegisterView, Width};
-use wasm_encoder::{BlockType, Instruction as Op};
+use wasm_encoder::{BlockType, Instruction as Op, MemArg};
 
 impl Emitter {
     pub(super) fn address(&mut self, address: Address, next_pc: u64) {
+        self.segment = address.segment;
         let has_base = if let AddressBase::Register(base) = address.base {
             self.op(Op::LocalGet(GPR + u32::from(base)));
             true
@@ -31,6 +33,38 @@ impl Emitter {
             if has_base || address.index.is_some() {
                 self.op(Op::I64Add);
             }
+        }
+        self.narrow(address.size);
+    }
+
+    fn linear_address(&mut self) {
+        self.op(Op::LocalGet(ADDRESS));
+        if self.context.is_long64() {
+            let base = self.context.segment_base(self.segment);
+            if base != 0 {
+                self.op(Op::I64Const(base as i64)).op(Op::I64Add);
+            }
+        }
+    }
+
+    pub(super) fn record_fault_segment(&mut self, segment: Segment) {
+        self.op(Op::LocalGet(0))
+            .op(Op::I32Const(segment as i32))
+            .op(Op::I32Store(MemArg {
+                offset: std::mem::offset_of!(RunState, fault_segment) as u64,
+                align: 2,
+                memory_index: 0,
+            }));
+    }
+
+    fn memory_failure(&mut self, exit_depth: u32) {
+        if let Some(reason) = self.access_reason {
+            self.op(Op::Call(reason))
+                .op(Op::LocalSet(REASON))
+                .op(Op::Br(exit_depth));
+        } else {
+            self.record_fault_segment(self.segment);
+            self.exit(DATA, exit_depth);
         }
     }
 
@@ -68,26 +102,32 @@ impl Emitter {
     }
 
     pub(super) fn load_address_value(&mut self, width: Width, for_write: bool, exit_depth: u32) {
-        self.op(Op::LocalGet(ADDRESS))
-            .op(Op::I32Const(i32::from(width.bytes())))
-            .op(Op::Call(if for_write { 3 } else { 0 }))
+        self.linear_address();
+        self.op(Op::I32Const(i32::from(width.bytes())));
+        if !self.context.is_long64() {
+            self.op(Op::I32Const(self.segment as i32));
+        }
+        self.op(Op::Call(if for_write { 3 } else { 0 }))
             .op(Op::LocalSet(VALUE))
             .op(Op::Call(2))
             .op(Op::If(BlockType::Empty));
-        self.exit(DATA, exit_depth + 1);
+        self.memory_failure(exit_depth + 1);
         self.op(Op::End);
     }
 
     pub(super) fn store_result(&mut self, width: Width, exit_depth: u32) {
         self.stores = true;
-        self.op(Op::LocalGet(ADDRESS))
-            .op(Op::I32Const(i32::from(width.bytes())))
-            .op(Op::LocalGet(RESULT))
-            .op(Op::Call(1))
+        self.linear_address();
+        self.op(Op::I32Const(i32::from(width.bytes())))
+            .op(Op::LocalGet(RESULT));
+        if !self.context.is_long64() {
+            self.op(Op::I32Const(self.segment as i32));
+        }
+        self.op(Op::Call(1))
             .op(Op::LocalTee(STORE_STATUS))
             .op(Op::I32Eqz)
             .op(Op::If(BlockType::Empty));
-        self.exit(DATA, exit_depth + 1);
+        self.memory_failure(exit_depth + 1);
         self.op(Op::End);
     }
 
@@ -99,17 +139,20 @@ impl Emitter {
         next_pc: u64,
         exit_depth: u32,
     ) {
-        self.stores = true;
         self.address(address, next_pc);
-        self.op(Op::LocalSet(ADDRESS))
-            .op(Op::LocalGet(ADDRESS))
-            .op(Op::I32Const(i32::from(width.bytes())));
+        self.op(Op::LocalSet(ADDRESS));
+        self.linear_address();
+        self.op(Op::I32Const(i32::from(width.bytes())));
         self.data_operand(src, width);
+        if !self.context.is_long64() {
+            self.op(Op::I32Const(self.segment as i32));
+        }
+        self.stores = true;
         self.op(Op::Call(1))
             .op(Op::LocalTee(STORE_STATUS))
             .op(Op::I32Eqz)
             .op(Op::If(BlockType::Empty));
-        self.exit(DATA, exit_depth + 1);
+        self.memory_failure(exit_depth + 1);
         self.op(Op::End);
     }
 }

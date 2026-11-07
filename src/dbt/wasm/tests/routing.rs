@@ -11,7 +11,10 @@ fn dynamic_entry_lookup_uses_full_pcs_and_the_artifacts_original_ordinals() {
         Instruction {
             pc: 0x1000,
             next_pc: 0x1002,
-            operation: Operation::JumpRegister { target: 0 },
+            operation: Operation::JumpRegister {
+                width: crate::x86::instruction::Width::W64,
+                target: 0,
+            },
         },
         Instruction {
             pc: high,
@@ -105,6 +108,8 @@ fn entry_lookup_and_write_intent_helpers_keep_distinct_function_indices() {
                 operation: Operation::MemoryAlu {
                     kind: Alu::Add,
                     address: Address {
+                        size: crate::x86::instruction::Width::W64,
+                        segment: crate::x86::context::Segment::Ds,
                         base: AddressBase::Register(3),
                         index: None,
                         displacement: 0,
@@ -116,7 +121,10 @@ fn entry_lookup_and_write_intent_helpers_keep_distinct_function_indices() {
             Instruction {
                 pc: 0x1004,
                 next_pc: 0x1006,
-                operation: Operation::JumpRegister { target: 0 },
+                operation: Operation::JumpRegister {
+                    width: crate::x86::instruction::Width::W64,
+                    target: 0,
+                },
             },
             Instruction {
                 pc: 0x1010,

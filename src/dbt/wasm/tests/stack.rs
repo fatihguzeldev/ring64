@@ -33,7 +33,10 @@ fn stack_publication_follows_checked_access_and_preserves_aliases() {
         ] {
             let expected = if success { vec![(4, 0x4018)] } else { vec![] };
             let mut p = packet(
-                Operation::Push { src },
+                Operation::Push {
+                    width: crate::x86::instruction::Width::W64,
+                    src,
+                },
                 &[(4, 0x4020)],
                 &expected,
                 if success { 0x1003 } else { 0x1000 },
@@ -50,7 +53,10 @@ fn stack_publication_follows_checked_access_and_preserves_aliases() {
                 expected.push((dst, 0xfedcba9876543210));
             }
             let mut p = packet(
-                Operation::Pop { dst: dst as u8 },
+                Operation::Pop {
+                    width: crate::x86::instruction::Width::W64,
+                    dst: dst as u8,
+                },
                 &[(4, 0x4020)],
                 &expected,
                 if success { 0x1003 } else { 0x1000 },
@@ -76,18 +82,25 @@ fn runtime_targets_are_checked_before_stack_or_architectural_commit() {
         for (operation, input, reads) in [
             (
                 Operation::Call {
+                    width: crate::x86::instruction::Width::W64,
                     target: Operand::Register(4),
                 },
                 vec![(4, bad)],
                 false,
             ),
             (
-                Operation::JumpRegister { target: 12 },
+                Operation::JumpRegister {
+                    width: crate::x86::instruction::Width::W64,
+                    target: 12,
+                },
                 vec![(4, 0x7000), (12, bad)],
                 false,
             ),
             (
-                Operation::Return { cleanup: 0xffff },
+                Operation::Return {
+                    width: crate::x86::instruction::Width::W64,
+                    cleanup: 0xffff,
+                },
                 vec![(4, 0x4020)],
                 true,
             ),
@@ -104,6 +117,7 @@ fn runtime_targets_are_checked_before_stack_or_architectural_commit() {
     }
     let mut p = packet(
         Operation::Call {
+            width: crate::x86::instruction::Width::W64,
             target: Operand::Register(4),
         },
         &[(4, 0x4020)],
@@ -122,7 +136,10 @@ fn runtime_targets_are_checked_before_stack_or_architectural_commit() {
         };
         let expected = if succeeded { vec![(4, 0xc027)] } else { vec![] };
         let mut p = packet(
-            Operation::Return { cleanup: 0x7fff },
+            Operation::Return {
+                width: crate::x86::instruction::Width::W64,
+                cleanup: 0x7fff,
+            },
             &[(4, 0x4020)],
             &expected,
             if succeeded {
@@ -150,7 +167,10 @@ fn runtime_targets_are_checked_before_stack_or_architectural_commit() {
         vec![Instruction {
             pc: 0x1000,
             next_pc: 0x1002,
-            operation: Operation::JumpRegister { target: 0 },
+            operation: Operation::JumpRegister {
+                width: crate::x86::instruction::Width::W64,
+                target: 0,
+            },
         }],
         &[(0, 0xffff800000001010)],
         0x8d7,

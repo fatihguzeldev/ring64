@@ -50,7 +50,9 @@ impl Emitter {
     }
 
     pub(super) fn write_register(&mut self, register: RegisterView, width: Width) {
-        if matches!(width, Width::W8 | Width::W16) {
+        if matches!(width, Width::W8 | Width::W16)
+            || (width == Width::W32 && !self.context.is_long64())
+        {
             let shift = register.shift();
             if shift != 0 {
                 self.op(Op::I64Const(i64::from(shift))).op(Op::I64Shl);

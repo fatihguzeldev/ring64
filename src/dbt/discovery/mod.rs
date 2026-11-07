@@ -1,18 +1,30 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use crate::memory::{Image, canonical48};
+use crate::memory::{Access, Image, canonical48};
 use crate::x86::{
-    decode::decode,
+    context::{AccessFailure, ExecutionContext, Segment},
+    decode::{DecodeError, decode_with_context},
     instruction::{Operand, Operation},
 };
 
 use super::{CompileError, Limits, SourceRange, unit::Unit};
 
+#[cfg(test)]
 pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit, CompileError> {
+    discover_with_context(image, &ExecutionContext::default(), entry, limits)
+}
+
+pub(crate) fn discover_with_context(
+    image: &Image,
+    context: &ExecutionContext,
+    entry: u64,
+    limits: Limits,
+) -> Result<Unit, CompileError> {
     let mut pending = VecDeque::from([entry]);
     let mut visited = BTreeSet::new();
     let mut instructions = BTreeMap::new();
     let mut source = BTreeSet::new();
+    let mut linear_source = BTreeSet::new();
     while let Some(pc) = pending.pop_front() {
         if instructions.len() >= limits.max_instructions as usize {
             break;
@@ -20,11 +32,22 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
         if !visited.insert(pc) {
             continue;
         }
-        let Ok(instruction) = decode(pc, |address| image.fetch(address)) else {
+        let mut fetched = Vec::new();
+        let Ok(instruction) = decode_with_context(pc, context, |offset| {
+            let linear = context
+                .translate(offset, 1, Segment::Cs, Access::Execute, false)
+                .map_err(|failure| match failure {
+                    AccessFailure::Segment(fault) => DecodeError::Segment(fault),
+                    AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
+                })?;
+            let byte = image.fetch(linear).map_err(DecodeError::Fetch)?;
+            fetched.push((offset, linear));
+            Ok(byte)
+        }) else {
             // A future diagnostic is a frontier, never an early guest exit.
             continue;
         };
-        let length = instruction.next_pc.wrapping_sub(pc);
+        let length = u64::from(instruction.encoded_len());
         let bytes: Vec<_> = (0..length).map(|offset| pc.wrapping_add(offset)).collect();
         let additional = bytes
             .iter()
@@ -34,22 +57,23 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
             continue;
         }
         source.extend(bytes);
+        linear_source.extend(fetched.into_iter().map(|(_, linear)| linear));
         match instruction.operation {
             Operation::Jump { target } => {
-                if canonical48(target) {
+                if !context.is_long64() || canonical48(target) {
                     pending.push_back(target);
                 }
             }
             Operation::Jcc { target, .. } => {
                 pending.push_back(instruction.next_pc);
-                if canonical48(target) {
+                if !context.is_long64() || canonical48(target) {
                     pending.push_back(target);
                 }
             }
-            Operation::Call { target } => {
+            Operation::Call { target, .. } => {
                 pending.push_back(instruction.next_pc);
                 if let Operand::Immediate(target) = target
-                    && canonical48(target)
+                    && (!context.is_long64() || canonical48(target))
                 {
                     pending.push_back(target);
                 }
@@ -72,7 +96,7 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
                 leaders.insert(target);
                 leaders.insert(instruction.next_pc);
             }
-            Operation::Call { target } => {
+            Operation::Call { target, .. } => {
                 leaders.insert(instruction.next_pc);
                 if let Operand::Immediate(target) = target {
                     leaders.insert(target);
@@ -82,7 +106,7 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
         }
     }
     let mut source_ranges: Vec<SourceRange> = Vec::new();
-    for address in &source {
+    for address in &linear_source {
         if let Some(last) = source_ranges.last_mut()
             && u128::from(last.start) + u128::from(last.length) == u128::from(*address)
         {
@@ -95,6 +119,7 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
         }
     }
     Ok(Unit {
+        context: context.clone(),
         block_count: leaders
             .iter()
             .filter(|pc| instructions.contains_key(pc))
@@ -108,6 +133,49 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::memory::{MappingInput, MemoryLimits, Permissions};
+    use serde_json::json;
+
+    fn context(cs_base: u32) -> ExecutionContext {
+        let mut segments = serde_json::Map::new();
+        for name in ["cs", "ss", "ds", "es", "fs", "gs"] {
+            segments.insert(
+                name.into(),
+                json!({
+                    "base":format!("0x{:x}",if name == "cs" { cs_base } else { 0 }),
+                    "limit":u32::MAX,"default32":true,"usable":true,
+                    "type":if name == "cs" { "readable-code" } else { "read-write" }
+                }),
+            );
+        }
+        ExecutionContext::from_json(&json!({"mode":"protected","segments":segments})).unwrap()
+    }
+
+    fn split_image(code: &[u8], high_offset: u32) -> Image {
+        Image::mapped(
+            vec![("code".into(), code.to_vec())],
+            [(u32::MAX, high_offset, 1), (0, 0, high_offset)]
+                .into_iter()
+                .map(|(base, offset, length)| MappingInput {
+                    base: u64::from(base),
+                    backing: "code".into(),
+                    offset,
+                    length,
+                    permissions: Permissions {
+                        read: true,
+                        write: true,
+                        execute: true,
+                    },
+                })
+                .collect(),
+            MemoryLimits {
+                max_backing_bytes: 32,
+                max_backings: 1,
+                max_mappings: 2,
+            },
+        )
+        .unwrap()
+    }
 
     fn image(bytes: &[u8]) -> Image {
         Image::new(0x1000, bytes.to_vec(), 0x8000, vec![0; 32]).unwrap()
@@ -246,5 +314,101 @@ mod tests {
                 length: 5
             }]
         );
+    }
+
+    #[test]
+    fn logical_entries_remain_distinct_from_translated_source_dependencies() {
+        let code = Image::new(0x9000, vec![0xb8, 1, 0, 0, 0, 0xc3], 0x10000, vec![0; 8]).unwrap();
+        let unit = discover_with_context(&code, &context(0x8000), 0x1000, limits()).unwrap();
+        assert_eq!(
+            unit.instructions.iter().map(|i| i.pc).collect::<Vec<_>>(),
+            [0x1000, 0x1005]
+        );
+        assert_eq!(unit.source_bytes, 6);
+        assert_eq!(
+            unit.source_ranges,
+            [SourceRange {
+                start: 0x9000,
+                length: 6
+            }]
+        );
+        assert_eq!(unit.context, context(0x8000));
+    }
+
+    #[test]
+    fn translated_fetch_wrap_splits_linear_dependencies_without_changing_source_budget() {
+        // Logical offsets 0..4 map to ffffffff,0,1,2,3.
+        let image = split_image(&[1, 2, 3, 4, 0xb8], 4);
+        let context = context(u32::MAX);
+        let unit = discover_with_context(
+            &image,
+            &context,
+            0,
+            Limits {
+                max_source_bytes: 5,
+                ..limits()
+            },
+        )
+        .unwrap();
+        assert_eq!(unit.instructions.len(), 1);
+        assert_eq!(unit.instructions[0].next_pc, 5);
+        assert_eq!(unit.source_bytes, 5);
+        assert_eq!(
+            unit.source_ranges,
+            [
+                SourceRange {
+                    start: 0,
+                    length: 4
+                },
+                SourceRange {
+                    start: u64::from(u32::MAX),
+                    length: 1
+                }
+            ]
+        );
+        assert!(matches!(
+            discover_with_context(
+                &image,
+                &context,
+                0,
+                Limits {
+                    max_source_bytes: 4,
+                    ..limits()
+                }
+            ),
+            Err(CompileError::Resource)
+        ));
+    }
+
+    #[test]
+    fn eip_wrap_advances_to_a_logical_entry_without_wrapping_required_fetch_bytes() {
+        let image = split_image(&[0xb8, 1, 0, 0, 0, 0x40], 5);
+        let unit =
+            discover_with_context(&image, &context(0), u64::from(u32::MAX), limits()).unwrap();
+        assert_eq!(
+            unit.instructions.iter().map(|i| i.pc).collect::<Vec<_>>(),
+            [0, u64::from(u32::MAX)]
+        );
+        assert_eq!(unit.instructions[1].next_pc, 0);
+        assert_eq!(unit.source_bytes, 6);
+        assert_eq!(
+            unit.source_ranges,
+            [
+                SourceRange {
+                    start: 0,
+                    length: 5
+                },
+                SourceRange {
+                    start: u64::from(u32::MAX),
+                    length: 1
+                }
+            ]
+        );
+
+        let crossing = split_image(&[1, 0, 0, 0, 0, 0xb8], 5);
+        assert!(matches!(
+            discover_with_context(&crossing, &context(0), u64::from(u32::MAX), limits()),
+            Err(CompileError::Resource)
+        ));
     }
 }

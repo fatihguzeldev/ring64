@@ -79,6 +79,8 @@ fn generated_mov_addresses_match_literal_memory_calls() {
                     operation: Operation::Load {
                         dst: RegisterView::low(0),
                         address: Address {
+                            size: crate::x86::instruction::Width::W64,
+                            segment: crate::x86::context::Segment::Ds,
                             base,
                             index: index.map(|(register, scale)| AddressIndex { register, scale }),
                             displacement,
@@ -157,6 +159,8 @@ fn generated_mov_addresses_match_literal_memory_calls() {
                 operation: Operation::Store {
                     src: DataOperand::Register(RegisterView::low(source)),
                     address: Address {
+                        size: crate::x86::instruction::Width::W64,
+                        segment: crate::x86::context::Segment::Ds,
                         base: Register(base),
                         index: Some(AddressIndex {
                             register: index,

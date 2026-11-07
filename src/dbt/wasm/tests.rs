@@ -7,6 +7,7 @@ mod counts;
 mod data_widths;
 mod integer_memory;
 mod logical;
+mod mode_context;
 mod multiply_divide;
 mod routing;
 mod stack;
@@ -21,6 +22,7 @@ use std::process::{Command, Stdio};
 
 fn unit(instructions: Vec<Instruction>) -> Unit {
     Unit {
+        context: crate::x86::context::ExecutionContext::default(),
         source_bytes: instructions.len(),
         source_ranges: vec![],
         block_count: 1,
@@ -462,10 +464,15 @@ for (const [index,c] of cases.entries()) {
  const load_for_write=(address,width)=>BigInt('0x'+access('load_for_write',[bits(address),width]));
  const store=(address,width,value)=>access('store',[bits(address),width,bits(value)]);
  const access_failed=()=>access('access_failed',[]);
+ const segmented_load=(address,width,segment)=>BigInt('0x'+access('segmented_load',[bits(address),width,segment]));
+ const segmented_load_for_write=(address,width,segment)=>BigInt('0x'+access('segmented_load_for_write',[bits(address),width,segment]));
+ const segmented_store=(address,width,value,segment)=>access('segmented_store',[bits(address),width,bits(value),segment]);
+ const access_reason=()=>access('access_reason',[]);
+ const target_check=target=>access('target_check',[bits(target)]);
  const multiply_high=(a,b,signed)=>BigInt('0x'+access('multiply_high',[bits(a),bits(b),signed]));
  const divide=(high,low,divisor,signed)=>BigInt('0x'+access('divide',[bits(high),bits(low),bits(divisor),signed]));
  const divide_failed=()=>access('divide_failed',[]);
- const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,multiply_high,divide,divide_failed}});
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const snapshot=reason=>{
   const flags=d.getBigUint64(l.flags,true);
@@ -482,6 +489,7 @@ for (const [index,c] of cases.entries()) {
  if(c.flagMask!==undefined) actual.flags=(flagWord&BigInt('0x'+c.flagMask)).toString(16);
  assert.deepEqual(actual,c.expected,'generated case '+index);
  if(c.target!==undefined) assert.equal(d.getBigUint64(targetOffset,true).toString(16),c.target,'executed target '+index);
+ if(c.faultSegment!==undefined) assert.equal(d.getUint32(l.faultSegment,true),c.faultSegment,'fault segment '+index);
  if(c.preservingSuffix!==undefined){
   const suffix=c.preservingSuffix;
   const savedFlags=suffix.flags===undefined?flagWord:BigInt('0x'+suffix.flags);

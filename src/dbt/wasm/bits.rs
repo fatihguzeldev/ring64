@@ -35,6 +35,7 @@ impl Emitter {
                         .op(Op::I64Shl)
                         .op(Op::I64Add);
                 }
+                self.narrow(address.size);
                 self.op(Op::LocalSet(ADDRESS));
                 self.load_address_value(width, kind.writes_result(), exit_depth);
                 self.op(Op::LocalGet(VALUE));

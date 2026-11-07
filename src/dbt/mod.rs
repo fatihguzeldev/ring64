@@ -3,6 +3,7 @@ mod unit;
 mod wasm;
 
 use crate::memory::Image;
+use crate::x86::context::ExecutionContext;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
@@ -34,7 +35,16 @@ pub enum CompileError {
 }
 
 pub fn compile(image: &Image, entry: u64, limits: Limits) -> Result<Artifact, CompileError> {
-    let unit = discovery::discover(image, entry, limits)?;
+    compile_with_context(image, &ExecutionContext::default(), entry, limits)
+}
+
+pub fn compile_with_context(
+    image: &Image,
+    context: &ExecutionContext,
+    entry: u64,
+    limits: Limits,
+) -> Result<Artifact, CompileError> {
+    let unit = discovery::discover_with_context(image, context, entry, limits)?;
     let bytes = wasm::emit(&unit);
     if bytes.len() > limits.max_artifact_bytes as usize {
         return Err(CompileError::Resource);
