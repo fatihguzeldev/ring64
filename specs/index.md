@@ -14,6 +14,7 @@
 - [near control and stack](near-control-and-stack/spec.md): memory-indirect transfers, explicit stack-memory operands, frame teardown and counter branches.
 - [scalar exchange and locked rmw](scalar-exchange-and-locked-rmw/spec.md): exchange, compare-exchange, LOCK legality and checked RMW publication in private memory.
 - [simd integer and data](simd-integer-and-data/spec.md): raw XMM state, legacy packed integers, bit-preserving moves and checked wide memory.
+- [simd floating point and controls](simd-floating-point-and-controls/spec.md): legacy SSE/SSE2 numeric operations, MXCSR, precise numeric faults and raw data forms.
 
 ## scope
 
@@ -41,7 +42,7 @@ memory backing supports ram, special accesses, aliases and code mutation indepen
 
 fault detection and state recovery can be tested before full event delivery. handler entry and return then combine fault records with descriptor, privilege and memory rules. interrupt eligibility, debug boundaries and halt/wakeup depend on that delivery path.
 
-numeric execution needs register state, checked byte-range accesses and numeric fault outcomes. feature-enable writes and state images must agree with the instruction families they control. x87 special functions belong to `x87-state-and-execution`; mmx shares the x87 physical state.
+numeric execution needs register state, checked byte-range accesses and numeric fault outcomes. SIMD floating-point execution adds MXCSR rounding, status and exception masks to the XMM state contract; numeric faults can publish status while suppressing destination changes. feature-enable writes and state images must agree with the instruction families they control. x87 special functions belong to `x87-state-and-execution`; mmx shares the x87 physical state.
 
 imported contexts allow isolated tests of paging, descriptors and numeric instructions. integration tests execute guest control writes, mode transitions and save/restore, then check their effects on subsequent instructions.
 
