@@ -52,7 +52,8 @@ export function decodingScenarios(compiler: WebAssembly.Module): Scenario[] {
                 code,
                 LONG,
                 async (cpu) => {
-                  const before = input(0x1000n, { 0: 0x6000n, 4: 0x6000n }, 0xcd7n);
+                  // An early source access would fault instead of reporting the missing code byte.
+                  const before = input(0x1000n, { 0: 0x7000n, 4: 0x7000n }, 0xcd7n);
                   const raw = banks();
                   cpu.setState(before);
                   cpu.setXmmState(raw);
