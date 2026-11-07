@@ -5,6 +5,7 @@ mod code_validity;
 mod conditions;
 mod counts;
 mod data_widths;
+mod df;
 mod integer_memory;
 mod logical;
 mod mode_context;
@@ -477,7 +478,7 @@ for (const [index,c] of cases.entries()) {
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const snapshot=reason=>{
   const flags=d.getBigUint64(l.flags,true);
-  assert.equal(flags&~0x8d7n,0n,'valid flag word '+index);
+  assert.equal(flags&~0xcd7n,0n,'valid flag word '+index);
   assert.equal(flags&2n,2n,'reserved flag bit '+index);
   return {registers:Array.from({length:16},(_,i)=>d.getBigUint64(l.registers+8*i,true).toString(16)),
    flags:flags.toString(16),pc:d.getBigUint64(l.rip,true).toString(16),

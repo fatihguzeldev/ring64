@@ -135,9 +135,12 @@ impl Emitter {
     }
 
     pub(super) fn arithmetic_flags(&mut self, kind: Alu, width: Width) {
-        // All admitted arithmetic forms define these six bits. No control
-        // flags are admitted by this context; fixed bit 1 remains set.
-        self.op(Op::I64Const(2));
+        // Arithmetic defines six status bits while preserving direction.
+        self.op(Op::LocalGet(FLAGS))
+            .op(Op::I64Const(0x400))
+            .op(Op::I64And)
+            .op(Op::I64Const(2))
+            .op(Op::I64Or);
         if kind == Alu::Add {
             self.op(Op::LocalGet(RESULT)).op(Op::LocalGet(LHS));
         } else {
@@ -215,7 +218,11 @@ impl Emitter {
     }
 
     pub(super) fn logical_flags(&mut self, width: Width) {
-        self.op(Op::I64Const(2))
+        self.op(Op::LocalGet(FLAGS))
+            .op(Op::I64Const(0x400))
+            .op(Op::I64And)
+            .op(Op::I64Const(2))
+            .op(Op::I64Or)
             .op(Op::LocalGet(RESULT))
             .op(Op::I64Const(255))
             .op(Op::I64And)

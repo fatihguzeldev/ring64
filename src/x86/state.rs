@@ -17,8 +17,8 @@ impl Default for State {
 
 impl State {
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.flags & !0x8d7 != 0 {
-            return Err("flags contain bits outside the imported arithmetic context");
+        if self.flags & !0xcd7 != 0 {
+            return Err("flags contain bits outside the imported arithmetic and direction context");
         }
         if self.flags & 2 == 0 {
             return Err("flags must contain reserved bit one");
@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn imported_flags_require_bit_one_and_exclude_controls_and_reserved_bits() {
-        for flags in [0, 1, 0x8d5, 0x202, 0x402, u64::MAX] {
+        for flags in [0, 1, 0x8d5, 0xcd5, 0x102, 0x202, u64::MAX] {
             assert!(
                 State {
                     flags,
@@ -56,7 +56,7 @@ mod tests {
                 "{flags:x}"
             );
         }
-        for flags in [2, 3, 0x46, 0x97, 0x8d7] {
+        for flags in [2, 3, 0x46, 0x97, 0x8d7, 0x402, 0x497, 0xcd7] {
             assert_eq!(
                 State {
                     flags,
