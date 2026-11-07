@@ -8,7 +8,9 @@ export function mutationScenarios(compiler: WebAssembly.Module): Scenario[] {
       run: async () => {
         const bytes = new Uint8Array(32).fill(0xa5);
         bytes.set(hex('b801000000'));
+        bytes[5] = 0xf4;
         bytes.set(hex('b802000000'), 16);
+        bytes[21] = 0xf4;
         const maps = [mapping(BASE, 'code', 32, RX), mapping(0x4000n, 'code', 32, RW)];
         await using(compiler, [{ id: 'code', bytes }], maps, async (cpu) => {
           const run = async (pc: bigint, expected: bigint, compilations: number) => {

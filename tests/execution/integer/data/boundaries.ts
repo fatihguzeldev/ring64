@@ -80,7 +80,7 @@ export function dataBoundaryScenarios(core: WebAssembly.Module): Scenario[] {
     {
       name: 'scalar unsupported prefixes maps and selectors stop before speculative address tails',
       run: async () => {
-        const codes = ['f0', 'f2', 'f3', '660fbf', '660fb7', '66400fbf', '82'];
+        const codes = ['f08b', 'f28b', 'f38b', '660fbf', '660fb7', '66400fbf', '82'];
         for (const opcode of ['c6', 'c7'])
           for (let selector = 1; selector < 8; selector++)
             codes.push('6644' + opcode + modrm(selector, 4, 0));

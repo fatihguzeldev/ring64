@@ -7,6 +7,7 @@ import { controlScenarios } from './execution/control.js';
 import { translationsScenarios } from './execution/translations.js';
 import { embeddingScenarios } from './embedding/scenarios.js';
 import { modeScenarios } from './execution/modes/index.js';
+import { stringScenarios } from './execution/strings/index.js';
 
 export async function runScenarios(
   compiler: Uint8Array | WebAssembly.Module,
@@ -25,6 +26,7 @@ export async function runScenarios(
     ...translationsScenarios(core),
     ...embeddingScenarios(core),
     ...modeScenarios(core),
+    ...stringScenarios(core),
   ];
   const passed: string[] = [];
   for (const { name, run } of scenarios) {

@@ -206,7 +206,7 @@ test('reentrant backing additions revalidate current capacity and names before p
 });
 
 test('alias patch invalidates an older owner while preserving a newer shared middle entry', async () => {
-  const bytes = Uint8Array.of(0xe9, 5, 0, 0, 0, 0xe9, 0, 0, 0, 0, 0xb8, 1, 0, 0, 0, 0xa5);
+  const bytes = Uint8Array.of(0xe9, 5, 0, 0, 0, 0xe9, 0, 0, 0, 0, 0xb8, 1, 0, 0, 0, 0xf4);
   const cpu = await createCpu({
     compiler,
     memory: {
