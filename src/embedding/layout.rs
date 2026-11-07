@@ -10,8 +10,9 @@ pub const DATA: i32 = 6;
 pub const INVALID: i32 = 7;
 pub const RESOURCE: i32 = 8;
 pub const DIVIDE_ERROR: i32 = 9;
+pub const SEGMENT: i32 = 10;
 
-pub const REASONS: [&str; 10] = [
+pub const REASONS: [&str; 11] = [
     "dispatch",
     "budget",
     "stop",
@@ -22,6 +23,7 @@ pub const REASONS: [&str; 10] = [
     "invalid-encoding",
     "resource-limit",
     "divide-error",
+    "segment-fault",
 ];
 
 #[repr(C)]
@@ -31,6 +33,7 @@ pub struct RunState {
     pub rip: u64,
     pub remaining: u64,
     pub target: u64,
+    pub fault_segment: u32,
 }
 
 impl Default for RunState {
@@ -41,6 +44,7 @@ impl Default for RunState {
             rip: 0,
             remaining: 0,
             target: 0,
+            fault_segment: 0,
         }
     }
 }
@@ -52,6 +56,7 @@ impl RunState {
         self.rip = state.rip;
         self.remaining = 0;
         self.target = 0;
+        self.fault_segment = 0;
     }
 
     pub fn descriptor() -> serde_json::Value {
@@ -61,6 +66,7 @@ impl RunState {
             "flags": std::mem::offset_of!(Self, flags),
             "rip": std::mem::offset_of!(Self, rip),
             "remaining": std::mem::offset_of!(Self, remaining),
+            "faultSegment": std::mem::offset_of!(Self, fault_segment),
             "reasons": REASONS,
         })
     }
@@ -89,7 +95,7 @@ mod tests {
             ]
         );
         assert_eq!(RunState::descriptor()["reasons"][9], "divide-error");
-        assert_eq!(size_of::<RunState>(), 160);
+        assert_eq!(size_of::<RunState>(), 168);
     }
 
     #[test]
@@ -99,8 +105,9 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, rip), 136);
         assert_eq!(std::mem::offset_of!(RunState, remaining), 144);
         assert_eq!(std::mem::offset_of!(RunState, target), 152);
-        assert_eq!(size_of::<RunState>(), 160);
-        assert_eq!(RunState::descriptor()["size"], 160);
+        assert_eq!(std::mem::offset_of!(RunState, fault_segment), 160);
+        assert_eq!(size_of::<RunState>(), 168);
+        assert_eq!(RunState::descriptor()["size"], 168);
     }
 
     #[test]

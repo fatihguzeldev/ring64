@@ -2,11 +2,13 @@ use std::cell::{RefCell, UnsafeCell};
 
 use crate::dbt::{self, CompileError, Limits};
 use crate::memory::{Access, Cause, Fault, Image};
+use crate::x86::context::{AccessFailure, ExecutionContext, Segment, SegmentCause, SegmentFault};
 use crate::x86::decode::{self, DecodeError};
 use crate::x86::state::State;
 
-use super::layout::{DATA, FETCH, INVALID, RESOURCE, RunState, TARGET, UNSUPPORTED};
+use super::layout::{DATA, FETCH, INVALID, RESOURCE, RunState, SEGMENT, TARGET, UNSUPPORTED};
 
+mod context;
 mod mapped;
 
 struct Core {
@@ -14,6 +16,9 @@ struct Core {
     state: Box<UnsafeCell<RunState>>,
     fault: Option<Fault>,
     divide_failed: bool,
+    context: ExecutionContext,
+    context_version: u64,
+    segment_fault: Option<SegmentFault>,
 }
 
 #[derive(Default)]
@@ -77,6 +82,9 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             state,
             fault: None,
             divide_failed: false,
+            context: ExecutionContext::default(),
+            context_version: 0,
+            segment_fault: None,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
         0
@@ -112,6 +120,7 @@ pub extern "C" fn core_import_state() -> i32 {
         unsafe { (&mut *core.state.get()).import(state) };
         core.fault = None;
         core.divide_failed = false;
+        core.segment_fault = None;
         0
     })
 }
@@ -122,7 +131,11 @@ pub extern "C" fn core_clear_fault() {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
         core.divide_failed = false;
-        unsafe { (*core.state.get()).target = 0 };
+        core.segment_fault = None;
+        unsafe {
+            (*core.state.get()).target = 0;
+            (*core.state.get()).fault_segment = Segment::Cs as u32;
+        };
     });
 }
 
@@ -131,8 +144,21 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
-        match decode::decode(pc, |address| core.image.fetch(address)) {
+        core.segment_fault = None;
+        unsafe { (*core.state.get()).fault_segment = Segment::Cs as u32 };
+        match decode::decode_with_context(pc, &core.context, |offset| {
+            core.context
+                .fetch(&core.image, offset)
+                .map_err(|failure| match failure {
+                    AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
+                    AccessFailure::Segment(fault) => DecodeError::Segment(fault),
+                })
+        }) {
             Ok(_) => 0,
+            Err(DecodeError::Segment(fault)) => {
+                core.segment_fault = Some(fault);
+                SEGMENT
+            }
             Err(DecodeError::Unsupported) => UNSUPPORTED,
             Err(DecodeError::Invalid) => INVALID,
             Err(DecodeError::Fetch(fault)) => {
@@ -154,7 +180,7 @@ pub extern "C" fn core_compile(
         bridge.output.clear();
         let core = bridge.core.as_mut().unwrap();
         let limits = Limits { max_instructions, max_source_bytes, max_artifact_bytes };
-        match dbt::compile(&core.image, pc, limits) {
+        match dbt::compile_with_context(&core.image, &core.context, pc, limits) {
             Ok(artifact) => {
                 let owner = match core.image.register_source(artifact.source_ranges.iter().map(|range| (range.start, range.length))) {
                     Ok(owner) => owner,
@@ -166,6 +192,7 @@ pub extern "C" fn core_compile(
                     "blockCount": artifact.block_count,
                     "sourceBytes": artifact.source_bytes,
                     "owner": format!("0x{owner:x}"),
+                    "contextVersion": format!("0x{:x}",core.context_version),
                     "dependencies": artifact.source_ranges.iter().map(|range| serde_json::json!({
                         "start": format!("0x{:x}", range.start), "length": range.length,
                     })).collect::<Vec<_>>(),
@@ -187,6 +214,9 @@ pub extern "C" fn core_load(address: u64, width: u32) -> u64 {
             Ok(value) => value,
             Err(fault) => {
                 core.fault = Some(fault);
+                unsafe {
+                    (*core.state.get()).fault_segment = Segment::Ds as u32;
+                }
                 0
             }
         }
@@ -202,6 +232,9 @@ pub extern "C" fn core_load_for_write(address: u64, width: u32) -> u64 {
             Ok(value) => value,
             Err(fault) => {
                 core.fault = Some(fault);
+                unsafe {
+                    (*core.state.get()).fault_segment = Segment::Ds as u32;
+                }
                 0
             }
         }
@@ -223,6 +256,9 @@ pub extern "C" fn core_store(address: u64, width: u32, value: u64) -> i32 {
             }
             Err(fault) => {
                 core.fault = Some(fault);
+                unsafe {
+                    (*core.state.get()).fault_segment = Segment::Ds as u32;
+                }
                 0
             }
         }
@@ -231,7 +267,10 @@ pub extern "C" fn core_store(address: u64, width: u32, value: u64) -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_access_failed() -> i32 {
-    BRIDGE.with_borrow(|bridge| i32::from(bridge.core.as_ref().unwrap().fault.is_some()))
+    BRIDGE.with_borrow(|bridge| {
+        let core = bridge.core.as_ref().unwrap();
+        i32::from(core.fault.is_some() || core.segment_fault.is_some())
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -258,9 +297,9 @@ pub extern "C" fn core_fault_info(reason: i32) {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_ref().unwrap();
         let fault = match reason {
+            SEGMENT => core.segment_fault.as_ref().map(context::segment_fault_json),
             DATA | FETCH => core.fault.as_ref().map(fault_json),
             TARGET => {
-                // Every generated target failure publishes the executed value.
                 let target = unsafe { (*core.state.get()).target };
                 Some(fault_json(&Fault {
                     address: target,
@@ -272,6 +311,17 @@ pub extern "C" fn core_fault_info(reason: i32) {
             }
             _ => None,
         };
+        let fault = fault.map(|mut value| {
+            if reason != SEGMENT {
+                let segment = if reason == TARGET {
+                    Segment::Cs
+                } else {
+                    Segment::from_id(unsafe { (*core.state.get()).fault_segment })
+                };
+                value["segment"] = serde_json::json!(segment.name());
+            }
+            value
+        });
         bridge.info = serde_json::to_vec(&fault).unwrap();
     })
 }

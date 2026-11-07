@@ -206,6 +206,15 @@ impl Image {
         self.validity.active_invalid
     }
 
+    pub fn retire_sources(&mut self) {
+        self.validity.owners.clear();
+        self.validity.active = None;
+        self.validity.active_invalid = false;
+        self.validity.sources.clear();
+        self.validity.completed_write = None;
+        self.refresh_watchers();
+    }
+
     pub fn release(&mut self, owner: u64) {
         self.validity.owners.remove(&owner);
         if self.validity.active == Some(owner) {

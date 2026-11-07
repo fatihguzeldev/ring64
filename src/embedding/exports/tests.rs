@@ -21,7 +21,7 @@ fn memory_fault_metadata_only_belongs_to_data_and_fetch_exits() {
     assert_eq!(core_load(0x7000, 8), 0);
     let data = serde_json::json!({
         "address": "0x7000", "width": 8, "access": "read",
-        "cause": "unmapped", "failingAddress": "0x7000",
+        "cause": "unmapped", "failingAddress": "0x7000", "segment": "ds",
     });
     assert_eq!(metadata(DATA), data);
     for reason in [
@@ -40,7 +40,7 @@ fn memory_fault_metadata_only_belongs_to_data_and_fetch_exits() {
         metadata(FETCH),
         serde_json::json!({
             "address": "0x7001", "width": 1, "access": "execute",
-            "cause": "unmapped", "failingAddress": "0x7001",
+            "cause": "unmapped", "failingAddress": "0x7001", "segment": "cs",
         })
     );
 }
@@ -58,7 +58,7 @@ fn static_target_metadata_uses_the_execution_transport() {
             metadata(TARGET),
             serde_json::json!({
                 "address": "0x800000000008", "width": 0, "access": "execute",
-                "cause": "noncanonical", "failingAddress": "0x800000000008",
+                "cause": "noncanonical", "failingAddress": "0x800000000008", "segment": "cs",
             })
         );
     }
@@ -78,7 +78,7 @@ fn runtime_target_metadata_uses_each_executed_value() {
                 metadata(TARGET),
                 serde_json::json!({
                     "address": format!("0x{target:x}"), "width": 0, "access": "execute",
-                    "cause": "noncanonical", "failingAddress": format!("0x{target:x}"),
+                    "cause": "noncanonical", "failingAddress": format!("0x{target:x}"), "segment": "cs",
                 })
             );
         }
@@ -237,3 +237,5 @@ fn rejected_mapped_exports_preserve_storage_and_owner_validity() {
     assert_eq!(core_load(0x4000, 8), 0xa5a5_a500_0000_01b8);
     assert_eq!(core_probe(0x1000), DISPATCH);
 }
+
+mod contexts;

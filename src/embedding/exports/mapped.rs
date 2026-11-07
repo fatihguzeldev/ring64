@@ -127,6 +127,9 @@ pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
             })),
             fault: None,
             divide_failed: false,
+            context: ExecutionContext::default(),
+            context_version: 0,
+            segment_fault: None,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
         0
