@@ -4,6 +4,47 @@ import { BASE, RW, RX, backing, input, mapping, using } from './fixture.js';
 export function mutationScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     {
+      name: 'equivalent split sources retain owners while identical alias stores invalidate them',
+      run: async () => {
+        const alias = mapping(0x4000n, 'code', 5, RW);
+        const joined = mapping(BASE, 'code', 5, RX);
+        await using(
+          compiler,
+          [backing('code', 'b807000000')],
+          [joined, alias],
+          async (cpu) => {
+            const run = async (compilations: number) => {
+              const before = input();
+              cpu.setState(before);
+              const result = await cpu.run({ budget: 1n });
+              exit(result, 'budget', 1n, 1n, changed(before, BASE + 5n, { 0: 7n }));
+              equal(result.resources.compilations, compilations, 'source identity compilation');
+              equal(
+                result.resources.cacheHits,
+                compilations === 0 ? 1 : 0,
+                'source identity reuse',
+              );
+            };
+            await run(1);
+            for (let split = 1; split < 5; split++) {
+              cpu.setMappings([
+                alias,
+                mapping(BASE + BigInt(split), 'code', 5 - split, RX, split),
+                mapping(BASE, 'code', split, RX),
+              ]);
+              await run(0);
+              cpu.setMappings([{ ...joined, permissions: { ...RX, read: false } }, alias]);
+              await run(0);
+            }
+            cpu.writeMemory(0x4001n, Uint8Array.of(7));
+            equal(cpu.inspectTranslations().length, 0, 'identical alias store retires source');
+            await run(1);
+          },
+          { maxInstructions: 1 },
+        );
+      },
+    },
+    {
       name: 'host patches and map replacement invalidate only affected code owners',
       run: async () => {
         const bytes = new Uint8Array(32).fill(0xa5);
