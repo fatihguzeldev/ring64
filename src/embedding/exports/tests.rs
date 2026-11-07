@@ -120,7 +120,7 @@ fn importing_state_cannot_import_a_stale_runtime_target() {
     assert_eq!(core_load(0x7000, 8), 0);
     BRIDGE.with_borrow_mut(|bridge| {
         unsafe { (*bridge.core.as_mut().unwrap().state.get()).target = 0x8000_0000_0000 };
-        bridge.input = vec![0xff; size_of::<RunState>()];
+        bridge.input = vec![0xff; SCALAR_STATE_SIZE];
         for index in 0..16 {
             let offset = std::mem::offset_of!(RunState, registers) + index * 8;
             bridge.input[offset..offset + 8].copy_from_slice(&(index as u64).to_le_bytes());
@@ -249,3 +249,5 @@ fn rejected_mapped_exports_preserve_storage_and_owner_validity() {
 }
 
 mod contexts;
+
+mod vectors;

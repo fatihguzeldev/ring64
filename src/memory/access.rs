@@ -82,6 +82,28 @@ impl Image {
         Ok(output)
     }
 
+    pub fn read_vector(&self, address: u64, width: u32) -> Result<[u8; 16], Fault> {
+        assert!(matches!(width, 2 | 4 | 8 | 16));
+        let mut index = self.preflight(address, width, Access::Read, false, false)?;
+        let mut output = [0; 16];
+        let mut cursor = address;
+        let mut copied = 0;
+        while copied < width as usize {
+            let mapping = &self.mappings[index];
+            let offset = mapping.offset as usize + (cursor - mapping.base) as usize;
+            let count =
+                (width as usize - copied).min((mapping.end() - u128::from(cursor)) as usize);
+            output[copied..copied + count]
+                .copy_from_slice(&self.backings[mapping.backing].bytes[offset..offset + count]);
+            copied += count;
+            if copied < width as usize {
+                cursor += count as u64;
+                index += 1;
+            }
+        }
+        Ok(output)
+    }
+
     pub fn write_bytes(&mut self, address: u64, bytes: &[u8]) -> Result<(), Fault> {
         let width = u32::try_from(bytes.len()).expect("memory copy length exceeds u32");
         let first = self.preflight(address, width, Access::Write, false, false)?;

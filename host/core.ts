@@ -23,6 +23,16 @@ export interface Fault {
   failingAddress: bigint;
 }
 
+export interface AlignmentFault {
+  segment: SegmentName;
+  instructionPc: bigint;
+  offset: bigint;
+  address: bigint;
+  width: number;
+  access: 'read' | 'write';
+  alignment: number;
+}
+
 export interface Span {
   base: bigint;
   bytes: Uint8Array;
@@ -48,6 +58,10 @@ export interface UnitMetadata {
 
 interface Layout {
   size: number;
+  scalarSize: number;
+  xmm: number;
+  xmmBytes: number;
+  vectorScratch: number;
   registers: number;
   flags: number;
   rip: number;
@@ -78,6 +92,15 @@ type CoreExports = WebAssembly.Exports & {
   core_target_check(target: bigint): number;
   core_state_ptr(): number;
   core_import_state(): number;
+  core_import_xmm(): number;
+  core_vector_load(offset: bigint, width: number, segment: number, alignment: number): number;
+  core_vector_store(
+    offset: bigint,
+    width: number,
+    segment: number,
+    alignment: number,
+    value: number,
+  ): number;
   core_clear_fault(): void;
   core_probe(pc: bigint): number;
   core_compile(
@@ -142,6 +165,19 @@ export function captureState(state: State): State {
   return { registers, flags, rip };
 }
 
+export function captureXmmState(input: bigint[]): bigint[] {
+  if (!Array.isArray(input) || input.length !== 16)
+    throw new TypeError('XMM state requires sixteen registers');
+  const bank: bigint[] = [];
+  for (let index = 0; index < 16; index++) {
+    const value = input[index];
+    if (typeof value !== 'bigint' || value < 0n || value >= 1n << 128n)
+      throw new TypeError('XMM register must be an unsigned 128-bit bigint');
+    bank.push(value);
+  }
+  return bank;
+}
+
 export function copyMemoryInput(bytes: Uint8Array): Uint8Array {
   if (!(bytes instanceof Uint8Array)) throw new TypeError('memory input must be Uint8Array');
   const copy = new Uint8Array(bytes);
@@ -197,13 +233,21 @@ export class Core {
     this.#statePointer = exports.core_state_ptr() >>> 0;
     for (const name of [
       'size',
+      'scalarSize',
+      'xmm',
+      'xmmBytes',
+      'vectorScratch',
       'registers',
       'flags',
       'rip',
       'remaining',
       'repeatRemaining',
     ] as const) {
-      if (!Number.isInteger(this.#layout[name]) || this.#layout[name] < 0) {
+      if (
+        !Number.isSafeInteger(this.#layout[name]) ||
+        this.#layout[name] < 0 ||
+        this.#layout[name] > 0xffffffff
+      ) {
         throw new Error('core returned an invalid transport layout');
       }
     }
@@ -213,6 +257,21 @@ export class Core {
     ) {
       throw new Error('core returned invalid exit names');
     }
+    const layout = this.#layout;
+    if (
+      layout.scalarSize !== 176 ||
+      layout.registers !== 0 ||
+      layout.flags !== 128 ||
+      layout.rip !== 136 ||
+      layout.remaining !== 144 ||
+      layout.repeatRemaining !== 168 ||
+      layout.xmm < layout.scalarSize ||
+      layout.xmmBytes !== 256 ||
+      layout.xmm + layout.xmmBytes > layout.size ||
+      layout.vectorScratch < layout.xmm + layout.xmmBytes ||
+      layout.vectorScratch + 16 > layout.size
+    )
+      throw new Error('core returned an incompatible transport layout');
     this.stateView();
   }
 
@@ -248,6 +307,9 @@ export class Core {
       'core_target_check',
       'core_state_ptr',
       'core_import_state',
+      'core_import_xmm',
+      'core_vector_load',
+      'core_vector_store',
       'core_clear_fault',
       'core_probe',
       'core_compile',
@@ -293,12 +355,12 @@ export class Core {
       if (status === 2) throw new RangeError(error);
       throw new Error('mapped initialization returned an invalid status');
     }
-    const core = new Core(exports);
     try {
+      const core = new Core(exports);
       if (context !== undefined) core.setContext(context);
       return core;
     } catch (error) {
-      core.dispose();
+      exports.core_dispose();
       throw error;
     }
   }
@@ -337,14 +399,35 @@ export class Core {
 
   setState(state: State): void {
     const input = captureState(state);
-    const pointer = this.#exports.core_input(this.#layout.size) >>> 0;
-    const view = new DataView(this.#exports.memory.buffer, pointer, this.#layout.size);
+    const pointer = this.#exports.core_input(this.#layout.scalarSize) >>> 0;
+    const view = new DataView(this.#exports.memory.buffer, pointer, this.#layout.scalarSize);
     for (let index = 0; index < 16; index++) {
       view.setBigUint64(this.#layout.registers + index * 8, input.registers[index]!, true);
     }
     view.setBigUint64(this.#layout.flags, input.flags, true);
     view.setBigUint64(this.#layout.rip, input.rip, true);
     if (this.#exports.core_import_state() !== 0)
+      throw new TypeError(this.info<{ error: string }>().error);
+  }
+
+  readXmmState(): bigint[] {
+    const view = this.stateView();
+    return Array.from({ length: 16 }, (_, index) => {
+      const offset = this.#layout.xmm + index * 16;
+      return view.getBigUint64(offset, true) | (view.getBigUint64(offset + 8, true) << 64n);
+    });
+  }
+
+  setXmmState(state: bigint[]): void {
+    const bank = captureXmmState(state);
+    const pointer = this.#exports.core_input(this.#layout.xmmBytes) >>> 0;
+    const view = new DataView(this.#exports.memory.buffer, pointer, this.#layout.xmmBytes);
+    for (let index = 0; index < 16; index++) {
+      const value = bank[index]!;
+      view.setBigUint64(index * 16, value & U64_MAX, true);
+      view.setBigUint64(index * 16 + 8, value >> 64n, true);
+    }
+    if (this.#exports.core_import_xmm() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
   }
 
@@ -421,6 +504,8 @@ export class Core {
         segmented_store: this.#exports.core_segmented_store,
         segmented_access_failed: this.#exports.core_segmented_access_failed,
         access_reason: this.#exports.core_access_reason,
+        vector_load: this.#exports.core_vector_load,
+        vector_store: this.#exports.core_vector_store,
         target_check: this.#exports.core_target_check,
         multiply_high: this.#exports.core_multiply_high,
         divide: this.#exports.core_divide,
@@ -446,7 +531,7 @@ export class Core {
   }
 
   fault(reason: string): Fault | undefined {
-    if (reason === 'segment-fault') return undefined;
+    if (reason === 'segment-fault' || reason === 'alignment-fault') return undefined;
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
     const raw = this.info<null | {
       address: string;
@@ -496,6 +581,23 @@ export class Core {
       instructionPc: this.current().rip,
       offset: BigInt(raw.offset),
       failingOffset: BigInt(raw.failingOffset),
+    };
+  }
+
+  alignmentFault(reason: string): AlignmentFault | undefined {
+    if (reason !== 'alignment-fault') return undefined;
+    this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
+    const raw = this.info<
+      Omit<AlignmentFault, 'instructionPc' | 'offset' | 'address'> & {
+        offset: string;
+        address: string;
+      }
+    >();
+    return {
+      ...raw,
+      instructionPc: this.current().rip,
+      offset: BigInt(raw.offset),
+      address: BigInt(raw.address),
     };
   }
 

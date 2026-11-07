@@ -2,10 +2,12 @@ import { captureContext, type ExecutionContext, type SegmentFault } from './cont
 import {
   Core,
   captureState,
+  captureXmmState,
   copyMemoryInput,
   unsigned64,
   type CompileLimits,
   type Fault,
+  type AlignmentFault,
   type Span,
   type State,
 } from './core.js';
@@ -55,6 +57,7 @@ export interface RunResult {
   state: State;
   fault?: Fault;
   segmentFault?: SegmentFault;
+  alignmentFault?: AlignmentFault;
   resources: {
     compilations: number;
     cacheHits: number;
@@ -93,9 +96,41 @@ function checkedLimits(limits: Limits): Limits {
 }
 
 const CONSTRUCTION = Symbol('createCpu');
+// [] -> [] with v128.const followed by drop: fixed SIMD, no relaxed operations.
+const SIMD_PROBE = Uint8Array.of(
+  0,
+  97,
+  115,
+  109,
+  1,
+  0,
+  0,
+  0,
+  1,
+  4,
+  1,
+  96,
+  0,
+  0,
+  3,
+  2,
+  1,
+  0,
+  10,
+  23,
+  1,
+  21,
+  0,
+  253,
+  12,
+  ...Array<number>(16).fill(0),
+  26,
+  11,
+);
 
 export async function createCpu(options: Options): Promise<Cpu> {
   const began = performance.now();
+  if (!WebAssembly.validate(SIMD_PROBE)) throw new TypeError('WebAssembly SIMD is required');
   const limits = checkedLimits(options.limits);
   const memory = captureInitialMemory(options);
   const contextInput = options.context;
@@ -215,6 +250,16 @@ export class Cpu {
     this.requireIdle();
     return this.engineCall(() => this.#engine.snapshot());
   }
+  setXmmState(state: bigint[]): void {
+    this.requireIdle();
+    const bank = captureXmmState(state);
+    this.requireIdle();
+    this.engineCall(() => this.#engine.setXmmState(bank));
+  }
+  readXmmState(): bigint[] {
+    this.requireIdle();
+    return this.engineCall(() => this.#engine.readXmmState());
+  }
   readMemory(address: bigint, length: number): Uint8Array {
     this.requireIdle();
     return this.engineCall(() => this.#engine.readMemory(address, length));
@@ -266,6 +311,7 @@ export class Cpu {
       this.pruneTranslations();
       const fault = this.#engine.fault(reason);
       const segmentFault = this.#engine.segmentFault(reason);
+      const alignmentFault = this.#engine.alignmentFault(reason);
       const result = {
         reason,
         retired: budget - remaining,
@@ -275,6 +321,7 @@ export class Cpu {
         state: this.#engine.snapshot(),
         ...(fault ? { fault } : {}),
         ...(segmentFault ? { segmentFault } : {}),
+        ...(alignmentFault ? { alignmentFault } : {}),
         resources: { ...resources, ...this.#cache.resources() },
         timings,
       };

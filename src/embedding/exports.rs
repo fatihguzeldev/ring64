@@ -6,10 +6,13 @@ use crate::x86::context::{AccessFailure, ExecutionContext, Segment, SegmentCause
 use crate::x86::decode::{self, DecodeError};
 use crate::x86::state::State;
 
-use super::layout::{DATA, FETCH, INVALID, RESOURCE, RunState, SEGMENT, TARGET, UNSUPPORTED};
+use super::layout::{
+    DATA, FETCH, INVALID, RESOURCE, RunState, SCALAR_STATE_SIZE, SEGMENT, TARGET, UNSUPPORTED,
+};
 
 mod context;
 mod mapped;
+mod vector;
 
 struct Core {
     image: Image,
@@ -19,6 +22,7 @@ struct Core {
     context: ExecutionContext,
     context_version: u64,
     segment_fault: Option<SegmentFault>,
+    alignment_fault: Option<vector::AlignmentFault>,
 }
 
 #[derive(Default)]
@@ -85,6 +89,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             context: ExecutionContext::default(),
             context_version: 0,
             segment_fault: None,
+            alignment_fault: None,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
         0
@@ -99,7 +104,7 @@ pub extern "C" fn core_state_ptr() -> u32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn core_import_state() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
-        if bridge.input.len() != size_of::<RunState>() {
+        if bridge.input.len() != SCALAR_STATE_SIZE {
             return bridge.error("state input length differs");
         }
         let word =
@@ -119,6 +124,7 @@ pub extern "C" fn core_import_state() -> i32 {
         // this foreign-mutable buffer survives the call back into generated wasm.
         unsafe { (&mut *core.state.get()).import(state) };
         core.fault = None;
+        core.alignment_fault = None;
         core.divide_failed = false;
         core.segment_fault = None;
         0
@@ -130,6 +136,7 @@ pub extern "C" fn core_clear_fault() {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
+        core.alignment_fault = None;
         core.divide_failed = false;
         core.segment_fault = None;
         unsafe {
@@ -144,6 +151,7 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
+        core.alignment_fault = None;
         core.segment_fault = None;
         unsafe { (*core.state.get()).fault_segment = Segment::Cs as u32 };
         match decode::decode_with_context(pc, &core.context, |offset| {
@@ -302,6 +310,10 @@ pub extern "C" fn core_fault_info(reason: i32) {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_ref().unwrap();
         let fault = match reason {
+            super::layout::ALIGNMENT => core
+                .alignment_fault
+                .as_ref()
+                .map(vector::AlignmentFault::json),
             SEGMENT => core.segment_fault.as_ref().map(context::segment_fault_json),
             DATA | FETCH => core.fault.as_ref().map(fault_json),
             TARGET => {
@@ -317,7 +329,7 @@ pub extern "C" fn core_fault_info(reason: i32) {
             _ => None,
         };
         let fault = fault.map(|mut value| {
-            if reason != SEGMENT {
+            if reason != SEGMENT && reason != super::layout::ALIGNMENT {
                 let segment = if reason == TARGET {
                     Segment::Cs
                 } else {

@@ -8,7 +8,7 @@ impl Core {
         }
     }
 
-    fn segment_address(
+    pub(super) fn segment_address(
         &mut self,
         offset: u64,
         width: u32,
@@ -70,6 +70,7 @@ pub extern "C" fn core_set_context() -> i32 {
             core.context = context;
             core.context_version = core.context_version.saturating_add(1);
             core.fault = None;
+            core.alignment_fault = None;
             core.segment_fault = None;
             core.divide_failed = false;
         }
@@ -155,7 +156,9 @@ pub extern "C" fn core_segmented_store(offset: u64, width: u32, value: u64, segm
 #[unsafe(no_mangle)]
 pub extern "C" fn core_access_reason() -> i32 {
     BRIDGE.with_borrow(|bridge| {
-        if bridge.core.as_ref().unwrap().segment_fault.is_some() {
+        if bridge.core.as_ref().unwrap().alignment_fault.is_some() {
+            super::super::layout::ALIGNMENT
+        } else if bridge.core.as_ref().unwrap().segment_fault.is_some() {
             SEGMENT
         } else {
             DATA

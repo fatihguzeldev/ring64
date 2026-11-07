@@ -12,8 +12,10 @@ pub const RESOURCE: i32 = 8;
 pub const DIVIDE_ERROR: i32 = 9;
 pub const SEGMENT: i32 = 10;
 pub const REPEAT_BUDGET: i32 = 11;
+pub const ALIGNMENT: i32 = 12;
+pub const SCALAR_STATE_SIZE: usize = 176;
 
-pub const REASONS: [&str; 12] = [
+pub const REASONS: [&str; 13] = [
     "dispatch",
     "budget",
     "stop",
@@ -26,6 +28,7 @@ pub const REASONS: [&str; 12] = [
     "divide-error",
     "segment-fault",
     "repeat-budget",
+    "alignment-fault",
 ];
 
 #[repr(C)]
@@ -37,6 +40,8 @@ pub struct RunState {
     pub target: u64,
     pub fault_segment: u32,
     pub repeat_remaining: u64,
+    pub xmm: [[u8; 16]; 16],
+    pub vector_scratch: [u8; 16],
 }
 
 impl Default for RunState {
@@ -49,6 +54,8 @@ impl Default for RunState {
             target: 0,
             fault_segment: 0,
             repeat_remaining: 0,
+            xmm: [[0; 16]; 16],
+            vector_scratch: [0; 16],
         }
     }
 }
@@ -67,6 +74,10 @@ impl RunState {
     pub fn descriptor() -> serde_json::Value {
         serde_json::json!({
             "size": size_of::<Self>(),
+            "scalarSize": SCALAR_STATE_SIZE,
+            "xmm": std::mem::offset_of!(Self, xmm),
+            "xmmBytes": size_of::<[[u8; 16]; 16]>(),
+            "vectorScratch": std::mem::offset_of!(Self, vector_scratch),
             "registers": std::mem::offset_of!(Self, registers),
             "flags": std::mem::offset_of!(Self, flags),
             "rip": std::mem::offset_of!(Self, rip),
@@ -83,9 +94,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn xmm_banks_append_without_changing_scalar_import_or_legacy_offsets() {
+        let mut state = RunState::default();
+        assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
+        assert_eq!(std::mem::offset_of!(RunState, vector_scratch), 432);
+        assert_eq!(size_of::<RunState>(), 448);
+        assert_eq!(RunState::descriptor()["scalarSize"], 176);
+        assert_eq!(RunState::descriptor()["xmmBytes"], 256);
+        assert_eq!(state.xmm, [[0; 16]; 16]);
+        state.xmm[15] = [0xff; 16];
+        state.import(State::default());
+        assert_eq!(state.xmm[15], [0xff; 16]);
+    }
+
+    #[test]
     fn repeated_work_extends_transport_after_existing_fields() {
         let descriptor = RunState::descriptor();
-        assert_eq!(descriptor["size"], 176);
+        assert_eq!(descriptor["size"], 448);
         assert_eq!(descriptor["repeatRemaining"], 168);
         assert_eq!(descriptor["reasons"][11], "repeat-budget");
     }
@@ -109,7 +134,7 @@ mod tests {
             ]
         );
         assert_eq!(RunState::descriptor()["reasons"][9], "divide-error");
-        assert_eq!(size_of::<RunState>(), 176);
+        assert_eq!(size_of::<RunState>(), 448);
     }
 
     #[test]
@@ -121,8 +146,8 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, target), 152);
         assert_eq!(std::mem::offset_of!(RunState, fault_segment), 160);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
-        assert_eq!(size_of::<RunState>(), 176);
-        assert_eq!(RunState::descriptor()["size"], 176);
+        assert_eq!(size_of::<RunState>(), 448);
+        assert_eq!(RunState::descriptor()["size"], 448);
     }
 
     #[test]

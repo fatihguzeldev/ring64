@@ -15,7 +15,7 @@ browser tests use installed chrome on macos. elsewhere, run `npx playwright inst
 
 ## use
 
-after `npm run build`, this node example executes one guest instruction. the same host module works in a browser with fetched compiler bytes.
+after `npm run build`, this node example executes one guest instruction. the same host module works in a browser with fetched compiler bytes. the runtime must support BigInt and standard fixed128 WebAssembly SIMD, including for scalar guests. `createCpu` checks SIMD support before allocating its Core and rejects unsupported runtimes with `TypeError`.
 
 ```js
 import { readFile } from 'node:fs/promises';
@@ -49,6 +49,8 @@ while idle, `addBacking`, `removeBacking` and `setMappings` manage the layout. `
 
 `context` defaults to long64 with zero FS and GS bases. it can also import real, virtual8086, protected or compatibility execution with loaded segment caches. `readContext()` returns a copy; idle `setContext(context)` replaces it, preserving registers, flags and RIP. a changed context invalidates translations. guest mode transitions are not implemented. see the [execution context contract](specs/mode-context-and-decoding/spec.md) for profile validation and supported instruction forms.
 
-RIP, entry points and stop addresses are logical CS offsets. memory mappings and host memory access use linear addresses. execution can return `segment-fault` with a `segmentFault` record; mapping and address faults use `fault`, which also names the selected segment.
+`readState()`, `setState()` and run results contain the GPR, flags and RIP projection. `readXmmState()` returns a fresh array of sixteen unsigned128-bit bigints; idle `setXmmState(bank)` replaces that complete bank. XMM registers start at zero. scalar state imports and context changes preserve them, including XMM8-15 in modes where guest instructions cannot address those registers. a complete checkpoint includes both state projections, context and memory.
+
+RIP, entry points and stop addresses are logical CS offsets. memory mappings and host memory access use linear addresses. execution can return `segment-fault` with a `segmentFault` record; mapping and address faults use `fault`, which also names the selected segment. aligned SIMD memory operands can return `alignment-fault` with an `alignmentFault` record containing the instruction PC, segment, logical offset, translated address, width, access and required alignment.
 
 memory strings support DF, CLD/STD and REP/REPE/REPNE. `run({ budget, repeatBudget })` counts retired instructions separately from completed repeated elements. `repeatBudget` defaults to `budget`; exhausting it during an unfinished REP returns `repeat-budget` at the same RIP with completed effects preserved. results include `repeatIterations` and `remainingRepeatBudget`. resuming uses the published state; [the string contract](specs/string-and-repeated-execution/spec.md) defines comparison flags, fault repair and code changes between elements.

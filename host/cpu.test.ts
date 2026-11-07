@@ -20,13 +20,19 @@ type Step = { reason: string; remaining: bigint; repeatRemaining: bigint };
 
 async function fixture(steps: Step[] = []) {
   let current = { rip: 0x1000n, remaining: 0n, repeatRemaining: 0n };
+  let xmm = Array<bigint>(16).fill(0n);
   const entries: { budget: bigint; repeatBudget: bigint | undefined }[] = [];
   const engine = {
     current: () => current,
     snapshot: () => ({ registers: Array<bigint>(16).fill(0n), flags: 2n, rip: current.rip }),
+    readXmmState: () => [...xmm],
+    setXmmState: (bank: bigint[]) => {
+      xmm = [...bank];
+    },
     clearFault() {},
     fault() {},
     segmentFault() {},
+    alignmentFault() {},
     probe: () => 'dispatch',
     compile: (pc: bigint) => ({
       bytes: Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0),
@@ -263,3 +269,42 @@ for (const [name, steps] of Object.entries({
     }
   });
 }
+
+test('pending and failed CPUs reject XMM access before capturing user inputs', async () => {
+  const { cpu } = await fixture([{ reason: 'budget', remaining: 0n, repeatRemaining: 0n }]);
+  cpu.setXmmState(Array<bigint>(16).fill(17n));
+  const bank = new Proxy(Array<bigint>(16).fill(3n), {
+    get() {
+      return assert.fail('must not capture busy or failed CPU input');
+    },
+  });
+  const pending = cpu.run({ budget: 1n });
+  assert.throws(() => cpu.setXmmState(bank), /running/);
+  assert.throws(() => cpu.readXmmState(), /running/);
+  await pending;
+  assert.deepEqual(cpu.readXmmState(), Array<bigint>(16).fill(17n));
+  cpu.dispose();
+  const failed = await fixture([{ reason: 'budget', remaining: 1n, repeatRemaining: 0n }]);
+  await assert.rejects(failed.cpu.run({ budget: 1n }), /engine failed/);
+  assert.throws(() => failed.cpu.setXmmState(bank), /failed/);
+  assert.throws(() => failed.cpu.readXmmState(), /failed/);
+  failed.cpu.dispose();
+});
+
+test('a run started by an XMM getter rejects outer publication while retaining completed effects', async () => {
+  const { cpu } = await fixture([{ reason: 'budget', remaining: 0n, repeatRemaining: 0n }]);
+  cpu.setXmmState(Array<bigint>(16).fill(5n));
+  let pending: Promise<unknown> | undefined;
+  const bank = Array<bigint>(16).fill(9n);
+  Object.defineProperty(bank, 0, {
+    get() {
+      pending = cpu.run({ budget: 1n });
+      return 9n;
+    },
+  });
+  assert.throws(() => cpu.setXmmState(bank), /running/);
+  assert.ok(pending);
+  await pending;
+  assert.deepEqual(cpu.readXmmState(), Array<bigint>(16).fill(5n));
+  cpu.dispose();
+});
