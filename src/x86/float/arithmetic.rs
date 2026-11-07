@@ -182,6 +182,7 @@ pub(super) fn compare(format: Format, a: u64, b: u64) -> std::cmp::Ordering {
     .unwrap()
 }
 
+#[cfg(test)]
 fn root(value: u128) -> (u128, u128) {
     let mut remainder = value;
     let mut result = 0u128;
@@ -201,7 +202,8 @@ fn root(value: u128) -> (u128, u128) {
     (result, remainder)
 }
 
-pub(super) fn sqrt(format: Format, value: u64, mxcsr: u32) -> (u64, u32) {
+#[cfg(test)]
+pub(super) fn restoring_sqrt(format: Format, value: u64, mxcsr: u32) -> (u64, u32) {
     if format.zero(value) || format.infinite(value) {
         return (value, 0);
     }
@@ -240,4 +242,61 @@ pub(super) fn sqrt(format: Format, value: u64, mxcsr: u32) -> (u64, u32) {
     }
     let bits = (((output_exponent + bias) as u64) << p) | (result as u64 & format.fraction_mask());
     (bits, if remainder != 0 { 32 } else { 0 })
+}
+
+pub(super) fn sqrt(format: Format, value: u64, mxcsr: u32) -> (u64, u32) {
+    if format.zero(value) || format.infinite(value) {
+        return (value, 0);
+    }
+    let p = format.fraction();
+    let bias = (1i32 << (format.exponent_bits() - 1)) - 1;
+    let encoded_exp = ((value >> p) & ((1 << format.exponent_bits()) - 1)) as i32;
+    let mut significand = value & format.fraction_mask();
+    let mut exponent = if encoded_exp == 0 {
+        1 - bias
+    } else {
+        significand |= 1 << p;
+        encoded_exp - bias
+    };
+    while significand & (1 << p) == 0 {
+        significand <<= 1;
+        exponent -= 1;
+    }
+    if exponent & 1 != 0 {
+        significand <<= 1;
+        exponent -= 1;
+    }
+    let radicand = (significand as u128) << p;
+    let mut rounded = match format {
+        Format::F32 => f32::from_bits(value as u32).sqrt().to_bits() as u64,
+        Format::F64 => f64::from_bits(value).sqrt().to_bits(),
+    };
+    let rounded_exp = ((rounded >> p) & ((1 << format.exponent_bits()) - 1)) as i32 - bias;
+    let rounded_significand = ((rounded & format.fraction_mask()) | (1 << p)) as u128;
+    // The exact integer square decides precision and the adjacent directed result.
+    let scaled_significand = rounded_significand << (rounded_exp - exponent / 2);
+    let square = scaled_significand * scaled_significand;
+    match (mxcsr >> 13) & 3 {
+        1 | 3 if square > radicand => rounded -= 1,
+        2 if square < radicand => rounded += 1,
+        _ => {}
+    }
+    (rounded, if square == radicand { 0 } else { 32 })
+}
+
+pub(super) fn approximate(kind: Kind, format: Format, value: u64) -> u64 {
+    let mut result = match format {
+        Format::F32 => {
+            let x = f32::from_bits(value as u32);
+            (1.0f32 / if kind == Kind::Rsqrt { x.sqrt() } else { x }).to_bits() as u64
+        }
+        Format::F64 => {
+            let x = f64::from_bits(value);
+            (1.0f64 / if kind == Kind::Rsqrt { x.sqrt() } else { x }).to_bits()
+        }
+    };
+    if kind == Kind::Rcp && format.denormal(result) {
+        result &= format.sign();
+    }
+    result
 }

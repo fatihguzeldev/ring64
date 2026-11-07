@@ -80,3 +80,33 @@ fn finite_default_rounding_matches_independent_host_ieee_operations_and_square_r
         }
     }
 }
+
+#[test]
+fn native_square_classification_matches_restoring_integer_root_for_every_round() {
+    let mut seed = 0xb2f408ca5de76319u64;
+    for sample in 0..8192 {
+        for format in [Format::F32, Format::F64] {
+            let random = step(&mut seed);
+            let mut input = if format == Format::F32 {
+                random as u32 as u64 & 0x7f7fffff
+            } else {
+                random & 0x7fefffffffffffff
+            };
+            if sample % 8 == 0 {
+                input &= format.fraction_mask();
+            }
+            if sample % 8 == 1 {
+                input = (input & format.fraction_mask()) | 1 << format.fraction();
+            }
+            for rc in 0..4 {
+                let mxcsr = 0x1f80 | (rc << 13);
+                let expected = arithmetic::restoring_sqrt(format, input, mxcsr);
+                let actual = arithmetic::sqrt(format, input, mxcsr);
+                assert_eq!(
+                    actual, expected,
+                    "sample{sample} {format:?} SQRT{input:x} rc{rc}"
+                );
+            }
+        }
+    }
+}

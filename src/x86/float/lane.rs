@@ -1,4 +1,4 @@
-use super::{Format, Kind, Op, arithmetic};
+use super::{Kind, Op, arithmetic};
 use std::cmp::Ordering;
 
 #[derive(Clone, Copy, Default)]
@@ -189,28 +189,7 @@ pub(super) fn calculate(op: Op, mut lane: Lane, mxcsr: u32) -> Lane {
             },
             mxcsr,
         ),
-        Rcp => {
-            let one = if op.format == Format::F32 {
-                0x3f800000
-            } else {
-                0x3ff0000000000000
-            };
-            let (mut value, _) = arithmetic::binary(Div, op.format, one, lane.right, 0x1f80);
-            if op.format.denormal(value) {
-                value &= op.format.sign();
-            }
-            (value, 0)
-        }
-        Rsqrt => {
-            let (root, _) = arithmetic::sqrt(op.format, lane.right, 0x1f80);
-            let one = if op.format == Format::F32 {
-                0x3f800000
-            } else {
-                0x3ff0000000000000
-            };
-            let (value, _) = arithmetic::binary(Div, op.format, one, root, 0x1f80);
-            (value, 0)
-        }
+        Rcp | Rsqrt => (arithmetic::approximate(op.kind, op.format, lane.right), 0),
         _ => unreachable!(),
     };
     lane.value = value;
