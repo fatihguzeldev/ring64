@@ -3,11 +3,14 @@ import {
   Core,
   captureState,
   captureXmmState,
+  captureMxcsr,
   copyMemoryInput,
   unsigned64,
   type CompileLimits,
   type Fault,
   type AlignmentFault,
+  type SimdException,
+  type GeneralProtectionFault,
   type Span,
   type State,
 } from './core.js';
@@ -58,6 +61,8 @@ export interface RunResult {
   fault?: Fault;
   segmentFault?: SegmentFault;
   alignmentFault?: AlignmentFault;
+  simdException?: SimdException;
+  generalProtectionFault?: GeneralProtectionFault;
   resources: {
     compilations: number;
     cacheHits: number;
@@ -260,6 +265,16 @@ export class Cpu {
     this.requireIdle();
     return this.engineCall(() => this.#engine.readXmmState());
   }
+  readMxcsr(): number {
+    this.requireIdle();
+    return this.engineCall(() => this.#engine.readMxcsr());
+  }
+  setMxcsr(value: number): void {
+    this.requireIdle();
+    const input = captureMxcsr(value);
+    this.requireIdle();
+    this.engineCall(() => this.#engine.setMxcsr(input));
+  }
   readMemory(address: bigint, length: number): Uint8Array {
     this.requireIdle();
     return this.engineCall(() => this.#engine.readMemory(address, length));
@@ -312,6 +327,10 @@ export class Cpu {
       const fault = this.#engine.fault(reason);
       const segmentFault = this.#engine.segmentFault(reason);
       const alignmentFault = this.#engine.alignmentFault(reason);
+      const simdException =
+        reason === 'simd-exception' ? this.#engine.simdException(reason) : undefined;
+      const generalProtectionFault =
+        reason === 'general-protection' ? this.#engine.generalProtectionFault(reason) : undefined;
       const result = {
         reason,
         retired: budget - remaining,
@@ -322,6 +341,8 @@ export class Cpu {
         ...(fault ? { fault } : {}),
         ...(segmentFault ? { segmentFault } : {}),
         ...(alignmentFault ? { alignmentFault } : {}),
+        ...(simdException ? { simdException } : {}),
+        ...(generalProtectionFault ? { generalProtectionFault } : {}),
         resources: { ...resources, ...this.#cache.resources() },
         timings,
       };

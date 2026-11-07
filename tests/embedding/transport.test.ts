@@ -57,11 +57,13 @@ async function fixture(
       initializationError
         ? { error: 'fixture initialization rejected' }
         : {
-            size: 448,
+            size: 456,
             scalarSize: 176,
             xmm: 176,
             xmmBytes: 256,
             vectorScratch: 432,
+            mxcsr: 448,
+            mxcsrBytes: 4,
             registers: 0,
             flags: 128,
             rip: 136,
@@ -94,6 +96,7 @@ async function fixture(
     let instructions = constant(values[name] ?? 0);
     if (name === 'core_import_state') instructions = copy(state, imported, 176);
     if (name === 'core_import_xmm') instructions = copy(state + 176, imported, 256);
+    if (name === 'core_import_mxcsr') instructions = copy(state + 448, imported, 4);
     if (name === 'core_write_memory') instructions = copy(output, imported, 4);
     if (name === 'core_input' && high === 'later-input') {
       instructions = [

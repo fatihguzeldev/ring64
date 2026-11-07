@@ -12,6 +12,7 @@ use super::layout::{
 
 mod context;
 mod mapped;
+mod numeric;
 mod vector;
 
 struct Core {
@@ -23,6 +24,8 @@ struct Core {
     context_version: u64,
     segment_fault: Option<SegmentFault>,
     alignment_fault: Option<vector::AlignmentFault>,
+    simd_exception: Option<numeric::SimdException>,
+    general_protection: Option<numeric::GeneralProtectionFault>,
 }
 
 #[derive(Default)]
@@ -90,6 +93,8 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             context_version: 0,
             segment_fault: None,
             alignment_fault: None,
+            simd_exception: None,
+            general_protection: None,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
         0
@@ -125,6 +130,8 @@ pub extern "C" fn core_import_state() -> i32 {
         unsafe { (&mut *core.state.get()).import(state) };
         core.fault = None;
         core.alignment_fault = None;
+        core.simd_exception = None;
+        core.general_protection = None;
         core.divide_failed = false;
         core.segment_fault = None;
         0
@@ -137,6 +144,8 @@ pub extern "C" fn core_clear_fault() {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
         core.alignment_fault = None;
+        core.simd_exception = None;
+        core.general_protection = None;
         core.divide_failed = false;
         core.segment_fault = None;
         unsafe {
@@ -152,6 +161,8 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
         core.alignment_fault = None;
+        core.simd_exception = None;
+        core.general_protection = None;
         core.segment_fault = None;
         unsafe { (*core.state.get()).fault_segment = Segment::Cs as u32 };
         match decode::decode_with_context(pc, &core.context, |offset| {
@@ -310,6 +321,14 @@ pub extern "C" fn core_fault_info(reason: i32) {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_ref().unwrap();
         let fault = match reason {
+            super::layout::SIMD_EXCEPTION => core
+                .simd_exception
+                .as_ref()
+                .map(numeric::SimdException::json),
+            super::layout::GENERAL_PROTECTION => core
+                .general_protection
+                .as_ref()
+                .map(numeric::GeneralProtectionFault::json),
             super::layout::ALIGNMENT => core
                 .alignment_fault
                 .as_ref()
@@ -329,7 +348,7 @@ pub extern "C" fn core_fault_info(reason: i32) {
             _ => None,
         };
         let fault = fault.map(|mut value| {
-            if reason != SEGMENT && reason != super::layout::ALIGNMENT {
+            if matches!(reason, DATA | FETCH | TARGET) {
                 let segment = if reason == TARGET {
                     Segment::Cs
                 } else {

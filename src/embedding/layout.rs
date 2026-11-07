@@ -13,9 +13,11 @@ pub const DIVIDE_ERROR: i32 = 9;
 pub const SEGMENT: i32 = 10;
 pub const REPEAT_BUDGET: i32 = 11;
 pub const ALIGNMENT: i32 = 12;
+pub const SIMD_EXCEPTION: i32 = 13;
+pub const GENERAL_PROTECTION: i32 = 14;
 pub const SCALAR_STATE_SIZE: usize = 176;
 
-pub const REASONS: [&str; 13] = [
+pub const REASONS: [&str; 15] = [
     "dispatch",
     "budget",
     "stop",
@@ -29,6 +31,8 @@ pub const REASONS: [&str; 13] = [
     "segment-fault",
     "repeat-budget",
     "alignment-fault",
+    "simd-exception",
+    "general-protection",
 ];
 
 #[repr(C)]
@@ -42,6 +46,7 @@ pub struct RunState {
     pub repeat_remaining: u64,
     pub xmm: [[u8; 16]; 16],
     pub vector_scratch: [u8; 16],
+    pub mxcsr: u32,
 }
 
 impl Default for RunState {
@@ -56,6 +61,7 @@ impl Default for RunState {
             repeat_remaining: 0,
             xmm: [[0; 16]; 16],
             vector_scratch: [0; 16],
+            mxcsr: 0x1f80,
         }
     }
 }
@@ -78,6 +84,8 @@ impl RunState {
             "xmm": std::mem::offset_of!(Self, xmm),
             "xmmBytes": size_of::<[[u8; 16]; 16]>(),
             "vectorScratch": std::mem::offset_of!(Self, vector_scratch),
+            "mxcsr": std::mem::offset_of!(Self, mxcsr),
+            "mxcsrBytes": size_of::<u32>(),
             "registers": std::mem::offset_of!(Self, registers),
             "flags": std::mem::offset_of!(Self, flags),
             "rip": std::mem::offset_of!(Self, rip),
@@ -98,7 +106,7 @@ mod tests {
         let mut state = RunState::default();
         assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
         assert_eq!(std::mem::offset_of!(RunState, vector_scratch), 432);
-        assert_eq!(size_of::<RunState>(), 448);
+        assert_eq!(size_of::<RunState>(), 456);
         assert_eq!(RunState::descriptor()["scalarSize"], 176);
         assert_eq!(RunState::descriptor()["xmmBytes"], 256);
         assert_eq!(state.xmm, [[0; 16]; 16]);
@@ -110,7 +118,7 @@ mod tests {
     #[test]
     fn repeated_work_extends_transport_after_existing_fields() {
         let descriptor = RunState::descriptor();
-        assert_eq!(descriptor["size"], 448);
+        assert_eq!(descriptor["size"], 456);
         assert_eq!(descriptor["repeatRemaining"], 168);
         assert_eq!(descriptor["reasons"][11], "repeat-budget");
     }
@@ -134,7 +142,7 @@ mod tests {
             ]
         );
         assert_eq!(RunState::descriptor()["reasons"][9], "divide-error");
-        assert_eq!(size_of::<RunState>(), 448);
+        assert_eq!(size_of::<RunState>(), 456);
     }
 
     #[test]
@@ -146,8 +154,8 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, target), 152);
         assert_eq!(std::mem::offset_of!(RunState, fault_segment), 160);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
-        assert_eq!(size_of::<RunState>(), 448);
-        assert_eq!(RunState::descriptor()["size"], 448);
+        assert_eq!(size_of::<RunState>(), 456);
+        assert_eq!(RunState::descriptor()["size"], 456);
     }
 
     #[test]

@@ -71,6 +71,8 @@ pub extern "C" fn core_set_context() -> i32 {
             core.context_version = core.context_version.saturating_add(1);
             core.fault = None;
             core.alignment_fault = None;
+            core.simd_exception = None;
+            core.general_protection = None;
             core.segment_fault = None;
             core.divide_failed = false;
         }

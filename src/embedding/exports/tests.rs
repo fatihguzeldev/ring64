@@ -250,4 +250,5 @@ fn rejected_mapped_exports_preserve_storage_and_owner_validity() {
 
 mod contexts;
 
+mod mxcsr;
 mod vectors;

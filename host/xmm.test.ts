@@ -19,7 +19,7 @@ const options = () => ({
   limits,
 });
 const layout = {
-  size: 448,
+  size: 456,
   scalarSize: 176,
   registers: 0,
   flags: 128,
@@ -29,6 +29,8 @@ const layout = {
   xmm: 176,
   xmmBytes: 256,
   vectorScratch: 432,
+  mxcsr: 448,
+  mxcsrBytes: 4,
   reasons: ['dispatch', 'alignment-fault'],
 };
 

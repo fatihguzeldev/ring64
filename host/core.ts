@@ -33,6 +33,24 @@ export interface AlignmentFault {
   alignment: number;
 }
 
+export interface SimdException {
+  instructionPc: bigint;
+  vector: 19;
+  stage: 'pre-computation' | 'post-computation';
+  raised: number;
+  unmasked: number;
+  mxcsrBefore: number;
+  mxcsrAfter: number;
+}
+
+export interface GeneralProtectionFault {
+  instructionPc: bigint;
+  vector: 13;
+  errorCode: 0;
+  cause: 'mxcsr-reserved-bits';
+  loadedValue: number;
+}
+
 export interface Span {
   base: bigint;
   bytes: Uint8Array;
@@ -62,6 +80,8 @@ interface Layout {
   xmm: number;
   xmmBytes: number;
   vectorScratch: number;
+  mxcsr: number;
+  mxcsrBytes: number;
   registers: number;
   flags: number;
   rip: number;
@@ -93,6 +113,16 @@ type CoreExports = WebAssembly.Exports & {
   core_state_ptr(): number;
   core_import_state(): number;
   core_import_xmm(): number;
+  core_import_mxcsr(): number;
+  core_float(
+    operation: number,
+    leftLo: bigint,
+    leftHi: bigint,
+    rightLo: bigint,
+    rightHi: bigint,
+  ): number;
+  core_load_mxcsr(offset: bigint, segment: number): number;
+  core_store_mxcsr(offset: bigint, segment: number): number;
   core_vector_load(offset: bigint, width: number, segment: number, alignment: number): number;
   core_vector_store(
     offset: bigint,
@@ -163,6 +193,12 @@ export function captureState(state: State): State {
   const rip = state.rip;
   unsigned64(rip, 'rip');
   return { registers, flags, rip };
+}
+
+export function captureMxcsr(value: number): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 0xffff)
+    throw new TypeError('MXCSR must be an unsigned 16-bit integer number');
+  return value === 0 ? 0 : value;
 }
 
 export function captureXmmState(input: bigint[]): bigint[] {
@@ -237,6 +273,8 @@ export class Core {
       'xmm',
       'xmmBytes',
       'vectorScratch',
+      'mxcsr',
+      'mxcsrBytes',
       'registers',
       'flags',
       'rip',
@@ -269,7 +307,11 @@ export class Core {
       layout.xmmBytes !== 256 ||
       layout.xmm + layout.xmmBytes > layout.size ||
       layout.vectorScratch < layout.xmm + layout.xmmBytes ||
-      layout.vectorScratch + 16 > layout.size
+      layout.vectorScratch + 16 > layout.size ||
+      layout.mxcsr < 448 ||
+      layout.mxcsr < layout.vectorScratch + 16 ||
+      layout.mxcsrBytes !== 4 ||
+      layout.mxcsr + layout.mxcsrBytes > layout.size
     )
       throw new Error('core returned an incompatible transport layout');
     this.stateView();
@@ -308,6 +350,10 @@ export class Core {
       'core_state_ptr',
       'core_import_state',
       'core_import_xmm',
+      'core_import_mxcsr',
+      'core_float',
+      'core_load_mxcsr',
+      'core_store_mxcsr',
       'core_vector_load',
       'core_vector_store',
       'core_clear_fault',
@@ -431,6 +477,22 @@ export class Core {
       throw new TypeError(this.info<{ error: string }>().error);
   }
 
+  readMxcsr(): number {
+    return this.stateView().getUint32(this.#layout.mxcsr, true);
+  }
+
+  setMxcsr(value: number): void {
+    const input = captureMxcsr(value);
+    const pointer = this.#exports.core_input(this.#layout.mxcsrBytes) >>> 0;
+    new DataView(this.#exports.memory.buffer, pointer, this.#layout.mxcsrBytes).setUint32(
+      0,
+      input,
+      true,
+    );
+    if (this.#exports.core_import_mxcsr() !== 0)
+      throw new TypeError(this.info<{ error: string }>().error);
+  }
+
   current(): { rip: bigint; remaining: bigint; repeatRemaining: bigint } {
     const view = this.stateView();
     return {
@@ -506,6 +568,9 @@ export class Core {
         access_reason: this.#exports.core_access_reason,
         vector_load: this.#exports.core_vector_load,
         vector_store: this.#exports.core_vector_store,
+        float: this.#exports.core_float,
+        load_mxcsr: this.#exports.core_load_mxcsr,
+        store_mxcsr: this.#exports.core_store_mxcsr,
         target_check: this.#exports.core_target_check,
         multiply_high: this.#exports.core_multiply_high,
         divide: this.#exports.core_divide,
@@ -531,7 +596,13 @@ export class Core {
   }
 
   fault(reason: string): Fault | undefined {
-    if (reason === 'segment-fault' || reason === 'alignment-fault') return undefined;
+    if (
+      reason === 'segment-fault' ||
+      reason === 'alignment-fault' ||
+      reason === 'simd-exception' ||
+      reason === 'general-protection'
+    )
+      return undefined;
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
     const raw = this.info<null | {
       address: string;
@@ -598,6 +669,24 @@ export class Core {
       instructionPc: this.current().rip,
       offset: BigInt(raw.offset),
       address: BigInt(raw.address),
+    };
+  }
+
+  simdException(reason: string): SimdException | undefined {
+    if (reason !== 'simd-exception') return undefined;
+    this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
+    return {
+      ...this.info<Omit<SimdException, 'instructionPc'>>(),
+      instructionPc: this.current().rip,
+    };
+  }
+
+  generalProtectionFault(reason: string): GeneralProtectionFault | undefined {
+    if (reason !== 'general-protection') return undefined;
+    this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
+    return {
+      ...this.info<Omit<GeneralProtectionFault, 'instructionPc'>>(),
+      instructionPc: this.current().rip,
     };
   }
 

@@ -73,6 +73,8 @@ pub extern "C" fn core_import_xmm() -> i32 {
         core.fault = None;
         core.segment_fault = None;
         core.alignment_fault = None;
+        core.simd_exception = None;
+        core.general_protection = None;
         core.divide_failed = false;
         0
     })
