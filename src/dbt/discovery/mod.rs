@@ -34,25 +34,21 @@ pub(crate) fn discover_with_context(
             continue;
         }
         let mut fetched = Vec::new();
-        let decoded = if identity_source {
+        let Ok(instruction) = decode_with_context(pc, context, |offset| {
             // Long64 CS offsets are linear; fetch already checks the full byte span.
-            decode_with_context(pc, context, |address| {
-                image.fetch(address).map_err(DecodeError::Fetch)
-            })
-        } else {
-            decode_with_context(pc, context, |offset| {
-                let linear = context
-                    .translate(offset, 1, Segment::Cs, Access::Execute, false)
-                    .map_err(|failure| match failure {
-                        AccessFailure::Segment(fault) => DecodeError::Segment(fault),
-                        AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
-                    })?;
-                let byte = image.fetch(linear).map_err(DecodeError::Fetch)?;
-                fetched.push(linear);
-                Ok(byte)
-            })
-        };
-        let Ok(instruction) = decoded else {
+            if identity_source {
+                return image.fetch(offset).map_err(DecodeError::Fetch);
+            }
+            let linear = context
+                .translate(offset, 1, Segment::Cs, Access::Execute, false)
+                .map_err(|failure| match failure {
+                    AccessFailure::Segment(fault) => DecodeError::Segment(fault),
+                    AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
+                })?;
+            let byte = image.fetch(linear).map_err(DecodeError::Fetch)?;
+            fetched.push(linear);
+            Ok(byte)
+        }) else {
             // A future diagnostic is a frontier, never an early guest exit.
             continue;
         };
