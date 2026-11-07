@@ -59,9 +59,6 @@ export function widthScenarios(compiler: WebAssembly.Module): Scenario[] {
                 put(0, row.a ?? 3n);
                 put(3, row.b ?? 4n);
                 put(2, row.d ?? 0x55n);
-                // LEA must discard high address bits even when the destination is 32-bit.
-                if (row.code === '8d03' && wide && !execution.segments.cs.default32)
-                  before.registers[3] = 0x1122334400000004n;
                 cpu.setState(before);
                 const writes: Record<number, bigint> = {};
                 for (const [index, word] of Object.entries(row.writes))

@@ -1,5 +1,5 @@
 import { createCpu, type RunResult, type SegmentFault } from '../../../host/index.js';
-import { LIMITS, check, equal, exit, fault, hex, memory } from '../../support/fixture.js';
+import { LIMITS, check, equal, exit, fault, hex, memory, state } from '../../support/fixture.js';
 import { changed, context, input, using, type Scenario } from './fixture.js';
 
 function segmentFault(result: RunResult, expected: SegmentFault): void {
@@ -47,6 +47,80 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
             memory(cpu, 0x1000n, row.code);
           });
         }
+      },
+    },
+    {
+      name: 'repairing a segment fault resumes without rewriting raw state or reviving old owners',
+      async run() {
+        const broken = context();
+        broken.segments.ds.base = 0x10000n;
+        broken.segments.ds.usable = false;
+        await using(
+          compiler,
+          '8b03',
+          broken,
+          async (cpu) => {
+            const before = input(0x1000n, { 3: 0x2000n });
+            cpu.setState(before);
+            const failed = await cpu.run({ budget: 1n });
+            exit(failed, 'segment-fault', 1n, 0n, before);
+            segmentFault(failed, {
+              instructionPc: 0x1000n,
+              segment: 'ds',
+              offset: 0x2000n,
+              width: 4,
+              access: 'read',
+              cause: 'unusable',
+              failingOffset: 0x2000n,
+            });
+            const faultOwner = cpu.inspectTranslations()[0]!.owner;
+            cpu.setContext(broken);
+            equal(
+              cpu.inspectTranslations()[0]!.owner,
+              faultOwner,
+              'equal context retains faulting owner',
+            );
+            const repaired = context();
+            repaired.segments.ds.base = 0x10000n;
+            cpu.setContext(repaired);
+            state(cpu.readState(), before);
+            equal(cpu.inspectTranslations().length, 0, 'repair retires faulting owner');
+            const resumed = await cpu.run({ budget: 1n });
+            const after = changed(before, 0x1002n, { 0: 0x1122334412345678n });
+            exit(resumed, 'budget', 1n, 1n, after);
+            equal(resumed.fault, undefined, 'repaired linear diagnostic cleared');
+            equal(resumed.segmentFault, undefined, 'repaired segment diagnostic cleared');
+            const repairedOwner = cpu.inspectTranslations()[0]!.owner;
+            check(repairedOwner !== faultOwner, 'repair uses a fresh owner token');
+            cpu.setContext(repaired);
+            equal(cpu.inspectTranslations()[0]!.owner, repairedOwner, 'equal repair retains owner');
+            cpu.setState(before);
+            const reused = await cpu.run({ budget: 1n });
+            exit(reused, 'budget', 1n, 1n, after);
+            equal(reused.resources.compilations, 0, 'same context reuses warm code');
+            const other = context();
+            other.segments.ds.base = 0x20000n;
+            cpu.setContext(other);
+            cpu.setContext(repaired);
+            state(cpu.readState(), after);
+            equal(
+              cpu.inspectTranslations().length,
+              0,
+              'context round trip cannot revive retired owner',
+            );
+            cpu.setState(before);
+            const rebuilt = await cpu.run({ budget: 1n });
+            exit(rebuilt, 'budget', 1n, 1n, after);
+            equal(rebuilt.resources.compilations, 1, 'context round trip recompiles');
+            check(
+              cpu.inspectTranslations()[0]!.owner !== repairedOwner,
+              'context round trip uses a fresh token',
+            );
+            memory(cpu, 0x1000n, '8b03');
+            memory(cpu, 0x11fffn, 'a578563412a5');
+          },
+          { data: [{ base: 0x11fffn, bytes: 'a578563412a5' }] },
+        );
       },
     },
     {
@@ -346,6 +420,56 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
           },
           { codeBase: 0x21000n },
         );
+      },
+    },
+    {
+      name: 'EIP completion wraps while required bytes and reached raw RIP stay in the offset domain',
+      async run() {
+        for (const code of ['f5', '66'])
+          await using(
+            compiler,
+            code,
+            context(),
+            async (cpu) => {
+              const before = input(0xffffffffn);
+              cpu.setState(before);
+              const result = await cpu.run({ budget: 1n });
+              if (code === 'f5') {
+                exit(result, 'budget', 1n, 1n, changed(before, 0n, {}, 0x8d6n));
+                cpu.setState(before);
+                exit(await cpu.run({ budget: 2n }), 'budget', 2n, 2n, changed(before, 1n));
+              } else {
+                exit(result, 'segment-fault', 1n, 0n, before);
+                segmentFault(result, {
+                  instructionPc: 0xffffffffn,
+                  segment: 'cs',
+                  offset: 0x100000000n,
+                  width: 1,
+                  access: 'execute',
+                  cause: 'limit',
+                  failingOffset: 0x100000000n,
+                });
+              }
+              const raw = input(0x100000000n);
+              cpu.setState(raw);
+              exit(await cpu.run({ budget: 0n }), 'budget', 0n, 0n, raw);
+              exit(await cpu.run({ budget: 1n, stop: raw.rip }), 'stop', 1n, 0n, raw);
+              const reached = await cpu.run({ budget: 1n });
+              exit(reached, 'segment-fault', 1n, 0n, raw);
+              segmentFault(reached, {
+                instructionPc: raw.rip,
+                segment: 'cs',
+                offset: raw.rip,
+                width: 1,
+                access: 'execute',
+                cause: 'limit',
+                failingOffset: raw.rip,
+              });
+              memory(cpu, 0xffffffffn, code);
+              memory(cpu, 0n, 'f5');
+            },
+            { entry: 0xffffffffn, data: [{ base: 0n, bytes: 'f5', execute: true }] },
+          );
       },
     },
     {
