@@ -114,27 +114,17 @@ export function decodeScenarios(core: WebAssembly.Module): Scenario[] {
             if (!popped) memory(cpu, pointer, code === '6650' ? '8877' : '8877665544332211');
           });
         for (const code of [
-          'ff10',
-          'ff14',
-          'ff15',
-          'ff20',
-          'ff24',
           'ff1c',
           'ff2c',
           'ffd8',
           'ffe8',
-          'fff0',
           'fff8',
-          '8f',
-          '8fc0',
-          'f050',
           'f2c3',
           'f3c3',
           '9a',
           'ca',
           'cb',
           'c8',
-          'c9',
           '9c',
           '9d',
         ]) {
@@ -149,6 +139,15 @@ export function decodeScenarios(core: WebAssembly.Module): Scenario[] {
             memory(cpu, 0x4000n, RAM);
           });
         }
+        await using('f050', async (cpu) => {
+          const before = input(CODE, { 4: 0x7000n });
+          cpu.setState(before);
+          const result = await cpu.run({ budget: 1n });
+          exit(result, 'invalid-encoding', 1n, 0n, before);
+          noFault(result);
+          equal(result.resources.compilations, 0, 'invalid LOCK precedes operand checks');
+          memory(cpu, 0x4000n, RAM);
+        });
       },
     },
   ];

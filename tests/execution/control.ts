@@ -192,7 +192,7 @@ export function controlScenarios(core: WebAssembly.Module): Scenario[] {
             const input = initial();
             cpu.setState(input);
             const result = await cpu.run({ budget: 3n });
-            const truncated = code === '4889' || code === '4883c0';
+            const truncated = code === '8f' || code === '4889' || code === '4883c0';
             exit(result, truncated ? 'fetch-fault' : 'unsupported', 3n, 0n, input);
             equal(result.resources.compilations, 0, 'diagnostic before compilation');
             if (truncated)

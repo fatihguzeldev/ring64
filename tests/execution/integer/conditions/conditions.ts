@@ -302,7 +302,7 @@ export function conditionScenarios(core: WebAssembly.Module): Scenario[] {
             },
             defaultRam,
           );
-        for (const code of ['e300', '0fc1c0', '0fb1c0'])
+        for (const code of ['0fc1c0', '0fb1c0'])
           await using(
             code,
             async (cpu) => {

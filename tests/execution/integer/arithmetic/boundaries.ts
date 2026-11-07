@@ -76,7 +76,7 @@ export function arithmeticBoundaryScenarios(core: WebAssembly.Module): Scenario[
       name: 'integer arithmetic excluded selectors stop before tails while shared FF prefix decoding requires its selector',
       run: async () => {
         const unsupported = [
-          '66ff14',
+          '66ff1c',
           '660fc8',
           '66470fc8',
           'f30fbc',

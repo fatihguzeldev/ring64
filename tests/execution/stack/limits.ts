@@ -83,12 +83,7 @@ export function limitScenarios(core: WebAssembly.Module): Scenario[] {
               const before = input(CODE, { 4: 0x7000n });
               cpu.setState(before);
               const result = await cpu.run({ budget: 3n });
-              const reason =
-                suffix === '50' || suffix === 'c3'
-                  ? 'resource-limit'
-                  : suffix === '8f'
-                    ? 'unsupported'
-                    : 'fetch-fault';
+              const reason = suffix === '50' || suffix === 'c3' ? 'resource-limit' : 'fetch-fault';
               const after = changed(before, 0x1005n, { 0: 2n });
               exit(result, reason, 3n, 1n, after);
               equal(result.resources.compilations, 1, 'only the completed prefix was translated');
