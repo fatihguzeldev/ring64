@@ -42,6 +42,7 @@ async function mockedCore(
   inputPointer = 512,
 ) {
   let disposed = 0;
+  let initialized = 0;
   let imported = 0;
   let inputLength = 0;
   const infoPointer = 4096;
@@ -56,7 +57,10 @@ async function mockedCore(
     core_info_ptr: () => infoPointer,
     core_info_len: () => json.length,
     core_state_ptr: () => statePointer | 0,
-    core_init_mapped: () => 0,
+    core_init_mapped() {
+      initialized++;
+      return 0;
+    },
     core_dispose() {
       disposed++;
     },
@@ -87,9 +91,20 @@ async function mockedCore(
   try {
     const input = options();
     const core = await Core.create(input.compiler, captureInitialMemory(input));
-    return { core, memory, imported: () => imported, disposed: () => disposed };
+    return {
+      core,
+      memory,
+      imported: () => imported,
+      disposed: () => disposed,
+      initialized: () => initialized,
+    };
   } catch (error) {
-    return { error, imported: () => imported, disposed: () => disposed };
+    return {
+      error,
+      imported: () => imported,
+      disposed: () => disposed,
+      initialized: () => initialized,
+    };
   } finally {
     WebAssembly.instantiate = instantiate;
   }
@@ -164,6 +179,17 @@ test('XMM layout rejects incompatible extents and cleans up the initialized core
   for (const name of ['core_import_xmm', 'core_vector_load', 'core_vector_store']) {
     const missing = await mockedCore(layout, 8192, undefined, name);
     assert.match(String(missing.error), new RegExp(name));
+    assert.equal(missing.imported(), 0);
+  }
+});
+
+test('required wide arithmetic helpers reject construction before core initialization', async () => {
+  for (const name of ['core_multiply_high', 'core_divide', 'core_divide_failed']) {
+    const missing = await mockedCore(layout, 8192, undefined, name);
+    missing.core?.dispose();
+    assert.match(String(missing.error), new RegExp(name));
+    assert.equal(missing.initialized(), 0);
+    assert.equal(missing.disposed(), 0);
     assert.equal(missing.imported(), 0);
   }
 });
