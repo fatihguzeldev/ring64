@@ -321,7 +321,7 @@ export function observationScenarios(core: WebAssembly.Module): Scenario[] {
             const instruction = operation === 'ret' ? 'c3' : operation === 'call' ? 'ffd0' : 'ffe0';
             const code =
               instruction +
-              (destination === 'unsupported' ? '90' : destination === 'truncated' ? 'e8' : '');
+              (destination === 'unsupported' ? 'f4' : destination === 'truncated' ? 'e8' : '');
             const target =
               destination === 'unmapped'
                 ? 0x7000n

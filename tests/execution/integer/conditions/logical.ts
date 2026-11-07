@@ -341,7 +341,7 @@ export function logicalScenarios(core: WebAssembly.Module): Scenario[] {
               const stopped = await cpu.run({ budget: 1n, stop: CODE });
               exit(stopped, 'stop', 1n, 0n, before);
               const reached = await cpu.run({ budget: 1n });
-              exit(reached, 'unsupported', 1n, 0n, before);
+              exit(reached, code === 'f021c0' ? 'invalid-encoding' : 'unsupported', 1n, 0n, before);
               noFault(reached);
               equal(reached.resources.compilations, 0, 'unsupported precedes translation');
               memory(cpu, 0x4000n, '00');

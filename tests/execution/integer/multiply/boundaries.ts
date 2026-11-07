@@ -77,7 +77,13 @@ export function multiplyBoundaryScenarios(core: WebAssembly.Module): Scenario[] 
               const before = input(CODE, { 1: 0n, 3: 0x800000000000n });
               cpu.setState(before);
               const result = await cpu.run({ budget: 1n });
-              exit(result, 'unsupported', 1n, 0n, before);
+              exit(
+                result,
+                code === 'f048f7f1' ? 'invalid-encoding' : 'unsupported',
+                1n,
+                0n,
+                before,
+              );
               noFault(result);
               equal(
                 result.resources.compilations,

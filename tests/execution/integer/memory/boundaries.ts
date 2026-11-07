@@ -343,7 +343,6 @@ export function boundaryScenarios(core: WebAssembly.Module): Scenario[] {
           'f7c9',
           'f7ca',
           '66f70b',
-          'f00103',
           'f30103',
           'f60b',
           'f7cd',

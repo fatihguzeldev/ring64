@@ -81,7 +81,6 @@ export function arithmeticBoundaryScenarios(core: WebAssembly.Module): Scenario[
           '66470fc8',
           'f30fbc',
           'f30fbd',
-          'f001',
           'f201',
           'f301',
         ];
