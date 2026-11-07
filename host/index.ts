@@ -7,3 +7,10 @@ export type {
   MemoryMapping,
   MemoryLimits,
 } from './memory.js';
+export type {
+  ExecutionContext,
+  LoadedSegment,
+  SegmentName,
+  SegmentType,
+  SegmentFault,
+} from './context.js';

@@ -42,10 +42,6 @@ const TYPES: readonly SegmentType[] = [
   'expand-down-read-write',
 ];
 
-export function defaultContext(): ExecutionContext {
-  return { mode: 'long64', fsBase: 0n, gsBase: 0n };
-}
-
 function captureSegment(segment: LoadedSegment): LoadedSegment {
   const base = segment.base;
   const limit = segment.limit;

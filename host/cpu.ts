@@ -1,3 +1,4 @@
+import { captureContext, type ExecutionContext, type SegmentFault } from './context.js';
 import {
   Core,
   captureState,
@@ -30,6 +31,7 @@ export interface Limits extends CompileLimits {
 interface CommonOptions {
   compiler: Uint8Array | WebAssembly.Module;
   limits: Limits;
+  context?: ExecutionContext;
 }
 
 export type Options = CommonOptions &
@@ -50,6 +52,7 @@ export interface RunResult {
   remaining: bigint;
   state: State;
   fault?: Fault;
+  segmentFault?: SegmentFault;
   resources: {
     compilations: number;
     cacheHits: number;
@@ -93,7 +96,9 @@ export async function createCpu(options: Options): Promise<Cpu> {
   const began = performance.now();
   const limits = checkedLimits(options.limits);
   const memory = captureInitialMemory(options);
-  const core = await Core.create(options.compiler, memory);
+  const contextInput = options.context;
+  const context = contextInput === undefined ? undefined : captureContext(contextInput);
+  const core = await Core.create(options.compiler, memory, context);
   return new Cpu(
     CONSTRUCTION,
     core,
@@ -184,6 +189,19 @@ export class Cpu {
     this.pruneTranslations();
   }
 
+  readContext(): ExecutionContext {
+    this.requireIdle();
+    return this.engineCall(() => this.#engine.readContext());
+  }
+
+  setContext(context: ExecutionContext): void {
+    this.requireIdle();
+    const input = captureContext(context);
+    this.requireIdle();
+    this.engineCall(() => this.#engine.setContext(input));
+    this.pruneTranslations();
+  }
+
   setState(state: State): void {
     this.requireIdle();
     const input = captureState(state);
@@ -236,12 +254,14 @@ export class Cpu {
     const finish = (reason: string): RunResult => {
       this.pruneTranslations();
       const fault = this.#engine.fault(reason);
+      const segmentFault = this.#engine.segmentFault(reason);
       const result = {
         reason,
         retired: budget - remaining,
         remaining,
         state: this.#engine.snapshot(),
         ...(fault ? { fault } : {}),
+        ...(segmentFault ? { segmentFault } : {}),
         resources: { ...resources, ...this.#cache.resources() },
         timings,
       };
@@ -277,7 +297,11 @@ export class Cpu {
             at = performance.now();
             const module = await WebAssembly.compile(new Uint8Array(output.bytes));
             timings.browserCompileMs += performance.now() - at;
-            if (!this.#engine.valid(output.metadata.owner)) continue;
+            if (
+              this.#engine.contextVersion() !== output.metadata.contextVersion ||
+              !this.#engine.valid(output.metadata.owner)
+            )
+              continue;
             at = performance.now();
             const artifact: Artifact = {
               run: this.#engine.instantiate(module),

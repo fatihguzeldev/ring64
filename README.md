@@ -46,3 +46,7 @@ try {
 `code` and `ram` create copied RX and RW mappings. for multiple regions or aliases, replace them with `memory: { backings, mappings }`, an explicit `entry` and `memoryLimits`. a backing owns bytes; mappings expose its slices at guest addresses with independent read, write and execute permissions. see the [memory contract](specs/memory-map-and-code-validity/spec.md) for the input types and limits.
 
 while idle, `addBacking`, `removeBacking` and `setMappings` manage the layout. `setMappings` atomically replaces the whole table; remove a backing only after unmapping it. `readMemory` requires read permission and `writeMemory` requires write permission. writes through any alias invalidate affected translations, including when guest code changes its own instructions.
+
+`context` defaults to long64 with zero FS and GS bases. it can also import real, virtual8086, protected or compatibility execution with loaded segment caches. `readContext()` returns a copy; idle `setContext(context)` replaces it, preserving registers, flags and RIP. a changed context invalidates translations. guest mode transitions are not implemented. see the [execution context contract](specs/mode-context-and-decoding/spec.md) for profile validation and supported instruction forms.
+
+RIP, entry points and stop addresses are logical CS offsets. memory mappings and host memory access use linear addresses. execution can return `segment-fault` with a `segmentFault` record; mapping and address faults use `fault`, which also names the selected segment.

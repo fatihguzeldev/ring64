@@ -12,6 +12,7 @@ function artifact(entries: bigint[], byteLength: number): Artifact {
       blockCount: entries.length,
       sourceBytes: entries.length,
       owner: 1n,
+      contextVersion: 0n,
       dependencies: entries.map((start) => ({ start, length: 1 })),
     },
   };

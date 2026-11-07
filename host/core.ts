@@ -1,3 +1,10 @@
+import {
+  contextFromJson,
+  type ContextInfo,
+  type ExecutionContext,
+  type SegmentFault,
+  type SegmentName,
+} from './context.js';
 import type { InitialMemory, MemoryBackingInput, MemoryMapping } from './memory.js';
 
 export interface State {
@@ -7,6 +14,7 @@ export interface State {
 }
 
 export interface Fault {
+  segment: SegmentName;
   instructionPc: bigint;
   address: bigint;
   width: number;
@@ -33,6 +41,7 @@ export interface UnitMetadata {
   blockCount: number;
   sourceBytes: number;
   owner: bigint;
+  contextVersion: bigint;
   dependencies: { start: bigint; length: number }[];
   byteLength: number;
 }
@@ -57,6 +66,14 @@ type CoreExports = WebAssembly.Exports & {
   core_validity(owner: bigint): number;
   core_activate(owner: bigint): number;
   core_release(owner: bigint): void;
+  core_context_info(): void;
+  core_context_version(): bigint;
+  core_set_context(): number;
+  core_segmented_load(offset: bigint, width: number, segment: number): bigint;
+  core_segmented_load_for_write(offset: bigint, width: number, segment: number): bigint;
+  core_segmented_store(offset: bigint, width: number, value: bigint, segment: number): number;
+  core_access_reason(): number;
+  core_target_check(target: bigint): number;
   core_state_ptr(): number;
   core_import_state(): number;
   core_clear_fault(): void;
@@ -192,6 +209,7 @@ export class Core {
   static async create(
     compiler: Uint8Array | WebAssembly.Module,
     memory: InitialMemory,
+    context?: ExecutionContext,
   ): Promise<Core> {
     const module =
       compiler instanceof WebAssembly.Module
@@ -209,6 +227,14 @@ export class Core {
       'core_validity',
       'core_activate',
       'core_release',
+      'core_context_info',
+      'core_context_version',
+      'core_set_context',
+      'core_segmented_load',
+      'core_segmented_load_for_write',
+      'core_segmented_store',
+      'core_access_reason',
+      'core_target_check',
       'core_state_ptr',
       'core_import_state',
       'core_clear_fault',
@@ -252,7 +278,14 @@ export class Core {
       if (status === 2) throw new RangeError(error);
       throw new Error('mapped initialization returned an invalid status');
     }
-    return new Core(exports);
+    const core = new Core(exports);
+    try {
+      if (context !== undefined) core.setContext(context);
+      return core;
+    } catch (error) {
+      core.dispose();
+      throw error;
+    }
   }
 
   private info<T>(): T {
@@ -335,9 +368,10 @@ export class Core {
     if (this.reason(status) === 'resource-limit') return undefined;
     if (status !== 0) throw new Error('translator returned an unexpected result');
     const metadata = this.info<
-      Omit<UnitMetadata, 'entries' | 'byteLength' | 'owner' | 'dependencies'> & {
+      Omit<UnitMetadata, 'entries' | 'byteLength' | 'owner' | 'dependencies' | 'contextVersion'> & {
         entries: string[];
         owner: string;
+        contextVersion: string;
         dependencies: { start: string; length: number }[];
       }
     >();
@@ -348,6 +382,7 @@ export class Core {
         ...metadata,
         entries: metadata.entries.map((pc) => BigInt(pc)),
         owner: BigInt(metadata.owner),
+        contextVersion: BigInt(metadata.contextVersion),
         dependencies: metadata.dependencies.map(({ start, length }) => ({
           start: BigInt(start),
           length,
@@ -365,6 +400,11 @@ export class Core {
         load_for_write: this.#exports.core_load_for_write,
         store: this.#exports.core_store,
         access_failed: this.#exports.core_access_failed,
+        segmented_load: this.#exports.core_segmented_load,
+        segmented_load_for_write: this.#exports.core_segmented_load_for_write,
+        segmented_store: this.#exports.core_segmented_store,
+        access_reason: this.#exports.core_access_reason,
+        target_check: this.#exports.core_target_check,
         multiply_high: this.#exports.core_multiply_high,
         divide: this.#exports.core_divide,
         divide_failed: this.#exports.core_divide_failed,
@@ -382,6 +422,7 @@ export class Core {
   }
 
   fault(reason: string): Fault | undefined {
+    if (reason === 'segment-fault') return undefined;
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
     const raw = this.info<null | {
       address: string;
@@ -389,6 +430,7 @@ export class Core {
       access: Fault['access'];
       cause: Fault['cause'];
       failingAddress: string;
+      segment: SegmentName;
     }>();
     return raw === null
       ? undefined
@@ -398,6 +440,39 @@ export class Core {
           address: BigInt(raw.address),
           failingAddress: BigInt(raw.failingAddress),
         };
+  }
+
+  readContext(): ExecutionContext {
+    this.#exports.core_context_info();
+    return contextFromJson(this.info<ContextInfo>());
+  }
+
+  setContext(context: ExecutionContext): void {
+    writeInput(this.#exports, context);
+    const status = this.#exports.core_set_context();
+    if (status === 1) throw new TypeError(this.info<{ error: string }>().error);
+    if (status !== 0) throw new Error('invalid context mutation status');
+  }
+
+  contextVersion(): bigint {
+    return BigInt.asUintN(64, this.#exports.core_context_version());
+  }
+
+  segmentFault(reason: string): SegmentFault | undefined {
+    if (reason !== 'segment-fault') return undefined;
+    this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
+    const raw = this.info<
+      Omit<SegmentFault, 'instructionPc' | 'offset' | 'failingOffset'> & {
+        offset: string;
+        failingOffset: string;
+      }
+    >();
+    return {
+      ...raw,
+      instructionPc: this.current().rip,
+      offset: BigInt(raw.offset),
+      failingOffset: BigInt(raw.failingOffset),
+    };
   }
 
   readMemory(address: bigint, length: number): Uint8Array {
