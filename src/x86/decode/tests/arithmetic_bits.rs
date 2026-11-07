@@ -749,11 +749,11 @@ fn bit_family_exclusions_stop_at_the_deciding_prefix_or_selector() {
             }
         }
     }
-    for bytes in [
-        &[0xf0, 0x0f, 0xab][..],
-        &[0xf3, 0x0f, 0xbc][..],
-        &[0xf3, 0x0f, 0xbd][..],
-    ] {
+    for bytes in [&[0xf3, 0x0f, 0xbc][..], &[0xf3, 0x0f, 0xbd][..]] {
         assert_eq!(at(0x1000, bytes), Err(DecodeError::Unsupported));
     }
+    assert!(matches!(
+        at(0x1000, &[0xf0, 0x0f, 0xab]),
+        Err(DecodeError::Fetch(_))
+    ));
 }

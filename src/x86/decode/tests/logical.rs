@@ -238,12 +238,16 @@ fn unsupported_logical_selectors_do_not_request_operand_tails() {
 
 #[test]
 fn logical_extensions_admit_byte_and_accumulator_forms_but_keep_other_prefixes_unsupported() {
-    for prefix in [0xf0, 0xf2, 0xf3] {
+    for prefix in [0xf2, 0xf3] {
         assert_eq!(
             at(0x1000, &[prefix, 0x45, 0x21, 0xc8]),
             Err(DecodeError::Unsupported)
         );
     }
+    assert_eq!(
+        at(0x1000, &[0xf0, 0x45, 0x21, 0xc8]),
+        Err(DecodeError::Invalid)
+    );
     for opcode in [0x20, 0x22, 0x08, 0x0a, 0x30, 0x32, 0x84, 0x80, 0xf6] {
         assert!(matches!(
             at(0x1000, &[0x4f, opcode, 0xc0, 0xff]).unwrap().operation,

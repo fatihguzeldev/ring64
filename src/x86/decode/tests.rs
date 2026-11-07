@@ -9,6 +9,7 @@ use crate::x86::instruction::{
 mod addressing;
 mod arithmetic_bits;
 mod conditions;
+mod exchange;
 mod integer_memory;
 mod logical;
 mod modes;
@@ -375,7 +376,7 @@ fn relative_targets_use_the_following_pc_and_signed_displacements() {
 
 #[test]
 fn valid_forms_outside_the_subset_are_unsupported_without_operand_effects() {
-    for bytes in [&[0x82, 0xd0, 1][..], &[0xf4][..], &[0x0f, 0xc0, 0xc0][..]] {
+    for bytes in [&[0x82, 0xd0, 1][..], &[0xf4][..]] {
         assert_eq!(
             at(0x1000, bytes),
             Err(DecodeError::Unsupported),

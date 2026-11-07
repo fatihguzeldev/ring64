@@ -340,16 +340,23 @@ fn new_forms_reject_unsupported_prefixes_after_opcode_before_operands() {
         ] {
             let bytes = [prefix, suffix].concat();
             let mut reads = Vec::new();
+            let required = prefix.len()
+                + usize::from(prefix == [0xf0] && matches!(suffix[0], 0xf6 | 0x0f))
+                + 1;
             assert_eq!(
                 decode(0x1000, |address| {
                     reads.push(address);
-                    assert!(address <= 0x1000 + prefix.len() as u64);
+                    assert!(address < 0x1000 + required as u64);
                     Ok(bytes[(address - 0x1000) as usize])
                 }),
-                Err(DecodeError::Unsupported),
+                Err(if prefix == [0xf0] && suffix[0] == 0xf6 {
+                    DecodeError::Invalid
+                } else {
+                    DecodeError::Unsupported
+                }),
                 "{bytes:02x?}"
             );
-            assert_eq!(reads.len(), prefix.len() + 1);
+            assert_eq!(reads.len(), required);
         }
     }
 }

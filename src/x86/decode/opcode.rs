@@ -16,10 +16,43 @@ where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
     let operation = refine_inner(opcode, prefixes, cursor)?;
-    if prefixes.lock {
+    if prefixes.lock && !lockable(operation) {
         Err(DecodeError::Invalid)
     } else {
         Ok(operation)
+    }
+}
+
+fn lockable(operation: Operation) -> bool {
+    match operation {
+        Operation::MemoryAlu {
+            kind,
+            operands: MemoryAluOperands::MemoryFirst(_),
+            ..
+        } => kind.writes_result(),
+        Operation::Unary {
+            dst: Location::Memory(_),
+            ..
+        }
+        | Operation::Exchange {
+            dst: Location::Memory(_),
+            ..
+        }
+        | Operation::Xadd {
+            dst: Location::Memory(_),
+            ..
+        }
+        | Operation::CompareExchange {
+            dst: Location::Memory(_),
+            ..
+        }
+        | Operation::CompareExchange8b { .. } => true,
+        Operation::Bit {
+            kind,
+            dst: Location::Memory(_),
+            ..
+        } => kind.writes_result(),
+        _ => false,
     }
 }
 
@@ -40,7 +73,11 @@ where
         _ => None,
     };
     if prefixes.lock
-        && !matches!(opcode, 0x50..=0x5f | 0x68 | 0x6a | 0x8f | 0xc2 | 0xc3 | 0xc9 | 0xe0..=0xe3 | 0xe8 | 0xff)
+        && !matches!(opcode,
+            0x00..=0x05 | 0x08..=0x0d | 0x0f | 0x10..=0x15 | 0x18..=0x1d
+            | 0x20..=0x25 | 0x28..=0x2d | 0x30..=0x35 | 0x38..=0x3d
+            | 0x50..=0x5f | 0x68 | 0x6a | 0x80 | 0x81 | 0x83..=0x87 | 0x8f | 0x90..=0x97
+            | 0xc2 | 0xc3 | 0xc9 | 0xe0..=0xe3 | 0xe8 | 0xf6 | 0xf7 | 0xfe | 0xff)
     {
         return Err(if string_kind.is_some() || matches!(opcode, 0xfc | 0xfd) {
             DecodeError::Invalid
@@ -73,6 +110,27 @@ where
     let stack_width = prefixes.stack_width();
     let near_width = prefixes.near_width();
     match opcode {
+        0x86 | 0x87 => {
+            let width = byte_or_wide(opcode, wide);
+            let operands = ModRm::read(cursor, rex)?;
+            Ok(Operation::Exchange {
+                dst: operands.location(cursor, prefixes, width)?,
+                src: rex.view(operands.register, width),
+                width,
+            })
+        }
+        0x90..=0x97 => {
+            let bank = (opcode - 0x90) | rex.base_extension();
+            Ok(if bank == 0 {
+                Operation::Nop
+            } else {
+                Operation::Exchange {
+                    dst: Location::Register(RegisterView::low(bank)),
+                    src: RegisterView::low(0),
+                    width: wide,
+                }
+            })
+        }
         0xfc | 0xfd => Ok(Operation::Direction {
             set: opcode == 0xfd,
         }),
@@ -154,9 +212,6 @@ where
         0xff => {
             let operands = ModRm::read(cursor, rex)?;
             if operands.selector <= 1 {
-                if prefixes.lock {
-                    return Err(DecodeError::Unsupported);
-                }
                 return Ok(Operation::Unary {
                     kind: if operands.selector == 0 {
                         Unary::Inc
@@ -541,7 +596,41 @@ where
 {
     let rex = prefixes.rex;
     let width = prefixes.width();
+    if prefixes.lock
+        && !matches!(
+            opcode,
+            0xa3 | 0xab | 0xb3 | 0xbb | 0xba | 0xb0 | 0xb1 | 0xc0 | 0xc1 | 0xc7
+        )
+    {
+        return Err(DecodeError::Unsupported);
+    }
     match opcode {
+        0xb0 | 0xb1 | 0xc0 | 0xc1 => {
+            let width = byte_or_wide(opcode, width);
+            let operands = ModRm::read(cursor, rex)?;
+            let dst = operands.location(cursor, prefixes, width)?;
+            let src = rex.view(operands.register, width);
+            Ok(if opcode & 0xf0 == 0xb0 {
+                Operation::CompareExchange { dst, src, width }
+            } else {
+                Operation::Xadd { dst, src, width }
+            })
+        }
+        0xc7 => {
+            let operands = ModRm::read(cursor, rex)?;
+            if operands.selector != 1 {
+                return Err(DecodeError::Unsupported);
+            }
+            if operands.mode == 3 {
+                return Err(DecodeError::Invalid);
+            }
+            if width == Width::W64 {
+                return Err(DecodeError::Unsupported);
+            }
+            Ok(Operation::CompareExchange8b {
+                address: operands.address(cursor, prefixes)?,
+            })
+        }
         0xaf => {
             let operands = ModRm::read(cursor, rex)?;
             Ok(Operation::Imul {
