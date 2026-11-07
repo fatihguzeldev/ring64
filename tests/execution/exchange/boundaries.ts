@@ -306,6 +306,7 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
       name: 'selected LOCK decode diagnostics consume required tails without accessing operand data',
       async run() {
         for (const code of [
+          'f00303',
           'f086c0',
           'f087c0',
           'f00fc0c0',

@@ -223,7 +223,7 @@ fn selected_lock_opcode_groups_keep_every_modifying_family_and_reject_readonly_m
             if selector == 7 {
                 assert_eq!(decoded, Err(DecodeError::Invalid));
             } else {
-                assert!(matches!(decoded, Ok(_)));
+                assert!(decoded.is_ok());
             }
         }
     }
