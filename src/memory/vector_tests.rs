@@ -148,6 +148,35 @@ fn vector_alias_stores_commit_in_linear_order() {
 }
 
 #[test]
+fn split_alias_stores_end_at_the_last_guest_byte_without_wrapping() {
+    let address = u64::MAX - 15;
+    let payload: Vec<u8> = (0xa0..0xb0).collect();
+    for split in [1, 8, 15] {
+        let mut image = image(vec![
+            mapping(address, 3, split, false, true),
+            mapping(address + u64::from(split), 7, 16 - split, false, true),
+        ]);
+        let mut expected: Vec<u8> = (0..32).collect();
+        for (byte, &value) in payload.iter().enumerate() {
+            let offset = if byte < split as usize {
+                3 + byte
+            } else {
+                7 + byte - split as usize
+            };
+            expected[offset] = value;
+        }
+        assert_eq!(image.write_bytes(address, &payload), Ok(()));
+        assert_eq!(image.backings[0].bytes, expected, "split{split}");
+        let fault = image.write_bytes(address + 1, &[0x55; 16]).unwrap_err();
+        assert_eq!(
+            (fault.cause, fault.failing),
+            (Cause::AddressRange, 1u128 << 64)
+        );
+        assert_eq!(image.backings[0].bytes, expected, "split{split} overflow");
+    }
+}
+
+#[test]
 fn one_mapping_write_only_stores_preserve_guards_and_invalidate_executable_aliases() {
     for identical in [false, true] {
         let writable = mapping(0x1000, 3, 24, false, true);

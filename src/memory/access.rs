@@ -117,13 +117,13 @@ impl Image {
     }
 
     fn write_after_preflight(&mut self, address: u64, bytes: &[u8], mut index: usize) {
-        let mut cursor = u128::from(address);
-        let end = cursor + bytes.len() as u128;
+        let mut cursor = address;
         let mut source = 0;
-        while cursor < end {
+        while source < bytes.len() {
             let mapping = &self.mappings[index];
-            let offset = mapping.offset as usize + (cursor as u64 - mapping.base) as usize;
-            let count = (end.min(mapping.end()) - cursor) as usize;
+            let relative = (cursor - mapping.base) as usize;
+            let offset = mapping.offset as usize + relative;
+            let count = (bytes.len() - source).min(mapping.length as usize - relative);
             let backing = &mut self.backings[mapping.backing];
             if backing.has_sources {
                 self.validity
@@ -131,8 +131,10 @@ impl Image {
             }
             backing.bytes[offset..offset + count].copy_from_slice(&bytes[source..source + count]);
             source += count;
-            cursor += count as u128;
-            index += 1;
+            if source < bytes.len() {
+                cursor += count as u64;
+                index += 1;
+            }
         }
     }
 
