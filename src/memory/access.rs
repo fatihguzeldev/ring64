@@ -93,6 +93,12 @@ impl Image {
             let offset = mapping.offset as usize + (cursor - mapping.base) as usize;
             let count =
                 (width as usize - copied).min((mapping.end() - u128::from(cursor)) as usize);
+            // A full transport chunk is the complete admitted operand.
+            if count == 16 {
+                return Ok(self.backings[mapping.backing].bytes[offset..offset + 16]
+                    .try_into()
+                    .unwrap());
+            }
             output[copied..copied + count]
                 .copy_from_slice(&self.backings[mapping.backing].bytes[offset..offset + count]);
             copied += count;

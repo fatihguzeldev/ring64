@@ -16,3 +16,6 @@ mod mapped_tests;
 
 #[cfg(test)]
 mod vector_tests;
+
+#[cfg(test)]
+mod vector_read_tests;
