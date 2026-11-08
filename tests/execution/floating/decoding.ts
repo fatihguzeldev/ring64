@@ -38,7 +38,7 @@ export function decodeScenarios(compiler: WebAssembly.Module): Scenario[] {
           ['f0660f5800', 'invalid-encoding'],
           ['f00fc2842400000000ff', 'invalid-encoding'],
           ['0fae24', 'unsupported'],
-          ['0faef0', 'unsupported'],
+          ['0fae30', 'unsupported'],
           ['660fae', 'unsupported'],
           ['f20fae', 'unsupported'],
           ['f30fae', 'unsupported'],

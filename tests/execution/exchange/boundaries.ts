@@ -337,7 +337,7 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
             );
           });
         for (const code of [
-          'f390',
+          'f3f290',
           'f290',
           'f0f090',
           'f2f08703',
