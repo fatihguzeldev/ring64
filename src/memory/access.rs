@@ -116,6 +116,75 @@ impl Image {
             .map(|_| ())
     }
 
+    pub fn read_fields(
+        &self,
+        address: u64,
+        width: u32,
+        fields: &[(u32, u32)],
+        output: &mut [u8],
+    ) -> Result<(), Fault> {
+        Self::check_fields(width, fields, output.len());
+        let mut index = self.preflight(address, width, Access::Read, false, false)?;
+        for &(start, length) in fields {
+            let mut cursor = address + u64::from(start);
+            while self.mappings[index].end() <= u128::from(cursor) {
+                index += 1;
+            }
+            let target = &mut output[start as usize..(start + length) as usize];
+            let mut copied = 0;
+            while copied < target.len() {
+                let mapping = &self.mappings[index];
+                let relative = (cursor - mapping.base) as usize;
+                let offset = mapping.offset as usize + relative;
+                let count = (target.len() - copied).min(mapping.length as usize - relative);
+                target[copied..copied + count]
+                    .copy_from_slice(&self.backings[mapping.backing].bytes[offset..offset + count]);
+                copied += count;
+                if copied < target.len() {
+                    cursor += count as u64;
+                    index += 1;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn write_fields(
+        &mut self,
+        address: u64,
+        width: u32,
+        fields: &[(u32, u32)],
+        bytes: &[u8],
+    ) -> Result<(), Fault> {
+        Self::check_fields(width, fields, bytes.len());
+        let mut index = self.preflight(address, width, Access::Write, false, false)?;
+        for &(start, length) in fields {
+            let cursor = address + u64::from(start);
+            while self.mappings[index].end() <= u128::from(cursor) {
+                index += 1;
+            }
+            self.write_after_preflight(
+                cursor,
+                &bytes[start as usize..(start + length) as usize],
+                index,
+            );
+        }
+        Ok(())
+    }
+
+    fn check_fields(width: u32, fields: &[(u32, u32)], buffer_length: usize) {
+        assert!(width as usize <= buffer_length, "field buffer is too short");
+        let mut end = 0;
+        for &(start, length) in fields {
+            let next = u64::from(start) + u64::from(length);
+            assert!(
+                length != 0 && start >= end && next <= u64::from(width),
+                "fields must be nonempty ordered slices of the nominal operand"
+            );
+            end = next as u32;
+        }
+    }
+
     fn write_after_preflight(&mut self, address: u64, bytes: &[u8], mut index: usize) {
         let mut cursor = address;
         let mut source = 0;
