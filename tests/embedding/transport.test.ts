@@ -57,13 +57,25 @@ async function fixture(
       initializationError
         ? { error: 'fixture initialization rejected' }
         : {
-            size: 456,
+            size: 560,
             scalarSize: 176,
             xmm: 176,
             xmmBytes: 256,
             vectorScratch: 432,
             mxcsr: 448,
             mxcsrBytes: 4,
+            x87: {
+              offset: 456,
+              bytes: 104,
+              registers: 0,
+              registerBytes: 10,
+              controlWord: 80,
+              statusWord: 82,
+              tagWord: 84,
+              opcode: 86,
+              instructionPointer: 88,
+              dataPointer: 96,
+            },
             registers: 0,
             flags: 128,
             rip: 136,
@@ -97,6 +109,7 @@ async function fixture(
     if (name === 'core_import_state') instructions = copy(state, imported, 176);
     if (name === 'core_import_xmm') instructions = copy(state + 176, imported, 256);
     if (name === 'core_import_mxcsr') instructions = copy(state + 448, imported, 4);
+    if (name === 'core_import_x87') instructions = copy(state + 456, imported, 104);
     if (name === 'core_write_memory') instructions = copy(output, imported, 4);
     if (name === 'core_input' && high === 'later-input') {
       instructions = [
@@ -112,6 +125,11 @@ async function fixture(
         0x20,
         0,
         ...constant(256),
+        0x46,
+        0x72,
+        0x20,
+        0,
+        ...constant(104),
         0x46,
         0x72,
         0x04,
@@ -189,9 +207,17 @@ for (const high of ['input', 'state', 'info', 'output', 'later-input'] as const)
       assert.deepEqual(cpu.readXmmState(), Array<bigint>(16).fill(0n));
       cpu.setXmmState(xmm);
       assert.deepEqual(cpu.readXmmState(), xmm);
+      const x87 = {
+        registers: Array.from({ length: 8 }, (_, i) => (0xfedcn << 64n) | BigInt(i)),
+        controlWord: 0x037b, statusWord: 0xa884, tagWord: 0xffff, opcode: 0x7ff,
+        instructionPointer: 0xfedcba9876543210n, dataPointer: 0x8877665544332211n,
+      };
+      cpu.setX87State(x87);
+      assert.deepEqual(cpu.readX87State(), x87);
       const state = initial(0x1234n, { 0: 0x8877_6655_4433_2211n }, 0x8d7n);
       cpu.setState(state);
       assert.deepEqual(cpu.readState(), state);
+      assert.deepEqual(cpu.readX87State(), x87);
       assert.deepEqual(cpu.readXmmState(), xmm);
       assert.deepEqual(cpu.readMemory(0n, 4), Uint8Array.of(0x11, 0x22, 0x33, 0x44));
       cpu.writeMemory(0n, Uint8Array.of(0x55, 0x66, 0x77, 0x88));
@@ -199,6 +225,7 @@ for (const high of ['input', 'state', 'info', 'output', 'later-input'] as const)
       cpu.setXmmState(xmm.slice().reverse());
       assert.deepEqual(cpu.readXmmState(), xmm.slice().reverse());
       assert.deepEqual(cpu.readState(), state);
+      assert.deepEqual(cpu.readX87State(), x87);
     } finally {
       cpu.dispose();
     }

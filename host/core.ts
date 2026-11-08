@@ -6,6 +6,15 @@ import {
   type SegmentName,
 } from './context.js';
 import type { InitialMemory, MemoryBackingInput, MemoryMapping } from './memory.js';
+import {
+  captureX87State,
+  readX87,
+  writeX87,
+  validateX87Layout,
+  type X87State,
+  type X87Exception,
+  type X87Layout,
+} from './x87.js';
 
 export interface State {
   registers: bigint[];
@@ -82,6 +91,7 @@ interface Layout {
   vectorScratch: number;
   mxcsr: number;
   mxcsrBytes: number;
+  x87: X87Layout;
   registers: number;
   flags: number;
   rip: number;
@@ -114,6 +124,15 @@ type CoreExports = WebAssembly.Exports & {
   core_import_state(): number;
   core_import_xmm(): number;
   core_import_mxcsr(): number;
+  core_import_x87(): number;
+  core_x87(
+    operation: number,
+    offset: bigint,
+    segment: number,
+    pc: bigint,
+    flags: bigint,
+    rax: bigint,
+  ): number;
   core_float(
     operation: number,
     leftLo: bigint,
@@ -314,6 +333,7 @@ export class Core {
       layout.mxcsr + layout.mxcsrBytes > layout.size
     )
       throw new Error('core returned an incompatible transport layout');
+    validateX87Layout(layout.x87, layout.size, layout.mxcsr + layout.mxcsrBytes);
     this.stateView();
   }
 
@@ -351,6 +371,8 @@ export class Core {
       'core_import_state',
       'core_import_xmm',
       'core_import_mxcsr',
+      'core_import_x87',
+      'core_x87',
       'core_float',
       'core_load_mxcsr',
       'core_store_mxcsr',
@@ -484,6 +506,23 @@ export class Core {
     return this.stateView().getUint32(this.#layout.mxcsr, true);
   }
 
+  readX87State(): X87State {
+    const layout = this.#layout.x87;
+    return readX87(
+      new DataView(this.#exports.memory.buffer, this.#statePointer + layout.offset, layout.bytes),
+      layout,
+    );
+  }
+
+  setX87State(value: X87State): void {
+    const input = captureX87State(value),
+      layout = this.#layout.x87;
+    const pointer = this.#exports.core_input(layout.bytes) >>> 0;
+    writeX87(new DataView(this.#exports.memory.buffer, pointer, layout.bytes), layout, input);
+    if (this.#exports.core_import_x87() !== 0)
+      throw new TypeError(this.info<{ error: string }>().error);
+  }
+
   setMxcsr(value: number): void {
     const input = captureMxcsr(value);
     const pointer = this.#exports.core_input(this.#layout.mxcsrBytes) >>> 0;
@@ -574,6 +613,7 @@ export class Core {
         float: this.#exports.core_float,
         load_mxcsr: this.#exports.core_load_mxcsr,
         store_mxcsr: this.#exports.core_store_mxcsr,
+        x87: this.#exports.core_x87,
         target_check: this.#exports.core_target_check,
         multiply_high: this.#exports.core_multiply_high,
         divide: this.#exports.core_divide,
@@ -603,6 +643,7 @@ export class Core {
       reason === 'segment-fault' ||
       reason === 'alignment-fault' ||
       reason === 'simd-exception' ||
+      reason === 'x87-exception' ||
       reason === 'general-protection'
     )
       return undefined;
@@ -690,6 +731,23 @@ export class Core {
     return {
       ...this.info<Omit<GeneralProtectionFault, 'instructionPc'>>(),
       instructionPc: this.current().rip,
+    };
+  }
+
+  x87Exception(reason: string): X87Exception | undefined {
+    if (reason !== 'x87-exception') return undefined;
+    this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
+    const raw = this.info<
+      Omit<X87Exception, 'instructionPc' | 'instructionPointer' | 'dataPointer'> & {
+        instructionPointer: string;
+        dataPointer: string;
+      }
+    >();
+    return {
+      ...raw,
+      instructionPc: this.current().rip,
+      instructionPointer: BigInt(raw.instructionPointer),
+      dataPointer: BigInt(raw.dataPointer),
     };
   }
 

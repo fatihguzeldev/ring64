@@ -1,4 +1,5 @@
 import { captureContext, type ExecutionContext, type SegmentFault } from './context.js';
+import { captureX87State, type X87State, type X87Exception } from './x87.js';
 import {
   Core,
   captureState,
@@ -63,6 +64,7 @@ export interface RunResult {
   alignmentFault?: AlignmentFault;
   simdException?: SimdException;
   generalProtectionFault?: GeneralProtectionFault;
+  x87Exception?: X87Exception;
   resources: {
     compilations: number;
     cacheHits: number;
@@ -275,6 +277,16 @@ export class Cpu {
     this.requireIdle();
     this.engineCall(() => this.#engine.setMxcsr(input));
   }
+  readX87State(): X87State {
+    this.requireIdle();
+    return this.engineCall(() => this.#engine.readX87State());
+  }
+  setX87State(value: X87State): void {
+    this.requireIdle();
+    const input = captureX87State(value);
+    this.requireIdle();
+    this.engineCall(() => this.#engine.setX87State(input));
+  }
   readMemory(address: bigint, length: number): Uint8Array {
     this.requireIdle();
     return this.engineCall(() => this.#engine.readMemory(address, length));
@@ -331,6 +343,8 @@ export class Cpu {
         reason === 'simd-exception' ? this.#engine.simdException(reason) : undefined;
       const generalProtectionFault =
         reason === 'general-protection' ? this.#engine.generalProtectionFault(reason) : undefined;
+      const x87Exception =
+        reason === 'x87-exception' ? this.#engine.x87Exception(reason) : undefined;
       const result = {
         reason,
         retired: budget - remaining,
@@ -343,6 +357,7 @@ export class Cpu {
         ...(alignmentFault ? { alignmentFault } : {}),
         ...(simdException ? { simdException } : {}),
         ...(generalProtectionFault ? { generalProtectionFault } : {}),
+        ...(x87Exception ? { x87Exception } : {}),
         resources: { ...resources, ...this.#cache.resources() },
         timings,
       };
