@@ -117,7 +117,8 @@ async function browserRun() {
         return;
       }
       let file;
-      if (pathname === '/kernels.mjs') file = resolve(root, 'benchmarks/kernels.mjs');
+      if (pathname === '/kernels.mjs' || pathname === '/x87.mjs')
+        file = resolve(root, 'benchmarks', pathname.slice(1));
       else {
         const [, label, ...parts] = pathname.split('/'),
           base = roots.get(label);
@@ -193,11 +194,18 @@ const environment = {
   platform: os.platform(),
   arch: os.arch(),
 };
+const benchmarkFiles = ['kernels.mjs', 'x87.mjs'];
+const benchmarkHash = createHash('sha256');
+for (const file of benchmarkFiles) {
+  benchmarkHash.update(file + '\0');
+  benchmarkHash.update(await readFile(resolve(root, 'benchmarks', file)));
+}
 const result = {
   time: new Date().toISOString(),
   environment,
   sides: manifests,
-  benchmarkSha256: hash(await readFile(resolve(root, 'benchmarks/kernels.mjs'))),
+  benchmarkFiles,
+  benchmarkSha256: benchmarkHash.digest('hex'),
   ...(await (config.browser ? browserRun() : nodeRun())),
 };
 const output =
@@ -216,6 +224,10 @@ for (const definition of result.definitions)
         (s) => s.workload === definition.name && s.side === side.label,
       ),
       later = all.filter((s) => s.window === 'later');
+    if (!all.length) {
+      console.log(`${definition.name} | ${side.label} | unavailable`);
+      continue;
+    }
     const elapsed = median((later.length ? later : all).map((s) => s.elapsedMs));
     const rate = elapsed > 0 ? (Number(definition.work) / elapsed / 1000).toFixed(2) : 'n/a';
     console.log(

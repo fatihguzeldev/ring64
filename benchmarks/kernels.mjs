@@ -1,3 +1,5 @@
+import { x87Rows } from './x87.mjs';
+
 const MASK64 = (1n << 64n) - 1n;
 const MASK128 = (1n << 128n) - 1n;
 const FLAGS = 0xcd7n;
@@ -259,6 +261,7 @@ const rows = [
     },
   },
 ];
+rows.push(...x87Rows);
 export const workloadNames = rows.map((row) => row.name);
 function check(actual, expected, label) {
   if (actual !== expected) throw Error(`${label}: expected ${expected}, received ${actual}`);
@@ -284,9 +287,27 @@ function initial(n, repeat, sample) {
     gpr[6] = RAM;
     gpr[7] = RAM + n + 32n;
   }
-  return { gpr, xmm, ram, flags: repeat ? 0x8d7n : FLAGS, mxcsr: 0x1f80 };
+  const x87 = {
+    registers: Array.from(
+      { length: 8 },
+      (_, i) => (BigInt(0xa000 + i) << 64n) | BigInt(i + sample + 1),
+    ),
+    controlWord: 0x037b,
+    statusWord: 0xa884,
+    tagWord: 0xffff,
+    opcode: 0x123,
+    instructionPointer: 0x1122334455667788n,
+    dataPointer: 0x8877665544332211n,
+  };
+  return { gpr, xmm, ram, x87, flags: repeat ? 0x8d7n : FLAGS, mxcsr: 0x1f80 };
 }
-const copy = (s) => ({ ...s, gpr: s.gpr.slice(), xmm: s.xmm.slice(), ram: s.ram.slice() });
+const copy = (s) => ({
+  ...s,
+  gpr: s.gpr.slice(),
+  xmm: s.xmm.slice(),
+  ram: s.ram.slice(),
+  x87: { ...s.x87, registers: s.x87.registers.slice() },
+});
 const resources = () => ({
   compilations: 0,
   cacheHits: 0,
@@ -318,7 +339,8 @@ export async function measure(
   for (const name of workloads)
     if (!workloadNames.includes(name)) throw Error(`unknown workload: ${name}`);
   const results = [],
-    definitions = [];
+    definitions = [],
+    unavailable = [];
   for (const row of rows.filter((row) => workloads.includes(row.name))) {
     const n =
       BigInt(row.resume ? Math.min(iterations, 3000) : iterations) * BigInt(row.factor ?? 1);
@@ -340,29 +362,39 @@ export async function measure(
       throughputUnit: row.repeat ? 'repeat elements' : 'guest instructions',
       flagMask: row.flagMask ?? 0xcd7n,
       resume: !!row.resume,
+      requiresX87: !!row.requiresX87,
     });
     try {
-      for (const side of sides)
-        active.push({
-          ...side,
-          cpu: await side.createCpu({
-            compiler: side.compiler,
-            code: { base: CODE, bytes: code },
-            ram: { base: RAM, bytes: new Uint8Array(row.repeat ? 2 * Number(n) + 64 : 64) },
-            limits,
-          }),
+      for (const side of sides) {
+        const cpu = await side.createCpu({
+          compiler: side.compiler,
+          code: { base: CODE, bytes: code },
+          ram: { base: RAM, bytes: new Uint8Array(row.repeat ? 2 * Number(n) + 64 : 64) },
+          limits,
         });
+        const hasX87 =
+          typeof cpu.readX87State === 'function' && typeof cpu.setX87State === 'function';
+        active.push({ ...side, cpu, hasX87 });
+        if (row.requiresX87 && !hasX87) {
+          if (side.label === 'current') throw Error('current build is missing x87 APIs');
+          cpu.dispose();
+          active.pop();
+          unavailable.push({ side: side.label, workload: row.name, reason: 'x87 API unavailable' });
+        }
+      }
       for (let sample = 0; sample < samples; sample++)
         for (const side of sample % 2 ? [...active].reverse() : active) {
           const input = initial(n, row.repeat, sample);
-          row.setup?.(input);
+          row.setup?.(input, n, sample);
           const expected = copy(input);
-          row.expected(expected, n);
+          row.expected(expected, n, sample);
           expected.gpr[1] = 0n;
           side.cpu.writeMemory(RAM, input.ram);
           side.cpu.setState({ registers: input.gpr, flags: input.flags, rip: CODE });
           side.cpu.setXmmState(input.xmm);
           side.cpu.setMxcsr(input.mxcsr);
+          const hasX87 = side.hasX87;
+          if (hasX87) side.cpu.setX87State(input.x87);
           let result;
           const totals = resources(),
             timings = phases();
@@ -396,6 +428,20 @@ export async function measure(
           checkArray(result.state.registers, expected.gpr, 'GPR');
           checkArray(side.cpu.readXmmState(), expected.xmm, 'XMM');
           check(side.cpu.readMxcsr(), expected.mxcsr, 'MXCSR');
+          const x87 = hasX87 ? side.cpu.readX87State() : undefined;
+          if (x87) {
+            checkArray(x87.registers, expected.x87.registers, 'physical x87');
+            const mask = row.requiresX87 ? (row.x87StatusMask ?? 0xbaff) : 0xffff;
+            check(x87.statusWord & mask, expected.x87.statusWord & mask, 'defined x87 status');
+            for (const field of [
+              'controlWord',
+              'tagWord',
+              'opcode',
+              'instructionPointer',
+              'dataPointer',
+            ])
+              check(x87[field], expected.x87[field], `x87 ${field}`);
+          }
           check(result.state.flags & ~0xcd7n, 0n, 'valid flags');
           const flagMask = row.flagMask ?? 0xcd7n;
           check(
@@ -411,6 +457,7 @@ export async function measure(
             'alignmentFault',
             'simdException',
             'generalProtectionFault',
+            'x87Exception',
           ])
             check(result[field], undefined, field);
           check(totals.compilations, sample === 0 ? 1 : 0, 'compilations');
@@ -429,6 +476,7 @@ export async function measure(
             state: result.state,
             xmm: side.cpu.readXmmState(),
             mxcsr: side.cpu.readMxcsr(),
+            ...(x87 ? { x87 } : {}),
             units: side.cpu.inspectTranslations(),
           });
         }
@@ -438,6 +486,7 @@ export async function measure(
   }
   return {
     definitions,
+    unavailable,
     samples: results,
     limits,
     ceiling:
