@@ -1,5 +1,7 @@
 mod execute;
 mod number;
+#[cfg(test)]
+mod tests;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
