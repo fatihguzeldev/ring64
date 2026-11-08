@@ -188,6 +188,39 @@ fn selected_writes_check_the_nominal_span_and_invalidate_only_actual_fields() {
 }
 
 #[test]
+fn selected_alias_writes_invalidate_backing_dependencies_even_at_inactive_guest_positions() {
+    for fields in [&[][..], &[(8, 1)][..], &[(0, 1), (8, 1)][..]] {
+        let mut source = mapping(0x2000, 3, 2, true, false);
+        source.permissions.execute = true;
+        let mut image = image(
+            32,
+            vec![
+                mapping(0x1000, 3, 8, false, true),
+                mapping(0x1008, 3, 8, false, true),
+                source,
+                mapping(0x3000, 3, 8, true, false),
+            ],
+        );
+        let changed = image.register_source([(0x2000, 1)]).unwrap();
+        let neighbor = image.register_source([(0x2001, 1)]).unwrap();
+        assert!(image.activate(changed));
+        let mut bytes = [0; 16];
+        bytes[0] = 0xa0;
+        bytes[8] = 0xb8;
+        let mut expected = image.backings[0].bytes.clone();
+        if !fields.is_empty() {
+            expected[3] = 0xb8;
+        }
+        image.write_fields(0x1000, 16, fields, &bytes).unwrap();
+        assert_eq!(image.backings[0].bytes, expected);
+        assert_eq!(image.read(0x3000, 1), Ok(u64::from(expected[3])));
+        assert_eq!(image.owner_valid(changed), fields.is_empty());
+        assert!(image.owner_valid(neighbor));
+        assert_eq!(image.active_changed(), !fields.is_empty());
+    }
+}
+
+#[test]
 fn selected_reads_admit_the_whole_operand_before_touching_output() {
     let fields = [(0, 5), (6, 8), (24, 4), (32, 10), (160, 128)];
     for readable in [0, 5, 287, 288, 415, 416, 511, 512] {
