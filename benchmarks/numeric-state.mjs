@@ -27,6 +27,76 @@ function fx(s) {
 }
 export const numericStateRows = [
   {
+    name: 'mmx-byte-add',
+    body: '0ffcc1',
+    instructions: 1,
+    setup(s) {
+      numeric(s);
+      s.x87.registers[0] = 0n;
+      s.x87.registers[1] = 0x0101010101010101n;
+    },
+    expected(s, n) {
+      transition(s);
+      s.x87.registers[0] = marker | ((n & 255n) * 0x0101010101010101n);
+    },
+  },
+  {
+    name: 'mmx-pack-saturating',
+    body: '0f6fc20f63c1',
+    instructions: 2,
+    setup(s) {
+      numeric(s);
+      s.x87.registers[2] = 0x0080ff7f007fff80n;
+      s.x87.registers[1] = 0x7fff80000000ffffn;
+    },
+    expected(s) {
+      transition(s);
+      s.x87.registers[0] = marker | 0x7f8000ff7f807f80n;
+    },
+  },
+  {
+    name: 'mmx-unpack-high',
+    body: '0f6fc20f68c1',
+    instructions: 2,
+    setup(s) {
+      numeric(s);
+      s.x87.registers[2] = 0x0706050403020100n;
+      s.x87.registers[1] = 0x0f0e0d0c0b0a0908n;
+    },
+    expected(s) {
+      transition(s);
+      s.x87.registers[0] = marker | 0x0f070e060d050c04n;
+    },
+  },
+  {
+    name: 'mmx-shift-variable',
+    body: '0f6fc20fe1c1',
+    instructions: 2,
+    setup(s) {
+      numeric(s);
+      s.x87.registers[2] = 0xffff800000010002n;
+      s.x87.registers[1] = 3n;
+    },
+    expected(s) {
+      transition(s);
+      s.x87.registers[0] = marker | 0xfffff00000000000n;
+    },
+  },
+  {
+    name: 'mmx-sad',
+    body: '0f6fc20ff6c1',
+    instructions: 2,
+    setup(s) {
+      numeric(s);
+      s.x87.registers[2] = 0x00010203040506ffn;
+      s.x87.registers[1] = 0n;
+    },
+    expected(s) {
+      transition(s);
+      s.x87.registers[0] = marker | 0x114n;
+    },
+  },
+  {
     name: 'mmx-gpr-xmm-bridges',
     body: '0f6ec0f30fd6c0f20fd6c80f7ec8',
     instructions: 4,
