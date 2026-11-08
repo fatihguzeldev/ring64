@@ -20,6 +20,9 @@ where
         }));
     }
     let operands = ModRm::read(cursor, prefixes.rex)?;
+    if operands.mode != 3 && matches!(opcode, 0xd9 | 0xdd) && matches!(operands.selector, 4 | 6) {
+        return super::numeric_image::legacy(opcode, &operands, prefixes, cursor);
+    }
     let modrm = (operands.mode << 6) | (operands.selector << 3) | (operands.rm & 7);
     let mut op = if operands.mode == 3 {
         register(opcode, modrm)?

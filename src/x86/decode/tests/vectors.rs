@@ -96,7 +96,14 @@ fn selected_packed_integer_opcodes_have_exact_lane_and_signedness_models() {
                 src: O::Register(9)
             }
         );
-        assert_eq!(at(0x1000, &[0x0f, opcode]), Err(DecodeError::Unsupported));
+        assert_eq!(
+            at(0x1000, &[0x0f, opcode]),
+            if matches!(opcode, 0x6c | 0x6d) {
+                Err(DecodeError::Unsupported)
+            } else {
+                Err(DecodeError::Fetch(missing(0x1002)))
+            }
+        );
         assert_eq!(
             at(0x1000, &[0x66, 0xf3, 0x0f, opcode]),
             Err(DecodeError::Unsupported)
@@ -455,12 +462,15 @@ fn vector_legality_stops_at_deciding_classes_and_fetches_complete_valid_tails() 
     for code in [
         &[0x66, 0x0f, 0x71, 0x0c][..],
         &[0x66, 0x0f, 0x73, 0x24][..],
-        &[0x0f, 0x6f][..],
         &[0x66, 0x0f, 0x38][..],
         &[0xf3, 0x66, 0x0f, 0xfc][..],
     ] {
         assert_eq!(at(0x1000, code), Err(DecodeError::Unsupported));
     }
+    assert_eq!(
+        at(0x1000, &[0x0f, 0x6f]),
+        Err(DecodeError::Fetch(missing(0x1002)))
+    );
     for full in [
         &[0x66, 0x0f, 0xfc, 0x84, 0x24, 0x78, 0x56, 0x34, 0x12][..],
         &[

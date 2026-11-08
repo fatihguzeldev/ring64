@@ -13,6 +13,7 @@ mod logical;
 mod mode_context;
 mod multiply_divide;
 mod near_stack;
+mod numeric_state;
 mod routing;
 mod stack;
 mod strings;
@@ -491,7 +492,9 @@ for (const [index,c] of cases.entries()) {
  const load_mxcsr=(address,segment)=>{const result=access('load_mxcsr',[bits(address),segment]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);return result.reason};
  const store_mxcsr=(address,segment)=>access('store_mxcsr',[bits(address),segment,d.getUint32(l.mxcsr,true)]);
  const x87=(op,address,segment,pc,flags,rax)=>{const result=access('x87',[op,bits(address),segment,bits(pc),bits(flags),bits(rax)]);if(result.flags!==undefined)d.setBigUint64(l.flags,BigInt('0x'+result.flags),true);if(result.rax!==undefined)d.setBigUint64(l.registers,BigInt('0x'+result.rax),true);return result.reason};
- const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store,float,load_mxcsr,store_mxcsr,x87}});
+ const numericState=(kind,op,address,segment)=>{const result=access(kind,[op,bits(address),segment]);for(const [bank,value] of Object.entries(result.xmmBefore??{}))assert.equal(read128(xmmOffset+16*Number(bank)),value,'live XMM before '+kind);for(const [bank,value] of Object.entries(result.xmm??{})){const raw=BigInt('0x'+value),offset=xmmOffset+16*Number(bank);d.setBigUint64(offset,BigInt.asUintN(64,raw),true);d.setBigUint64(offset+8,raw>>64n,true)}for(const [bank,value] of Object.entries(result.registers??{}))d.setBigUint64(l.registers+8*Number(bank),BigInt('0x'+value),true);return result.reason};
+ const mmx=(...args)=>numericState('mmx',...args),numeric_image=(...args)=>numericState('numeric_image',...args);
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store,float,load_mxcsr,store_mxcsr,x87,mmx,numeric_image}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const snapshot=reason=>{
   const flags=d.getBigUint64(l.flags,true);

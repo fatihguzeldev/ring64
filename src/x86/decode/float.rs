@@ -90,6 +90,9 @@ where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
     let operands = ModRm::read(cursor, prefixes.rex)?;
+    if operands.selector < 2 {
+        return super::numeric_image::fx(&operands, prefixes, cursor);
+    }
     if !matches!(operands.selector, 2 | 3) {
         return Err(DecodeError::Unsupported);
     }

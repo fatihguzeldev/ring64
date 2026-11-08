@@ -9,6 +9,7 @@ mod integer;
 mod integer_memory;
 mod memory;
 mod multiply_divide;
+mod numeric_state;
 mod stack;
 mod state;
 mod strings;
@@ -69,6 +70,8 @@ struct Emitter {
     load_mxcsr: Option<u32>,
     store_mxcsr: Option<u32>,
     x87: Option<u32>,
+    mmx: Option<u32>,
+    numeric_image: Option<u32>,
 }
 
 impl Emitter {
@@ -209,6 +212,14 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::X87(_)));
+    let has_mmx = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Mmx { .. }));
+    let has_numeric_image = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::NumericImage { .. }));
     let float_type = has_float.then(|| {
         let index = next_type;
         types.ty().function(
@@ -245,6 +256,14 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             ],
             [ValType::I32],
         );
+        next_type += 1;
+        index
+    });
+    let numeric_state_type = (has_mmx || has_numeric_image).then(|| {
+        let index = next_type;
+        types
+            .ty()
+            .function([ValType::I32, ValType::I64, ValType::I32], [ValType::I32]);
         index
     });
     let mut imports = ImportSection::new();
@@ -397,6 +416,26 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let mmx = has_mmx.then(|| {
+        imports.import(
+            "env",
+            "mmx",
+            EntityType::Function(numeric_state_type.unwrap()),
+        );
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let numeric_image = has_numeric_image.then(|| {
+        imports.import(
+            "env",
+            "numeric_image",
+            EntityType::Function(numeric_state_type.unwrap()),
+        );
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let vector_access_reason = if vector_banks.loads || vector_banks.stores || store_mxcsr_used {
         Some(access_reason.unwrap_or_else(|| {
             imports.import("env", "access_reason", EntityType::Function(2));
@@ -459,6 +498,8 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         load_mxcsr,
         store_mxcsr,
         x87,
+        mmx,
+        numeric_image,
         body: Function::new(locals),
         entries: unit
             .instructions
@@ -496,6 +537,12 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         emitter.gates(exit_depth);
         match instruction.operation {
             Operation::Nop => {}
+            Operation::Mmx { op, address } => {
+                emitter.mmx(op, address, instruction.next_pc, exit_depth)
+            }
+            Operation::NumericImage { op, address } => {
+                emitter.numeric_image(op, address, instruction.next_pc, exit_depth)
+            }
             Operation::X87(x87) => {
                 emitter.x87(x87, instruction.pc, instruction.next_pc, exit_depth)
             }

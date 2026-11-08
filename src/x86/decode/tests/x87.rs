@@ -159,8 +159,8 @@ fn every_esc_selector_admits_exactly_the_documented_selection_and_rejects_lock()
         for selector in 0..8 {
             let selected = match opcode {
                 0xd8 | 0xda | 0xdc | 0xde => true,
-                0xd9 => matches!(selector, 0 | 2 | 3 | 5 | 7),
-                0xdd => matches!(selector, 0 | 2 | 3 | 7),
+                0xd9 => matches!(selector, 0 | 2..=7),
+                0xdd => matches!(selector, 0 | 2..=4 | 6 | 7),
                 0xdb | 0xdf => matches!(selector, 0 | 2 | 3 | 5 | 7),
                 _ => unreachable!(),
             };
@@ -182,7 +182,7 @@ fn every_esc_selector_admits_exactly_the_documented_selection_and_rejects_lock()
             }
         }
     }
-    assert_eq!((registers, memory), (333, 51));
+    assert_eq!((registers, memory), (333, 55));
 }
 
 #[test]
@@ -340,10 +340,6 @@ fn required_x87_address_tails_precede_lock_rejection_but_unselected_forms_stop_a
         assert_eq!(at(0x1000, prefix), Err(DecodeError::Unsupported));
     }
     for code in [
-        [0xd9, 0x24],
-        [0xd9, 0x34],
-        [0xdd, 0x24],
-        [0xdd, 0x34],
         [0xdf, 0x24],
         [0xdf, 0x34],
         [0xdd, 0x0c],

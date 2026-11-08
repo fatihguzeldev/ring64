@@ -5,6 +5,8 @@ use super::instruction::Instruction;
 
 mod cursor;
 mod float;
+mod mmx;
+mod numeric_image;
 mod opcode;
 mod operand;
 mod prefix;

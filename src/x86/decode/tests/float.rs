@@ -237,10 +237,16 @@ fn mxcsr_groups_preserve_deciding_class_and_complete_valid_tails_before_lock_rej
             Err(DecodeError::Invalid)
         );
     }
-    for selector in [0, 1, 4, 5, 6, 7] {
+    for selector in [4, 5, 6, 7] {
         assert_eq!(
             at(0x1000, &[0x0f, 0xae, 4 | (selector << 3)]),
             Err(DecodeError::Unsupported)
+        );
+    }
+    for selector in [0, 1] {
+        assert_eq!(
+            at(0x1000, &[0x0f, 0xae, 4 | (selector << 3)]),
+            Err(DecodeError::Fetch(missing(0x1003)))
         );
     }
     for prefix in [0x66, 0xf2, 0xf3] {

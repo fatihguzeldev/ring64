@@ -169,5 +169,8 @@ fn condition_coverage_keeps_lock_rep_and_other_branch_families_unsupported() {
             Err(DecodeError::Fetch(missing(0x1002)))
         );
     }
-    assert_eq!(at(0x1000, &[0x0f, 0x7f]), Err(DecodeError::Unsupported));
+    assert_eq!(
+        at(0x1000, &[0x0f, 0x7f]),
+        Err(DecodeError::Fetch(missing(0x1002)))
+    );
 }

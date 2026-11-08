@@ -16,6 +16,7 @@ mod logical;
 mod modes;
 mod multiply_divide;
 mod near_control;
+mod numeric_state;
 mod scalar_data;
 mod stack;
 mod strings;

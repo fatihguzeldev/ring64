@@ -24,6 +24,15 @@ impl Banks {
             stores: false,
         };
         for instruction in &unit.instructions {
+            if let Operation::Mmx { op, .. } = instruction.operation {
+                if let Some(bank) = op.source_xmm() {
+                    banks.read(bank);
+                }
+                if let Some(bank) = op.destination_xmm() {
+                    banks.write(bank);
+                }
+                continue;
+            }
             if let Operation::Float(float) = instruction.operation {
                 if float.writes_flags() {
                     banks.read(float.dst);

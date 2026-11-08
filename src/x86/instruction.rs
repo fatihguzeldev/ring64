@@ -423,6 +423,14 @@ pub struct X87Instruction {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
+    Mmx {
+        op: super::mmx::Op,
+        address: Option<Address>,
+    },
+    NumericImage {
+        op: super::numeric_images::ImageOp,
+        address: Address,
+    },
     X87(X87Instruction),
     Float(FloatInstruction),
     Mxcsr {
