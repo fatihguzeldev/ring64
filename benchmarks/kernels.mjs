@@ -46,6 +46,14 @@ const incFlags = (n) => {
   );
 };
 const rows = [
+  ...[4, 8].map((width) => ({
+    name: `checked-vector-load-low${width * 8}`,
+    body: width === 4 ? 'f30f1003' : 'f20f1003',
+    instructions: 1,
+    expected(s) {
+      s.xmm[0] = read(s.ram, 16, width);
+    },
+  })),
   {
     name: 'scalar-add',
     body: '4883c001',

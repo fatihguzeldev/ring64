@@ -24,10 +24,7 @@ pub(super) fn direct(operation: MmxOp) -> bool {
 }
 
 pub(super) fn vector_temps(operation: MmxOp) -> bool {
-    matches!(
-        operation.kind,
-        Kind::Binary(_) | Kind::Shift(_)
-    )
+    matches!(operation.kind, Kind::Binary(_) | Kind::Shift(_))
 }
 
 fn raw(bank: u8) -> usize {
