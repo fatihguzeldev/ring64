@@ -1,5 +1,6 @@
 import { x87Rows } from './x87.mjs';
 import { numericStateRows } from './numeric-state.mjs';
+import { streamingRows } from './streaming.mjs';
 
 const MASK64 = (1n << 64n) - 1n;
 const MASK128 = (1n << 128n) - 1n;
@@ -272,6 +273,7 @@ const rows = [
 ];
 rows.push(...x87Rows);
 rows.push(...numericStateRows);
+rows.push(...streamingRows);
 export const workloadNames = rows.map((row) => row.name);
 function check(actual, expected, label) {
   if (actual !== expected) throw Error(`${label}: expected ${expected}, received ${actual}`);
@@ -374,12 +376,26 @@ export async function measure(
       resume: !!row.resume,
       requiresX87: !!row.requiresX87,
       requiresNumericState: !!row.requiresNumericState,
+      requiresStreaming: !!row.requiresStreaming,
       ...(row.guestMemoryPerIteration
         ? { guestMemoryPerIteration: row.guestMemoryPerIteration }
         : {}),
     });
     try {
       for (const side of sides) {
+        if (
+          row.requiresStreaming &&
+          !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_masked_store')
+        ) {
+          if (side.label === 'current')
+            throw Error('current build is missing masked and streaming memory');
+          unavailable.push({
+            side: side.label,
+            workload: row.name,
+            reason: 'masked and streaming memory unavailable',
+          });
+          continue;
+        }
         if (
           row.requiresNumericState &&
           !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_numeric_image')
