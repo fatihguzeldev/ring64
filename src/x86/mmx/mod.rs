@@ -416,11 +416,6 @@ fn convert(
     } else {
         input
     };
-    let source = if format == float::Format::F32 || to_xmm {
-        source & u128::from(u64::MAX)
-    } else {
-        source
-    };
     let left = if to_xmm {
         xmm_destination
     } else {
@@ -433,8 +428,7 @@ fn convert(
     } else {
         float::Kind::FloatToInt
     };
-    // Zeroed unused f32 lanes add no conditions to the existing packed SSE evaluator.
-    let mut outcome = float::eval(
+    let mut outcome = float::eval_pair(
         float::Op {
             kind,
             format,

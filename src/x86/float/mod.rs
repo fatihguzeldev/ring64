@@ -96,7 +96,31 @@ pub struct Outcome {
     pub stage: Option<Stage>,
 }
 
+pub(super) fn eval_pair(op: Op, left: u128, right: u128, mxcsr: u32) -> Outcome {
+    debug_assert!(
+        !op.scalar
+            && !op.integer64
+            && matches!(
+                op.kind,
+                Kind::IntToFloat | Kind::FloatToInt | Kind::TruncToInt
+            )
+    );
+    eval_lanes(op, left, right, mxcsr, 2)
+}
+
 pub fn eval(op: Op, left: u128, right: u128, mxcsr: u32) -> Outcome {
+    let count = if op.scalar || matches!(op.kind, Kind::Comi | Kind::Ucomi) {
+        1
+    } else if op.kind == Kind::FloatConvert {
+        2
+    } else {
+        128 / op.format.bits()
+    };
+    eval_lanes(op, left, right, mxcsr, count)
+}
+
+#[inline]
+fn eval_lanes(op: Op, left: u128, right: u128, mxcsr: u32, count: u32) -> Outcome {
     let masks = (mxcsr >> 7) & 0x3f;
     let source_bits = if op.kind == Kind::IntToFloat {
         if op.scalar && op.integer64 { 64 } else { 32 }
@@ -113,13 +137,6 @@ pub fn eval(op: Op, left: u128, right: u128, mxcsr: u32) -> Outcome {
             }
         }
         _ => op.format.bits(),
-    };
-    let count = if op.scalar || matches!(op.kind, Kind::Comi | Kind::Ucomi) {
-        1
-    } else if op.kind == Kind::FloatConvert {
-        2
-    } else {
-        128 / op.format.bits()
     };
     let mut lanes = [lane::Lane::default(); 4];
     let mut raised = 0;
@@ -182,3 +199,6 @@ mod packets;
 
 #[cfg(test)]
 mod native_reference;
+
+#[cfg(test)]
+mod pair_tests;
