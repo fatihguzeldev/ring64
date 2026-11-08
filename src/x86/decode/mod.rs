@@ -9,6 +9,7 @@ mod opcode;
 mod operand;
 mod prefix;
 mod vector;
+mod x87;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {

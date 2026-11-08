@@ -416,7 +416,14 @@ impl FloatInstruction {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct X87Instruction {
+    pub op: super::x87::Op,
+    pub address: Option<Address>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
+    X87(X87Instruction),
     Float(FloatInstruction),
     Mxcsr {
         address: Address,

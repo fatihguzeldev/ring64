@@ -17,6 +17,7 @@ mod routing;
 mod stack;
 mod strings;
 mod vector;
+mod x87;
 
 use super::*;
 use crate::embedding::layout::RunState;
@@ -489,7 +490,8 @@ for (const [index,c] of cases.entries()) {
  const float=(op,leftlo,lefthi,rightlo,righthi)=>{const result=access('float',[op,bits(leftlo),bits(lefthi),bits(rightlo),bits(righthi)]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);if(result.value!==undefined){const value=BigInt('0x'+result.value);d.setBigUint64(scratch,BigInt.asUintN(64,value),true);d.setBigUint64(scratch+8,value>>64n,true)}return result.reason};
  const load_mxcsr=(address,segment)=>{const result=access('load_mxcsr',[bits(address),segment]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);return result.reason};
  const store_mxcsr=(address,segment)=>access('store_mxcsr',[bits(address),segment,d.getUint32(l.mxcsr,true)]);
- const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store,float,load_mxcsr,store_mxcsr}});
+ const x87=(op,address,segment,pc,flags,rax)=>{const result=access('x87',[op,bits(address),segment,bits(pc),bits(flags),bits(rax)]);if(result.flags!==undefined)d.setBigUint64(l.flags,BigInt('0x'+result.flags),true);if(result.rax!==undefined)d.setBigUint64(l.registers,BigInt('0x'+result.rax),true);return result.reason};
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store,float,load_mxcsr,store_mxcsr,x87}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const snapshot=reason=>{
   const flags=d.getBigUint64(l.flags,true);

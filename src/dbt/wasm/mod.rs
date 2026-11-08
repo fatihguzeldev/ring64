@@ -14,6 +14,7 @@ mod state;
 mod strings;
 mod unary;
 mod vector;
+mod x87;
 
 use std::collections::BTreeMap;
 use wasm_encoder::{
@@ -67,6 +68,7 @@ struct Emitter {
     float: Option<u32>,
     load_mxcsr: Option<u32>,
     store_mxcsr: Option<u32>,
+    x87: Option<u32>,
 }
 
 impl Emitter {
@@ -203,6 +205,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::Mxcsr { store: true, .. }));
+    let has_x87 = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::X87(_)));
     let float_type = has_float.then(|| {
         let index = next_type;
         types.ty().function(
@@ -223,6 +229,22 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         types
             .ty()
             .function([ValType::I64, ValType::I32], [ValType::I32]);
+        next_type += 1;
+        index
+    });
+    let x87_type = has_x87.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [
+                ValType::I32,
+                ValType::I64,
+                ValType::I32,
+                ValType::I64,
+                ValType::I64,
+                ValType::I64,
+            ],
+            [ValType::I32],
+        );
         index
     });
     let mut imports = ImportSection::new();
@@ -369,6 +391,12 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let x87 = x87_type.map(|index| {
+        imports.import("env", "x87", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let vector_access_reason = if vector_banks.loads || vector_banks.stores || store_mxcsr_used {
         Some(access_reason.unwrap_or_else(|| {
             imports.import("env", "access_reason", EntityType::Function(2));
@@ -430,6 +458,7 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         float,
         load_mxcsr,
         store_mxcsr,
+        x87,
         body: Function::new(locals),
         entries: unit
             .instructions
@@ -467,6 +496,9 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         emitter.gates(exit_depth);
         match instruction.operation {
             Operation::Nop => {}
+            Operation::X87(x87) => {
+                emitter.x87(x87, instruction.pc, instruction.next_pc, exit_depth)
+            }
             Operation::Float(float) => emitter.float(float, instruction.next_pc, exit_depth),
             Operation::Mxcsr { address, store } => {
                 emitter.mxcsr(address, store, instruction.next_pc, exit_depth)

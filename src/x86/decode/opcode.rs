@@ -64,6 +64,9 @@ fn refine_inner<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if matches!(opcode, 0x9b | 0xd8..=0xdf) {
+        return super::x87::refine(opcode, prefixes, cursor);
+    }
     let string_kind = match opcode {
         0xa4 | 0xa5 => Some(StringKind::Movs),
         0xaa | 0xab => Some(StringKind::Stos),

@@ -20,6 +20,7 @@ mod scalar_data;
 mod stack;
 mod strings;
 mod vectors;
+mod x87;
 
 fn missing(address: u64) -> Fault {
     Fault {
