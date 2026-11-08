@@ -1,4 +1,5 @@
 import { x87Rows } from './x87.mjs';
+import { numericStateRows } from './numeric-state.mjs';
 
 const MASK64 = (1n << 64n) - 1n;
 const MASK128 = (1n << 128n) - 1n;
@@ -262,6 +263,7 @@ const rows = [
   },
 ];
 rows.push(...x87Rows);
+rows.push(...numericStateRows);
 export const workloadNames = rows.map((row) => row.name);
 function check(actual, expected, label) {
   if (actual !== expected) throw Error(`${label}: expected ${expected}, received ${actual}`);
@@ -363,13 +365,33 @@ export async function measure(
       flagMask: row.flagMask ?? 0xcd7n,
       resume: !!row.resume,
       requiresX87: !!row.requiresX87,
+      requiresNumericState: !!row.requiresNumericState,
+      ...(row.guestMemoryPerIteration
+        ? { guestMemoryPerIteration: row.guestMemoryPerIteration }
+        : {}),
     });
     try {
       for (const side of sides) {
+        if (
+          row.requiresNumericState &&
+          !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_numeric_image')
+        ) {
+          if (side.label === 'current')
+            throw Error('current build is missing numeric state execution');
+          unavailable.push({
+            side: side.label,
+            workload: row.name,
+            reason: 'MMX and numeric state images unavailable',
+          });
+          continue;
+        }
         const cpu = await side.createCpu({
           compiler: side.compiler,
           code: { base: CODE, bytes: code },
-          ram: { base: RAM, bytes: new Uint8Array(row.repeat ? 2 * Number(n) + 64 : 64) },
+          ram: {
+            base: RAM,
+            bytes: new Uint8Array(row.repeat ? 2 * Number(n) + 64 : (row.ramBytes ?? 64)),
+          },
           limits,
         });
         const hasX87 =
@@ -385,6 +407,7 @@ export async function measure(
       for (let sample = 0; sample < samples; sample++)
         for (const side of sample % 2 ? [...active].reverse() : active) {
           const input = initial(n, row.repeat, sample);
+          if (row.ramBytes) input.ram = new Uint8Array(row.ramBytes);
           row.setup?.(input, n, sample);
           const expected = copy(input);
           row.expected(expected, n, sample);
