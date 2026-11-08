@@ -1,5 +1,86 @@
 use super::*;
 
+#[test]
+fn clflush_changes_only_the_execute_only_segment_read_rule() {
+    for segment in [Segment::Cs, Segment::Ds] {
+        let mut context = protected();
+        context.segments[segment as usize].kind = SegmentType::Code;
+        context.segments[segment as usize].base = 0x2000;
+        context.segments[segment as usize].limit = 0xfff;
+        let before = context.clone();
+        assert_eq!(context.translate_clflush(0xfff, segment), Ok(0x2fff));
+        assert_eq!(
+            context.translate(0xfff, 1, segment, Access::Read, false),
+            Err(AccessFailure::Segment(SegmentFault {
+                segment,
+                offset: 0xfff,
+                width: 1,
+                access: Access::Read,
+                cause: SegmentCause::Type,
+                failing: 0xfff
+            }))
+        );
+        assert_eq!(
+            context.translate_clflush(0x1000, segment),
+            Err(AccessFailure::Segment(SegmentFault {
+                segment,
+                offset: 0x1000,
+                width: 1,
+                access: Access::Read,
+                cause: SegmentCause::Limit,
+                failing: 0x1000
+            }))
+        );
+        assert_eq!(context, before);
+    }
+}
+
+#[test]
+fn clflush_preserves_unusable_expand_down_and_linear_geometry_checks() {
+    let mut context = protected();
+    let ds = &mut context.segments[Segment::Ds as usize];
+    ds.kind = SegmentType::ExpandDownReadOnly;
+    ds.default32 = false;
+    ds.limit = 0xff00;
+    ds.base = 0x1000;
+    assert_eq!(context.translate_clflush(0xffff, Segment::Ds), Ok(0x10fff));
+    for offset in [0xff00, 0x10000] {
+        let Err(AccessFailure::Segment(fault)) = context.translate_clflush(offset, Segment::Ds)
+        else {
+            panic!()
+        };
+        assert_eq!(
+            (fault.cause, fault.width, fault.access),
+            (SegmentCause::Limit, 1, Access::Read)
+        );
+    }
+    context.segments[Segment::Ds as usize].usable = false;
+    let Err(AccessFailure::Segment(fault)) = context.translate_clflush(0, Segment::Ds) else {
+        panic!()
+    };
+    assert_eq!(fault.cause, SegmentCause::Unusable);
+
+    let context = ExecutionContext::from_json(&json!({
+        "mode":"long64", "fsBase":"0x1000", "gsBase":"0x0"
+    }))
+    .unwrap();
+    assert_eq!(
+        context.translate_clflush(u64::MAX, Segment::Cs),
+        Ok(u64::MAX)
+    );
+    assert_eq!(context.translate_clflush(u64::MAX, Segment::Fs), Ok(0xfff));
+    assert_eq!(
+        context.translate_clflush(0x8000_0000_0000, Segment::Ds),
+        Err(AccessFailure::Linear(Fault {
+            address: 0x8000_0000_0000,
+            width: 1,
+            access: Access::Read,
+            cause: Cause::Noncanonical,
+            failing: 0x8000_0000_0000
+        }))
+    );
+}
+
 fn protected() -> ExecutionContext {
     let segment =
         json!({"base":"0x0","limit":u32::MAX,"default32":true,"usable":true,"type":"read-write"});

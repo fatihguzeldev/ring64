@@ -242,6 +242,16 @@ impl ExecutionContext {
         Ok(address)
     }
 
+    pub fn translate_clflush(&self, offset: u64, segment: Segment) -> Result<u64, AccessFailure> {
+        if self.is_long64() || self.segment(segment).kind != SegmentType::Code {
+            return self.translate(offset, 1, segment, Access::Read, false);
+        }
+        // Keep the type exception local; ordinary read translation is unchanged.
+        let mut readable = self.clone();
+        readable.segments[segment as usize].kind = SegmentType::ReadableCode;
+        readable.translate(offset, 1, segment, Access::Read, false)
+    }
+
     pub fn fetch(&self, image: &Image, offset: u64) -> Result<u8, AccessFailure> {
         let address = self.translate(offset, 1, Segment::Cs, Access::Execute, false)?;
         image.fetch(address).map_err(AccessFailure::Linear)
