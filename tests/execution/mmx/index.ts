@@ -1,6 +1,7 @@
 import { literalScenarios } from './literals.js';
 import { imageScenarios } from './images.js';
 import { boundaryScenarios } from './boundaries.js';
+import { restoreScenarios } from './restore.js';
 import type { Scenario } from '../modes/fixture.js';
 
 export function numericStateScenarios(compiler: WebAssembly.Module): Scenario[] {
@@ -8,5 +9,6 @@ export function numericStateScenarios(compiler: WebAssembly.Module): Scenario[] 
     ...literalScenarios(compiler),
     ...imageScenarios(compiler),
     ...boundaryScenarios(compiler),
+    ...restoreScenarios(compiler),
   ];
 }
