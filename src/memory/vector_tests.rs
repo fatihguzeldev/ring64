@@ -148,6 +148,51 @@ fn vector_alias_stores_commit_in_linear_order() {
 }
 
 #[test]
+fn one_mapping_write_only_stores_preserve_guards_and_invalidate_executable_aliases() {
+    for identical in [false, true] {
+        let writable = mapping(0x1000, 3, 24, false, true);
+        let mut executable = mapping(0x2000, 3, 24, false, false);
+        executable.permissions.execute = true;
+        let mut image = image(vec![writable, executable]);
+        let owner = image.register_source([(0x2008, 6)]).unwrap();
+        assert!(image.activate(owner));
+        let before = image.backings[0].bytes.clone();
+        let payload: Vec<u8> = if identical {
+            before[7..23].to_vec()
+        } else {
+            vec![0xa5; 16]
+        };
+        let mut expected = before;
+        expected[7..23].copy_from_slice(&payload);
+
+        assert_eq!(image.write_bytes(0x1004, &payload), Ok(()));
+        assert_eq!(image.backings[0].bytes, expected);
+        assert!(!image.owner_valid(owner), "identical={identical}");
+        assert!(image.active_changed(), "identical={identical}");
+    }
+}
+
+#[test]
+fn empty_writes_need_no_mapping_even_at_a_noncanonical_address() {
+    let mut image = Image::mapped(
+        vec![],
+        vec![],
+        MemoryLimits {
+            max_backing_bytes: 1,
+            max_backings: 1,
+            max_mappings: 1,
+        },
+    )
+    .unwrap();
+    for address in [0, 0x8000_0000_0000, u64::MAX] {
+        assert_eq!(image.write_bytes(address, &[]), Ok(()));
+    }
+    assert!(image.backings.is_empty());
+    assert!(image.mappings.is_empty());
+    assert!(!image.active_changed());
+}
+
+#[test]
 fn write_preflight_checks_all_ten_bytes_without_reading_or_invalidating_sources() {
     for writable in 0..=10 {
         let mut mappings = Vec::new();
