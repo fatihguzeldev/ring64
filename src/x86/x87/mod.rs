@@ -2,6 +2,8 @@ mod execute;
 mod number;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod reference_tests;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
