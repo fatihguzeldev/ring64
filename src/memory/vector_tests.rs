@@ -29,7 +29,7 @@ fn image(mappings: Vec<MappingInput>) -> Image {
 
 #[test]
 fn fixed_vector_reads_cross_every_split_and_zero_only_unused_transport_bytes() {
-    for width in [2, 4, 8, 16] {
+    for width in [2, 4, 8, 10, 16] {
         for split in 1..width {
             let image = image(vec![
                 mapping(0x1000, 3, split, true, true),
@@ -145,4 +145,96 @@ fn vector_alias_stores_commit_in_linear_order() {
         image.read_bytes(0x1008, 24).unwrap(),
         (8..32).collect::<Vec<u8>>()
     );
+}
+
+#[test]
+fn write_preflight_checks_all_ten_bytes_without_reading_or_invalidating_sources() {
+    for writable in 0..=10 {
+        let mut mappings = Vec::new();
+        if writable != 0 {
+            mappings.push(mapping(0x1000, 0, writable, false, true));
+        }
+        if writable != 10 {
+            mappings.push(mapping(
+                0x1000 + u64::from(writable),
+                writable,
+                10 - writable,
+                true,
+                false,
+            ));
+        }
+        let mut executable = mapping(0x2000, 0, 10, false, false);
+        executable.permissions.execute = true;
+        mappings.push(executable);
+        let mut image = Image::mapped(
+            vec![("data".into(), (0..32).collect())],
+            mappings,
+            MemoryLimits {
+                max_backing_bytes: 32,
+                max_backings: 1,
+                max_mappings: 3,
+            },
+        )
+        .unwrap();
+        let owner = image.register_source([(0x2000, 10)]).unwrap();
+        image.activate(owner);
+        let before = image.backings[0].bytes.clone();
+        let checked = image.check_write(0x1000, 10);
+        if writable == 10 {
+            assert_eq!(checked, Ok(()));
+        } else {
+            let fault = checked.unwrap_err();
+            assert_eq!(
+                (fault.width, fault.access, fault.cause, fault.failing),
+                (
+                    10,
+                    Access::Write,
+                    Cause::Permission,
+                    0x1000 + u128::from(writable)
+                )
+            );
+        }
+        assert_eq!(image.backings[0].bytes, before);
+        assert!(image.owner_valid(owner));
+        assert!(!image.active_changed());
+        let written = image.write_bytes(0x1000, &[0xa5; 10]);
+        if writable == 10 {
+            assert_eq!(written, Ok(()));
+            assert!(!image.owner_valid(owner));
+            assert!(image.active_changed());
+        } else {
+            assert_eq!(written, checked);
+            assert_eq!(image.backings[0].bytes, before);
+            assert!(image.owner_valid(owner));
+        }
+    }
+}
+
+#[test]
+fn ten_byte_accesses_reach_the_exact_u64_end_without_reading_transport_padding() {
+    let mut image = image(vec![mapping(u64::MAX - 9, 7, 10, true, true)]);
+    assert_eq!(
+        image.read_vector(u64::MAX - 9, 10),
+        Ok(std::array::from_fn(|index| if index < 10 {
+            index as u8 + 7
+        } else {
+            0
+        }))
+    );
+    assert_eq!(image.check_write(u64::MAX - 9, 10), Ok(()));
+    for address in [u64::MAX - 8, u64::MAX] {
+        let fault = image.read_vector(address, 10).unwrap_err();
+        assert_eq!(
+            (fault.cause, fault.failing),
+            (Cause::AddressRange, 1u128 << 64)
+        );
+        assert_eq!(
+            image.check_write(address, 10).unwrap_err().cause,
+            Cause::AddressRange
+        );
+    }
+    image.write_bytes(u64::MAX - 9, &[0x5a; 10]).unwrap();
+    assert_eq!(&image.backings[0].bytes[7..17], &[0x5a; 10]);
+    assert_eq!(image.backings[0].bytes[6], 6);
+    assert_eq!(image.backings[0].bytes[17], 17);
 }

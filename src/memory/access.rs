@@ -83,7 +83,7 @@ impl Image {
     }
 
     pub fn read_vector(&self, address: u64, width: u32) -> Result<[u8; 16], Fault> {
-        assert!(matches!(width, 2 | 4 | 8 | 16));
+        assert!(matches!(width, 2 | 4 | 8 | 10 | 16));
         let mut index = self.preflight(address, width, Access::Read, false, false)?;
         let mut output = [0; 16];
         let mut cursor = address;
@@ -109,6 +109,11 @@ impl Image {
         let first = self.preflight(address, width, Access::Write, false, false)?;
         self.write_after_preflight(address, bytes, first);
         Ok(())
+    }
+
+    pub fn check_write(&self, address: u64, width: u32) -> Result<(), Fault> {
+        self.preflight(address, width, Access::Write, false, false)
+            .map(|_| ())
     }
 
     fn write_after_preflight(&mut self, address: u64, bytes: &[u8], mut index: usize) {
