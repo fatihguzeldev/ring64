@@ -16,6 +16,7 @@
 - [simd integer and data](simd-integer-and-data/spec.md): raw XMM state, legacy packed integers, bit-preserving moves and checked wide memory.
 - [simd floating point and controls](simd-floating-point-and-controls/spec.md): legacy SSE/SSE2 numeric operations, MXCSR, precise numeric faults and raw data forms.
 - [x87 state and execution](x87-state-and-execution/spec.md): raw80 register stack, tags, precision/rounding controls, core numeric execution and deferred x87 exceptions.
+- [mmx and numeric state images](mmx-and-numeric-state-images/spec.md): MMX aliases and packed execution, MMX/SIMD conversions, legacy x87 environments and full-state images, FXSAVE and FXRSTOR.
 
 ## scope
 
@@ -43,7 +44,7 @@ memory backing supports ram, special accesses, aliases and code mutation indepen
 
 fault detection and state recovery can be tested before full event delivery. handler entry and return then combine fault records with descriptor, privilege and memory rules. interrupt eligibility, debug boundaries and halt/wakeup depend on that delivery path.
 
-numeric execution needs register state, checked byte-range accesses and numeric fault outcomes. SIMD floating-point execution adds MXCSR rounding, status and exception masks to the XMM state contract; numeric faults can publish status while suppressing destination changes. feature-enable writes and state images must agree with the instruction families they control. core x87 execution establishes raw80 state, stack effects and deferred exceptions. `x87-special-functions` adds remainder/exponent operations, transcendentals and packed-decimal conversions; mmx shares the x87 physical state.
+numeric execution needs register state, checked byte-range accesses and numeric fault outcomes. SIMD floating-point execution adds MXCSR rounding, status and exception masks to the XMM state contract; numeric faults can publish status while suppressing destination changes. feature-enable writes and state images must agree with the instruction families they control. core x87 execution establishes raw80 state, stack effects and deferred exceptions. mmx shares the x87 physical state. legacy and FX images add guest save/restore across x87, MMX, XMM and MXCSR, including handover of live generated values. `x87-special-functions` adds remainder/exponent operations, transcendentals and packed-decimal conversions; XSAVE-style component images need their own enable, mask and format rules.
 
 imported contexts allow isolated tests of paging, descriptors and numeric instructions. integration tests execute guest control writes, mode transitions and save/restore, then check their effects on subsequent instructions.
 
