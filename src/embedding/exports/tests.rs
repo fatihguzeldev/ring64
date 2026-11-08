@@ -1,4 +1,5 @@
 use super::*;
+mod streaming_bridge;
 mod x87_bridge;
 use crate::embedding::layout::{BUDGET, DATA, DISPATCH, DIVIDE_ERROR, REPEAT_BUDGET, STOP};
 
