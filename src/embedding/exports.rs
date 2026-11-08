@@ -12,7 +12,9 @@ use super::layout::{
 
 mod context;
 mod mapped;
+mod mmx;
 mod numeric;
+mod numeric_image;
 mod vector;
 mod x87;
 mod x87_state;

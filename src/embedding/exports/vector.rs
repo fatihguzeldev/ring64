@@ -1,12 +1,12 @@
 use super::*;
 
 pub(super) struct AlignmentFault {
-    segment: Segment,
-    offset: u64,
-    address: u64,
-    width: u32,
-    access: Access,
-    alignment: u32,
+    pub(super) segment: Segment,
+    pub(super) offset: u64,
+    pub(super) address: u64,
+    pub(super) width: u32,
+    pub(super) access: Access,
+    pub(super) alignment: u32,
 }
 
 impl AlignmentFault {
@@ -23,7 +23,7 @@ impl AlignmentFault {
 }
 
 impl Core {
-    fn vector_address(
+    pub(super) fn vector_address(
         &mut self,
         offset: u64,
         width: u32,

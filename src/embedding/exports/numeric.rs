@@ -3,10 +3,10 @@ use crate::embedding::layout::{GENERAL_PROTECTION, SIMD_EXCEPTION};
 use crate::x86::float::{self, Op, Stage};
 
 pub(super) struct SimdException {
-    stage: Stage,
-    raised: u32,
-    before: u32,
-    after: u32,
+    pub(super) stage: Stage,
+    pub(super) raised: u32,
+    pub(super) before: u32,
+    pub(super) after: u32,
 }
 impl SimdException {
     pub(super) fn json(&self) -> serde_json::Value {
@@ -22,7 +22,7 @@ impl SimdException {
 }
 
 pub(super) struct GeneralProtectionFault {
-    loaded: u32,
+    pub(super) loaded: u32,
 }
 impl GeneralProtectionFault {
     pub(super) fn json(&self) -> serde_json::Value {
