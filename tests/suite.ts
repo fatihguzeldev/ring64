@@ -13,6 +13,7 @@ import { exchangeScenarios } from './execution/exchange/index.js';
 import { simdScenarios } from './execution/simd/index.js';
 import { floatingScenarios } from './execution/floating/index.js';
 import { x87Scenarios } from './execution/x87/index.js';
+import { numericStateScenarios } from './execution/mmx/index.js';
 
 export async function runScenarios(
   compiler: Uint8Array | WebAssembly.Module,
@@ -37,6 +38,7 @@ export async function runScenarios(
     ...simdScenarios(core),
     ...floatingScenarios(core),
     ...x87Scenarios(core),
+    ...numericStateScenarios(core),
   ];
   const passed: string[] = [];
   for (const { name, run } of scenarios) {
