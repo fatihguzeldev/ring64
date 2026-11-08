@@ -1,5 +1,112 @@
 use super::*;
 
+#[test]
+fn read_admission_checks_only_the_requested_byte_without_warming_hints_or_owners() {
+    for address in [0x1000, u64::MAX] {
+        for readable in [false, true] {
+            let mut source = mapping(0x2000, 7, 1, false, false);
+            source.permissions.execute = true;
+            let mut image = image(
+                32,
+                vec![
+                    mapping(address, 7, 1, readable, !readable),
+                    source,
+                    mapping(0x3000, 1, 1, true, false),
+                    mapping(0x4000, 2, 1, true, false),
+                ],
+            );
+            let owner = image.register_source([(0x2000, 1)]).unwrap();
+            assert!(image.activate(owner));
+            image.read(0x3000, 1).unwrap();
+            image.read(0x4000, 1).unwrap();
+            let hints = (image.last_mapping.get(), image.previous_mapping.get());
+            let before = image.backings[0].bytes.clone();
+            assert_eq!(
+                image.check_read(address, 1),
+                if readable {
+                    Ok(())
+                } else {
+                    Err(Fault {
+                        address,
+                        width: 1,
+                        access: Access::Read,
+                        cause: Cause::Permission,
+                        failing: u128::from(address),
+                    })
+                }
+            );
+            if address == u64::MAX {
+                assert_eq!(
+                    image.check_read(address, 2),
+                    Err(Fault {
+                        address,
+                        width: 2,
+                        access: Access::Read,
+                        cause: Cause::AddressRange,
+                        failing: 1u128 << 64,
+                    })
+                );
+            } else {
+                assert_eq!(
+                    image.check_read(address + 1, 1).unwrap_err().cause,
+                    Cause::Unmapped
+                );
+            }
+            assert_eq!(image.backings[0].bytes, before);
+            assert_eq!(
+                (image.last_mapping.get(), image.previous_mapping.get()),
+                hints
+            );
+            assert!(image.owner_valid(owner));
+            assert!(!image.active_changed());
+        }
+    }
+}
+
+#[test]
+fn empty_selected_fields_still_admit_the_nominal_write_without_invalidating_sources() {
+    for writable in 0..=16 {
+        let mut mappings = vec![];
+        if writable != 0 {
+            mappings.push(mapping(0x1000, 3, writable, false, true));
+        }
+        if writable != 16 {
+            mappings.push(mapping(
+                0x1000 + u64::from(writable),
+                3 + writable,
+                16 - writable,
+                false,
+                false,
+            ));
+        }
+        let mut source = mapping(0x2000, 3, 16, false, false);
+        source.permissions.execute = true;
+        mappings.push(source);
+        let mut image = image(32, mappings);
+        let owner = image.register_source([(0x2000, 16)]).unwrap();
+        assert!(image.activate(owner));
+        let before = image.backings[0].bytes.clone();
+        let result = image.write_fields(0x1000, 16, &[], &[0xa5; 16]);
+        if writable == 16 {
+            assert_eq!(result, Ok(()));
+        } else {
+            assert_eq!(
+                result,
+                Err(Fault {
+                    address: 0x1000,
+                    width: 16,
+                    access: Access::Write,
+                    cause: Cause::Permission,
+                    failing: 0x1000 + u128::from(writable)
+                })
+            );
+        }
+        assert_eq!(image.backings[0].bytes, before);
+        assert!(image.owner_valid(owner));
+        assert!(!image.active_changed());
+    }
+}
+
 fn mapping(base: u64, offset: u32, length: u32, read: bool, write: bool) -> MappingInput {
     MappingInput {
         base,

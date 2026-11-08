@@ -122,6 +122,11 @@ impl Image {
             .map(|_| ())
     }
 
+    pub fn check_read(&self, address: u64, width: u32) -> Result<(), Fault> {
+        self.preflight(address, width, Access::Read, false, false)
+            .map(|_| ())
+    }
+
     pub fn read_fields(
         &self,
         address: u64,
