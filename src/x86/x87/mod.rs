@@ -31,6 +31,10 @@ impl Default for State {
         }
     }
 }
+pub fn classify_tag(raw: u128) -> u16 {
+    number::tag(raw)
+}
+
 impl State {
     pub fn pending(&self) -> u16 {
         self.status_word & !self.control_word & 63
