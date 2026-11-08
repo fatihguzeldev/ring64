@@ -45,6 +45,10 @@ impl Emitter {
         next_pc: u64,
         exit_depth: u32,
     ) {
+        if super::mmx::direct(operation) {
+            self.mmx_direct(operation, address, next_pc, exit_depth);
+            return;
+        }
         if let Some(bank) = operation.source_xmm() {
             self.spill_xmm(bank);
         }

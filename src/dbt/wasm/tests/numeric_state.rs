@@ -40,9 +40,9 @@ fn image(kind: Kind) -> u32 {
 fn numeric_imports_and_xmm_locals_are_selected_by_actual_consumers() {
     for (code, mmx, image) in [
         (&[0x90][..], false, false),
-        (&[0x0f, 0x77], true, false),
+        (&[0x0f, 0x77], false, false),
         (&[0x0f, 0xae, 0x03], false, true),
-        (&[0x0f, 0x77, 0x0f, 0xae, 0x03], true, true),
+        (&[0x0f, 0x77, 0x0f, 0xae, 0x03], false, true),
     ] {
         let artifact = compiled_fixture(0x1000, code, 0x1000);
         let mut imports = vec![];
@@ -156,31 +156,15 @@ fn mmx_bridges_capture_live_gpr_and_selected_xmm_and_reload_destinations() {
         0x49, 0xb8, 0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01, 0x49, 0x0f, 0x6e, 0xc0, 0x49,
         0x0f, 0x7e, 0xc0,
     ];
-    let mut gp = packet(
+    let gp = packet(
         &code,
         0x1000,
         3,
-        (&[(8, 0xfedcba9876543210)], 0xcd7, 0x1012, BUDGET as u32, 0),
+        (&[(8, 0x123456789abcdef)], 0xcd7, 0x1012, BUDGET as u32, 0),
     );
-    let from = Mmx {
-        kind: MmxKind::FromGpr,
-        src: 8,
-        wide: true,
-        ..Mmx::default()
-    };
-    let to = Mmx {
-        kind: MmxKind::ToGpr,
-        dst: 8,
-        wide: true,
-        ..Mmx::default()
-    };
-    gp["accesses"] = json!([
-        {"kind":"mmx","args":[from.encode(),"123456789abcdef",2],"result":{"reason":0}},
-        {"kind":"mmx","args":[to.encode(),"123456789abcdef",2],"result":{"reason":0,"registers":{"8":"fedcba9876543210"}}}
-    ]);
     let mut zero = raw();
     zero[1] = 0;
-    let mut source = xmm(
+    let source = xmm(
         packet(
             &[0x66, 0x0f, 0xef, 0xc9, 0xf2, 0x0f, 0xd6, 0xc1],
             0x1000,
@@ -190,7 +174,6 @@ fn mmx_bridges_capture_live_gpr_and_selected_xmm_and_reload_destinations() {
         raw(),
         zero,
     );
-    source["accesses"] = json!([{"kind":"mmx","args":[Mmx{kind:MmxKind::FromXmm,src:1,..Mmx::default()}.encode(),"0",2],"result":{"reason":0,"xmmBefore":{"1":"0"}}}]);
     let mut result = raw();
     result[0] = (raw()[1] & !(u64::MAX as u128)) | 0x12345678;
     let mut destination = xmm(
@@ -222,22 +205,11 @@ fn numeric_state_stores_retire_before_smc_exit_with_budget_stop_priority() {
                 budget,
                 (&[], 0xcd7, 0x1003, reason as u32, remaining),
             );
-            let (kind, op) = if code[1] == 0xae {
-                ("numeric_image", image(Kind::SaveFx))
+            p["accesses"] = if code[1] == 0xae {
+                json!([{"kind":"numeric_image","args":[image(Kind::SaveFx),"1122334400000003",2],"result":{"reason":2}}])
             } else {
-                (
-                    "mmx",
-                    Mmx {
-                        kind: MmxKind::Store,
-                        memory: true,
-                        wide: true,
-                        ..Mmx::default()
-                    }
-                    .encode(),
-                )
+                json!([{"kind":"store","args":["1122334400000003",8,"0"],"result":2}])
             };
-            p["accesses"] =
-                json!([{"kind":kind,"args":[op,"1122334400000003",2],"result":{"reason":2}}]);
             if stop {
                 p["stop"] = json!("1003");
             }

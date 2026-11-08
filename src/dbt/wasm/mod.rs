@@ -8,6 +8,7 @@ mod float;
 mod integer;
 mod integer_memory;
 mod memory;
+mod mmx;
 mod multiply_divide;
 mod numeric_state;
 mod stack;
@@ -215,7 +216,11 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     let has_mmx = unit
         .instructions
         .iter()
-        .any(|i| matches!(i.operation, Operation::Mmx { .. }));
+        .any(|i| matches!(i.operation, Operation::Mmx { op, .. } if !mmx::direct(op)));
+    let has_mmx_vector = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Mmx { op, .. } if mmx::vector_temps(op)));
     let has_numeric_image = unit
         .instructions
         .iter()
@@ -471,7 +476,7 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             next_local += 1;
         }
     }
-    let vector_temporaries = (vector_banks.used != 0 || has_float).then(|| {
+    let vector_temporaries = (vector_banks.used != 0 || has_float || has_mmx_vector).then(|| {
         locals.push((vector_banks.used.count_ones() + 3, ValType::V128));
         [next_local, next_local + 1, next_local + 2]
     });

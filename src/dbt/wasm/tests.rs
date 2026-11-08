@@ -10,6 +10,7 @@ mod exchange;
 mod float;
 mod integer_memory;
 mod logical;
+mod mmx;
 mod mode_context;
 mod multiply_divide;
 mod near_stack;
@@ -465,6 +466,9 @@ for (const [index,c] of cases.entries()) {
  const xmmOffset=l.xmm??176,scratch=l.vectorScratch??432;
  if(c.mxcsr!==undefined)d.setUint32(l.mxcsr,Number(c.mxcsr),true);
  const read128=pointer=>(d.getBigUint64(pointer,true)|(d.getBigUint64(pointer+8,true)<<64n)).toString(16);
+ const fp=l.x87,fpBase=fp.offset;
+ const read80=pointer=>{let raw=0n;for(let i=9;i>=0;i--)raw=(raw<<8n)|BigInt(d.getUint8(pointer+i));return raw.toString(16)};
+ if(c.x87){for(let bank=0;bank<8;bank++){let raw=BigInt('0x'+c.x87.registers[bank]);for(let i=0;i<10;i++){d.setUint8(fpBase+fp.registers+10*bank+i,Number(raw&255n));raw>>=8n}}for(const field of ['controlWord','statusWord','tagWord','opcode'])d.setUint16(fpBase+fp[field],c.x87[field],true);for(const field of ['instructionPointer','dataPointer'])d.setBigUint64(fpBase+fp[field],BigInt('0x'+c.x87[field]),true)}
  if(c.xmm)c.xmm.forEach((v,i)=>{const bits=BigInt('0x'+v);d.setBigUint64(xmmOffset+16*i,BigInt.asUintN(64,bits),true);d.setBigUint64(xmmOffset+16*i+8,bits>>64n,true)});
  let accessIndex=0;
  const access=(kind,args)=>{
@@ -505,6 +509,7 @@ for (const [index,c] of cases.entries()) {
    reason,remaining:d.getBigUint64(l.remaining,true).toString(),
    ...(c.mxcsr===undefined?{}:{mxcsr:d.getUint32(l.mxcsr,true)}),
    ...(c.xmm===undefined?{}:{xmm:Array.from({length:16},(_,i)=>read128(xmmOffset+16*i))}),
+   ...(c.x87===undefined?{}:{x87:{registers:Array.from({length:8},(_,i)=>read80(fpBase+fp.registers+10*i)),...Object.fromEntries(['controlWord','statusWord','tagWord','opcode'].map(field=>[field,d.getUint16(fpBase+fp[field],true)])),...Object.fromEntries(['instructionPointer','dataPointer'].map(field=>[field,d.getBigUint64(fpBase+fp[field],true).toString(16)]))}}),
    ...(c.repeatBudget===undefined?{}:{repeatRemaining:d.getBigUint64(l.repeatRemaining,true).toString()})};
  };
  const entryIndex=c.entries.indexOf(c.pc);assert(entryIndex>=0,'entry must belong to the artifact');

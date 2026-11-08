@@ -450,7 +450,7 @@ impl Emitter {
             })));
     }
 
-    fn vector_binary(&mut self, kind: VectorBinary, left: u32, right: u32, result: u32) {
+    pub(super) fn vector_binary(&mut self, kind: VectorBinary, left: u32, right: u32, result: u32) {
         use VectorBinary::*;
         match kind {
             MulHighWord { signed } => {
@@ -550,7 +550,7 @@ impl Emitter {
         }
     }
 
-    fn vector_shift_op(&mut self, kind: VectorShift) {
+    pub(super) fn vector_shift_op(&mut self, kind: VectorShift) {
         self.op(match kind {
             VectorShift::Left(Width::W16) => Op::I16x8Shl,
             VectorShift::Left(Width::W32) => Op::I32x4Shl,
@@ -564,7 +564,7 @@ impl Emitter {
         });
     }
 
-    fn vector_overshift(&mut self, kind: VectorShift, width: Width, left: u32) {
+    pub(super) fn vector_overshift(&mut self, kind: VectorShift, width: Width, left: u32) {
         if matches!(kind, VectorShift::ArithmeticRight(_)) {
             self.op(Op::LocalGet(left))
                 .op(Op::I32Const(width.bits() as i32 - 1));
