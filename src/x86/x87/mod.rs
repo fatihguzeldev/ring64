@@ -1,11 +1,11 @@
+#[cfg(test)]
+mod exception_review_tests;
 mod execute;
 mod number;
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 mod reference_tests;
 #[cfg(test)]
-mod exception_review_tests;
+mod tests;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]

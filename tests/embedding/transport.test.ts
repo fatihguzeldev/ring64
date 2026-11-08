@@ -209,8 +209,12 @@ for (const high of ['input', 'state', 'info', 'output', 'later-input'] as const)
       assert.deepEqual(cpu.readXmmState(), xmm);
       const x87 = {
         registers: Array.from({ length: 8 }, (_, i) => (0xfedcn << 64n) | BigInt(i)),
-        controlWord: 0x037b, statusWord: 0xa884, tagWord: 0xffff, opcode: 0x7ff,
-        instructionPointer: 0xfedcba9876543210n, dataPointer: 0x8877665544332211n,
+        controlWord: 0x037b,
+        statusWord: 0xa884,
+        tagWord: 0xffff,
+        opcode: 0x7ff,
+        instructionPointer: 0xfedcba9876543210n,
+        dataPointer: 0x8877665544332211n,
       };
       cpu.setX87State(x87);
       assert.deepEqual(cpu.readX87State(), x87);
