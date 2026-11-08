@@ -13,6 +13,7 @@ mod multiply_divide;
 mod numeric_state;
 mod stack;
 mod state;
+mod streaming;
 mod strings;
 mod unary;
 mod vector;
@@ -73,6 +74,8 @@ struct Emitter {
     x87: Option<u32>,
     mmx: Option<u32>,
     numeric_image: Option<u32>,
+    masked_store: Option<u32>,
+    clflush: Option<u32>,
 }
 
 impl Emitter {
@@ -225,6 +228,14 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::NumericImage { .. }));
+    let has_masked_store = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::MaskedStore { .. }));
+    let has_clflush = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Clflush { .. }));
     let float_type = has_float.then(|| {
         let index = next_type;
         types.ty().function(
@@ -261,6 +272,29 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             ],
             [ValType::I32],
         );
+        next_type += 1;
+        index
+    });
+    let masked_store_type = has_masked_store.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [
+                ValType::I64,
+                ValType::I32,
+                ValType::I32,
+                ValType::I32,
+                ValType::I32,
+            ],
+            [ValType::I32],
+        );
+        next_type += 1;
+        index
+    });
+    let clflush_type = has_clflush.then(|| {
+        let index = next_type;
+        types
+            .ty()
+            .function([ValType::I64, ValType::I32], [ValType::I32]);
         next_type += 1;
         index
     });
@@ -441,6 +475,18 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let masked_store = masked_store_type.map(|index| {
+        imports.import("env", "masked_store", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let clflush = clflush_type.map(|index| {
+        imports.import("env", "clflush", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let vector_access_reason = if vector_banks.loads || vector_banks.stores || store_mxcsr_used {
         Some(access_reason.unwrap_or_else(|| {
             imports.import("env", "access_reason", EntityType::Function(2));
@@ -505,6 +551,8 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         x87,
         mmx,
         numeric_image,
+        masked_store,
+        clflush,
         body: Function::new(locals),
         entries: unit
             .instructions
@@ -541,6 +589,15 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             .op(Op::LocalSet(RIP));
         emitter.gates(exit_depth);
         match instruction.operation {
+            Operation::MaskedStore {
+                data,
+                mask,
+                mmx,
+                address,
+            } => emitter.masked_store(data, mask, mmx, address, instruction.next_pc, exit_depth),
+            Operation::Clflush { address } => {
+                emitter.clflush(address, instruction.next_pc, exit_depth)
+            }
             Operation::Nop => {}
             Operation::Mmx { op, address } => {
                 emitter.mmx(op, address, instruction.next_pc, exit_depth)

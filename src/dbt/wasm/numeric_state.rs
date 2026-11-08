@@ -27,7 +27,7 @@ impl Emitter {
         }
     }
 
-    fn numeric_state_result(&mut self, exit_depth: u32) {
+    pub(super) fn numeric_state_result(&mut self, exit_depth: u32) {
         self.op(Wasm::LocalTee(REASON))
             .op(Wasm::I32Eqz)
             .op(Wasm::LocalGet(REASON))

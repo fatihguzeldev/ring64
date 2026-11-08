@@ -423,6 +423,15 @@ pub struct X87Instruction {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
+    MaskedStore {
+        data: u8,
+        mask: u8,
+        mmx: bool,
+        address: Address,
+    },
+    Clflush {
+        address: Address,
+    },
     Mmx {
         op: super::mmx::Op,
         address: Option<Address>,

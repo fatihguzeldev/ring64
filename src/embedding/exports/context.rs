@@ -1,7 +1,7 @@
 use super::*;
 
 impl Core {
-    fn access_failure(&mut self, failure: AccessFailure) {
+    pub(super) fn access_failure(&mut self, failure: AccessFailure) {
         match failure {
             AccessFailure::Linear(fault) => self.fault = Some(fault),
             AccessFailure::Segment(fault) => self.segment_fault = Some(fault),

@@ -15,6 +15,7 @@ mod mapped;
 mod mmx;
 mod numeric;
 mod numeric_image;
+mod streaming;
 mod vector;
 mod x87;
 mod x87_state;

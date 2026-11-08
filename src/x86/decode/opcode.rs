@@ -108,6 +108,9 @@ where
     if opcode == 0x0f {
         return two_byte(cursor.byte()?, prefixes, cursor);
     }
+    if opcode == 0x90 && prefixes.repeat == Some(0xf3) {
+        return Ok(Operation::Nop);
+    }
     if prefixes.repeat.is_some() {
         return Err(DecodeError::Unsupported);
     }
@@ -599,6 +602,9 @@ fn two_byte<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if let Some(result) = super::streaming::refine(opcode, prefixes, cursor) {
+        return result;
+    }
     if let Some(result) = super::mmx::refine(opcode, prefixes, cursor) {
         return result;
     }

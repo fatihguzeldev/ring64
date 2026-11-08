@@ -67,7 +67,7 @@ impl Emitter {
         self.op(Op::LocalGet(0)).op(Op::I64Load(memory(raw(bank))));
     }
 
-    fn mmx_read_vector(&mut self, bank: u8) {
+    pub(super) fn mmx_read_vector(&mut self, bank: u8) {
         self.op(Op::LocalGet(0))
             .op(Op::V128Load64Zero(memory(raw(bank))));
     }

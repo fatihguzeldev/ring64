@@ -19,6 +19,7 @@ mod near_control;
 mod numeric_state;
 mod scalar_data;
 mod stack;
+mod streaming;
 mod strings;
 mod vectors;
 mod x87;

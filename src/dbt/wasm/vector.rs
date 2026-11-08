@@ -24,6 +24,17 @@ impl Banks {
             stores: false,
         };
         for instruction in &unit.instructions {
+            if let Operation::MaskedStore {
+                data,
+                mask,
+                mmx: false,
+                ..
+            } = instruction.operation
+            {
+                banks.read(data);
+                banks.read(mask);
+                continue;
+            }
             if let Operation::Mmx { op, .. } = instruction.operation {
                 if let Some(bank) = op.source_xmm() {
                     banks.read(bank);

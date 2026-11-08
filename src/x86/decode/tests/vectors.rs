@@ -221,7 +221,7 @@ fn mandatory_prefix_selection_is_independent_of_physical_rex_cancellation() {
         at(0x1000, &[0xf3, 0x0f, 0xb1]),
         Err(DecodeError::Unsupported)
     );
-    assert_eq!(at(0x1000, &[0xf3, 0x90]), Err(DecodeError::Unsupported));
+    assert_eq!(operation(&[0xf3, 0x90]), Operation::Nop);
 }
 
 #[test]

@@ -13,9 +13,6 @@ where
     let mandatory = prefixes
         .repeat
         .or(prefixes.operand_override.then_some(0x66));
-    if opcode == 0xae && mandatory.is_none() {
-        return Some(mxcsr(prefixes, cursor));
-    }
     let scalar = matches!(mandatory, Some(0xf2 | 0xf3));
     let format = if matches!(mandatory, Some(0x66 | 0xf2)) {
         Format::F64
@@ -83,26 +80,6 @@ where
         _ => return None,
     };
     Some(decode(op, prefixes, cursor))
-}
-
-fn mxcsr<F>(prefixes: Prefixes, cursor: &mut Cursor<F>) -> Result<Operation, DecodeError>
-where
-    F: FnMut(u64) -> Result<u8, DecodeError>,
-{
-    let operands = ModRm::read(cursor, prefixes.rex)?;
-    if operands.selector < 2 {
-        return super::numeric_image::fx(&operands, prefixes, cursor);
-    }
-    if !matches!(operands.selector, 2 | 3) {
-        return Err(DecodeError::Unsupported);
-    }
-    if operands.mode == 3 {
-        return Err(DecodeError::Invalid);
-    }
-    Ok(Operation::Mxcsr {
-        address: operands.address(cursor, prefixes)?,
-        store: operands.selector == 3,
-    })
 }
 
 fn decode<F>(

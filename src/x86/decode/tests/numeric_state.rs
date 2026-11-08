@@ -118,7 +118,7 @@ fn every_selected_mmx_lane_opcode_roundtrips_and_keeps_exact_memory_widths() {
             Err(DecodeError::Invalid)
         );
     }
-    for opcode in [0x6c, 0x6d, 0x0f, 0xe7, 0xf7] {
+    for opcode in [0x6c, 0x6d, 0x0f] {
         assert_eq!(
             at(0x1000, &[0x0f, opcode, 0xc1]),
             Err(DecodeError::Unsupported)

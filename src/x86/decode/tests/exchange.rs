@@ -46,7 +46,7 @@ fn exchange_views_and_opcode_register_nop_are_distinct() {
             width: Width::W8
         }
     );
-    assert_eq!(at(0x1000, &[0xf3, 0x90]), Err(DecodeError::Unsupported));
+    assert_eq!(operation(&[0xf3, 0x90]), Operation::Nop);
 }
 
 #[test]

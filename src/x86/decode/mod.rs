@@ -10,6 +10,7 @@ mod numeric_image;
 mod opcode;
 mod operand;
 mod prefix;
+mod streaming;
 mod vector;
 mod x87;
 
