@@ -14,6 +14,8 @@ mod context;
 mod mapped;
 mod numeric;
 mod vector;
+mod x87;
+mod x87_state;
 
 struct Core {
     image: Image,
@@ -321,6 +323,9 @@ pub extern "C" fn core_fault_info(reason: i32) {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_ref().unwrap();
         let fault = match reason {
+            super::layout::X87_EXCEPTION => unsafe {
+                x87_state::exception_json(&(*core.state.get()).x87)
+            },
             super::layout::SIMD_EXCEPTION => core
                 .simd_exception
                 .as_ref()

@@ -1,4 +1,5 @@
 use crate::x86::state::State;
+use crate::x86::x87::State as X87State;
 
 pub const DISPATCH: i32 = 0;
 pub const BUDGET: i32 = 1;
@@ -15,9 +16,10 @@ pub const REPEAT_BUDGET: i32 = 11;
 pub const ALIGNMENT: i32 = 12;
 pub const SIMD_EXCEPTION: i32 = 13;
 pub const GENERAL_PROTECTION: i32 = 14;
+pub const X87_EXCEPTION: i32 = 15;
 pub const SCALAR_STATE_SIZE: usize = 176;
 
-pub const REASONS: [&str; 15] = [
+pub const REASONS: [&str; 16] = [
     "dispatch",
     "budget",
     "stop",
@@ -33,6 +35,7 @@ pub const REASONS: [&str; 15] = [
     "alignment-fault",
     "simd-exception",
     "general-protection",
+    "x87-exception",
 ];
 
 #[repr(C)]
@@ -47,6 +50,7 @@ pub struct RunState {
     pub xmm: [[u8; 16]; 16],
     pub vector_scratch: [u8; 16],
     pub mxcsr: u32,
+    pub x87: X87State,
 }
 
 impl Default for RunState {
@@ -62,6 +66,7 @@ impl Default for RunState {
             xmm: [[0; 16]; 16],
             vector_scratch: [0; 16],
             mxcsr: 0x1f80,
+            x87: X87State::default(),
         }
     }
 }
@@ -86,6 +91,18 @@ impl RunState {
             "vectorScratch": std::mem::offset_of!(Self, vector_scratch),
             "mxcsr": std::mem::offset_of!(Self, mxcsr),
             "mxcsrBytes": size_of::<u32>(),
+            "x87": {
+                "offset": std::mem::offset_of!(Self, x87),
+                "bytes": size_of::<X87State>(),
+                "registers": std::mem::offset_of!(X87State, registers),
+                "registerBytes": 10,
+                "controlWord": std::mem::offset_of!(X87State, control_word),
+                "statusWord": std::mem::offset_of!(X87State, status_word),
+                "tagWord": std::mem::offset_of!(X87State, tag_word),
+                "opcode": std::mem::offset_of!(X87State, opcode),
+                "instructionPointer": std::mem::offset_of!(X87State, instruction_pointer),
+                "dataPointer": std::mem::offset_of!(X87State, data_pointer),
+            },
             "registers": std::mem::offset_of!(Self, registers),
             "flags": std::mem::offset_of!(Self, flags),
             "rip": std::mem::offset_of!(Self, rip),
@@ -102,11 +119,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn x87_projection_appends_after_mxcsr_and_scalar_import_preserves_pending_and_ghosts() {
+        let mut transport = RunState::default();
+        assert_eq!(std::mem::offset_of!(RunState, mxcsr), 448);
+        assert_eq!(std::mem::offset_of!(RunState, x87), 456);
+        assert_eq!(size_of::<RunState>(), 560);
+        let projection = &RunState::descriptor()["x87"];
+        assert_eq!(projection["bytes"], 104);
+        assert_eq!(projection["controlWord"], 80);
+        assert_eq!(projection["instructionPointer"], 88);
+        transport.x87.registers[7] = [0xa5; 10];
+        transport.x87.control_word = 0x37b;
+        transport.x87.status_word = 0xa884;
+        let before = transport.x87;
+        transport.import(State::default());
+        assert_eq!(transport.x87, before);
+        assert_eq!(REASONS[X87_EXCEPTION as usize], "x87-exception");
+    }
+
+    #[test]
     fn xmm_banks_append_without_changing_scalar_import_or_legacy_offsets() {
         let mut state = RunState::default();
         assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
         assert_eq!(std::mem::offset_of!(RunState, vector_scratch), 432);
-        assert_eq!(size_of::<RunState>(), 456);
+        assert_eq!(size_of::<RunState>(), 560);
         assert_eq!(RunState::descriptor()["scalarSize"], 176);
         assert_eq!(RunState::descriptor()["xmmBytes"], 256);
         assert_eq!(state.xmm, [[0; 16]; 16]);
@@ -118,7 +154,7 @@ mod tests {
     #[test]
     fn repeated_work_extends_transport_after_existing_fields() {
         let descriptor = RunState::descriptor();
-        assert_eq!(descriptor["size"], 456);
+        assert_eq!(descriptor["size"], 560);
         assert_eq!(descriptor["repeatRemaining"], 168);
         assert_eq!(descriptor["reasons"][11], "repeat-budget");
     }
@@ -142,7 +178,7 @@ mod tests {
             ]
         );
         assert_eq!(RunState::descriptor()["reasons"][9], "divide-error");
-        assert_eq!(size_of::<RunState>(), 456);
+        assert_eq!(size_of::<RunState>(), 560);
     }
 
     #[test]
@@ -154,8 +190,8 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, target), 152);
         assert_eq!(std::mem::offset_of!(RunState, fault_segment), 160);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
-        assert_eq!(size_of::<RunState>(), 456);
-        assert_eq!(RunState::descriptor()["size"], 456);
+        assert_eq!(size_of::<RunState>(), 560);
+        assert_eq!(RunState::descriptor()["size"], 560);
     }
 
     #[test]

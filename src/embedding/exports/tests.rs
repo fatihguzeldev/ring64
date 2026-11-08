@@ -1,4 +1,5 @@
 use super::*;
+mod x87_bridge;
 use crate::embedding::layout::{BUDGET, DATA, DISPATCH, DIVIDE_ERROR, REPEAT_BUDGET, STOP};
 
 fn initialize(code_base: u64, code: &[u8]) {
@@ -253,3 +254,4 @@ mod contexts;
 mod mxcsr;
 mod numeric_bridge;
 mod vectors;
+mod x87_state;
