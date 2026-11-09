@@ -144,7 +144,7 @@ impl Image {
     ) -> Result<u64, MemoryError> {
         let mut sources = Vec::new();
         for (start, length) in ranges {
-            if length == 0 || super::address::span_failure(start, u128::from(length)).is_some() {
+            if length == 0 || super::address::span_failure(start, u64::from(length)).is_some() {
                 return Err(MemoryError::Invalid("invalid artifact source range"));
             }
             let mut cursor = u128::from(start);

@@ -31,7 +31,7 @@ pub fn canonical48(address: u64) -> bool {
 }
 
 pub(crate) fn check_span(address: u64, width: u32, access: Access) -> Result<(), Fault> {
-    match span_failure(address, u128::from(width)) {
+    match span_failure(address, u64::from(width)) {
         Some((cause, failing)) => Err(Fault {
             address,
             width,
@@ -43,16 +43,16 @@ pub(crate) fn check_span(address: u64, width: u32, access: Access) -> Result<(),
     }
 }
 
-pub(super) fn span_failure(address: u64, length: u128) -> Option<(Cause, u128)> {
+pub(super) fn span_failure(address: u64, length: u64) -> Option<(Cause, u128)> {
     if length == 0 {
         return None;
     }
-    let last = u128::from(address) + length - 1;
-    if last >= ADDRESS_DOMAIN_END {
-        Some((Cause::AddressRange, ADDRESS_DOMAIN_END))
-    } else if !canonical48(address) {
+    let Some(last) = address.checked_add(length - 1) else {
+        return Some((Cause::AddressRange, ADDRESS_DOMAIN_END));
+    };
+    if !canonical48(address) {
         Some((Cause::Noncanonical, u128::from(address)))
-    } else if address <= LOW_CANONICAL_END && last > u128::from(LOW_CANONICAL_END) {
+    } else if address <= LOW_CANONICAL_END && last > LOW_CANONICAL_END {
         Some((Cause::Noncanonical, u128::from(LOW_CANONICAL_END) + 1))
     } else {
         None
@@ -62,6 +62,99 @@ pub(super) fn span_failure(address: u64, length: u128) -> Option<(Cause, u128)> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn widened_interval_oracle(address: u64, length: u64) -> Option<(Cause, u128)> {
+        if length == 0 {
+            return None;
+        }
+        let start = u128::from(address);
+        let end = start + u128::from(length);
+        let domain_end = 1u128 << 64;
+        if end > domain_end {
+            return Some((Cause::AddressRange, domain_end));
+        }
+        let overlap_start = start.max(0x0000_8000_0000_0000u128);
+        let overlap_end = end.min(0xffff_8000_0000_0000u128);
+        (overlap_start < overlap_end).then_some((Cause::Noncanonical, overlap_start))
+    }
+
+    fn boundary_addresses() -> Vec<u64> {
+        let mut addresses = Vec::new();
+        for anchor in [0, 0x0000_7fff_ffff_ffff, 0xffff_8000_0000_0000, u64::MAX] {
+            for distance in [0, 1, 2, 8, 511] {
+                if let Some(address) = anchor.checked_sub(distance) {
+                    addresses.push(address);
+                }
+                if let Some(address) = anchor.checked_add(distance) {
+                    addresses.push(address);
+                }
+            }
+        }
+        addresses.sort_unstable();
+        addresses.dedup();
+        addresses
+    }
+
+    #[test]
+    fn checked_spans_match_widened_interval_intersection_at_every_address_boundary() {
+        for address in boundary_addresses() {
+            for width in [0, 1, 2, 4, 8, 10, 16, 512, u32::MAX] {
+                for access in [Access::Read, Access::Write, Access::Execute] {
+                    let expected = match widened_interval_oracle(address, u64::from(width)) {
+                        Some((cause, failing)) => Err(Fault {
+                            address,
+                            width,
+                            access,
+                            cause,
+                            failing,
+                        }),
+                        None => Ok(()),
+                    };
+                    assert_eq!(
+                        check_span(address, width, access),
+                        expected,
+                        "address={address:#018x}, width={width}, access={access:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn long_spans_match_widened_oracle_without_confusing_last_byte_and_exclusive_end() {
+        for address in boundary_addresses() {
+            for length in [
+                0,
+                1,
+                2,
+                8,
+                u64::from(u32::MAX),
+                u64::from(u32::MAX) + 1,
+                1 << 63,
+                u64::MAX,
+                0xffff_8000_0000_0000 - 0x0000_7fff_ffff_ffff + 1,
+            ] {
+                assert_eq!(
+                    span_failure(address, length),
+                    widened_interval_oracle(address, length),
+                    "address={address:#018x}, length={length:#018x}"
+                );
+            }
+        }
+        assert_eq!(span_failure(u64::MAX, 1), None);
+        assert_eq!(
+            span_failure(u64::MAX, 2),
+            Some((Cause::AddressRange, 1u128 << 64))
+        );
+        assert_eq!(
+            span_failure(1, u64::MAX),
+            Some((Cause::Noncanonical, 0x0000_8000_0000_0000))
+        );
+        assert_eq!(
+            span_failure(2, u64::MAX),
+            Some((Cause::AddressRange, 1u128 << 64))
+        );
+    }
 
     #[test]
     fn canonicality_distinguishes_both_halves_and_the_hole() {
@@ -122,7 +215,7 @@ mod tests {
 
     #[test]
     fn canonical_endpoints_do_not_authorize_a_span_crossing_the_entire_hole() {
-        let length = u128::from(HIGH_CANONICAL_START) - u128::from(LOW_CANONICAL_END) + 1;
+        let length = HIGH_CANONICAL_START - LOW_CANONICAL_END + 1;
         assert_eq!(
             span_failure(LOW_CANONICAL_END, length),
             Some((Cause::Noncanonical, 0x0000_8000_0000_0000))

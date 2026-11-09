@@ -230,7 +230,7 @@ impl Image {
                 .position(|backing| backing.id == input.backing)
                 .ok_or(MemoryError::Invalid("mapping refers to unknown backing"))?;
             if input.length == 0
-                || span_failure(input.base, u128::from(input.length)).is_some()
+                || span_failure(input.base, u64::from(input.length)).is_some()
                 || u64::from(input.offset) + u64::from(input.length)
                     > self.backings[backing].bytes.len() as u64
             {
