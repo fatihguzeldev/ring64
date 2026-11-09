@@ -3,9 +3,9 @@ use crate::x86::context::{AccessFailure, Mode, Segment};
 use crate::x86::instruction::{SoftwareEventDescriptor, SoftwareEventKind, Width};
 
 mod entry;
-#[cfg(test)]
 mod flags;
 mod frame;
+mod returning;
 mod system;
 
 #[cfg(test)]
@@ -13,6 +13,9 @@ mod tests;
 
 #[cfg(test)]
 mod entry_priority_tests;
+
+#[cfg(test)]
+mod return_tests;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EventInputs {
@@ -57,7 +60,7 @@ pub fn execute(
         return Err(EventFailure::Unsupported);
     }
     if descriptor.kind == SoftwareEventKind::Return {
-        return Err(EventFailure::Unsupported);
+        return returning::execute(context, image, descriptor, inputs);
     }
     if descriptor.kind == SoftwareEventKind::Into && inputs.flags & 0x800 == 0 {
         return Ok(EventOutcome {

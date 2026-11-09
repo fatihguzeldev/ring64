@@ -305,11 +305,11 @@ impl Loaded {
 }
 
 #[derive(Clone, Copy)]
-struct Stack {
-    selector: u16,
-    cache: LoadedSegment,
-    attributes: SegmentAttributes,
-    loaded: Option<Loaded>,
+pub(super) struct Stack {
+    pub selector: u16,
+    pub cache: LoadedSegment,
+    pub attributes: SegmentAttributes,
+    pub loaded: Option<Loaded>,
 }
 
 #[derive(Clone, Copy)]
@@ -330,7 +330,7 @@ fn lookup(context: &ExecutionContext, image: &Image, selector: u16) -> Result<Lo
     Ok(Loaded { lookup, descriptor })
 }
 
-fn code(
+pub(super) fn code(
     context: &ExecutionContext,
     image: &Image,
     kind: FarKind,
@@ -373,7 +373,7 @@ fn code(
     Ok(loaded)
 }
 
-fn stack(
+pub(super) fn stack(
     context: &ExecutionContext,
     image: &Image,
     mode: Mode,
