@@ -36,7 +36,7 @@ fn memory(offset: usize) -> MemArg {
 }
 
 impl Emitter {
-    fn mmx_pending(&mut self, exit_depth: u32) {
+    pub(super) fn mmx_pending(&mut self, exit_depth: u32) {
         self.op(Op::LocalGet(0))
             .op(Op::I32Load16U(memory(STATUS)))
             .op(Op::LocalGet(0))

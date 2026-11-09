@@ -29,6 +29,23 @@ fn valid_flags(flags: u64) -> bool {
     flags & !flags::IMPORTED_MASK == 0 && flags & 2 != 0
 }
 
+impl Core {
+    pub(super) fn boundary_observed(&self) -> bool {
+        let state = unsafe { &*self.state.get() };
+        state.flags & (flags::TF | flags::RF) != 0 || state.interruptibility != 0
+    }
+
+    pub(super) fn owner_valid(&self, owner: u64) -> bool {
+        self.image.owner_valid(owner)
+            && self.observed_owners.contains(&owner) == self.boundary_observed()
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_boundary_observed() -> i32 {
+    BRIDGE.with_borrow(|bridge| i32::from(bridge.core.as_ref().unwrap().boundary_observed()))
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn core_flags(operation: u32, flags: u64, input: u64) -> i32 {
     let Some(operation) = SystemFlagsDescriptor::try_decode(operation) else {

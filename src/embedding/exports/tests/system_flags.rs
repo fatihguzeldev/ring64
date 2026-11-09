@@ -60,3 +60,47 @@ fn imported_boundary_history_and_context_replacement_have_explicit_lifetimes() {
         );
     });
 }
+
+#[test]
+fn boundary_profiles_guard_activation_without_invalidating_source_owners() {
+    initialize(0x1000, &[0x90]);
+    let compile = || {
+        assert_eq!(core_compile(0x1000, 1, 16, 65536), 0);
+        BRIDGE.with_borrow(|bridge| {
+            let value: serde_json::Value = serde_json::from_slice(&bridge.info).unwrap();
+            (
+                u64::from_str_radix(
+                    value["owner"].as_str().unwrap().trim_start_matches("0x"),
+                    16,
+                )
+                .unwrap(),
+                value["boundaryObserved"].as_bool().unwrap(),
+            )
+        })
+    };
+    let (fast, observed) = compile();
+    assert!(!observed);
+    scalar_input(0x102, 0);
+    assert_eq!(core_import_state(), 0);
+    assert_eq!(mapped::core_validity(fast), 1);
+    assert_eq!(mapped::core_activate(fast), 0);
+    let (step, observed) = compile();
+    assert!(observed);
+    assert_eq!(mapped::core_activate(step), 1);
+    scalar_input(2, 0);
+    assert_eq!(core_import_state(), 0);
+    assert_eq!(mapped::core_validity(step), 1);
+    assert_eq!(mapped::core_activate(step), 0);
+    assert_eq!(mapped::core_activate(fast), 1);
+    mapped::core_release(step);
+    BRIDGE.with_borrow(|bridge| {
+        assert!(
+            !bridge
+                .core
+                .as_ref()
+                .unwrap()
+                .observed_owners
+                .contains(&step)
+        )
+    });
+}

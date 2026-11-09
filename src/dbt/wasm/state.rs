@@ -1,4 +1,4 @@
-use super::{DIRECTION, Emitter, FLAGS, GPR, REMAINING, REPEAT_REMAINING, RIP};
+use super::{DIRECTION, Emitter, FLAGS, GPR, REMAINING, REPEAT_REMAINING, RIP, SHADOW, SYSTEM};
 use crate::embedding::layout::RunState;
 use std::mem::{offset_of, size_of};
 use wasm_encoder::{Instruction as Op, MemArg};
@@ -30,13 +30,24 @@ impl Emitter {
         }
         // Keep direction independent from arithmetic status producers.
         self.op(Op::LocalGet(FLAGS))
+            .op(Op::I64Const(!0xcd7))
+            .op(Op::I64And)
+            .op(Op::LocalSet(SYSTEM))
+            .op(Op::LocalGet(FLAGS))
             .op(Op::I64Const(0x400))
             .op(Op::I64And)
             .op(Op::LocalSet(DIRECTION))
             .op(Op::LocalGet(FLAGS))
-            .op(Op::I64Const(!0x400))
+            .op(Op::I64Const(0x8d7))
             .op(Op::I64And)
             .op(Op::LocalSet(FLAGS));
+        self.op(Op::LocalGet(0))
+            .op(Op::I32Load(MemArg {
+                offset: offset_of!(RunState, interruptibility) as u64,
+                align: 2,
+                memory_index: 0,
+            }))
+            .op(Op::LocalSet(SHADOW));
         self.op(Op::LocalGet(1)).op(Op::LocalSet(REMAINING));
         if self.has_repeat {
             self.op(Op::LocalGet(0))
@@ -69,10 +80,20 @@ impl Emitter {
         ] {
             self.op(Op::LocalGet(0)).op(Op::LocalGet(local));
             if local == FLAGS {
-                self.op(Op::LocalGet(DIRECTION)).op(Op::I64Or);
+                self.op(Op::LocalGet(DIRECTION))
+                    .op(Op::I64Or)
+                    .op(Op::LocalGet(SYSTEM))
+                    .op(Op::I64Or);
             }
             self.op(Op::I64Store(memory(offset)));
         }
+        self.op(Op::LocalGet(0))
+            .op(Op::LocalGet(SHADOW))
+            .op(Op::I32Store(MemArg {
+                offset: offset_of!(RunState, interruptibility) as u64,
+                align: 2,
+                memory_index: 0,
+            }));
         if self.has_repeat {
             self.op(Op::LocalGet(0))
                 .op(Op::LocalGet(REPEAT_REMAINING))

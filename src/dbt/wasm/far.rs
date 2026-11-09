@@ -44,6 +44,9 @@ impl Emitter {
             .op(Op::I64Const(1))
             .op(Op::I64Sub)
             .op(Op::LocalSet(REMAINING));
+        if self.finish_instruction(exit_depth) {
+            return;
+        }
         self.gates(exit_depth);
         self.exit(DISPATCH, exit_depth);
     }

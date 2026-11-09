@@ -6,7 +6,7 @@ use wasm_encoder::Instruction as Op;
 const RSP: u32 = GPR + 4;
 
 impl Emitter {
-    fn stack_word(&mut self, width: Width, exit_depth: u32) {
+    pub(super) fn stack_word(&mut self, width: Width, exit_depth: u32) {
         self.load_value(
             Address {
                 base: AddressBase::Register(4),
@@ -22,7 +22,7 @@ impl Emitter {
         );
     }
 
-    fn update_stack_pointer(&mut self, count: u64) {
+    pub(super) fn update_stack_pointer(&mut self, count: u64) {
         self.op(Op::LocalGet(ADDRESS))
             .op(Op::I64Const(count as i64))
             .op(Op::I64Add);
@@ -31,7 +31,7 @@ impl Emitter {
         self.write_register(RegisterView::low(4), stack_width);
     }
 
-    fn push_result(&mut self, width: Width, exit_depth: u32) {
+    pub(super) fn push_result(&mut self, width: Width, exit_depth: u32) {
         let stack_width = self.context.stack_width();
         self.op(Op::LocalGet(RSP))
             .op(Op::I64Const(i64::from(width.bytes())))

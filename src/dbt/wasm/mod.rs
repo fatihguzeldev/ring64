@@ -1,4 +1,5 @@
 mod bits;
+mod boundary;
 mod control;
 mod counts;
 mod data;
@@ -17,6 +18,7 @@ mod stack;
 mod state;
 mod streaming;
 mod strings;
+mod system_flags;
 mod unary;
 mod vector;
 mod x87;
@@ -46,8 +48,10 @@ const ADDRESS: u32 = 29;
 const VALUE: u32 = 30;
 const STORE_STATUS: u32 = 31;
 const DIRECTION: u32 = 32;
-const REPEAT_REMAINING: u32 = 33;
-const ENTRY_FLAGS: u32 = 34;
+const SYSTEM: u32 = 33;
+const SHADOW: u32 = 34;
+const REPEAT_REMAINING: u32 = 35;
+const ENTRY_FLAGS: u32 = 36;
 
 struct Emitter {
     body: Function,
@@ -80,6 +84,14 @@ struct Emitter {
     clflush: Option<u32>,
     protection: Option<u32>,
     far_control: Option<u32>,
+    system_flags: Option<u32>,
+    debug_step: Option<u32>,
+    observed: bool,
+    sampled_tf: Option<u32>,
+    incoming_shadow: Option<u32>,
+    next_shadow: Option<u32>,
+    current_pc: u64,
+    current_operation: Operation,
 }
 
 impl Emitter {
@@ -89,7 +101,12 @@ impl Emitter {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
+    emit_observed(unit, false)
+}
+
+pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
     let vector_banks = vector::Banks::for_unit(unit);
     let has_repeat = unit
         .instructions
@@ -240,14 +257,20 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::Clflush { .. }));
-    let has_protection = unit
-        .instructions
-        .iter()
-        .any(|i| matches!(i.operation, Operation::Protection(_)));
+    let has_protection = unit.instructions.iter().any(|i| {
+        matches!(
+            i.operation,
+            Operation::Protection(_) | Operation::PopSs { .. }
+        )
+    });
     let has_far = unit
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::Far(_)));
+    let has_system_flags = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::SystemFlags(_)));
     let float_type = has_float.then(|| {
         let index = next_type;
         types.ty().function(
@@ -330,6 +353,23 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 ValType::I64,
                 ValType::I32,
             ],
+            [ValType::I32],
+        );
+        next_type += 1;
+        index
+    });
+    let system_flags_type = has_system_flags.then(|| {
+        let index = next_type;
+        types
+            .ty()
+            .function([ValType::I32, ValType::I64, ValType::I64], [ValType::I32]);
+        next_type += 1;
+        index
+    });
+    let debug_type = observed.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [ValType::I64, ValType::I64, ValType::I32, ValType::I64],
             [ValType::I32],
         );
         next_type += 1;
@@ -536,6 +576,18 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let system_flags = system_flags_type.map(|index| {
+        imports.import("env", "flags", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let debug_step = debug_type.map(|index| {
+        imports.import("env", "debug_step", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let vector_access_reason = if vector_banks.loads || vector_banks.stores || store_mxcsr_used {
         Some(access_reason.unwrap_or_else(|| {
             imports.import("env", "access_reason", EntityType::Function(2));
@@ -558,13 +610,20 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         (2, ValType::I32),
         (5, ValType::I64),
         (1, ValType::I32),
-        (1, ValType::I64),
+        (2, ValType::I64),
+        (1, ValType::I32),
     ];
     if has_repeat {
         locals.push((2, ValType::I64));
     }
     let mut vector_registers = [None; 16];
-    let mut next_local = 33 + 2 * u32::from(has_repeat);
+    let mut next_local = 35 + 2 * u32::from(has_repeat);
+    let boundary_locals = observed.then(|| {
+        let result = [next_local, next_local + 1, next_local + 2];
+        locals.push((3, ValType::I32));
+        next_local += 3;
+        result
+    });
     for (bank, local) in vector_registers.iter_mut().enumerate() {
         if vector_banks.used & (1 << bank) != 0 {
             *local = Some(next_local);
@@ -604,6 +663,14 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         clflush,
         protection,
         far_control,
+        system_flags,
+        debug_step,
+        observed,
+        sampled_tf: boundary_locals.map(|l| l[0]),
+        incoming_shadow: boundary_locals.map(|l| l[1]),
+        next_shadow: boundary_locals.map(|l| l[2]),
+        current_pc: 0,
+        current_operation: Operation::Nop,
         body: Function::new(locals),
         entries: unit
             .instructions
@@ -615,6 +682,7 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     emitter.load_state();
     emitter.op(Op::Block(BlockType::Empty));
     emitter.gates(0);
+    emitter.profile_guard(0);
     let count = unit.instructions.len() as u32;
     // The artifact owner supplies the ordinal from Artifact::entries.
     emitter
@@ -632,6 +700,8 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     for (index, instruction) in unit.instructions.iter().enumerate() {
         emitter.op(Op::End);
         emitter.current_index = index as u32;
+        emitter.current_pc = instruction.pc;
+        emitter.current_operation = instruction.operation;
         emitter.stores = false;
         let loop_depth = count - index as u32;
         let exit_depth = loop_depth + 1;
@@ -639,11 +709,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             .op(Op::I64Const(instruction.pc as i64))
             .op(Op::LocalSet(RIP));
         emitter.gates(exit_depth);
+        emitter.begin(instruction.operation, exit_depth);
         match instruction.operation {
-            Operation::SystemFlags(_) | Operation::PopSs { .. } => {
-                emitter.exit(crate::embedding::layout::UNSUPPORTED, exit_depth);
-                continue;
-            }
+            Operation::SystemFlags(operation) => emitter.system_flags(operation, exit_depth),
+            Operation::PopSs { width } => emitter.pop_ss(width, exit_depth),
             Operation::MaskedStore {
                 data,
                 mask,

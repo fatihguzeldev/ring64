@@ -65,6 +65,7 @@ impl Emitter {
             }
             self.op(Op::BrIf(1));
         }
+        self.trap(false, exit_depth + 2);
         self.op(Op::LocalGet(REPEAT_REMAINING))
             .op(Op::I64Eqz)
             .op(Op::If(BlockType::Empty));

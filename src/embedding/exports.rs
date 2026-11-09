@@ -1,4 +1,5 @@
 use std::cell::{RefCell, UnsafeCell};
+use std::collections::HashSet;
 
 use crate::dbt::{self, CompileError, Limits};
 use crate::memory::{Access, Cause, Fault, Image};
@@ -37,6 +38,7 @@ struct Core {
     protection_fault: Option<crate::x86::protection::ProtectionFault>,
     system_memory_fault: Option<crate::x86::protection::SystemMemoryFault>,
     debug_exception: Option<system_flags::DebugException>,
+    observed_owners: HashSet<u64>,
 }
 
 #[derive(Default)]
@@ -109,6 +111,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             protection_fault: None,
             system_memory_fault: None,
             debug_exception: None,
+            observed_owners: HashSet::new(),
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
         0
@@ -231,12 +234,20 @@ pub extern "C" fn core_compile(
         bridge.output.clear();
         let core = bridge.core.as_mut().unwrap();
         let limits = Limits { max_instructions, max_source_bytes, max_artifact_bytes };
-        match dbt::compile_with_context(&core.image, &core.context, pc, limits) {
+        let observed = core.boundary_observed();
+        match dbt::compile_with_context_observed(&core.image, &core.context, pc, limits, observed) {
             Ok(artifact) => {
                 let owner = match core.image.register_source(artifact.source_ranges.iter().map(|range| (range.start, range.length))) {
                     Ok(owner) => owner,
                     Err(_) => return RESOURCE,
                 };
+                if observed {
+                    if core.observed_owners.try_reserve(1).is_err() {
+                        core.image.release(owner);
+                        return RESOURCE;
+                    }
+                    core.observed_owners.insert(owner);
+                }
                 bridge.info = serde_json::to_vec(&serde_json::json!({
                     "entries": artifact.entries.iter().map(|pc| format!("0x{pc:x}")).collect::<Vec<_>>(),
                     "instructionCount": artifact.instruction_count,
@@ -244,6 +255,7 @@ pub extern "C" fn core_compile(
                     "sourceBytes": artifact.source_bytes,
                     "owner": format!("0x{owner:x}"),
                     "contextVersion": format!("0x{:x}",core.context_version),
+                    "boundaryObserved": observed,
                     "dependencies": artifact.source_ranges.iter().map(|range| serde_json::json!({
                         "start": format!("0x{:x}", range.start), "length": range.length,
                     })).collect::<Vec<_>>(),

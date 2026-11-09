@@ -44,8 +44,18 @@ pub fn compile_with_context(
     entry: u64,
     limits: Limits,
 ) -> Result<Artifact, CompileError> {
+    compile_with_context_observed(image, context, entry, limits, false)
+}
+
+pub fn compile_with_context_observed(
+    image: &Image,
+    context: &ExecutionContext,
+    entry: u64,
+    limits: Limits,
+    observed: bool,
+) -> Result<Artifact, CompileError> {
     let unit = discovery::discover_with_context(image, context, entry, limits)?;
-    let bytes = wasm::emit(&unit);
+    let bytes = wasm::emit_observed(&unit, observed);
     if bytes.len() > limits.max_artifact_bytes as usize {
         return Err(CompileError::Resource);
     }

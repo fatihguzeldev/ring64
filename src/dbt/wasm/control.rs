@@ -48,6 +48,9 @@ impl Emitter {
             .op(Op::I64Const(1))
             .op(Op::I64Sub)
             .op(Op::LocalSet(REMAINING));
+        if self.finish_instruction(exit_depth) {
+            return;
+        }
         self.gates(exit_depth);
         self.code_write_boundary(exit_depth);
         let lookup = self
@@ -201,6 +204,9 @@ impl Emitter {
     }
 
     pub(super) fn route(&mut self, target: u64, loop_depth: u32, exit_depth: u32) {
+        if self.finish_instruction(exit_depth) {
+            return;
+        }
         self.code_write_boundary(exit_depth);
         if let Some(&index) = self.entries.get(&target) {
             if index > self.current_index {
