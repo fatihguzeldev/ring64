@@ -186,6 +186,12 @@ impl ExecutionContext {
     pub fn cpl(&self) -> u8 {
         self.cpl
     }
+    pub fn set_mode_and_cpl(&mut self, mode: Mode, cpl: u8) -> bool {
+        let changed = self.mode != mode || self.cpl != cpl;
+        self.mode = mode;
+        self.cpl = cpl;
+        changed
+    }
     pub fn selector(&self, segment: Segment) -> u16 {
         self.selectors[segment as usize]
     }

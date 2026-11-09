@@ -117,6 +117,7 @@ function captureSegment(
   source: Record<string, unknown>,
   mode: ExecutionMode,
   name: SegmentName,
+  full: boolean,
 ): LoadedSegment {
   const base = source.base;
   const limit = source.limit;
@@ -124,8 +125,13 @@ function captureSegment(
   const usable = source.usable;
   const type = source.type;
   unsigned64(base, 'segment base');
-  if (mode !== 'long64' && base > 0xffffffffn) throw new TypeError('segment base must fit u32');
-  if (mode === 'long64' && (name === 'fs' || name === 'gs') && !canonical(base))
+  const wide = mode === 'long64' || (full && mode === 'compatibility' && name !== 'cs');
+  if (!wide && base > 0xffffffffn) throw new TypeError('segment base must fit u32');
+  if (
+    (mode === 'long64' || mode === 'compatibility') &&
+    (name === 'fs' || name === 'gs') &&
+    !canonical(base)
+  )
     throw new TypeError('FS/GS base must be canonical48');
   byteLength(limit, 'segment limit');
   if (typeof type !== 'string' || !TYPES.includes(type as SegmentType))
@@ -219,7 +225,7 @@ export function captureContext(context: ExecutionContext): ExecutionContextSnaps
   } else {
     for (const name of SEGMENTS) {
       const input = inputs[name];
-      const cache = captureSegment(record(input), mode, name);
+      const cache = captureSegment(record(input), mode, name, full);
       if (full) {
         segments[name] = {
           ...cache,
@@ -270,8 +276,8 @@ export function captureContext(context: ExecutionContext): ExecutionContextSnaps
         ['code', 'readable-code'].includes(cs.type) ||
         (mode === 'real' && cs.type === 'read-write')
       ) ||
-      !ss.usable ||
-      !['read-write', 'expand-down-read-write'].includes(ss.type)
+      (!(full && mode === 'compatibility') &&
+        (!ss.usable || !['read-write', 'expand-down-read-write'].includes(ss.type)))
     )
       throw new TypeError('invalid loaded CS/SS');
   }

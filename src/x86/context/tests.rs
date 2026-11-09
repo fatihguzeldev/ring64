@@ -17,6 +17,106 @@ fn snapshot_default_has_visible_and_hidden_state_without_tables() {
 }
 
 #[test]
+fn far_snapshot_compatibility_retains_wide_non_cs_bases_and_arbitrary_ss_cache() {
+    for kind in [
+        "code",
+        "readable-code",
+        "read-only",
+        "read-write",
+        "expand-down-read-only",
+        "expand-down-read-write",
+    ] {
+        for usable in [false, true] {
+            let mut value = ExecutionContext::default().to_json();
+            value["mode"] = json!("compatibility");
+            value["cpl"] = json!(1);
+            value["segments"]["cs"]["long"] = json!(false);
+            value["segments"]["cs"]["default32"] = json!(true);
+            value["segments"]["ss"]["type"] = json!(kind);
+            value["segments"]["ss"]["usable"] = json!(usable);
+            value["segments"]["ss"]["selector"] = json!(1);
+            for segment in ["ss", "ds", "es"] {
+                value["segments"][segment]["base"] = json!("0x1234567800007000");
+            }
+            value["segments"]["fs"]["base"] = json!("0xffff800000005000");
+            value["segments"]["gs"]["base"] = json!("0x100006000");
+            let context = ExecutionContext::from_json(&value).unwrap();
+            assert_eq!(context.to_json(), value);
+            assert_eq!(
+                context.translate(0x20, 2, Segment::Fs, Access::Read, false),
+                Ok(0x5020)
+            );
+        }
+    }
+}
+
+#[test]
+fn far_snapshot_widening_does_not_relax_legacy_inputs_or_ia32e_fs_gs_canonicality() {
+    let mut legacy = protected().to_json();
+    for root in ["cpl", "gdtr", "idtr", "ldtr"] {
+        legacy.as_object_mut().unwrap().remove(root);
+    }
+    for segment in Segment::ALL {
+        for key in [
+            "selector",
+            "dpl",
+            "present",
+            "conforming",
+            "accessed",
+            "long",
+            "granularity",
+            "available",
+        ] {
+            legacy["segments"][segment.name()]
+                .as_object_mut()
+                .unwrap()
+                .remove(key);
+        }
+    }
+    legacy["mode"] = json!("compatibility");
+    assert!(ExecutionContext::from_json(&legacy).is_ok());
+    for (field, invalid) in [
+        ("base", json!("0x100000000")),
+        ("usable", json!(false)),
+        ("type", json!("read-only")),
+    ] {
+        let mut value = legacy.clone();
+        value["segments"]["ss"][field] = invalid;
+        assert!(ExecutionContext::from_json(&value).is_err());
+    }
+    for mode in ["long64", "compatibility"] {
+        for segment in ["fs", "gs"] {
+            for base in [
+                "0x800000000000",
+                "0xffff7fffffffffff",
+                "0x10000000000000000",
+            ] {
+                let mut value = ExecutionContext::default().to_json();
+                value["mode"] = json!(mode);
+                value["segments"][segment]["base"] = json!(base);
+                assert!(ExecutionContext::from_json(&value).is_err());
+            }
+        }
+    }
+}
+
+#[test]
+fn far_prepared_mode_cpl_update_keeps_one_authority_and_preserves_loaded_state() {
+    let mut context = protected();
+    let mut expected = context.to_json();
+    assert!(!context.set_mode_and_cpl(Mode::Protected, 0));
+    assert!(context.set_mode_and_cpl(Mode::Compatibility, 3));
+    expected["mode"] = json!("compatibility");
+    expected["cpl"] = json!(3);
+    assert_eq!(context.to_json(), expected);
+    assert!(!context.set_mode_and_cpl(Mode::Compatibility, 3));
+    assert!(context.set_mode_and_cpl(Mode::Long64, 3));
+    expected["mode"] = json!("long64");
+    assert_eq!(context.to_json(), expected);
+    assert_eq!(context.stack_width(), Width::W64);
+}
+
+#[test]
 fn snapshot_raw_hidden_state_and_unloaded_system_roots_roundtrip() {
     let mut value = ExecutionContext::default().to_json();
     value["cpl"] = json!(2);
@@ -86,7 +186,7 @@ fn snapshot_partial_fields_and_legacy_aliases_never_select_shorthand_fallback() 
 }
 
 #[test]
-fn snapshot_domains_distinguish_compatibility_system_bases_from_data_bases() {
+fn snapshot_domains_distinguish_legacy_and_cs_bases_from_retained_ia32e_bases() {
     for root in ["gdtr", "idtr", "ldtr"] {
         let mut value = protected().to_json();
         value[root]["base"] = json!("0x100000000");
@@ -95,6 +195,8 @@ fn snapshot_domains_distinguish_compatibility_system_bases_from_data_bases() {
         let context = ExecutionContext::from_json(&value).unwrap();
         assert_eq!(context.to_json(), value);
         value["segments"]["ds"]["base"] = json!("0x100000000");
+        assert!(ExecutionContext::from_json(&value).is_ok());
+        value["segments"]["cs"]["base"] = json!("0x100000000");
         assert!(ExecutionContext::from_json(&value).is_err());
     }
     for (object, key, invalid) in [

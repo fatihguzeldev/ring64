@@ -35,6 +35,57 @@ test('legacy context capture produces a complete deterministic owned snapshot', 
   assert.deepEqual(captured, longSnapshot(0x1234n));
 });
 
+test('far full compatibility snapshots retain raw non-CS bases and unusable or unusual SS', () => {
+  for (const type of [
+    'code',
+    'readable-code',
+    'read-only',
+    'read-write',
+    'expand-down-read-only',
+    'expand-down-read-write',
+  ] as const) {
+    for (const usable of [false, true]) {
+      const source = longSnapshot(0xffff800000005000n, 0x100006000n);
+      source.mode = 'compatibility';
+      source.cpl = 1;
+      source.segments.cs.long = false;
+      source.segments.cs.default32 = true;
+      source.segments.ss.type = type;
+      source.segments.ss.usable = usable;
+      source.segments.ss.selector = 1;
+      for (const name of ['ss', 'ds', 'es'] as const)
+        source.segments[name].base = 0x1234567800007000n;
+      assert.deepEqual(captureContext(source), source);
+    }
+  }
+});
+
+test('far snapshot widening keeps legacy shorthand and IA-32e FS GS validation strict', () => {
+  for (const [key, value] of [
+    ['base', 0x100000000n],
+    ['usable', false],
+    ['type', 'read-only'],
+  ] as const) {
+    const source = input();
+    if (source.mode === 'long64') assert.fail();
+    source.mode = 'compatibility';
+    Reflect.set(source.segments.ss, key, value);
+    assert.throws(() => captureContext(source), TypeError);
+  }
+  for (const mode of ['long64', 'compatibility'] as const)
+    for (const segment of ['fs', 'gs'] as const)
+      for (const base of [0x800000000000n, 0xffff7ffffffffffen, 1n << 64n]) {
+        const source = longSnapshot();
+        source.mode = mode;
+        source.segments[segment].base = base;
+        assert.throws(() => captureContext(source), TypeError);
+      }
+  const source = longSnapshot();
+  source.mode = 'compatibility';
+  source.segments.cs.base = 0x100000000n;
+  assert.throws(() => captureContext(source), TypeError);
+});
+
 test('context capture owns every loaded segment and reads each field once', () => {
   const value = input();
   assert.notEqual(value.mode, 'long64');

@@ -37,7 +37,12 @@ fn system_base(value: &Value, mode: Mode) -> Result<u64, &'static str> {
     Ok(base)
 }
 
-fn cache(value: &Value, mode: Mode, segment: Segment) -> Result<LoadedSegment, &'static str> {
+fn cache(
+    value: &Value,
+    mode: Mode,
+    segment: Segment,
+    full: bool,
+) -> Result<LoadedSegment, &'static str> {
     let kind = match value["type"].as_str() {
         Some("code") => SegmentType::Code,
         Some("readable-code") => SegmentType::ReadableCode,
@@ -48,8 +53,10 @@ fn cache(value: &Value, mode: Mode, segment: Segment) -> Result<LoadedSegment, &
         _ => return Err(INVALID),
     };
     let base = address(&value["base"])?;
-    if mode != Mode::Long64 && base > u64::from(u32::MAX)
-        || mode == Mode::Long64
+    let wide =
+        mode == Mode::Long64 || full && mode == Mode::Compatibility && segment != Segment::Cs;
+    if !wide && base > u64::from(u32::MAX)
+        || matches!(mode, Mode::Long64 | Mode::Compatibility)
             && matches!(segment, Segment::Fs | Segment::Gs)
             && !canonical48(base)
     {
@@ -139,7 +146,7 @@ impl ExecutionContext {
         }
         for segment in Segment::ALL {
             let input = &value["segments"][segment.name()];
-            let loaded = cache(input, mode, segment)?;
+            let loaded = cache(input, mode, segment, full)?;
             let index = segment as usize;
             context.segments[index] = loaded;
             if full {
@@ -179,8 +186,7 @@ impl ExecutionContext {
         } else if mode != Mode::Long64
             && (!cs.usable
                 || !(cs.kind.is_code() || mode == Mode::Real && cs.kind == SegmentType::ReadWrite)
-                || !ss.usable
-                || !ss.kind.writable())
+                || !(full && mode == Mode::Compatibility) && (!ss.usable || !ss.kind.writable()))
         {
             return Err(INVALID);
         }
