@@ -241,7 +241,14 @@ impl Image {
                 self.validity
                     .write(&backing.incarnation, offset as u32, count as u32);
             }
-            backing.bytes[offset..offset + count].copy_from_slice(&bytes[source..source + count]);
+            match count {
+                8 => backing.bytes[offset..offset + 8].copy_from_slice(&bytes[source..source + 8]),
+                16 => {
+                    backing.bytes[offset..offset + 16].copy_from_slice(&bytes[source..source + 16])
+                }
+                _ => backing.bytes[offset..offset + count]
+                    .copy_from_slice(&bytes[source..source + count]),
+            }
             source += count;
             if source < bytes.len() {
                 cursor += count as u64;
