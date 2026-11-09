@@ -205,7 +205,7 @@ pub extern "C" fn core_validity(owner: u64) -> i32 {
 pub extern "C" fn core_activate(owner: u64) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
-        i32::from(core.owner_valid(owner) && core.image.activate(owner))
+        i32::from(core.owner_matches_boundary(owner) && core.image.activate(owner))
     })
 }
 

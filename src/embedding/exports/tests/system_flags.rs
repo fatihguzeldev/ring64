@@ -93,6 +93,8 @@ fn boundary_profiles_guard_activation_without_invalidating_source_owners() {
     assert_eq!(mapped::core_activate(step), 0);
     assert_eq!(mapped::core_activate(fast), 1);
     mapped::core_release(step);
+    assert_eq!(mapped::core_activate(step), 0);
+    assert_eq!(mapped::core_activate(u64::MAX), 0);
     BRIDGE.with_borrow(|bridge| {
         assert!(
             !bridge

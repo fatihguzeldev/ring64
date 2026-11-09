@@ -35,9 +35,8 @@ impl Core {
         state.flags & (flags::TF | flags::RF) != 0 || state.interruptibility != 0
     }
 
-    pub(super) fn owner_valid(&self, owner: u64) -> bool {
-        self.image.owner_valid(owner)
-            && self.observed_owners.contains(&owner) == self.boundary_observed()
+    pub(super) fn owner_matches_boundary(&self, owner: u64) -> bool {
+        self.observed_owners.contains(&owner) == self.boundary_observed()
     }
 }
 
