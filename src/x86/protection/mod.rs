@@ -12,6 +12,9 @@ mod tests;
 #[cfg(test)]
 mod load_tests;
 
+#[cfg(test)]
+mod boundary_tests;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProtectionPhase {
     Privilege,
