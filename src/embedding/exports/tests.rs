@@ -3,6 +3,7 @@ mod far_bridge;
 mod protection_bridge;
 mod streaming_bridge;
 mod system_flags;
+mod system_flags_review;
 mod x87_bridge;
 use crate::embedding::layout::{BUDGET, DATA, DISPATCH, DIVIDE_ERROR, REPEAT_BUDGET, STOP};
 
