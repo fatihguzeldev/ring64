@@ -103,6 +103,31 @@ test('full snapshot capture preserves raw hidden caches and IA-32e roots indepen
   assert.deepEqual(captured, expected);
 });
 
+test('full snapshot capture reads every new getter once before publishing owned values', () => {
+  const source = longSnapshot(0x1234n, 0x5678n);
+  const expected = structuredClone(source);
+  const reads = new Map<string, number>();
+  function watch(value: Record<string, unknown>, path = 'context'): void {
+    for (const key of Object.keys(value)) {
+      const member = value[key];
+      const label = `${path}.${key}`;
+      if (member !== null && typeof member === 'object')
+        watch(member as Record<string, unknown>, label);
+      reads.set(label, 0);
+      Object.defineProperty(value, key, {
+        get() {
+          reads.set(label, reads.get(label)! + 1);
+          return member;
+        },
+        enumerable: true,
+      });
+    }
+  }
+  watch(source as unknown as Record<string, unknown>);
+  assert.deepEqual(captureContext(source), expected);
+  for (const [name, count] of reads) assert.equal(count, 1, name);
+});
+
 test('partial and mixed snapshots never fall back to legacy defaults', () => {
   for (const key of ['cpl', 'gdtr', 'idtr', 'ldtr'] as const) {
     const partial = { ...input(), [key]: undefined };
