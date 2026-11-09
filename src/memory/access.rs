@@ -169,6 +169,26 @@ impl Image {
     ) -> Result<(), Fault> {
         Self::check_fields(width, fields, bytes.len());
         let mut index = self.preflight(address, width, Access::Write, false, false)?;
+        if width == 0 {
+            return Ok(());
+        }
+        let mapping = &self.mappings[index];
+        let relative = address - mapping.base;
+        if u64::from(width) <= u64::from(mapping.length) - relative {
+            let offset = mapping.offset as usize + relative as usize;
+            let backing = &mut self.backings[mapping.backing];
+            for &(start, length) in fields {
+                let begin = offset + start as usize;
+                let end = begin + length as usize;
+                if backing.has_sources {
+                    self.validity
+                        .write(&backing.incarnation, begin as u32, length);
+                }
+                backing.bytes[begin..end]
+                    .copy_from_slice(&bytes[start as usize..(start + length) as usize]);
+            }
+            return Ok(());
+        }
         for &(start, length) in fields {
             let cursor = address + u64::from(start);
             while self.mappings[index].end() <= u128::from(cursor) {

@@ -329,3 +329,57 @@ fn selected_field_transfers_leave_warm_scalar_mapping_hints_unchanged() {
     assert_eq!(&output[4..8], &[4, 5, 6, 7]);
     assert_eq!(&image.backings[0].bytes[4..8], &[0xa5; 4]);
 }
+
+#[test]
+fn selected_writes_admit_unused_nominal_tails_before_touching_fields_at_the_last_byte() {
+    for address in [0x1000, u64::MAX - 511] {
+        for mapped in [416, 511, 512] {
+            let mut field_source = mapping(0x4000, 171, 4, false, false);
+            field_source.permissions.execute = true;
+            let mut padding_source = mapping(0x5000, 447, 4, false, false);
+            padding_source.permissions.execute = true;
+            let mut image = image(
+                528,
+                vec![
+                    mapping(address, 7, mapped, false, true),
+                    field_source,
+                    padding_source,
+                ],
+            );
+            let field = image.register_source([(0x4000, 4)]).unwrap();
+            let padding = image.register_source([(0x5000, 4)]).unwrap();
+            assert!(image.activate(field));
+            let mut expected = image.backings[0].bytes.clone();
+            let bytes: Vec<u8> = (0..512).map(|n| 0xa5 ^ n as u8).collect();
+            let result = image.write_fields(
+                address,
+                512,
+                &[(0, 3), (8, 2), (32, 32), (160, 256)],
+                &bytes,
+            );
+            if mapped == 512 {
+                assert_eq!(result, Ok(()));
+                for byte in 0..512 {
+                    if matches!(byte, 0..=2 | 8..=9 | 32..=63 | 160..=415) {
+                        expected[7 + byte] = bytes[byte];
+                    }
+                }
+            } else {
+                assert_eq!(
+                    result,
+                    Err(Fault {
+                        address,
+                        width: 512,
+                        access: Access::Write,
+                        cause: Cause::Unmapped,
+                        failing: u128::from(address) + u128::from(mapped),
+                    })
+                );
+            }
+            assert_eq!(image.backings[0].bytes, expected);
+            assert_eq!(image.owner_valid(field), mapped != 512);
+            assert!(image.owner_valid(padding));
+            assert_eq!(image.active_changed(), mapped == 512);
+        }
+    }
+}
