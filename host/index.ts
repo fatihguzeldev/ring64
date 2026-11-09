@@ -18,6 +18,12 @@ export type {
 } from './memory.js';
 export type {
   ExecutionContext,
+  ExecutionContextSnapshot,
+  LegacyExecutionContext,
+  ExecutionMode,
+  SegmentSnapshot,
+  TableRegister,
+  LdtRegister,
   LoadedSegment,
   SegmentName,
   SegmentType,

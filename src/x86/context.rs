@@ -1,5 +1,3 @@
-use serde_json::{Value, json};
-
 use super::instruction::Width;
 use crate::memory::{Access, Cause, Fault, Image, canonical48};
 
@@ -93,18 +91,65 @@ impl Default for LoadedSegment {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SegmentAttributes {
+    pub dpl: u8,
+    pub present: bool,
+    pub conforming: bool,
+    pub accessed: bool,
+    pub long: bool,
+    pub granularity: bool,
+    pub available: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TableRegister {
+    pub base: u64,
+    pub limit: u16,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LdtRegister {
+    pub selector: u16,
+    pub valid: bool,
+    pub base: u64,
+    pub limit: u32,
+    pub attributes: u16,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExecutionContext {
     mode: Mode,
     segments: [LoadedSegment; 6],
+    cpl: u8,
+    selectors: [u16; 6],
+    attributes: [SegmentAttributes; 6],
+    gdtr: TableRegister,
+    idtr: TableRegister,
+    ldtr: LdtRegister,
 }
 
 impl Default for ExecutionContext {
     fn default() -> Self {
-        Self {
+        let mut context = Self {
             mode: Mode::Long64,
             segments: [LoadedSegment::default(); 6],
-        }
+            cpl: 0,
+            selectors: [8, 16, 24, 24, 24, 24],
+            attributes: [SegmentAttributes {
+                present: true,
+                accessed: true,
+                granularity: true,
+                ..SegmentAttributes::default()
+            }; 6],
+            gdtr: TableRegister::default(),
+            idtr: TableRegister::default(),
+            ldtr: LdtRegister::default(),
+        };
+        context.segments[Segment::Cs as usize].kind = SegmentType::ReadableCode;
+        context.segments[Segment::Cs as usize].default32 = false;
+        context.attributes[Segment::Cs as usize].long = true;
+        context
     }
 }
 
@@ -137,6 +182,55 @@ impl ExecutionContext {
     }
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+    pub fn cpl(&self) -> u8 {
+        self.cpl
+    }
+    pub fn selector(&self, segment: Segment) -> u16 {
+        self.selectors[segment as usize]
+    }
+    pub fn attributes(&self, segment: Segment) -> SegmentAttributes {
+        self.attributes[segment as usize]
+    }
+    pub fn gdtr(&self) -> TableRegister {
+        self.gdtr
+    }
+    pub fn idtr(&self) -> TableRegister {
+        self.idtr
+    }
+    pub fn ldtr(&self) -> LdtRegister {
+        self.ldtr
+    }
+    pub fn set_segment(
+        &mut self,
+        segment: Segment,
+        selector: u16,
+        cache: LoadedSegment,
+        attributes: SegmentAttributes,
+    ) -> bool {
+        let index = segment as usize;
+        let changed = self.selectors[index] != selector
+            || self.segments[index] != cache
+            || self.attributes[index] != attributes;
+        self.selectors[index] = selector;
+        self.segments[index] = cache;
+        self.attributes[index] = attributes;
+        changed
+    }
+    pub fn set_gdtr(&mut self, table: TableRegister) -> bool {
+        let changed = self.gdtr != table;
+        self.gdtr = table;
+        changed
+    }
+    pub fn set_idtr(&mut self, table: TableRegister) -> bool {
+        let changed = self.idtr != table;
+        self.idtr = table;
+        changed
+    }
+    pub fn set_ldtr(&mut self, table: LdtRegister) -> bool {
+        let changed = self.ldtr != table;
+        self.ldtr = table;
+        changed
     }
     pub fn code32(&self) -> bool {
         self.segments[Segment::Cs as usize].default32
@@ -275,98 +369,9 @@ impl ExecutionContext {
                 .map(|_| ())
         }
     }
-
-    pub fn from_json(value: &Value) -> Result<Self, &'static str> {
-        let invalid = "invalid execution context";
-        let mode = match value["mode"].as_str() {
-            Some("long64") => Mode::Long64,
-            Some("real") => Mode::Real,
-            Some("virtual8086") => Mode::Virtual8086,
-            Some("protected") => Mode::Protected,
-            Some("compatibility") => Mode::Compatibility,
-            _ => return Err(invalid),
-        };
-        let base = |v: &Value| {
-            v.as_str()
-                .and_then(|s| s.strip_prefix("0x"))
-                .and_then(|s| u64::from_str_radix(s, 16).ok())
-                .ok_or(invalid)
-        };
-        let mut context = Self {
-            mode,
-            ..Self::default()
-        };
-        if mode == Mode::Long64 {
-            for (segment, key) in [(Segment::Fs, "fsBase"), (Segment::Gs, "gsBase")] {
-                let value = base(&value[key])?;
-                if !canonical48(value) {
-                    return Err(invalid);
-                }
-                context.segments[segment as usize].base = value;
-            }
-            return Ok(context);
-        }
-        for segment in Segment::ALL {
-            let value = &value["segments"][segment.name()];
-            let kind = match value["type"].as_str() {
-                Some("code") => SegmentType::Code,
-                Some("readable-code") => SegmentType::ReadableCode,
-                Some("read-only") => SegmentType::ReadOnly,
-                Some("read-write") => SegmentType::ReadWrite,
-                Some("expand-down-read-only") => SegmentType::ExpandDownReadOnly,
-                Some("expand-down-read-write") => SegmentType::ExpandDownReadWrite,
-                _ => return Err(invalid),
-            };
-            let base = base(&value["base"])?;
-            if base > u64::from(u32::MAX) {
-                return Err(invalid);
-            }
-            context.segments[segment as usize] = LoadedSegment {
-                base,
-                limit: value["limit"]
-                    .as_u64()
-                    .and_then(|n| u32::try_from(n).ok())
-                    .ok_or(invalid)?,
-                default32: value["default32"].as_bool().ok_or(invalid)?,
-                usable: value["usable"].as_bool().ok_or(invalid)?,
-                kind,
-            };
-        }
-        let cs = context.segment(Segment::Cs);
-        let ss = context.segment(Segment::Ss);
-        if mode == Mode::Virtual8086 {
-            if context.segments.iter().any(|s| {
-                !s.usable
-                    || s.kind != SegmentType::ReadWrite
-                    || s.base > 0xffff0
-                    || s.base & 15 != 0
-                    || s.limit != 0xffff
-                    || s.default32
-            }) {
-                return Err(invalid);
-            }
-        } else if !cs.usable
-            || !(cs.kind.is_code() || mode == Mode::Real && cs.kind == SegmentType::ReadWrite)
-            || !ss.usable
-            || !ss.kind.writable()
-        {
-            return Err(invalid);
-        }
-        Ok(context)
-    }
-
-    pub fn to_json(&self) -> Value {
-        if self.is_long64() {
-            return json!({"mode":"long64","fsBase":format!("0x{:x}",self.segment_base(Segment::Fs)),"gsBase":format!("0x{:x}",self.segment_base(Segment::Gs))});
-        }
-        let mut segments = serde_json::Map::new();
-        for segment in Segment::ALL {
-            let s = self.segment(segment);
-            segments.insert(segment.name().into(),json!({"base":format!("0x{:x}",s.base),"limit":s.limit,"default32":s.default32,"usable":s.usable,"type":s.kind.name()}));
-        }
-        json!({"mode":match self.mode { Mode::Real=>"real",Mode::Virtual8086=>"virtual8086",Mode::Protected=>"protected",Mode::Compatibility=>"compatibility",Mode::Long64=>unreachable!() },"segments":segments})
-    }
 }
+
+mod snapshot;
 
 #[cfg(test)]
 mod tests;

@@ -2,6 +2,7 @@ import {
   contextFromJson,
   type ContextInfo,
   type ExecutionContext,
+  type ExecutionContextSnapshot,
   type SegmentFault,
   type SegmentName,
 } from './context.js';
@@ -684,7 +685,7 @@ export class Core {
         };
   }
 
-  readContext(): ExecutionContext {
+  readContext(): ExecutionContextSnapshot {
     this.#exports.core_context_info();
     return contextFromJson(this.info<ContextInfo>());
   }

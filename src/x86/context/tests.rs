@@ -1,4 +1,22 @@
 use super::*;
+use serde_json::json;
+
+#[test]
+fn snapshot_default_has_visible_and_hidden_state_without_tables() {
+    let value = ExecutionContext::default().to_json();
+    assert_eq!(value["cpl"], json!(0));
+    assert_eq!(value["segments"]["cs"]["selector"], json!(8));
+    assert_eq!(value["segments"]["cs"]["long"], json!(true));
+    assert_eq!(value["segments"]["ss"]["selector"], json!(16));
+    assert_eq!(value["segments"]["fs"]["base"], json!("0x0"));
+    assert_eq!(value["gdtr"], json!({"base":"0x0","limit":0}));
+    assert_eq!(
+        value["ldtr"],
+        json!({"selector":0,"valid":false,"base":"0x0","limit":0,"attributes":0})
+    );
+}
+
+
 
 #[test]
 fn clflush_changes_only_the_execute_only_segment_read_rule() {

@@ -232,8 +232,8 @@ export function restoreScenarios(compiler: WebAssembly.Module): Scenario[] {
             const execution = cpu.readContext();
             equal(execution.mode, 'long64', 'restore preserves execution mode');
             if (execution.mode !== 'long64') throw new Error('restore changed execution mode');
-            equal(execution.fsBase, 0n, 'restore preserves FS base');
-            equal(execution.gsBase, 0n, 'restore preserves GS base');
+            equal(execution.segments.fs.base, 0n, 'restore preserves FS base');
+            equal(execution.segments.gs.base, 0n, 'restore preserves GS base');
             const waiting = await cpu.run({ budget: 1n, repeatBudget: 13n });
             outcome(waiting, 'x87-exception', 1n, 0n, 13n, 0n, changed(before, 0x1005n));
             pending(waiting, loaded, 0x1005n);

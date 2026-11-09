@@ -4,11 +4,11 @@ import test from 'node:test';
 import { createCpu } from '../../host/index.js';
 import type { ExecutionContext, LoadedSegment } from '../../host/context.js';
 import { LIMITS, initial, hex } from '../support/fixture.js';
+import { longSnapshot, protectedSnapshot } from '../support/context.js';
 
 const compiler = await WebAssembly.compile(
   new Uint8Array(await readFile(new URL('../../build/ring64.wasm', import.meta.url))),
 );
-const long64: ExecutionContext = { mode: 'long64', fsBase: 0n, gsBase: 0n };
 function segment(type: LoadedSegment['type'] = 'read-write'): LoadedSegment {
   return { base: 0n, limit: 0xffffffff, default32: true, usable: true, type };
 }
@@ -37,7 +37,7 @@ function options() {
 test('default context and identical imports preserve raw State and warm owners', async () => {
   const cpu = await createCpu(options());
   try {
-    assert.deepEqual(cpu.readContext(), long64);
+    assert.deepEqual(cpu.readContext(), longSnapshot());
     const state = initial();
     cpu.setState(state);
     const first = await cpu.run({ budget: 1n });
@@ -65,7 +65,7 @@ test('meaningful context changes retire all entries without changing raw banks f
     cpu.setContext(input);
     assert.deepEqual(cpu.readState(), state);
     assert.deepEqual(cpu.inspectTranslations(), []);
-    assert.deepEqual(cpu.readContext(), input);
+    assert.deepEqual(cpu.readContext(), protectedSnapshot());
     assert.notEqual(input.mode, 'long64');
     if (input.mode === 'long64') assert.fail();
     input.segments.ds.base = 0x1234n;

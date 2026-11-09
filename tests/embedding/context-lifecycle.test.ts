@@ -10,6 +10,7 @@ import {
   type RunResult,
 } from '../../host/index.js';
 import { LIMITS, changed, hex, initial } from '../support/fixture.js';
+import { longSnapshot } from '../support/context.js';
 
 const compiler = await WebAssembly.compile(
   new Uint8Array(await readFile(new URL('../../build/ring64.wasm', import.meta.url))),
@@ -73,7 +74,7 @@ test('a context getter may complete cached execution and publication preserves i
     assert.equal(result.resources.compilations, 0);
     assert.deepEqual(result.state, changed(source, 0x1005n, { 0: 1n }));
     assert.deepEqual(cpu.readState(), result.state);
-    assert.deepEqual(cpu.readContext(), long(0x100n));
+    assert.deepEqual(cpu.readContext(), longSnapshot(0x100n));
     assert.deepEqual(cpu.inspectTranslations(), []);
   } finally {
     await nested;
@@ -105,7 +106,7 @@ test('cold execution started by a context getter rejects overlapping publication
     const result = await nested;
     assert.equal(result.resources.compilations, 1);
     assert.deepEqual(result.state, changed(source, 0x1005n, { 0: 1n }));
-    assert.deepEqual(cpu.readContext(), long());
+    assert.deepEqual(cpu.readContext(), longSnapshot());
     assert.deepEqual(cpu.readState(), result.state);
   } finally {
     await nested;
@@ -134,7 +135,7 @@ test('context capture preserves successful nested changes even when the outer lo
     assert.equal(reads, 1);
     assert.deepEqual(cpu.readState(), source);
     assert.deepEqual(cpu.readMemory(0x4000n, 8), hex('1234567800000000'));
-    assert.deepEqual(cpu.readContext(), long(0x200n));
+    assert.deepEqual(cpu.readContext(), longSnapshot(0x200n));
     assert.deepEqual(cpu.inspectTranslations(), []);
   } finally {
     cpu.dispose();
@@ -176,7 +177,7 @@ test('equality uses the context current after getters and reordered loaded cache
       },
       gsBase: 0n,
     });
-    assert.deepEqual(cpu.readContext(), long());
+    assert.deepEqual(cpu.readContext(), longSnapshot());
     assert.deepEqual(cpu.readState(), raw);
     assert.deepEqual(cpu.inspectTranslations(), []);
   } finally {

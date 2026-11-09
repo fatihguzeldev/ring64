@@ -1,4 +1,4 @@
-import { captureContext, type ExecutionContext, type SegmentFault } from './context.js';
+import { captureContext, type ExecutionContext, type ExecutionContextSnapshot, type SegmentFault } from './context.js';
 import { captureX87State, type X87State, type X87Exception } from './x87.js';
 import {
   Core,
@@ -233,7 +233,7 @@ export class Cpu {
     this.pruneTranslations();
   }
 
-  readContext(): ExecutionContext {
+  readContext(): ExecutionContextSnapshot {
     this.requireIdle();
     return this.engineCall(() => this.#engine.readContext());
   }

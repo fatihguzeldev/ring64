@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { captureContext, type ExecutionContext, type LoadedSegment } from './context.js';
+import { longSnapshot, protectedSnapshot } from '../tests/support/context.js';
 
 const data = (): LoadedSegment => ({
   base: 0n,
@@ -23,11 +24,16 @@ function input(): ExecutionContext {
   };
 }
 
+test('legacy context capture produces a complete deterministic owned snapshot', () => {
+  const captured = captureContext({ mode: 'long64', fsBase: 0x1234n, gsBase: 0n });
+  assert.deepEqual(captured, longSnapshot(0x1234n));
+});
+
 test('context capture owns every loaded segment and reads each field once', () => {
   const value = input();
   assert.notEqual(value.mode, 'long64');
   if (value.mode === 'long64') assert.fail();
-  const expected = structuredClone(value);
+  const expected = protectedSnapshot();
   const reads: string[] = [];
   const source = value.segments.ds;
   for (const key of ['base', 'limit', 'default32', 'usable', 'type'] as const) {
