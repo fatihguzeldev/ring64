@@ -542,6 +542,7 @@ impl ProtectionInstruction {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
+    Protection(ProtectionInstruction),
     MaskedStore {
         data: u8,
         mask: u8,

@@ -61,6 +61,26 @@ export interface GeneralProtectionFault {
   loadedValue: number;
 }
 
+export interface ProtectionFault {
+  instructionPc: bigint;
+  vector: 11 | 12 | 13;
+  errorCode: number;
+  phase: 'privilege' | 'selector' | 'descriptor';
+  selector?: number;
+}
+
+export interface SystemMemoryFault {
+  instructionPc: bigint;
+  address: bigint;
+  width: number;
+  access: 'read' | 'write';
+  cause: 'address-range' | 'noncanonical' | 'unmapped' | 'permission';
+  failingAddress: bigint;
+  phase: 'descriptor-read' | 'descriptor-accessed-write';
+  table: 'gdt' | 'ldt';
+  selector: number;
+}
+
 export interface Span {
   base: bigint;
   bytes: Uint8Array;
@@ -135,6 +155,7 @@ type CoreExports = WebAssembly.Exports & {
     mask: number,
     segment: number,
   ): number;
+  core_protection(descriptor: number, offset: bigint, input: bigint, segment: number): number;
   core_clflush(offset: bigint, segment: number): number;
   core_x87(
     operation: number,
@@ -388,6 +409,7 @@ export class Core {
       'core_numeric_image',
       'core_masked_store',
       'core_clflush',
+      'core_protection',
       'core_float',
       'core_load_mxcsr',
       'core_store_mxcsr',
@@ -633,6 +655,7 @@ export class Core {
         numeric_image: this.#exports.core_numeric_image,
         masked_store: this.#exports.core_masked_store,
         clflush: this.#exports.core_clflush,
+        protection: this.#exports.core_protection,
         target_check: this.#exports.core_target_check,
         multiply_high: this.#exports.core_multiply_high,
         divide: this.#exports.core_divide,
@@ -663,7 +686,9 @@ export class Core {
       reason === 'alignment-fault' ||
       reason === 'simd-exception' ||
       reason === 'x87-exception' ||
-      reason === 'general-protection'
+      reason === 'general-protection' ||
+      reason === 'protection-fault' ||
+      reason === 'system-memory-fault'
     )
       return undefined;
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
@@ -750,6 +775,32 @@ export class Core {
     return {
       ...this.info<Omit<GeneralProtectionFault, 'instructionPc'>>(),
       instructionPc: this.current().rip,
+    };
+  }
+
+  protectionFault(reason: string): ProtectionFault | undefined {
+    if (reason !== 'protection-fault') return undefined;
+    this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
+    return {
+      ...this.info<Omit<ProtectionFault, 'instructionPc'>>(),
+      instructionPc: this.current().rip,
+    };
+  }
+
+  systemMemoryFault(reason: string): SystemMemoryFault | undefined {
+    if (reason !== 'system-memory-fault') return undefined;
+    this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
+    const raw = this.info<
+      Omit<SystemMemoryFault, 'instructionPc' | 'address' | 'failingAddress'> & {
+        address: string;
+        failingAddress: string;
+      }
+    >();
+    return {
+      ...raw,
+      instructionPc: this.current().rip,
+      address: BigInt(raw.address),
+      failingAddress: BigInt(raw.failingAddress),
     };
   }
 

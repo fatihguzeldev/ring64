@@ -11,6 +11,7 @@ mod memory;
 mod mmx;
 mod multiply_divide;
 mod numeric_state;
+mod protection;
 mod stack;
 mod state;
 mod streaming;
@@ -76,6 +77,7 @@ struct Emitter {
     numeric_image: Option<u32>,
     masked_store: Option<u32>,
     clflush: Option<u32>,
+    protection: Option<u32>,
 }
 
 impl Emitter {
@@ -236,6 +238,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::Clflush { .. }));
+    let has_protection = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Protection(_)));
     let float_type = has_float.then(|| {
         let index = next_type;
         types.ty().function(
@@ -295,6 +301,15 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         types
             .ty()
             .function([ValType::I64, ValType::I32], [ValType::I32]);
+        next_type += 1;
+        index
+    });
+    let protection_type = has_protection.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [ValType::I32, ValType::I64, ValType::I64, ValType::I32],
+            [ValType::I32],
+        );
         next_type += 1;
         index
     });
@@ -487,6 +502,12 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let protection = protection_type.map(|index| {
+        imports.import("env", "protection", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let vector_access_reason = if vector_banks.loads || vector_banks.stores || store_mxcsr_used {
         Some(access_reason.unwrap_or_else(|| {
             imports.import("env", "access_reason", EntityType::Function(2));
@@ -553,6 +574,7 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         numeric_image,
         masked_store,
         clflush,
+        protection,
         body: Function::new(locals),
         entries: unit
             .instructions
@@ -595,6 +617,9 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 mmx,
                 address,
             } => emitter.masked_store(data, mask, mmx, address, instruction.next_pc, exit_depth),
+            Operation::Protection(operation) => {
+                emitter.protection(operation, instruction.next_pc, exit_depth)
+            }
             Operation::Clflush { address } => {
                 emitter.clflush(address, instruction.next_pc, exit_depth)
             }

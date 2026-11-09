@@ -64,6 +64,9 @@ fn refine_inner<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if let Some(result) = super::protection::one_byte(opcode, prefixes, cursor) {
+        return result;
+    }
     if matches!(opcode, 0x9b | 0xd8..=0xdf) {
         return super::x87::refine(opcode, prefixes, cursor);
     }
@@ -602,6 +605,9 @@ fn two_byte<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if let Some(result) = super::protection::two_byte(opcode, prefixes, cursor) {
+        return result;
+    }
     if let Some(result) = super::streaming::refine(opcode, prefixes, cursor) {
         return result;
     }

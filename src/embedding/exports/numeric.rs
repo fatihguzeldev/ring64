@@ -49,6 +49,8 @@ pub extern "C" fn core_import_mxcsr() -> i32 {
         core.alignment_fault = None;
         core.simd_exception = None;
         core.general_protection = None;
+        core.protection_fault = None;
+        core.system_memory_fault = None;
         core.divide_failed = false;
         unsafe {
             (*core.state.get()).target = 0;
@@ -70,6 +72,8 @@ pub extern "C" fn core_float(
         let core = bridge.core.as_mut().unwrap();
         core.simd_exception = None;
         core.general_protection = None;
+        core.protection_fault = None;
+        core.system_memory_fault = None;
         let before = unsafe { (*core.state.get()).mxcsr };
         let outcome = float::eval(
             Op::decode(operation),
@@ -102,6 +106,8 @@ pub extern "C" fn core_load_mxcsr(offset: u64, segment: u32) -> i32 {
         let core = bridge.core.as_mut().unwrap();
         core.simd_exception = None;
         core.general_protection = None;
+        core.protection_fault = None;
+        core.system_memory_fault = None;
         core.alignment_fault = None;
         let Some(address) =
             core.segment_address(offset, 4, Segment::from_id(segment), Access::Read, false)
@@ -138,6 +144,8 @@ pub extern "C" fn core_store_mxcsr(offset: u64, segment: u32) -> i32 {
         let value = unsafe { (*core.state.get()).mxcsr.to_le_bytes() };
         core.simd_exception = None;
         core.general_protection = None;
+        core.protection_fault = None;
+        core.system_memory_fault = None;
         core.alignment_fault = None;
         let Some(address) =
             core.segment_address(offset, 4, Segment::from_id(segment), Access::Write, false)

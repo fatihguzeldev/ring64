@@ -7,6 +7,8 @@ export type {
   AlignmentFault,
   SimdException,
   GeneralProtectionFault,
+  ProtectionFault,
+  SystemMemoryFault,
   Span,
   UnitMetadata,
 } from './core.js';

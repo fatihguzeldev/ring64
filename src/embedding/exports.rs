@@ -15,6 +15,7 @@ mod mapped;
 mod mmx;
 mod numeric;
 mod numeric_image;
+mod protection;
 mod streaming;
 mod vector;
 mod x87;
@@ -31,6 +32,8 @@ struct Core {
     alignment_fault: Option<vector::AlignmentFault>,
     simd_exception: Option<numeric::SimdException>,
     general_protection: Option<numeric::GeneralProtectionFault>,
+    protection_fault: Option<crate::x86::protection::ProtectionFault>,
+    system_memory_fault: Option<crate::x86::protection::SystemMemoryFault>,
 }
 
 #[derive(Default)]
@@ -100,6 +103,8 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             alignment_fault: None,
             simd_exception: None,
             general_protection: None,
+            protection_fault: None,
+            system_memory_fault: None,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
         0
@@ -137,6 +142,8 @@ pub extern "C" fn core_import_state() -> i32 {
         core.alignment_fault = None;
         core.simd_exception = None;
         core.general_protection = None;
+        core.protection_fault = None;
+        core.system_memory_fault = None;
         core.divide_failed = false;
         core.segment_fault = None;
         0
@@ -151,6 +158,8 @@ pub extern "C" fn core_clear_fault() {
         core.alignment_fault = None;
         core.simd_exception = None;
         core.general_protection = None;
+        core.protection_fault = None;
+        core.system_memory_fault = None;
         core.divide_failed = false;
         core.segment_fault = None;
         unsafe {
@@ -168,6 +177,8 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
         core.alignment_fault = None;
         core.simd_exception = None;
         core.general_protection = None;
+        core.protection_fault = None;
+        core.system_memory_fault = None;
         core.segment_fault = None;
         unsafe { (*core.state.get()).fault_segment = Segment::Cs as u32 };
         match decode::decode_with_context(pc, &core.context, |offset| {
@@ -341,6 +352,11 @@ pub extern "C" fn core_fault_info(reason: i32) {
                 .alignment_fault
                 .as_ref()
                 .map(vector::AlignmentFault::json),
+            super::layout::PROTECTION => core.protection_fault.as_ref().map(protection::fault_json),
+            super::layout::SYSTEM_MEMORY => core
+                .system_memory_fault
+                .as_ref()
+                .map(protection::system_fault_json),
             SEGMENT => core.segment_fault.as_ref().map(context::segment_fault_json),
             DATA | FETCH => core.fault.as_ref().map(fault_json),
             TARGET => {

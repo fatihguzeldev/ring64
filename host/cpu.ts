@@ -1,4 +1,9 @@
-import { captureContext, type ExecutionContext, type ExecutionContextSnapshot, type SegmentFault } from './context.js';
+import {
+  captureContext,
+  type ExecutionContext,
+  type ExecutionContextSnapshot,
+  type SegmentFault,
+} from './context.js';
 import { captureX87State, type X87State, type X87Exception } from './x87.js';
 import {
   Core,
@@ -12,6 +17,8 @@ import {
   type AlignmentFault,
   type SimdException,
   type GeneralProtectionFault,
+  type ProtectionFault,
+  type SystemMemoryFault,
   type Span,
   type State,
 } from './core.js';
@@ -65,6 +72,8 @@ export interface RunResult {
   simdException?: SimdException;
   generalProtectionFault?: GeneralProtectionFault;
   x87Exception?: X87Exception;
+  protectionFault?: ProtectionFault;
+  systemMemoryFault?: SystemMemoryFault;
   resources: {
     compilations: number;
     cacheHits: number;
@@ -345,6 +354,10 @@ export class Cpu {
         reason === 'general-protection' ? this.#engine.generalProtectionFault(reason) : undefined;
       const x87Exception =
         reason === 'x87-exception' ? this.#engine.x87Exception(reason) : undefined;
+      const protectionFault =
+        reason === 'protection-fault' ? this.#engine.protectionFault(reason) : undefined;
+      const systemMemoryFault =
+        reason === 'system-memory-fault' ? this.#engine.systemMemoryFault(reason) : undefined;
       const result = {
         reason,
         retired: budget - remaining,
@@ -358,6 +371,8 @@ export class Cpu {
         ...(simdException ? { simdException } : {}),
         ...(generalProtectionFault ? { generalProtectionFault } : {}),
         ...(x87Exception ? { x87Exception } : {}),
+        ...(protectionFault ? { protectionFault } : {}),
+        ...(systemMemoryFault ? { systemMemoryFault } : {}),
         resources: { ...resources, ...this.#cache.resources() },
         timings,
       };

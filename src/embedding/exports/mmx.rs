@@ -18,6 +18,8 @@ pub extern "C" fn core_mmx(operation: u32, operand: u64, segment: u32) -> i32 {
         core.alignment_fault = None;
         core.simd_exception = None;
         core.general_protection = None;
+        core.protection_fault = None;
+        core.system_memory_fault = None;
         core.divide_failed = false;
         let (before, mxcsr) = unsafe {
             let state = &mut *core.state.get();

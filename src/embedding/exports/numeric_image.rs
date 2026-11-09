@@ -17,6 +17,8 @@ pub extern "C" fn core_numeric_image(operation: u32, offset: u64, segment: u32) 
         core.alignment_fault = None;
         core.simd_exception = None;
         core.general_protection = None;
+        core.protection_fault = None;
+        core.system_memory_fault = None;
         core.divide_failed = false;
         let before = unsafe {
             let state = &mut *core.state.get();

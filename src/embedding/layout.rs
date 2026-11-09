@@ -17,9 +17,11 @@ pub const ALIGNMENT: i32 = 12;
 pub const SIMD_EXCEPTION: i32 = 13;
 pub const GENERAL_PROTECTION: i32 = 14;
 pub const X87_EXCEPTION: i32 = 15;
+pub const PROTECTION: i32 = 16;
+pub const SYSTEM_MEMORY: i32 = 17;
 pub const SCALAR_STATE_SIZE: usize = 176;
 
-pub const REASONS: [&str; 16] = [
+pub const REASONS: [&str; 18] = [
     "dispatch",
     "budget",
     "stop",
@@ -36,6 +38,8 @@ pub const REASONS: [&str; 16] = [
     "simd-exception",
     "general-protection",
     "x87-exception",
+    "protection-fault",
+    "system-memory-fault",
 ];
 
 #[repr(C)]
