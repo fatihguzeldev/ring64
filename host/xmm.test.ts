@@ -233,6 +233,16 @@ test('scalar boundary transport uses existing padding and returns detached snaps
   }
 });
 
+test('a debug outcome is never decoded as an address-bearing memory fault', async () => {
+  const fixture = await mockedCore();
+  assert.ok(fixture.core);
+  try {
+    assert.equal(fixture.core.fault('debug-exception'), undefined);
+  } finally {
+    fixture.core.dispose();
+  }
+});
+
 test('required arithmetic and boundary helpers reject construction before core initialization', async () => {
   for (const name of [
     'core_multiply_high',

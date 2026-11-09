@@ -756,7 +756,8 @@ export class Core {
       reason === 'x87-exception' ||
       reason === 'general-protection' ||
       reason === 'protection-fault' ||
-      reason === 'system-memory-fault'
+      reason === 'system-memory-fault' ||
+      reason === 'debug-exception'
     )
       return undefined;
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
