@@ -75,6 +75,109 @@ function exclusive(result: RunResult, chosen: string): void {
 export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     {
+      name: 'MMX public resumes keep address faults exclusive across repaired budget stop and typed outcomes',
+      async run() {
+        const code = hex('0f6f030fd4c10fae0790');
+        const data = hex('a5'.repeat(8) + '0807060504030201' + 'a5'.repeat(8));
+        const mappings = [
+          map(0x1000n, 'code', code.length, true, false, 0, true),
+          map(0x6000n, 'data', 7, true, false, 8),
+          map(0x8000n, 'data', data.length, true, false),
+        ];
+        const cpu = await createCpu({
+          compiler,
+          limits: LIMITS,
+          entry: 0x1000n,
+          memoryLimits: { maxBackings: 2, maxMappings: 3, maxBackingBytes: 1024 },
+          memory: {
+            backings: [
+              { id: 'code', bytes: code },
+              { id: 'data', bytes: data },
+            ],
+            mappings,
+          },
+        });
+        try {
+          const before = input(0x1000n, { 3: 0x6000n, 7: 0x6001n }, 0xcd7n);
+          const numeric = stack({ 0: ONE }, 5);
+          numeric.registers[1] = 7n;
+          cpu.setState(before);
+          seed(cpu, numeric);
+          const encode = (value: unknown) =>
+            JSON.stringify(value, (_, v: unknown) => (typeof v === 'bigint' ? v.toString() : v));
+          const execution = encode(cpu.readContext());
+          const preserve = (expected: X87State, result: RunResult) => {
+            equal(result.state.interruptibility.sti, false, 'resumes retain STI history');
+            equal(result.state.interruptibility.ss, false, 'resumes retain SS history');
+            for (const field of ['protectionFault', 'systemMemoryFault', 'debugException'] as const)
+              equal(result[field], undefined, `exclusive ${field}`);
+            x87(cpu, expected);
+            other(cpu);
+            equal(encode(cpu.readContext()), execution, 'resumes retain complete context');
+            memory(cpu, 0x1000n, '0f6f030fd4c10fae0790');
+            memory(cpu, 0x8000n, 'a5'.repeat(8) + '0807060504030201' + 'a5'.repeat(8));
+          };
+          const failed = await cpu.run({ budget: 3n, repeatBudget: 13n });
+          outcome(failed, 'data-fault', 3n, 0n, 13n, 0n, before);
+          fault(failed, {
+            instructionPc: 0x1000n,
+            address: 0x6000n,
+            width: 8,
+            access: 'read',
+            cause: 'unmapped',
+            failingAddress: 0x6007n,
+            segment: 'ds',
+          });
+          exclusive(failed, 'fault');
+          preserve(numeric, failed);
+          cpu.setMappings(
+            mappings.map((mapping) =>
+              mapping.base === 0x6000n ? { ...mapping, length: 8 } : mapping,
+            ),
+          );
+          const loaded = await cpu.run({ budget: 1n, repeatBudget: 13n });
+          outcome(loaded, 'budget', 1n, 1n, 13n, 0n, changed(before, 0x1003n));
+          noFault(loaded);
+          const after = clone(numeric);
+          after.statusWord &= ~0x3800;
+          after.tagWord = 0;
+          after.registers[0] = 0xffff0102030405060708n;
+          preserve(after, loaded);
+          const stopped = await cpu.run({ budget: 1n, stop: 0x1003n, repeatBudget: 13n });
+          outcome(stopped, 'stop', 1n, 0n, 13n, 0n, changed(before, 0x1003n));
+          noFault(stopped);
+          preserve(after, stopped);
+          const added = await cpu.run({ budget: 1n, repeatBudget: 13n });
+          outcome(added, 'budget', 1n, 1n, 13n, 0n, changed(before, 0x1006n));
+          noFault(added);
+          after.registers[0] = 0xffff010203040506070fn;
+          preserve(after, added);
+          const aligned = await cpu.run({ budget: 1n, repeatBudget: 13n });
+          outcome(aligned, 'alignment-fault', 1n, 0n, 13n, 0n, changed(before, 0x1006n));
+          exclusive(aligned, 'alignmentFault');
+          equal(aligned.alignmentFault?.instructionPc, 0x1006n, 'typed save PC');
+          equal(aligned.alignmentFault?.address, 0x6001n, 'typed save address');
+          equal(aligned.alignmentFault?.width, 512, 'typed save width');
+          equal(aligned.alignmentFault?.alignment, 16, 'typed save alignment');
+          equal(aligned.alignmentFault?.segment, 'ds', 'typed save segment');
+          equal(aligned.alignmentFault?.offset, 0x6001n, 'typed save offset');
+          equal(aligned.alignmentFault?.access, 'write', 'typed save access');
+          preserve(after, aligned);
+          for (const [budget, stop, reason] of [
+            [1n, 0x1006n, 'stop'],
+            [0n, undefined, 'budget'],
+          ] as const) {
+            const result = await cpu.run({ budget, stop, repeatBudget: 13n });
+            outcome(result, reason, budget, 0n, 13n, 0n, changed(before, 0x1006n));
+            noFault(result);
+            preserve(after, result);
+          }
+        } finally {
+          cpu.dispose();
+        }
+      },
+    },
+    {
       name: 'MMX and numeric image stores need only W and late admission failures suppress bytes and post-effects',
       async run() {
         for (const [code, width] of [

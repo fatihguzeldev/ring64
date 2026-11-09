@@ -768,16 +768,7 @@ export class Core {
   }
 
   fault(reason: string): Fault | undefined {
-    if (
-      reason === 'segment-fault' ||
-      reason === 'alignment-fault' ||
-      reason === 'simd-exception' ||
-      reason === 'x87-exception' ||
-      reason === 'general-protection' ||
-      reason === 'protection-fault' ||
-      reason === 'system-memory-fault' ||
-      reason === 'debug-exception'
-    )
+    if (reason !== 'data-fault' && reason !== 'fetch-fault' && reason !== 'target-fault')
       return undefined;
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
     const raw = this.info<null | {
