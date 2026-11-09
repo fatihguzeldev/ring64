@@ -4,6 +4,7 @@ import { streamingRows } from './streaming.mjs';
 import { protectionRows } from './protection.mjs';
 import { farRows } from './far-control.mjs';
 import { systemFlagRows } from './system-flags.mjs';
+import { softwareEventRows } from './software-events.mjs';
 
 const MASK64 = (1n << 64n) - 1n;
 const MASK128 = (1n << 128n) - 1n;
@@ -276,7 +277,7 @@ const rows = [
 ];
 rows.push(...x87Rows);
 rows.push(...numericStateRows);
-rows.push(...streamingRows, ...protectionRows, ...farRows, ...systemFlagRows);
+rows.push(...streamingRows, ...protectionRows, ...farRows, ...systemFlagRows, ...softwareEventRows);
 export const workloadNames = rows.map((row) => row.name);
 function check(actual, expected, label) {
   if (actual !== expected) throw Error(`${label}: expected ${expected}, received ${actual}`);
@@ -285,6 +286,9 @@ function checkArray(actual, expected, label) {
   check(actual.length, expected.length, label + ' length');
   expected.forEach((v, i) => check(actual[i], v, `${label}${i}`));
 }
+
+const contextImage = (value) =>
+  JSON.stringify(value, (_, field) => (typeof field === 'bigint' ? field.toString() : field));
 function initial(n, repeat, sample) {
   const ram = Uint8Array.from(
     { length: repeat ? 2 * Number(n) + 64 : 64 },
@@ -376,7 +380,7 @@ export async function measure(
     const active = [];
     definitions.push({
       name: row.name,
-      profile: row.legacy ? 'protected32' : 'long64',
+      profile: row.profile ?? (row.legacy ? 'protected32' : 'long64'),
       code: Array.from(code, (b) => b.toString(16).padStart(2, '0')).join(''),
       iterations: n,
       instructions: budget,
@@ -391,6 +395,7 @@ export async function measure(
       requiresProtection: !!row.requiresProtection,
       requiresFar: !!row.requiresFar,
       requiresSystemFlags: !!row.requiresSystemFlags,
+      requiresSoftwareEvents: !!row.requiresSoftwareEvents,
       step: !!row.step,
       ...(row.guestMemoryPerIteration
         ? { guestMemoryPerIteration: row.guestMemoryPerIteration }
@@ -398,6 +403,18 @@ export async function measure(
     });
     try {
       for (const side of sides) {
+        if (
+          row.requiresSoftwareEvents &&
+          !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_software_event')
+        ) {
+          if (side.label === 'current') throw Error('current build is missing software events');
+          unavailable.push({
+            side: side.label,
+            workload: row.name,
+            reason: 'software events unavailable',
+          });
+          continue;
+        }
         if (
           row.requiresSystemFlags &&
           !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_flags')
@@ -470,7 +487,7 @@ export async function measure(
           },
           limits,
         });
-        const expectedContext = row.context?.(cpu);
+        const expectedContext = row.context?.(cpu) ?? cpu.readContext?.();
         const hasX87 =
           typeof cpu.readX87State === 'function' && typeof cpu.setX87State === 'function';
         active.push({ ...side, cpu, hasX87, expectedContext });
@@ -584,6 +601,9 @@ export async function measure(
           ])
             check(result[field], undefined, field);
           row.verify?.(side.cpu, side.expectedContext);
+          const context = side.cpu.readContext?.();
+          if (side.expectedContext !== undefined)
+            check(contextImage(context), contextImage(side.expectedContext), 'complete context');
           if (row.resources)
             row.resources(totals, n, sample, result.resources, side.cpu.inspectTranslations());
           else {
@@ -602,6 +622,7 @@ export async function measure(
             resources: { ...result.resources, ...totals },
             timings,
             state: result.state,
+            ...(context ? { context } : {}),
             xmm: side.cpu.readXmmState(),
             mxcsr: side.cpu.readMxcsr(),
             ...(x87 ? { x87 } : {}),
