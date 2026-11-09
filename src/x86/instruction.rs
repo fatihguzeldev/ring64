@@ -514,6 +514,74 @@ pub enum ProtectionKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SoftwareEventKind {
+    Interrupt,
+    Int3,
+    Into,
+    Int1,
+    Return,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SoftwareEventDescriptor {
+    pub kind: SoftwareEventKind,
+    pub width: Width,
+    pub vector: u8,
+}
+
+impl SoftwareEventDescriptor {
+    pub fn encode(self) -> u32 {
+        let kind = match self.kind {
+            SoftwareEventKind::Interrupt => 0,
+            SoftwareEventKind::Int3 => 1,
+            SoftwareEventKind::Into => 2,
+            SoftwareEventKind::Int1 => 3,
+            SoftwareEventKind::Return => 4,
+        };
+        let width = match self.width {
+            Width::W16 => 0,
+            Width::W32 => 1,
+            Width::W64 => 2,
+            Width::W8 => panic!("byte software-event operand"),
+        };
+        kind | width << 3 | u32::from(self.vector) << 8
+    }
+
+    pub fn try_decode(encoded: u32) -> Option<Self> {
+        if encoded & !0xff1f != 0 {
+            return None;
+        }
+        let kind = match encoded & 7 {
+            0 => SoftwareEventKind::Interrupt,
+            1 => SoftwareEventKind::Int3,
+            2 => SoftwareEventKind::Into,
+            3 => SoftwareEventKind::Int1,
+            4 => SoftwareEventKind::Return,
+            _ => return None,
+        };
+        let width = match (encoded >> 3) & 3 {
+            0 => Width::W16,
+            1 => Width::W32,
+            2 => Width::W64,
+            _ => return None,
+        };
+        let vector = (encoded >> 8) as u8;
+        let valid = match kind {
+            SoftwareEventKind::Return => vector == 0,
+            SoftwareEventKind::Interrupt => width == Width::W16,
+            SoftwareEventKind::Int3 => width == Width::W16 && vector == 3,
+            SoftwareEventKind::Into => width == Width::W16 && vector == 4,
+            SoftwareEventKind::Int1 => width == Width::W16 && vector == 1,
+        };
+        valid.then_some(Self {
+            kind,
+            width,
+            vector,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProtectionDescriptor {
     pub kind: ProtectionKind,
     pub width: Width,
