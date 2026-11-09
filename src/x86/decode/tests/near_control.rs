@@ -355,7 +355,7 @@ fn near_forms_keep_fifteen_byte_and_required_fetch_boundaries() {
 
 #[test]
 fn unfamiliar_selectors_and_xop_candidates_stop_before_address_fields() {
-    for (opcode, selectors) in [(0xff, &[3, 5, 7][..]), (0x8f, &[1, 2, 3, 4, 5, 6, 7][..])] {
+    for (opcode, selectors) in [(0xff, &[7][..]), (0x8f, &[1, 2, 3, 4, 5, 6, 7][..])] {
         for selector in selectors {
             for mode in 0..4 {
                 let bytes = [opcode, (mode << 6) | (selector << 3) | 4];

@@ -4,6 +4,7 @@ mod counts;
 mod data;
 mod entry_lookup;
 mod exchange;
+mod far;
 mod float;
 mod integer;
 mod integer_memory;
@@ -78,6 +79,7 @@ struct Emitter {
     masked_store: Option<u32>,
     clflush: Option<u32>,
     protection: Option<u32>,
+    far_control: Option<u32>,
 }
 
 impl Emitter {
@@ -242,6 +244,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::Protection(_)));
+    let has_far = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Far(_)));
     let float_type = has_float.then(|| {
         let index = next_type;
         types.ty().function(
@@ -308,6 +314,22 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         let index = next_type;
         types.ty().function(
             [ValType::I32, ValType::I64, ValType::I64, ValType::I32],
+            [ValType::I32],
+        );
+        next_type += 1;
+        index
+    });
+    let far_type = has_far.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [
+                ValType::I32,
+                ValType::I64,
+                ValType::I32,
+                ValType::I64,
+                ValType::I64,
+                ValType::I32,
+            ],
             [ValType::I32],
         );
         next_type += 1;
@@ -508,6 +530,12 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let far_control = far_type.map(|index| {
+        imports.import("env", "far_control", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let vector_access_reason = if vector_banks.loads || vector_banks.stores || store_mxcsr_used {
         Some(access_reason.unwrap_or_else(|| {
             imports.import("env", "access_reason", EntityType::Function(2));
@@ -575,6 +603,7 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
         masked_store,
         clflush,
         protection,
+        far_control,
         body: Function::new(locals),
         entries: unit
             .instructions
@@ -617,6 +646,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
                 mmx,
                 address,
             } => emitter.masked_store(data, mask, mmx, address, instruction.next_pc, exit_depth),
+            Operation::Far(far) => {
+                emitter.far_control(far, instruction.next_pc, exit_depth);
+                continue;
+            }
             Operation::Protection(operation) => {
                 emitter.protection(operation, instruction.next_pc, exit_depth)
             }

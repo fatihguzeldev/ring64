@@ -4,6 +4,7 @@ use crate::x86::context::{ExecutionContext, SegmentFault};
 use super::instruction::Instruction;
 
 mod cursor;
+mod far;
 mod float;
 mod mmx;
 mod numeric_image;

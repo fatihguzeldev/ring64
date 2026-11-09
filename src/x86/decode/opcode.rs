@@ -64,6 +64,9 @@ fn refine_inner<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if let Some(result) = super::far::one_byte(opcode, prefixes, cursor) {
+        return result;
+    }
     if let Some(result) = super::protection::one_byte(opcode, prefixes, cursor) {
         return result;
     }
@@ -235,6 +238,7 @@ where
                 });
             }
             match operands.selector {
+                3 | 5 => super::far::memory(&operands, prefixes, cursor),
                 2 => Ok(Operation::Call {
                     target: stack_operand(operands.location(cursor, prefixes, near_width)?),
                     width: near_width,

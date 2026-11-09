@@ -85,7 +85,8 @@ pub(crate) fn discover_with_context(
             }
             Operation::JumpRegister { .. }
             | Operation::JumpMemory { .. }
-            | Operation::Return { .. } => {}
+            | Operation::Return { .. }
+            | Operation::Far(_) => {}
             _ => pending.push_back(instruction.next_pc),
         }
         instructions.insert(pc, instruction);
@@ -472,5 +473,27 @@ mod tests {
             discover_with_context(&crossing, &context(0), u64::from(u32::MAX), limits()),
             Err(CompileError::Resource)
         ));
+    }
+    #[test]
+    fn far_transfers_stop_discovery_before_old_context_continuations_or_data_targets() {
+        for code in [
+            vec![0xcb, 0x90, 0x90],
+            vec![0xff, 0x1b, 0x90],
+            vec![0xff, 0x2b, 0x90],
+        ] {
+            let u = discover(&image(&code), 0x1000, limits()).unwrap();
+            assert_eq!(u.instructions.len(), 1);
+            assert!(matches!(u.instructions[0].operation, Operation::Far(_)));
+            assert_eq!(u.source_bytes, if code[0] == 0xcb { 1 } else { 2 });
+        }
+        let u = discover_with_context(
+            &image(&[0xea, 0x07, 0x10, 0, 0, 8, 0, 0x90]),
+            &context(0),
+            0x1000,
+            limits(),
+        )
+        .unwrap();
+        assert_eq!(u.instructions.len(), 1);
+        assert_eq!(u.source_bytes, 7);
     }
 }

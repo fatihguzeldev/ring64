@@ -7,6 +7,7 @@ mod counts;
 mod data_widths;
 mod df;
 mod exchange;
+mod far;
 mod float;
 mod integer_memory;
 mod logical;
@@ -496,6 +497,7 @@ for (const [index,c] of cases.entries()) {
  const vector_store=(address,width,segment,alignment,pointer)=>access('vector_store',[bits(address),width,segment,alignment,read128(pointer)]);
  const masked_store=(address,width,pointer,mask,segment)=>{assert.equal(pointer,scratch,'shared masked-store scratch');return access('masked_store',[bits(address),width,read128(pointer),mask,segment])};
  const clflush=(address,segment)=>access('clflush',[bits(address),segment]);
+ const far_control=(op,operand,selector,sp,next,segment)=>{const result=access('far_control',[op,bits(operand),selector,bits(sp),bits(next),segment]);if(result.pc!==undefined)d.setBigUint64(scratch,BigInt('0x'+result.pc),true);if(result.sp!==undefined)d.setBigUint64(scratch+8,BigInt('0x'+result.sp),true);return result.reason};
  const protection=(op,address,input,segment)=>{const result=access('protection',[op,bits(address),bits(input),segment]);if(result.value!==undefined)d.setBigUint64(scratch,BigInt('0x'+result.value),true);d.setUint8(scratch+8,result.control??0);return result.reason};
  const float=(op,leftlo,lefthi,rightlo,righthi)=>{const result=access('float',[op,bits(leftlo),bits(lefthi),bits(rightlo),bits(righthi)]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);if(result.value!==undefined){const value=BigInt('0x'+result.value);d.setBigUint64(scratch,BigInt.asUintN(64,value),true);d.setBigUint64(scratch+8,value>>64n,true)}return result.reason};
  const load_mxcsr=(address,segment)=>{const result=access('load_mxcsr',[bits(address),segment]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);return result.reason};
@@ -503,7 +505,7 @@ for (const [index,c] of cases.entries()) {
  const x87=(op,address,segment,pc,flags,rax)=>{const result=access('x87',[op,bits(address),segment,bits(pc),bits(flags),bits(rax)]);if(result.flags!==undefined)d.setBigUint64(l.flags,BigInt('0x'+result.flags),true);if(result.rax!==undefined)d.setBigUint64(l.registers,BigInt('0x'+result.rax),true);return result.reason};
  const numericState=(kind,op,address,segment)=>{const result=access(kind,[op,bits(address),segment]);for(const [bank,value] of Object.entries(result.xmmBefore??{}))assert.equal(read128(xmmOffset+16*Number(bank)),value,'live XMM before '+kind);for(const [bank,value] of Object.entries(result.xmm??{})){const raw=BigInt('0x'+value),offset=xmmOffset+16*Number(bank);d.setBigUint64(offset,BigInt.asUintN(64,raw),true);d.setBigUint64(offset+8,raw>>64n,true)}for(const [bank,value] of Object.entries(result.registers??{}))d.setBigUint64(l.registers+8*Number(bank),BigInt('0x'+value),true);return result.reason};
  const mmx=(...args)=>numericState('mmx',...args),numeric_image=(...args)=>numericState('numeric_image',...args);
- const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store,masked_store,clflush,protection,float,load_mxcsr,store_mxcsr,x87,mmx,numeric_image}});
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store,masked_store,clflush,protection,far_control,float,load_mxcsr,store_mxcsr,x87,mmx,numeric_image}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const snapshot=reason=>{
   const flags=d.getBigUint64(l.flags,true);

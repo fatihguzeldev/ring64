@@ -171,6 +171,7 @@ fn selected_lock_forms_require_full_encoding_then_validate_the_destination() {
         vec![0xf0, 0x0f, 0xb1, 0xc0],
         vec![0xf0, 0x87, 0xc0],
         vec![0xf0, 0x90],
+        vec![0xf0, 0xff, 0x5c, 0x24, 0],
     ] {
         for length in 1..bytes.len() {
             assert!(
@@ -186,7 +187,6 @@ fn selected_lock_forms_require_full_encoding_then_validate_the_destination() {
     }
     for bytes in [
         &[0xf0, 0xf6, 0x0c][..],
-        &[0xf0, 0xff, 0x1c],
         &[0xf0, 0x0f, 0xba, 0x1c],
         &[0xf0, 0x0f, 0xc7, 0x34],
         &[0xf0, 0x0f, 0x40],

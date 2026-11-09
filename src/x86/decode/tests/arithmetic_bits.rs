@@ -177,6 +177,16 @@ fn ff_selects_transfer_family_before_requesting_unsupported_address_tails() {
                             "{bytes:02x?}"
                         );
                     }
+                } else if matches!(selector, 3 | 5) {
+                    assert_eq!(
+                        at(0x1000, &bytes),
+                        if mode == 3 {
+                            Err(DecodeError::Invalid)
+                        } else {
+                            Err(DecodeError::Fetch(missing(0x1000 + bytes.len() as u64)))
+                        },
+                        "{bytes:02x?}"
+                    );
                 } else {
                     assert_eq!(
                         at(0x1000, &bytes),

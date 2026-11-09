@@ -623,6 +623,7 @@ impl FarInstruction {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
+    Far(FarInstruction),
     Protection(ProtectionInstruction),
     MaskedStore {
         data: u8,
