@@ -6,6 +6,9 @@ mod access;
 mod descriptor;
 mod reload;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProtectionPhase {
     Privilege,
