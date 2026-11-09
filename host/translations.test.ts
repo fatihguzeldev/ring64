@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Translations, type Artifact } from './translations.js';
 
-function artifact(entries: bigint[], byteLength: number): Artifact {
+function artifact(entries: bigint[], byteLength: number, boundaryObserved = false): Artifact {
   return {
     run: () => assert.fail('the artifact owner must not execute guest code'),
     metadata: {
@@ -13,10 +13,47 @@ function artifact(entries: bigint[], byteLength: number): Artifact {
       sourceBytes: entries.length,
       owner: 1n,
       contextVersion: 0n,
+      boundaryObserved,
       dependencies: entries.map((start) => ({ start, length: 1 })),
     },
   };
 }
+
+test('boundary variants retain independent same-PC and middle-entry ownership', () => {
+  const released: Artifact[] = [];
+  const cache = new Translations(3, 100, (owner) => released.push(owner));
+  const fast = artifact([1n, 2n], 10);
+  const observed = artifact([1n, 2n], 20, true);
+  cache.install(fast);
+  cache.install(observed);
+  assert.equal(cache.get(1n)?.artifact, fast);
+  assert.equal(cache.get(1n, true)?.artifact, observed);
+  assert.equal(cache.get(2n)?.index, 1);
+  assert.equal(cache.get(2n, true)?.index, 1);
+  assert.deepEqual(cache.resources(), { cachedArtifacts: 2, cachedBytes: 30 });
+  cache.prune((owner) => owner !== observed);
+  assert.equal(cache.get(1n)?.artifact, fast);
+  assert.equal(cache.get(1n, true), undefined);
+  assert.deepEqual(released, [observed]);
+  cache.clear();
+  assert.deepEqual(released, [observed, fast]);
+});
+
+test('boundary variant LRU eviction removes only the selected profile bindings', () => {
+  const cache = new Translations(2, 100);
+  const fast = artifact([1n, 2n], 10);
+  const observed = artifact([1n, 2n], 20, true);
+  const third = artifact([3n], 30);
+  cache.install(fast);
+  cache.install(observed);
+  cache.get(2n);
+  cache.install(third);
+  assert.equal(cache.get(1n)?.artifact, fast);
+  assert.equal(cache.get(2n)?.artifact, fast);
+  assert.equal(cache.get(1n, true), undefined);
+  assert.equal(cache.get(2n, true), undefined);
+  assert.deepEqual(cache.resources(), { cachedArtifacts: 2, cachedBytes: 40 });
+});
 
 test('eviction removes old aliases while preserving a newer entry owner', () => {
   const cache = new Translations(2, 100);

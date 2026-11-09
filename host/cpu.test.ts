@@ -69,6 +69,27 @@ test('boundary getters cannot publish an outer state import after run or disposa
   }
 });
 
+test('a boundary profile change during asynchronous compile refuses stale publication', async () => {
+  const f = await fixture([{ reason: 'budget', remaining: 0n, repeatRemaining: 1n }]);
+  const original = WebAssembly.compile;
+  let compilations = 0;
+  WebAssembly.compile = async (bytes) => {
+    if (compilations++ === 0) f.setBoundaryObserved(true);
+    return original(bytes);
+  };
+  try {
+    const result = await f.cpu.run({ budget: 1n, repeatBudget: 1n });
+    assert.equal(result.reason, 'budget');
+    assert.equal(result.retired, 1n);
+    assert.equal(result.resources.compilations, 2);
+    assert.deepEqual(f.instantiatedProfiles, [true]);
+    assert.equal(f.entries.length, 1);
+  } finally {
+    WebAssembly.compile = original;
+    f.cpu.dispose();
+  }
+});
+
 type Step = { reason: string; remaining: bigint; repeatRemaining: bigint; rip?: bigint };
 
 async function fixture(steps: Step[] = []) {
@@ -76,6 +97,8 @@ async function fixture(steps: Step[] = []) {
   let xmm = Array<bigint>(16).fill(0n);
   const entries: { budget: bigint; repeatBudget: bigint | undefined }[] = [];
   const stateImports: unknown[] = [];
+  let boundaryObserved = false;
+  const instantiatedProfiles: boolean[] = [];
   const engine = {
     current: () => current,
     snapshot: () => ({ registers: Array<bigint>(16).fill(0n), flags: 2n, rip: current.rip }),
@@ -106,6 +129,7 @@ async function fixture(steps: Step[] = []) {
         entries: [pc],
         owner: 1n,
         contextVersion: 0n,
+        boundaryObserved,
         byteLength: 8,
         instructionCount: 1,
         blockCount: 1,
@@ -114,8 +138,12 @@ async function fixture(steps: Step[] = []) {
       },
     }),
     contextVersion: () => 0n,
+    boundaryObserved: () => boundaryObserved,
     valid: () => true,
-    instantiate: () => () => 0,
+    instantiate: () => {
+      instantiatedProfiles.push(boundaryObserved);
+      return () => 0;
+    },
     activate() {},
     release() {},
     execute(_run: unknown, _index: number, budget: bigint, _stop: unknown, repeatBudget?: bigint) {
@@ -136,7 +164,15 @@ async function fixture(steps: Step[] = []) {
       ram: { base: 0x8000n, bytes: new Uint8Array(1) },
       limits,
     });
-    return { cpu, entries, stateImports };
+    return {
+      cpu,
+      entries,
+      stateImports,
+      instantiatedProfiles,
+      setBoundaryObserved(value: boolean) {
+        boundaryObserved = value;
+      },
+    };
   } finally {
     Core.create = create;
   }

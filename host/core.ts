@@ -120,6 +120,7 @@ export interface UnitMetadata {
   sourceBytes: number;
   owner: bigint;
   contextVersion: bigint;
+  boundaryObserved?: boolean;
   dependencies: { start: bigint; length: number }[];
   byteLength: number;
 }
@@ -156,6 +157,7 @@ type CoreExports = WebAssembly.Exports & {
   core_release(owner: bigint): void;
   core_context_info(): void;
   core_context_version(): bigint;
+  core_boundary_observed(): number;
   core_set_context(): number;
   core_segmented_load(offset: bigint, width: number, segment: number): bigint;
   core_segmented_load_for_write(offset: bigint, width: number, segment: number): bigint;
@@ -444,6 +446,7 @@ export class Core {
       'core_release',
       'core_context_info',
       'core_context_version',
+      'core_boundary_observed',
       'core_set_context',
       'core_segmented_load',
       'core_segmented_load_for_write',
@@ -681,6 +684,8 @@ export class Core {
       }
     >();
     const bytes = this.output();
+    if (typeof metadata.boundaryObserved !== 'boolean')
+      throw new Error('core returned an invalid boundary profile');
     return {
       bytes,
       metadata: {
@@ -793,6 +798,12 @@ export class Core {
 
   contextVersion(): bigint {
     return BigInt.asUintN(64, this.#exports.core_context_version());
+  }
+
+  boundaryObserved(): boolean {
+    const value = this.#exports.core_boundary_observed();
+    if (value !== 0 && value !== 1) throw new Error('core returned an invalid boundary profile');
+    return value === 1;
   }
 
   segmentFault(reason: string): SegmentFault | undefined {

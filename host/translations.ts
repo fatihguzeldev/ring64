@@ -12,6 +12,7 @@ export interface InstalledEntry {
 
 export class Translations {
   readonly #entries = new Map<bigint, InstalledEntry>();
+  readonly #observedEntries = new Map<bigint, InstalledEntry>();
   readonly #artifacts = new Map<Artifact, true>();
   #bytes = 0;
 
@@ -21,8 +22,9 @@ export class Translations {
     readonly release: (artifact: Artifact) => void = () => {},
   ) {}
 
-  get(pc: bigint): InstalledEntry | undefined {
-    const entry = this.#entries.get(pc);
+  get(pc: bigint, boundaryObserved = false): InstalledEntry | undefined {
+    const entries = boundaryObserved ? this.#observedEntries : this.#entries;
+    const entry = entries.get(pc);
     if (entry) {
       this.#artifacts.delete(entry.artifact);
       this.#artifacts.set(entry.artifact, true);
@@ -46,8 +48,9 @@ export class Translations {
     }
     this.#artifacts.set(artifact, true);
     this.#bytes += artifact.metadata.byteLength;
+    const entries = artifact.metadata.boundaryObserved ? this.#observedEntries : this.#entries;
     artifact.metadata.entries.forEach((pc, index) => {
-      this.#entries.set(pc, Object.freeze({ artifact, index }));
+      entries.set(pc, Object.freeze({ artifact, index }));
     });
     return true;
   }
@@ -67,8 +70,9 @@ export class Translations {
   private remove(artifact: Artifact): void {
     this.#artifacts.delete(artifact);
     this.#bytes -= artifact.metadata.byteLength;
+    const entries = artifact.metadata.boundaryObserved ? this.#observedEntries : this.#entries;
     for (const pc of artifact.metadata.entries) {
-      if (this.#entries.get(pc)?.artifact === artifact) this.#entries.delete(pc);
+      if (entries.get(pc)?.artifact === artifact) entries.delete(pc);
     }
     this.release(artifact);
   }
