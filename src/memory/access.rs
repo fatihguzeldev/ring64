@@ -85,6 +85,24 @@ impl Image {
     pub fn read_vector(&self, address: u64, width: u32) -> Result<[u8; 16], Fault> {
         assert!(matches!(width, 2 | 4 | 8 | 10 | 16));
         let mut index = self.preflight(address, width, Access::Read, false, false)?;
+        let mapping = &self.mappings[index];
+        let relative = address - mapping.base;
+        if u64::from(width) <= u64::from(mapping.length) - relative {
+            let offset = mapping.offset as usize + relative as usize;
+            let source = &self.backings[mapping.backing].bytes[offset..];
+            if width == 16 {
+                return Ok(source[..16].try_into().unwrap());
+            }
+            let mut output = [0; 16];
+            match width {
+                2 => output[..2].copy_from_slice(&source[..2]),
+                4 => output[..4].copy_from_slice(&source[..4]),
+                8 => output[..8].copy_from_slice(&source[..8]),
+                10 => output[..10].copy_from_slice(&source[..10]),
+                _ => unreachable!(),
+            }
+            return Ok(output);
+        }
         let mut output = [0; 16];
         let mut cursor = address;
         let mut copied = 0;
@@ -93,12 +111,6 @@ impl Image {
             let offset = mapping.offset as usize + (cursor - mapping.base) as usize;
             let count =
                 (width as usize - copied).min((mapping.end() - u128::from(cursor)) as usize);
-            // A full transport chunk is the complete admitted operand.
-            if count == 16 {
-                return Ok(self.backings[mapping.backing].bytes[offset..offset + 16]
-                    .try_into()
-                    .unwrap());
-            }
             output[copied..copied + count]
                 .copy_from_slice(&self.backings[mapping.backing].bytes[offset..offset + count]);
             copied += count;
