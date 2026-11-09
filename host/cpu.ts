@@ -167,6 +167,7 @@ export async function createCpu(options: Options): Promise<Cpu> {
 
 export class Cpu {
   #lifecycle: 'idle' | 'running' | 'failed' | 'disposed' = 'idle';
+  #runGeneration = 0;
   readonly #cache: Translations;
   #core: Core | undefined;
   readonly #limits: Limits;
@@ -191,8 +192,11 @@ export class Cpu {
     );
   }
 
-  private requireIdle(): void {
+  private requireIdle(runGeneration?: number): number {
     if (this.#lifecycle !== 'idle') throw new Error(`cpu is ${this.#lifecycle}`);
+    if (runGeneration !== undefined && runGeneration !== this.#runGeneration)
+      throw new Error('cpu run started during input capture');
+    return this.#runGeneration;
   }
 
   get #engine(): Core {
@@ -259,10 +263,10 @@ export class Cpu {
   }
 
   setState(state: State): void {
-    this.requireIdle();
+    const generation = this.requireIdle();
     const input = captureState(state);
     // Input accessors can start a run or dispose the CPU.
-    this.requireIdle();
+    this.requireIdle(generation);
     this.engineCall(() => this.#engine.setState(input));
   }
   readState(): StateSnapshot {
@@ -321,13 +325,16 @@ export class Cpu {
     stop?: bigint | undefined;
     repeatBudget?: bigint | undefined;
   }): Promise<RunResult> {
-    this.requireIdle();
+    const generation = this.requireIdle();
     const { budget, stop, repeatBudget: suppliedRepeatBudget } = options;
-    this.requireIdle();
+    this.requireIdle(generation);
     unsigned64(budget, 'budget');
     if (stop !== undefined) unsigned64(stop, 'stop');
     const repeatBudget = suppliedRepeatBudget === undefined ? budget : suppliedRepeatBudget;
     unsigned64(repeatBudget, 'repeatBudget');
+    if (this.#runGeneration === Number.MAX_SAFE_INTEGER)
+      throw new Error('cpu run generation exhausted');
+    this.#runGeneration++;
     this.#lifecycle = 'running';
     const began = performance.now();
     const resources = {

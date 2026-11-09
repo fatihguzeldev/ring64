@@ -7,12 +7,71 @@ import {
   throws,
   preserveNumeric,
   FLAGS_MASK,
+  outcome,
   type State,
   type Scenario,
 } from './fixture.js';
 
 export function stateScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
+    {
+      name: 'system warmed synchronous runs from state and run getters preserve nested work and reject the outer action',
+      async run() {
+        await using(compiler, '48ffc0ebfb', snapshot(), async (cpu) => {
+          const numeric = preserveNumeric(cpu);
+          cpu.setState(initial(0x1000n, { 0: 0n }));
+          const warm = await cpu.run({ budget: 2n });
+          outcome(warm, 'budget', 2n, 2n);
+          equal(warm.state.rip, 0x1000n, 'warm backedge entry');
+          for (const action of ['state', 'run'] as const) {
+            cpu.setState(initial(0x1000n, { 0: 1n }));
+            let pending: ReturnType<typeof cpu.run> | undefined;
+            const start = () => {
+              pending = cpu.run({ budget: 1n });
+              equal(cpu.readState().registers[0], 2n, 'nested cached run already completed');
+              equal(cpu.readState().rip, 0x1003n, 'nested continuation already published');
+            };
+            if (action === 'state') {
+              throws(
+                () =>
+                  cpu.setState({
+                    registers: Array<bigint>(16).fill(0n),
+                    flags: 2n,
+                    rip: 0x1000n,
+                    interruptibility: {
+                      get sti() {
+                        start();
+                        return false;
+                      },
+                      ss: false,
+                    },
+                  }),
+                'completed nested run rejects outer state import',
+              );
+            } else {
+              let rejected = false;
+              try {
+                await cpu.run({
+                  get budget() {
+                    start();
+                    return 1n;
+                  },
+                });
+              } catch {
+                rejected = true;
+              }
+              equal(rejected, true, 'completed nested run rejects outer run');
+            }
+            equal(pending !== undefined, true, 'nested run captured');
+            const nested = await pending!;
+            outcome(nested, 'budget', 1n, 1n);
+            equal(nested.resources.compilations, 0, 'synchronous warm native path');
+            same(cpu.readState(), nested.state, 'outer action cannot replace completed state');
+            numeric();
+          }
+        });
+      },
+    },
     {
       name: 'system flags full state snapshots own boundaries and reject malformed imports atomically',
       async run() {

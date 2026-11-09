@@ -90,6 +90,52 @@ test('a boundary profile change during asynchronous compile refuses stale public
   }
 });
 
+test('a synchronously completed cached run from an option getter rejects the outer run', async () => {
+  const f = await fixture(
+    Array.from({ length: 3 }, () => ({ reason: 'budget', remaining: 0n, repeatRemaining: 1n })),
+  );
+  let nested: Promise<unknown> | undefined;
+  try {
+    await f.cpu.run({ budget: 1n });
+    await assert.rejects(
+      f.cpu.run({
+        get budget() {
+          nested = f.cpu.run({ budget: 1n });
+          assert.equal(f.cpu.readState().rip, 0x1000n, 'cached nested call already completed');
+          return 1n;
+        },
+      }),
+      /run.*capture/,
+    );
+    await nested;
+    assert.equal(f.entries.length, 2, 'only warm and nested entries execute');
+  } finally {
+    await nested;
+    f.cpu.dispose();
+  }
+});
+
+test('an invalid nested run attempt does not invalidate a state capture', async () => {
+  const f = await fixture();
+  let nested: Promise<unknown> | undefined;
+  try {
+    f.cpu.setState({
+      registers: Array<bigint>(16).fill(9n),
+      rip: 0x2000n,
+      get flags() {
+        nested = f.cpu.run({ budget: -1n });
+        void nested.catch(() => {});
+        return 2n;
+      },
+    });
+    await assert.rejects(nested!, /unsigned 64-bit bigint/);
+    assert.equal(f.stateImports.length, 1);
+    assert.equal(f.entries.length, 0);
+  } finally {
+    f.cpu.dispose();
+  }
+});
+
 test('cached boundary variants consume one preparation token per entry without hot profile queries', async () => {
   const steps = Array.from({ length: 4 }, (_, index) => ({
     reason: index % 2 === 0 ? 'dispatch' : 'budget',
