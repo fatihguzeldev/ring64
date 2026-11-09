@@ -4,6 +4,7 @@ use crate::memory::{Access, Cause, Image};
 
 mod access;
 mod descriptor;
+pub mod far;
 mod reload;
 
 #[cfg(test)]
@@ -23,6 +24,7 @@ pub enum ProtectionPhase {
     Privilege,
     Selector,
     Descriptor,
+    Target,
 }
 
 impl ProtectionPhase {
@@ -31,6 +33,7 @@ impl ProtectionPhase {
             Self::Privilege => "privilege",
             Self::Selector => "selector",
             Self::Descriptor => "descriptor",
+            Self::Target => "target",
         }
     }
 }

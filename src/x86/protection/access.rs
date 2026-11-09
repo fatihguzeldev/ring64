@@ -112,6 +112,26 @@ impl Lookup {
             })
     }
 
+    pub fn prepare_accessed(
+        self,
+        context: &ExecutionContext,
+        image: &Image,
+        access_byte: u8,
+    ) -> Result<(u64, u8), Failure> {
+        let address = self.address(context, 5, 1, Access::Write, SystemPhase::AccessedWrite)?;
+        image.check_write(address, 1).map_err(|f| {
+            self.fault(
+                u128::from(f.address),
+                f.width,
+                f.access,
+                f.cause,
+                f.failing,
+                SystemPhase::AccessedWrite,
+            )
+        })?;
+        Ok((address, access_byte | 1))
+    }
+
     pub fn set_accessed(
         self,
         context: &ExecutionContext,

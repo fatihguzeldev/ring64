@@ -541,6 +541,87 @@ impl ProtectionInstruction {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FarKind {
+    Call,
+    Jump,
+    Return,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FarDescriptor {
+    pub kind: FarKind,
+    pub width: Width,
+    pub memory: bool,
+}
+
+impl FarDescriptor {
+    pub fn encode(self) -> u32 {
+        let kind = match self.kind {
+            FarKind::Call => 0,
+            FarKind::Jump => 1,
+            FarKind::Return => 2,
+        };
+        let width = match self.width {
+            Width::W16 => 0,
+            Width::W32 => 1,
+            Width::W64 => 2,
+            Width::W8 => panic!("byte far operand"),
+        };
+        kind | (width << 2) | (u32::from(self.memory) << 4)
+    }
+    pub fn try_decode(encoded: u32) -> Option<Self> {
+        if encoded & !31 != 0 {
+            return None;
+        }
+        let kind = match encoded & 3 {
+            0 => FarKind::Call,
+            1 => FarKind::Jump,
+            2 => FarKind::Return,
+            _ => return None,
+        };
+        let width = match (encoded >> 2) & 3 {
+            0 => Width::W16,
+            1 => Width::W32,
+            2 => Width::W64,
+            _ => return None,
+        };
+        let memory = encoded & 16 != 0;
+        if kind == FarKind::Return && memory {
+            return None;
+        }
+        Some(Self {
+            kind,
+            width,
+            memory,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FarOperand {
+    Immediate { selector: u16, offset: u64 },
+    Memory(Address),
+    Return { cleanup: u16 },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FarInstruction {
+    pub kind: FarKind,
+    pub width: Width,
+    pub operand: FarOperand,
+}
+
+impl FarInstruction {
+    pub fn descriptor(self) -> FarDescriptor {
+        FarDescriptor {
+            kind: self.kind,
+            width: self.width,
+            memory: matches!(self.operand, FarOperand::Memory(_)),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
     Protection(ProtectionInstruction),
     MaskedStore {
