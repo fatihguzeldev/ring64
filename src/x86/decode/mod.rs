@@ -13,6 +13,7 @@ mod operand;
 mod prefix;
 mod protection;
 mod streaming;
+mod system_flags;
 mod vector;
 mod x87;
 

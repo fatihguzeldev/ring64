@@ -166,7 +166,7 @@ fn protection_neighbors_and_invalid_classes_stop_at_their_deciding_modrm() {
         &[0x0f, 0x01, 0xc1],
         &[0x0f, 0x01, 0xd0],
         &[0x0f, 0x00, 0xc8],
-        &[0x8e, 0x14],
+        &[0x0f, 0x00, 0xd8],
     ] {
         assert_eq!(at(0x1000, bytes), Err(DecodeError::Unsupported));
     }

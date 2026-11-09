@@ -23,6 +23,7 @@ mod scalar_data;
 mod stack;
 mod streaming;
 mod strings;
+mod system_flags;
 mod vectors;
 mod x87;
 

@@ -640,6 +640,10 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
             .op(Op::LocalSet(RIP));
         emitter.gates(exit_depth);
         match instruction.operation {
+            Operation::SystemFlags(_) | Operation::PopSs { .. } => {
+                emitter.exit(crate::embedding::layout::UNSUPPORTED, exit_depth);
+                continue;
+            }
             Operation::MaskedStore {
                 data,
                 mask,

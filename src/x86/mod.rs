@@ -1,5 +1,6 @@
 pub mod context;
 pub mod decode;
+pub mod flags;
 pub mod float;
 pub mod instruction;
 pub mod masked;

@@ -123,7 +123,7 @@ fn private_helper_mode_gate_accepts_selected_forms_without_creating_missing_inst
     assert!(!valid(ProtectionKind::ReadLdt, Width::W16, false, &v86));
     assert!(!valid(ProtectionKind::Lar, Width::W16, false, &real));
     assert!(!valid(ProtectionKind::Lar, Width::W64, false, &protected));
-    assert!(!valid(
+    assert!(valid(
         ProtectionKind::LoadSegment(Segment::Ss),
         Width::W16,
         false,

@@ -422,6 +422,79 @@ pub struct X87Instruction {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SystemFlagsKind {
+    Push,
+    Pop,
+    Cli,
+    Sti,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SystemFlagsDescriptor {
+    pub kind: SystemFlagsKind,
+    pub width: Width,
+}
+
+impl SystemFlagsDescriptor {
+    pub fn encode(self) -> u32 {
+        let kind = match self.kind {
+            SystemFlagsKind::Push => 0,
+            SystemFlagsKind::Pop => 1,
+            SystemFlagsKind::Cli => 2,
+            SystemFlagsKind::Sti => 3,
+        };
+        let width = match self.width {
+            Width::W16 => 0,
+            Width::W32 => 1,
+            Width::W64 => 2,
+            Width::W8 => panic!("byte FLAGS operand"),
+        };
+        kind | width << 2
+    }
+
+    pub fn pack(self) -> u32 {
+        self.encode()
+    }
+
+    pub fn try_decode(encoded: u32) -> Option<Self> {
+        if encoded & !15 != 0 {
+            return None;
+        }
+        let kind = match encoded & 3 {
+            0 => SystemFlagsKind::Push,
+            1 => SystemFlagsKind::Pop,
+            2 => SystemFlagsKind::Cli,
+            _ => SystemFlagsKind::Sti,
+        };
+        let width = match encoded >> 2 {
+            0 => Width::W16,
+            1 => Width::W32,
+            2 => Width::W64,
+            _ => return None,
+        };
+        if matches!(kind, SystemFlagsKind::Cli | SystemFlagsKind::Sti) && width != Width::W16 {
+            return None;
+        }
+        Some(Self { kind, width })
+    }
+
+    pub fn valid_in_mode(self, context: &super::context::ExecutionContext) -> bool {
+        match self.kind {
+            SystemFlagsKind::Cli | SystemFlagsKind::Sti => self.width == Width::W16,
+            SystemFlagsKind::Push | SystemFlagsKind::Pop => {
+                self.width == Width::W16
+                    || self.width
+                        == if context.is_long64() {
+                            Width::W64
+                        } else {
+                            Width::W32
+                        }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProtectionKind {
     StoreGdt,
     StoreIdt,
@@ -504,9 +577,7 @@ impl ProtectionDescriptor {
             StoreGdt | StoreIdt | LoadGdt | LoadIdt => memory,
             ReadLdt | ReadSegment(_) => !memory || width == Width::W16,
             LoadLdt | Verr | Verw => width == Width::W16,
-            LoadSegment(segment) => {
-                !matches!(segment, Segment::Cs | Segment::Ss) && width == Width::W16
-            }
+            LoadSegment(segment) => segment != Segment::Cs && width == Width::W16,
             LoadFar(segment) => {
                 memory
                     && segment != Segment::Cs
@@ -623,6 +694,10 @@ impl FarInstruction {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
+    SystemFlags(SystemFlagsDescriptor),
+    PopSs {
+        width: Width,
+    },
     Far(FarInstruction),
     Protection(ProtectionInstruction),
     MaskedStore {

@@ -121,9 +121,7 @@ pub fn valid_in_mode(descriptor: ProtectionDescriptor, context: &ExecutionContex
         StoreGdt | StoreIdt | LoadGdt | LoadIdt => memory,
         ReadLdt | ReadSegment(_) => !memory || width == Width::W16,
         LoadLdt | Verr | Verw => width == Width::W16,
-        LoadSegment(segment) => {
-            width == Width::W16 && !matches!(segment, Segment::Cs | Segment::Ss)
-        }
+        LoadSegment(segment) => width == Width::W16 && segment != Segment::Cs,
         LoadFar(segment) => {
             memory
                 && segment != Segment::Cs

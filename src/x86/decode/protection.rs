@@ -33,9 +33,6 @@ where
                     if segment == Segment::Cs {
                         return Err(DecodeError::Invalid);
                     }
-                    if segment == Segment::Ss {
-                        return Err(DecodeError::Unsupported);
-                    }
                     (Kind::LoadSegment(segment), Width::W16, 0)
                 } else {
                     (
