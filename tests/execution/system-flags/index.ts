@@ -7,7 +7,10 @@ import { shadowScenarios } from './shadows.js';
 import { aliasScenarios } from './aliases.js';
 import { preservationScenarios } from './preservation.js';
 import { memoryScenarios } from './memory.js';
+import { numericBoundaryScenarios } from './numeric-boundaries.js';
 import { cacheScenarios } from './cache.js';
+import { acceptanceBoundaryScenarios } from './acceptance-boundaries.js';
+import { reviewScenarios } from './review.js';
 import type { Scenario } from './fixture.js';
 
 export function systemFlagScenarios(compiler: WebAssembly.Module): Scenario[] {
@@ -21,6 +24,9 @@ export function systemFlagScenarios(compiler: WebAssembly.Module): Scenario[] {
     ...aliasScenarios(compiler),
     ...preservationScenarios(compiler),
     ...memoryScenarios(compiler),
+    ...numericBoundaryScenarios(compiler),
     ...cacheScenarios(compiler),
+    ...acceptanceBoundaryScenarios(compiler),
+    ...reviewScenarios(compiler),
   ];
 }

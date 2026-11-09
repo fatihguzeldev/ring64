@@ -94,6 +94,21 @@ fn privilege_matrix_uses_old_iopl_and_preserves_virtual_bits() {
 }
 
 #[test]
+fn popf_literal_clears_and_preservation_distinguish_old_privilege_and_selected_width() {
+    for (mode, cpl, flags, input, width, expected) in [
+        ("long64", 3, 0x190002, u64::MAX, Width::W64, 0x3c4dd7),
+        ("protected", 1, 0x190202, 0, Width::W32, 0x180202),
+        ("protected", 1, 0x191202, 0, Width::W32, 0x181002),
+        ("protected", 3, 0x193202, 0, Width::W32, 0x183002),
+        ("real", 0, 0x193202, 0, Width::W32, 0x180002),
+        ("virtual8086", 3, 0x193202, 0, Width::W32, 0x183002),
+        ("long64", 0, 0x3d7fd7, 0, Width::W16, 0x3c0002),
+    ] {
+        assert_eq!(pop(flags, input, width, &context(mode, cpl)), Ok(expected));
+    }
+}
+
+#[test]
 fn private_descriptors_and_shadow_admission_reject_malformed_inputs() {
     for kind in [
         SystemFlagsKind::Push,
