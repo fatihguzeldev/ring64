@@ -169,7 +169,7 @@ impl Image {
     ) -> Result<(), Fault> {
         Self::check_fields(width, fields, bytes.len());
         let mut index = self.preflight(address, width, Access::Write, false, false)?;
-        if width == 0 {
+        if fields.is_empty() {
             return Ok(());
         }
         let mapping = &self.mappings[index];
