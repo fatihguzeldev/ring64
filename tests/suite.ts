@@ -17,6 +17,7 @@ import { numericStateScenarios } from './execution/mmx/index.js';
 import { farControlScenarios } from './execution/far-control/index.js';
 import { protectionScenarios } from './execution/protection/index.js';
 import { streamingScenarios } from './execution/streaming/index.js';
+import { systemFlagScenarios } from './execution/system-flags/index.js';
 
 export async function runScenarios(
   compiler: Uint8Array | WebAssembly.Module,
@@ -45,6 +46,7 @@ export async function runScenarios(
     ...streamingScenarios(core),
     ...protectionScenarios(core),
     ...farControlScenarios(core),
+    ...systemFlagScenarios(core),
   ];
   const passed: string[] = [];
   for (const { name, run } of scenarios) {
