@@ -194,7 +194,11 @@ export function diagnosticScenarios(compiler: WebAssembly.Module): Scenario[] {
               );
               equal(result.protectionFault?.vector, exception, 'DPL versus presence');
               equal(result.protectionFault?.errorCode, error, 'IDT selector encoding and EXT');
-              equal(result.protectionFault?.selector, undefined, 'IDT vector is not a code selector');
+              equal(
+                result.protectionFault?.selector,
+                undefined,
+                'IDT vector is not a code selector',
+              );
               same(cpu.readContext(), execution, 'no target cache publication');
               equal(
                 result.systemMemoryFault,
