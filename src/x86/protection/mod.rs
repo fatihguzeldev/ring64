@@ -9,6 +9,9 @@ mod reload;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod load_tests;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProtectionPhase {
     Privilege,
