@@ -1,6 +1,13 @@
-import { faultScenarios } from './faults.js';
+import { modeScenarios } from './modes.js';
+import { valueScenarios } from './values.js';
 import { reuseScenarios } from './reuse.js';
+import { faultScenarios } from './faults.js';
 import type { Scenario } from './fixture.js';
 export function farControlScenarios(compiler: WebAssembly.Module): Scenario[] {
-  return [...faultScenarios(compiler), ...reuseScenarios(compiler)];
+  return [
+    ...modeScenarios(compiler),
+    ...valueScenarios(compiler),
+    ...faultScenarios(compiler),
+    ...reuseScenarios(compiler),
+  ];
 }
