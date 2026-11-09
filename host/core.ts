@@ -194,6 +194,7 @@ type CoreExports = WebAssembly.Exports & {
     segment: number,
   ): number;
   core_flags(operation: number, flags: bigint, input: bigint): number;
+  core_software_event(operation: number, inputSp: bigint, flags: bigint, nextPc: bigint): number;
   core_debug_step(
     instructionPc: bigint,
     resumePc: bigint,
@@ -472,6 +473,7 @@ export class Core {
       'core_clflush',
       'core_protection',
       'core_far_control',
+      'core_software_event',
       'core_flags',
       'core_debug_step',
       'core_float',
@@ -738,6 +740,7 @@ export class Core {
         clflush: this.#exports.core_clflush,
         protection: this.#exports.core_protection,
         far_control: this.#exports.core_far_control,
+        software_event: this.#exports.core_software_event,
         flags: this.#exports.core_flags,
         debug_step: this.#exports.core_debug_step,
         target_check: this.#exports.core_target_check,

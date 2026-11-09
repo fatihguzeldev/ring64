@@ -1,6 +1,7 @@
 use super::*;
 mod far_bridge;
 mod protection_bridge;
+mod software_events;
 mod streaming_bridge;
 mod system_flags;
 mod system_flags_review;

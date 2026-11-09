@@ -18,6 +18,7 @@ mod mmx;
 mod numeric;
 mod numeric_image;
 mod protection;
+mod software_events;
 mod streaming;
 mod system_flags;
 mod vector;

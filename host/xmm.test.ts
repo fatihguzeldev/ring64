@@ -266,6 +266,7 @@ test('required arithmetic and boundary helpers reject construction before core i
     'core_divide_failed',
     'core_flags',
     'core_debug_step',
+    'core_software_event',
     'core_boundary_observed',
   ]) {
     const missing = await mockedCore(layout, 8192, undefined, name);
