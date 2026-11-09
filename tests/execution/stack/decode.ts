@@ -132,9 +132,41 @@ export function decodeScenarios(core: WebAssembly.Module): Scenario[] {
             const before = input(CODE, { 0: 0x800000000000n, 4: 0x7000n });
             cpu.setState(before);
             const result = await cpu.run({ budget: 1n });
-            exit(result, 'unsupported', 1n, 0n, before);
-            noFault(result);
-            equal(result.resources.compilations, 0, 'unsupported form does not compile');
+            const fetched = code === 'ff1c' || code === 'ff2c' || code === 'ca';
+            const invalid = code === 'ffd8' || code === 'ffe8' || code === '9a';
+            const reason = fetched
+              ? 'fetch-fault'
+              : invalid
+                ? 'invalid-encoding'
+                : code === 'cb'
+                  ? 'data-fault'
+                  : 'unsupported';
+            exit(result, reason, 1n, 0n, before);
+            if (fetched)
+              fault(result, {
+                instructionPc: CODE,
+                address: CODE + BigInt(code.length / 2),
+                width: 1,
+                access: 'execute',
+                cause: 'unmapped',
+                failingAddress: CODE + BigInt(code.length / 2),
+              });
+            else if (code === 'cb')
+              fault(result, {
+                instructionPc: CODE,
+                segment: 'ss',
+                address: 0x7000n,
+                width: 4,
+                access: 'read',
+                cause: 'unmapped',
+                failingAddress: 0x7000n,
+              });
+            else noFault(result);
+            equal(
+              result.resources.compilations,
+              code === 'cb' ? 1 : 0,
+              'only selected complete RETF compiles',
+            );
             memory(cpu, CODE, code);
             memory(cpu, 0x4000n, RAM);
           });

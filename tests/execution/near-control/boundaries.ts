@@ -466,7 +466,7 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
             );
             equal(result.fault, undefined, 'instruction length rejection has no operand access');
           });
-        for (const code of ['ff1c', '8f0c'])
+        for (const code of ['ff3c', '8f0c'])
           await using(compiler, code, LONG, async (cpu) => {
             const before = input(0x1000n, {}, 0xcd7n);
             cpu.setState(before);
