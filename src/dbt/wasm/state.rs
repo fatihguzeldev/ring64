@@ -80,20 +80,21 @@ impl Emitter {
         ] {
             self.op(Op::LocalGet(0)).op(Op::LocalGet(local));
             if local == FLAGS {
-                self.op(Op::LocalGet(DIRECTION))
-                    .op(Op::I64Or)
-                    .op(Op::LocalGet(SYSTEM))
-                    .op(Op::I64Or);
+                self.op(Op::LocalGet(DIRECTION)).op(Op::I64Or);
+                self.system_bits();
+                self.op(Op::I64Or);
             }
             self.op(Op::I64Store(memory(offset)));
         }
-        self.op(Op::LocalGet(0))
-            .op(Op::LocalGet(SHADOW))
-            .op(Op::I32Store(MemArg {
-                offset: offset_of!(RunState, interruptibility) as u64,
-                align: 2,
-                memory_index: 0,
-            }));
+        if self.publish_shadow {
+            self.op(Op::LocalGet(0))
+                .op(Op::LocalGet(SHADOW))
+                .op(Op::I32Store(MemArg {
+                    offset: offset_of!(RunState, interruptibility) as u64,
+                    align: 2,
+                    memory_index: 0,
+                }));
+        }
         if self.has_repeat {
             self.op(Op::LocalGet(0))
                 .op(Op::LocalGet(REPEAT_REMAINING))

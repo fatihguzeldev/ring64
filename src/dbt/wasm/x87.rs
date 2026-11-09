@@ -24,9 +24,13 @@ impl Emitter {
             Segment::Ds
         };
         self.op(Wasm::I32Const(segment as i32))
-            .op(Wasm::I64Const(pc as i64))
-            .op(Wasm::LocalGet(FLAGS))
-            .op(Wasm::LocalGet(GPR))
+            .op(Wasm::I64Const(pc as i64));
+        if operation.writes_flags() {
+            self.full_flags();
+        } else {
+            self.op(Wasm::LocalGet(FLAGS));
+        }
+        self.op(Wasm::LocalGet(GPR))
             .op(Wasm::Call(helper))
             .op(Wasm::LocalTee(REASON))
             .op(Wasm::I32Eqz)
@@ -43,6 +47,8 @@ impl Emitter {
                     align: 3,
                     memory_index: 0,
                 }))
+                .op(Wasm::I64Const(0x8d7))
+                .op(Wasm::I64And)
                 .op(Wasm::LocalSet(FLAGS));
         }
         if operation.writes_ax() {

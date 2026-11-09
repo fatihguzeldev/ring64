@@ -1,15 +1,43 @@
 use super::{DIRECTION, Emitter, FLAGS, REASON, REPEAT_REMAINING, RIP, SHADOW, SYSTEM};
-use crate::embedding::layout::DISPATCH;
+use crate::embedding::layout::{DISPATCH, RunState};
 use crate::x86::instruction::{Operation, ProtectionKind, Repeat, SystemFlagsKind};
-use wasm_encoder::{BlockType, Instruction as Op};
+use std::mem::offset_of;
+use wasm_encoder::{BlockType, Instruction as Op, MemArg};
+
+pub(super) fn ss_producer(operation: Operation) -> bool {
+    matches!(
+        operation,
+        Operation::PopSs { .. }
+            | Operation::Protection(crate::x86::instruction::ProtectionInstruction {
+                kind: ProtectionKind::LoadSegment(crate::x86::context::Segment::Ss),
+                ..
+            })
+    )
+}
 
 impl Emitter {
     pub(super) fn full_flags(&mut self) {
         self.op(Op::LocalGet(FLAGS))
             .op(Op::LocalGet(DIRECTION))
-            .op(Op::I64Or)
-            .op(Op::LocalGet(SYSTEM))
             .op(Op::I64Or);
+        self.system_bits();
+        self.op(Op::I64Or);
+    }
+
+    pub(super) fn system_bits(&mut self) {
+        if self.observed || self.system_flags.is_some() {
+            self.op(Op::LocalGet(SYSTEM));
+        } else {
+            // Ordinary fast units do not change controls; do not keep them live across the loop.
+            self.op(Op::LocalGet(0))
+                .op(Op::I64Load(MemArg {
+                    offset: offset_of!(RunState, flags) as u64,
+                    align: 3,
+                    memory_index: 0,
+                }))
+                .op(Op::I64Const(!0xcd7))
+                .op(Op::I64And);
+        }
     }
 
     pub(super) fn profile_guard(&mut self, exit_depth: u32) {
@@ -87,14 +115,7 @@ impl Emitter {
     }
 
     fn ss_producer(&self) -> bool {
-        matches!(
-            self.current_operation,
-            Operation::PopSs { .. }
-                | Operation::Protection(crate::x86::instruction::ProtectionInstruction {
-                    kind: ProtectionKind::LoadSegment(crate::x86::context::Segment::Ss),
-                    ..
-                })
-        )
+        ss_producer(self.current_operation)
     }
 
     pub(super) fn trap(&mut self, completed: bool, exit_depth: u32) {

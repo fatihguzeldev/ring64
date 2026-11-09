@@ -87,6 +87,7 @@ struct Emitter {
     system_flags: Option<u32>,
     debug_step: Option<u32>,
     observed: bool,
+    publish_shadow: bool,
     sampled_tf: Option<u32>,
     incoming_shadow: Option<u32>,
     next_shadow: Option<u32>,
@@ -666,6 +667,12 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         system_flags,
         debug_step,
         observed,
+        publish_shadow: observed
+            || has_system_flags
+            || unit
+                .instructions
+                .iter()
+                .any(|i| boundary::ss_producer(i.operation)),
         sampled_tf: boundary_locals.map(|l| l[0]),
         incoming_shadow: boundary_locals.map(|l| l[1]),
         next_shadow: boundary_locals.map(|l| l[2]),

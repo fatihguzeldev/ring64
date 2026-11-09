@@ -50,10 +50,11 @@ fn x87_generated_boundaries_capture_live_operands_and_reload_only_written_projec
     let mut cases = vec![];
     // Both helpers see live EAX/FLAGS after unpublished GP predecessors.
     // Their unrelated canonical writes must be overwritten by the right owner.
-    for (suffix, op, output, flags, registers) in [
+    for (suffix, op, input_flags, output, flags, registers) in [
         (
             &[0xdf, 0xe0][..],
             helper(Kind::StoreStatus, Format::Ax, 0x7e0),
+            "46",
             json!({"reason":0,"rax":"deadaabb","flags":"2"}),
             0x446,
             vec![(0, 0xdeadaabb)],
@@ -68,6 +69,7 @@ fn x87_generated_boundaries_capture_live_operands_and_reload_only_written_projec
                 ..Numeric::default()
             }
             .encode() as i32,
+            "446",
             json!({"reason":0,"flags":"47","rax":"1234"}),
             0x447,
             vec![(0, 0xdeadbeef)],
@@ -81,7 +83,7 @@ fn x87_generated_boundaries_capture_live_operands_and_reload_only_written_projec
             3,
             (&registers, flags, 0x1009, BUDGET as u32, 0),
         );
-        p["accesses"] = json!([{"kind":"x87","args":[op,"0",Segment::Ds as u32,"1007","46","deadbeef"],"result":output}]);
+        p["accesses"] = json!([{"kind":"x87","args":[op,"0",Segment::Ds as u32,"1007",input_flags,"deadbeef"],"result":output}]);
         cases.push(p);
     }
     run_cases(cases);

@@ -22,6 +22,7 @@ mod stack;
 mod streaming;
 mod strings;
 mod system_flags;
+mod system_lifetime;
 mod vector;
 mod x87;
 
