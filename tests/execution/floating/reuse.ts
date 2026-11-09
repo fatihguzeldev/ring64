@@ -230,7 +230,7 @@ export function reuseScenarios(compiler: WebAssembly.Module): Scenario[] {
             const prefix = half ? '0f1303' : '0fae1b',
               next = 0x1000n + BigInt(prefix.length / 2),
               original = half ? 'b801000000909090' : 'fc909090',
-              stored = half ? 'b802000000909090' : 'fb909090',
+              stored = half ? 'b802000000909090' : 'f4909090',
               code = prefix + original + 'f4';
             const cpu = await createCpu({
               compiler,
@@ -262,8 +262,8 @@ export function reuseScenarios(compiler: WebAssembly.Module): Scenario[] {
               const raw = banks(),
                 before = input(0x1000n, { 3: 0x6000n }, 0xcd7n);
               if (half) raw[0] = (raw[0]! & ~0xffffffffffffffffn) | 0x90909000000002b8n;
-              // STMXCSR writes fb900000, making a previously decoded CLD unsupported.
-              const csr = half ? 0x1f80 : 0x90fb;
+              // STMXCSR replaces decoded CLD with unimplemented HLT; STI is now selected.
+              const csr = half ? 0x1f80 : 0x90f4;
               cpu.setState(before);
               cpu.setXmmState(raw);
               cpu.setMxcsr(csr);
@@ -289,7 +289,7 @@ export function reuseScenarios(compiler: WebAssembly.Module): Scenario[] {
                     gate === 'continue' ? { 0: 2n } : {},
                   ),
                 );
-              const actualStored = half ? stored : 'fb900000';
+              const actualStored = half ? stored : 'f4900000';
               memory(cpu, 0x1000n, prefix + actualStored + 'f4');
               xmm(cpu, raw);
               mxcsr(cpu, csr);

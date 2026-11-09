@@ -138,7 +138,7 @@ export function decodeScenarios(core: WebAssembly.Module): Scenario[] {
               ? 'fetch-fault'
               : invalid
                 ? 'invalid-encoding'
-                : code === 'cb'
+                : ['cb', '9c', '9d'].includes(code)
                   ? 'data-fault'
                   : 'unsupported';
             exit(result, reason, 1n, 0n, before);
@@ -151,21 +151,21 @@ export function decodeScenarios(core: WebAssembly.Module): Scenario[] {
                 cause: 'unmapped',
                 failingAddress: CODE + BigInt(code.length / 2),
               });
-            else if (code === 'cb')
+            else if (['cb', '9c', '9d'].includes(code))
               fault(result, {
                 instructionPc: CODE,
                 segment: 'ss',
-                address: 0x7000n,
-                width: 4,
-                access: 'read',
+                address: code === '9c' ? 0x6ff8n : 0x7000n,
+                width: code === 'cb' ? 4 : 8,
+                access: code === '9c' ? 'write' : 'read',
                 cause: 'unmapped',
-                failingAddress: 0x7000n,
+                failingAddress: code === '9c' ? 0x6ff8n : 0x7000n,
               });
             else noFault(result);
             equal(
               result.resources.compilations,
-              code === 'cb' ? 1 : 0,
-              'only selected complete RETF compiles',
+              ['cb', '9c', '9d'].includes(code) ? 1 : 0,
+              'selected complete stack forms compile',
             );
             memory(cpu, CODE, code);
             memory(cpu, 0x4000n, RAM);

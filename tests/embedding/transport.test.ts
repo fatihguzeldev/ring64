@@ -81,6 +81,8 @@ async function fixture(
             rip: 136,
             remaining: 144,
             repeatRemaining: 168,
+            interruptibility: 164,
+            interruptibilityBytes: 4,
             reasons: ['dispatch', 'budget', 'stop'],
           },
     ),
@@ -219,6 +221,7 @@ for (const high of ['input', 'state', 'info', 'output', 'later-input'] as const)
       cpu.setX87State(x87);
       assert.deepEqual(cpu.readX87State(), x87);
       const state = initial(0x1234n, { 0: 0x8877_6655_4433_2211n }, 0x8d7n);
+      state.interruptibility = { sti: false, ss: true };
       cpu.setState(state);
       assert.deepEqual(cpu.readState(), state);
       assert.deepEqual(cpu.readX87State(), x87);
