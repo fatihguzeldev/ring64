@@ -123,7 +123,8 @@ async function browserRun() {
         pathname === '/numeric-state.mjs' ||
         pathname === '/streaming.mjs' ||
         pathname === '/protection.mjs' ||
-        pathname === '/far-control.mjs'
+        pathname === '/far-control.mjs' ||
+        pathname === '/system-flags.mjs'
       )
         file = resolve(root, 'benchmarks', pathname.slice(1));
       else {
@@ -208,6 +209,7 @@ const benchmarkFiles = [
   'streaming.mjs',
   'protection.mjs',
   'far-control.mjs',
+  'system-flags.mjs',
 ];
 const benchmarkHash = createHash('sha256');
 for (const file of benchmarkFiles) {

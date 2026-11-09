@@ -3,6 +3,7 @@ import { numericStateRows } from './numeric-state.mjs';
 import { streamingRows } from './streaming.mjs';
 import { protectionRows } from './protection.mjs';
 import { farRows } from './far-control.mjs';
+import { systemFlagRows } from './system-flags.mjs';
 
 const MASK64 = (1n << 64n) - 1n;
 const MASK128 = (1n << 128n) - 1n;
@@ -275,7 +276,7 @@ const rows = [
 ];
 rows.push(...x87Rows);
 rows.push(...numericStateRows);
-rows.push(...streamingRows, ...protectionRows, ...farRows);
+rows.push(...streamingRows, ...protectionRows, ...farRows, ...systemFlagRows);
 export const workloadNames = rows.map((row) => row.name);
 function check(actual, expected, label) {
   if (actual !== expected) throw Error(`${label}: expected ${expected}, received ${actual}`);
@@ -357,8 +358,9 @@ export async function measure(
     unavailable = [];
   for (const row of rows.filter((row) => workloads.includes(row.name))) {
     const n =
-      BigInt(Math.min(iterations, row.resume ? 3000 : (row.maxIterations ?? iterations))) *
-      BigInt(row.factor ?? 1);
+      BigInt(
+        Math.min(iterations, row.maxIterations ?? iterations, row.resume ? 3000 : iterations),
+      ) * BigInt(row.factor ?? 1);
     const displacement = -(row.body.length / 2 + 2),
       code = row.repeat
         ? hex(row.body)
@@ -388,12 +390,26 @@ export async function measure(
       requiresStreaming: !!row.requiresStreaming,
       requiresProtection: !!row.requiresProtection,
       requiresFar: !!row.requiresFar,
+      requiresSystemFlags: !!row.requiresSystemFlags,
+      step: !!row.step,
       ...(row.guestMemoryPerIteration
         ? { guestMemoryPerIteration: row.guestMemoryPerIteration }
         : {}),
     });
     try {
       for (const side of sides) {
+        if (
+          row.requiresSystemFlags &&
+          !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_flags')
+        ) {
+          if (side.label === 'current') throw Error('current build is missing system FLAGS');
+          unavailable.push({
+            side: side.label,
+            workload: row.name,
+            reason: 'system FLAGS unavailable',
+          });
+          continue;
+        }
         if (
           row.requiresFar &&
           !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_far_control')
@@ -486,12 +502,23 @@ export async function measure(
           let elapsedMs = 0;
           if (row.resume) {
             for (let i = 0n; i < budget; i++) {
+              const sourcePc = result?.state.rip ?? CODE;
               const callAt = performance.now();
               result = await side.cpu.run({ budget: 1n, repeatBudget: 0n });
               elapsedMs += performance.now() - callAt;
-              check(result.reason, 'budget', 'resume reason');
+              check(result.reason, row.step ? 'debug-exception' : 'budget', 'resume reason');
               check(result.retired, 1n, 'resume retired');
               check(result.remaining, 0n, 'resume remaining');
+              if (row.step) {
+                const trap = result.debugException;
+                check(trap?.vector, 1, 'step vector');
+                check(trap.class, 'trap', 'step class');
+                check(trap.cause, 'single-step', 'step cause');
+                check(trap.instructionPc, sourcePc, 'step source');
+                check(trap.resumePc, result.state.rip, 'step continuation');
+                check(trap.instructionCompleted, true, 'step completion');
+                check(trap.resumeFlags, result.state.flags, 'step saved flags');
+              }
               sum(totals, result.resources);
               sum(timings, result.timings);
             }
@@ -503,7 +530,7 @@ export async function measure(
             sum(timings, result.timings);
           }
           const wallMs = performance.now() - began;
-          check(result.reason, 'budget', 'reason');
+          check(result.reason, row.step ? 'debug-exception' : 'budget', 'reason');
           check(result.remaining, 0n, 'remaining');
           if (!row.resume) check(result.retired, budget, 'retired');
           check(result.repeatIterations, repeatBudget, 'repeated elements');
@@ -530,7 +557,13 @@ export async function measure(
             ])
               check(x87[field], expected.x87[field], `x87 ${field}`);
           }
-          check(result.state.flags & ~0xcd7n, 0n, 'valid flags');
+          check(
+            result.state.flags & ~(row.requiresSystemFlags ? 0x3d7fd7n : 0xcd7n),
+            0n,
+            'valid flags',
+          );
+          check(result.state.interruptibility?.sti ?? false, false, 'completed STI shadow');
+          check(result.state.interruptibility?.ss ?? false, false, 'completed SS shadow');
           const flagMask = row.flagMask ?? 0xcd7n;
           check(
             result.state.flags & flagMask,
