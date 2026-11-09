@@ -2,6 +2,7 @@ import { x87Rows } from './x87.mjs';
 import { numericStateRows } from './numeric-state.mjs';
 import { streamingRows } from './streaming.mjs';
 import { protectionRows } from './protection.mjs';
+import { farRows } from './far-control.mjs';
 
 const MASK64 = (1n << 64n) - 1n;
 const MASK128 = (1n << 128n) - 1n;
@@ -274,7 +275,7 @@ const rows = [
 ];
 rows.push(...x87Rows);
 rows.push(...numericStateRows);
-rows.push(...streamingRows, ...protectionRows);
+rows.push(...streamingRows, ...protectionRows, ...farRows);
 export const workloadNames = rows.map((row) => row.name);
 function check(actual, expected, label) {
   if (actual !== expected) throw Error(`${label}: expected ${expected}, received ${actual}`);
@@ -356,17 +357,24 @@ export async function measure(
     unavailable = [];
   for (const row of rows.filter((row) => workloads.includes(row.name))) {
     const n =
-      BigInt(row.resume ? Math.min(iterations, 3000) : iterations) * BigInt(row.factor ?? 1);
+      BigInt(Math.min(iterations, row.resume ? 3000 : (row.maxIterations ?? iterations))) *
+      BigInt(row.factor ?? 1);
     const displacement = -(row.body.length / 2 + 2),
       code = row.repeat
         ? hex(row.body)
-        : hex(row.body + 'e2' + (displacement & 255).toString(16).padStart(2, '0'));
+        : hex(
+            row.body +
+              'e2' +
+              (displacement & 255).toString(16).padStart(2, '0') +
+              (row.suffix ?? ''),
+          );
     if (displacement < -128) throw Error('benchmark loop exceeds rel8');
     const budget = row.repeat ? 1n : BigInt(row.instructions + 1) * n,
       repeatBudget = row.repeat ? n : 0n;
     const active = [];
     definitions.push({
       name: row.name,
+      profile: row.legacy ? 'protected32' : 'long64',
       code: Array.from(code, (b) => b.toString(16).padStart(2, '0')).join(''),
       iterations: n,
       instructions: budget,
@@ -379,12 +387,25 @@ export async function measure(
       requiresNumericState: !!row.requiresNumericState,
       requiresStreaming: !!row.requiresStreaming,
       requiresProtection: !!row.requiresProtection,
+      requiresFar: !!row.requiresFar,
       ...(row.guestMemoryPerIteration
         ? { guestMemoryPerIteration: row.guestMemoryPerIteration }
         : {}),
     });
     try {
       for (const side of sides) {
+        if (
+          row.requiresFar &&
+          !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_far_control')
+        ) {
+          if (side.label === 'current') throw Error('current build is missing far control');
+          unavailable.push({
+            side: side.label,
+            workload: row.name,
+            reason: 'far control unavailable',
+          });
+          continue;
+        }
         if (
           row.requiresProtection &&
           !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_protection')
@@ -487,7 +508,11 @@ export async function measure(
           if (!row.resume) check(result.retired, budget, 'retired');
           check(result.repeatIterations, repeatBudget, 'repeated elements');
           check(result.remainingRepeatBudget, 0n, 'remaining repeat budget');
-          check(result.state.rip, CODE + BigInt(code.length), 'RIP');
+          check(
+            result.state.rip,
+            CODE + BigInt(code.length - (row.suffix?.length ?? 0) / 2),
+            'RIP',
+          );
           checkArray(result.state.registers, expected.gpr, 'GPR');
           checkArray(side.cpu.readXmmState(), expected.xmm, 'XMM');
           check(side.cpu.readMxcsr(), expected.mxcsr, 'MXCSR');
@@ -526,9 +551,13 @@ export async function measure(
           ])
             check(result[field], undefined, field);
           row.verify?.(side.cpu, side.expectedContext);
-          check(totals.compilations, sample === 0 ? 1 : 0, 'compilations');
-          check(totals.dispatches, 0, 'dispatches');
-          check(totals.nativeEntries, row.resume ? Number(budget) : 1, 'native entries');
+          if (row.resources)
+            row.resources(totals, n, sample, result.resources, side.cpu.inspectTranslations());
+          else {
+            check(totals.compilations, sample === 0 ? 1 : 0, 'compilations');
+            check(totals.dispatches, 0, 'dispatches');
+            check(totals.nativeEntries, row.resume ? Number(budget) : 1, 'native entries');
+          }
           results.push({
             side: side.label,
             workload: row.name,
@@ -556,6 +585,6 @@ export async function measure(
     samples: results,
     limits,
     ceiling:
-      'Synthetic private-memory long64 kernels. Timings exclude reset/import/output guards, but include run snapshots and phase costs. FP loops include their recorded reset/control instructions. Undefined multiply/divide flags are masked. First completion is not an independent cold-start sample. No game/native-SIMD/peak-allocation claim.',
+      'Synthetic private-memory kernels in selected imported profiles. Timings exclude reset/import/output guards, but include run snapshots and phase costs. FP loops include their recorded reset/control instructions. Undefined multiply/divide flags are masked. First completion is not an independent cold-start sample. No game/native-SIMD/peak-allocation claim.',
   };
 }
