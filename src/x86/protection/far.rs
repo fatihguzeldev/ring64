@@ -263,13 +263,13 @@ pub fn execute(
 }
 
 #[derive(Clone, Copy)]
-struct Loaded {
-    lookup: Lookup,
-    descriptor: Descriptor,
+pub(super) struct Loaded {
+    pub lookup: Lookup,
+    pub descriptor: Descriptor,
 }
 
 impl Loaded {
-    fn cache(self) -> LoadedSegment {
+    pub fn cache(self) -> LoadedSegment {
         let d = self.descriptor;
         LoadedSegment {
             base: u64::from(d.base),
@@ -290,7 +290,7 @@ impl Loaded {
         }
     }
 
-    fn attributes(self) -> SegmentAttributes {
+    pub fn attributes(self) -> SegmentAttributes {
         let d = self.descriptor;
         SegmentAttributes {
             dpl: d.dpl(),

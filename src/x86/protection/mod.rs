@@ -4,6 +4,7 @@ use crate::memory::{Access, Cause, Image};
 
 mod access;
 mod descriptor;
+pub mod event;
 pub mod far;
 mod reload;
 mod task;
