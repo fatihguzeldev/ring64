@@ -53,7 +53,7 @@ fn far_snapshot_compatibility_retains_wide_non_cs_bases_and_arbitrary_ss_cache()
 #[test]
 fn far_snapshot_widening_does_not_relax_legacy_inputs_or_ia32e_fs_gs_canonicality() {
     let mut legacy = protected().to_json();
-    for root in ["cpl", "gdtr", "idtr", "ldtr"] {
+    for root in ["cpl", "gdtr", "idtr", "ldtr", "tr"] {
         legacy.as_object_mut().unwrap().remove(root);
     }
     for segment in Segment::ALL {
@@ -175,7 +175,7 @@ fn snapshot_partial_fields_and_legacy_aliases_never_select_shorthand_fallback() 
             ExecutionContext::from_json(&value).is_err(),
             "missing {key}"
         );
-        for root in ["cpl", "gdtr", "idtr", "ldtr"] {
+        for root in ["cpl", "gdtr", "idtr", "ldtr", "tr"] {
             value.as_object_mut().unwrap().remove(root);
         }
         assert!(

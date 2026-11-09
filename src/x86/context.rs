@@ -117,6 +117,15 @@ pub struct LdtRegister {
     pub attributes: u16,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TaskRegister {
+    pub selector: u16,
+    pub valid: bool,
+    pub base: u64,
+    pub limit: u32,
+    pub attributes: u16,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExecutionContext {
     mode: Mode,
@@ -127,6 +136,7 @@ pub struct ExecutionContext {
     gdtr: TableRegister,
     idtr: TableRegister,
     ldtr: LdtRegister,
+    tr: TaskRegister,
 }
 
 impl Default for ExecutionContext {
@@ -145,6 +155,7 @@ impl Default for ExecutionContext {
             gdtr: TableRegister::default(),
             idtr: TableRegister::default(),
             ldtr: LdtRegister::default(),
+            tr: TaskRegister::default(),
         };
         context.segments[Segment::Cs as usize].kind = SegmentType::ReadableCode;
         context.segments[Segment::Cs as usize].default32 = false;
@@ -207,6 +218,9 @@ impl ExecutionContext {
     pub fn ldtr(&self) -> LdtRegister {
         self.ldtr
     }
+    pub fn tr(&self) -> TaskRegister {
+        self.tr
+    }
     pub fn set_segment(
         &mut self,
         segment: Segment,
@@ -236,6 +250,11 @@ impl ExecutionContext {
     pub fn set_ldtr(&mut self, table: LdtRegister) -> bool {
         let changed = self.ldtr != table;
         self.ldtr = table;
+        changed
+    }
+    pub fn set_tr(&mut self, task: TaskRegister) -> bool {
+        let changed = self.tr != task;
+        self.tr = task;
         changed
     }
     pub fn code32(&self) -> bool {
@@ -381,3 +400,6 @@ mod snapshot;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod task_tests;

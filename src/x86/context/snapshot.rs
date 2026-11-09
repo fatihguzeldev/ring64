@@ -100,7 +100,7 @@ impl ExecutionContext {
             Some("compatibility") => Mode::Compatibility,
             _ => return Err(INVALID),
         };
-        let full = ["cpl", "gdtr", "idtr", "ldtr"]
+        let full = ["cpl", "gdtr", "idtr", "ldtr", "tr"]
             .iter()
             .any(|key| value.get(*key).is_some())
             || mode == Mode::Long64 && value.get("segments").is_some()
@@ -134,6 +134,15 @@ impl ExecutionContext {
                 limit: number(&ldtr["limit"], u64::from(u32::MAX))? as u32,
                 attributes: number(&ldtr["attributes"], 0xfff)? as u16,
             };
+            if let Some(tr) = value.get("tr") {
+                context.tr = TaskRegister {
+                    selector: number(&tr["selector"], u64::from(u16::MAX))? as u16,
+                    valid: boolean(&tr["valid"])?,
+                    base: system_base(&tr["base"], mode)?,
+                    limit: number(&tr["limit"], u64::from(u32::MAX))? as u32,
+                    attributes: number(&tr["attributes"], 0xfff)? as u16,
+                };
+            }
         } else if mode == Mode::Long64 {
             for (segment, key) in [(Segment::Fs, "fsBase"), (Segment::Gs, "gsBase")] {
                 let base = address(&value[key])?;
@@ -215,6 +224,8 @@ impl ExecutionContext {
             Mode::Compatibility=>"compatibility",Mode::Long64=>"long64",
         },"cpl":self.cpl,"segments":segments,"gdtr":root(self.gdtr),"idtr":root(self.idtr),
         "ldtr":{"selector":self.ldtr.selector,"valid":self.ldtr.valid,
-            "base":format!("0x{:x}",self.ldtr.base),"limit":self.ldtr.limit,"attributes":self.ldtr.attributes}})
+            "base":format!("0x{:x}",self.ldtr.base),"limit":self.ldtr.limit,"attributes":self.ldtr.attributes},
+        "tr":{"selector":self.tr.selector,"valid":self.tr.valid,
+            "base":format!("0x{:x}",self.tr.base),"limit":self.tr.limit,"attributes":self.tr.attributes}})
     }
 }

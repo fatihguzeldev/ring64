@@ -35,6 +35,76 @@ test('legacy context capture produces a complete deterministic owned snapshot', 
   assert.deepEqual(captured, longSnapshot(0x1234n));
 });
 
+test('task register output is required while older full input defaults to an invalid fresh cache', () => {
+  const source = longSnapshot();
+  Reflect.deleteProperty(source, 'tr');
+  const expected = {
+    ...source,
+    tr: { selector: 0, valid: false, base: 0n, limit: 0, attributes: 0 },
+  };
+  assert.deepEqual(captureContext(source), expected);
+  assert.deepEqual(captureContext({ mode: 'long64', fsBase: 0n, gsBase: 0n }), expected);
+});
+
+test('task register capture preserves bounded raw facts without normalizing their usability', () => {
+  const tr = {
+    selector: 0xffff,
+    valid: false,
+    base: 0xffffffffffffffffn,
+    limit: 0xffffffff,
+    attributes: 0xfff,
+  };
+  const source = { ...longSnapshot(), tr };
+  const expected = structuredClone(source);
+  const captured = captureContext(source);
+  assert.deepEqual(captured, expected);
+  const json = JSON.parse(
+    JSON.stringify(source, (_, value: unknown) =>
+      typeof value === 'bigint' ? `0x${value.toString(16)}` : value,
+    ),
+  ) as ContextInfo;
+  assert.deepEqual(contextFromJson(json), expected);
+  tr.base = 0n;
+  tr.attributes = 0;
+  assert.deepEqual(captured, expected);
+  assert.notEqual(captured.tr, tr);
+});
+
+test('task register presence selects full validation and malformed present values never default', () => {
+  for (const tr of [undefined, null, [], {}, 0, false]) {
+    assert.throws(() => captureContext({ ...longSnapshot(), tr } as ExecutionContext), TypeError);
+    assert.throws(
+      () => captureContext({ ...input(), tr } as ExecutionContext),
+      TypeError,
+      'TR cannot augment a legacy shorthand without the other full fields',
+    );
+  }
+  for (const [key, values] of [
+    ['selector', [-1, 0x10000, 1.5, '8']],
+    ['valid', [undefined, 0, 1]],
+    ['base', [-1n, 1n << 64n, 0]],
+    ['limit', [-1, 0x100000000, NaN]],
+    ['attributes', [-1, 0x1000, 1.5]],
+  ] as const) {
+    for (const value of values) {
+      const source = { ...longSnapshot(), tr: { ...longSnapshot().ldtr } };
+      Reflect.set(source.tr, key, value);
+      assert.throws(() => captureContext(source), TypeError, `invalid TR ${key}`);
+    }
+  }
+});
+
+test('task register base domain follows execution family without canonicalizing imported raw caches', () => {
+  for (const mode of ['long64', 'compatibility', 'protected', 'real'] as const) {
+    const source = { ...longSnapshot(), mode, tr: { ...longSnapshot().ldtr, base: 0x100000000n } };
+    source.segments.cs.long = mode === 'long64';
+    source.segments.cs.default32 = mode !== 'long64';
+    if (mode === 'long64' || mode === 'compatibility')
+      assert.equal(captureContext(source).tr.base, 0x100000000n);
+    else assert.throws(() => captureContext(source), TypeError);
+  }
+});
+
 test('far full compatibility snapshots retain raw non-CS bases and unusable or unusual SS', () => {
   for (const type of [
     'code',

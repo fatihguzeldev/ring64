@@ -37,6 +37,13 @@ export interface LdtRegister {
   limit: number;
   attributes: number;
 }
+export interface TaskRegister {
+  selector: number;
+  valid: boolean;
+  base: bigint;
+  limit: number;
+  attributes: number;
+}
 export interface ExecutionContextSnapshot {
   mode: ExecutionMode;
   cpl: number;
@@ -44,6 +51,7 @@ export interface ExecutionContextSnapshot {
   gdtr: TableRegister;
   idtr: TableRegister;
   ldtr: LdtRegister;
+  tr: TaskRegister;
 }
 export type LegacyExecutionContext =
   | { mode: 'long64'; fsBase: bigint; gsBase: bigint }
@@ -51,7 +59,8 @@ export type LegacyExecutionContext =
       mode: Exclude<ExecutionMode, 'long64'>;
       segments: Record<SegmentName, LoadedSegment>;
     };
-export type ExecutionContext = LegacyExecutionContext | ExecutionContextSnapshot;
+export type ExecutionContext =
+  LegacyExecutionContext | (Omit<ExecutionContextSnapshot, 'tr'> & { tr?: TaskRegister });
 
 export interface SegmentFault {
   instructionPc: bigint;
@@ -150,7 +159,7 @@ function captureTable(value: unknown, mode: ExecutionMode): TableRegister {
   const limit = source.limit;
   return { base: systemBase(base, mode), limit: integer(limit, 0xffff) };
 }
-function captureLdt(value: unknown, mode: ExecutionMode): LdtRegister {
+function captureSystemCache(value: unknown, mode: ExecutionMode): LdtRegister | TaskRegister {
   const source = record(value);
   const selector = source.selector;
   const valid = source.valid;
@@ -185,6 +194,7 @@ export function captureContext(context: ExecutionContext): ExecutionContextSnaps
   if (typeof modeValue !== 'string' || !MODES.includes(modeValue as ExecutionMode))
     throw new TypeError('invalid execution mode');
   const mode = modeValue as ExecutionMode;
+  const hasTr = 'tr' in source;
   const hasSegments = 'segments' in source;
   const inputs = {} as Record<SegmentName, Record<string, unknown>>;
   if (mode !== 'long64' || hasSegments) {
@@ -193,6 +203,7 @@ export function captureContext(context: ExecutionContext): ExecutionContextSnaps
   }
   const full =
     ['cpl', 'gdtr', 'idtr', 'ldtr'].some((key) => key in source) ||
+    hasTr ||
     (mode === 'long64' && hasSegments) ||
     SEGMENTS.some((name) => inputs[name] && EXTRA.some((key) => key in inputs[name]));
   if (full && ('fsBase' in source || 'gsBase' in source))
@@ -288,16 +299,23 @@ export function captureContext(context: ExecutionContext): ExecutionContextSnaps
     gdtr: full ? captureTable(source.gdtr, mode) : { base: 0n, limit: 0 },
     idtr: full ? captureTable(source.idtr, mode) : { base: 0n, limit: 0 },
     ldtr: full
-      ? captureLdt(source.ldtr, mode)
+      ? captureSystemCache(source.ldtr, mode)
+      : { selector: 0, valid: false, base: 0n, limit: 0, attributes: 0 },
+    tr: hasTr
+      ? captureSystemCache(source.tr, mode)
       : { selector: 0, valid: false, base: 0n, limit: 0, attributes: 0 },
   };
 }
 
-export type ContextInfo = Omit<ExecutionContextSnapshot, 'segments' | 'gdtr' | 'idtr' | 'ldtr'> & {
+export type ContextInfo = Omit<
+  ExecutionContextSnapshot,
+  'segments' | 'gdtr' | 'idtr' | 'ldtr' | 'tr'
+> & {
   segments: Record<SegmentName, Omit<SegmentSnapshot, 'base'> & { base: string }>;
   gdtr: Omit<TableRegister, 'base'> & { base: string };
   idtr: Omit<TableRegister, 'base'> & { base: string };
   ldtr: Omit<LdtRegister, 'base'> & { base: string };
+  tr: Omit<TaskRegister, 'base'> & { base: string };
 };
 
 // Rust publishes normalized owned JSON; convert only its address representation.
@@ -311,5 +329,6 @@ export function contextFromJson(value: ContextInfo): ExecutionContextSnapshot {
     gdtr: { ...value.gdtr, base: BigInt(value.gdtr.base) },
     idtr: { ...value.idtr, base: BigInt(value.idtr.base) },
     ldtr: { ...value.ldtr, base: BigInt(value.ldtr.base) },
+    tr: { ...value.tr, base: BigInt(value.tr.base) },
   });
 }

@@ -29,6 +29,7 @@ export type {
   SegmentSnapshot,
   TableRegister,
   LdtRegister,
+  TaskRegister,
   LoadedSegment,
   SegmentName,
   SegmentType,

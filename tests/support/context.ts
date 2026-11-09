@@ -31,6 +31,7 @@ export function longSnapshot(fsBase = 0n, gsBase = 0n): ExecutionContextSnapshot
     gdtr: { base: 0n, limit: 0 },
     idtr: { base: 0n, limit: 0 },
     ldtr: { selector: 0, valid: false, base: 0n, limit: 0, attributes: 0 },
+    tr: { selector: 0, valid: false, base: 0n, limit: 0, attributes: 0 },
   };
 }
 
