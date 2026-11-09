@@ -65,7 +65,7 @@ export interface ProtectionFault {
   instructionPc: bigint;
   vector: 11 | 12 | 13;
   errorCode: number;
-  phase: 'privilege' | 'selector' | 'descriptor';
+  phase: 'privilege' | 'selector' | 'descriptor' | 'target';
   selector?: number;
 }
 
@@ -153,6 +153,14 @@ type CoreExports = WebAssembly.Exports & {
     width: number,
     data: number,
     mask: number,
+    segment: number,
+  ): number;
+  core_far_control(
+    descriptor: number,
+    offset: bigint,
+    selector: number,
+    inputSp: bigint,
+    nextPc: bigint,
     segment: number,
   ): number;
   core_protection(descriptor: number, offset: bigint, input: bigint, segment: number): number;
@@ -410,6 +418,7 @@ export class Core {
       'core_masked_store',
       'core_clflush',
       'core_protection',
+      'core_far_control',
       'core_float',
       'core_load_mxcsr',
       'core_store_mxcsr',
@@ -656,6 +665,7 @@ export class Core {
         masked_store: this.#exports.core_masked_store,
         clflush: this.#exports.core_clflush,
         protection: this.#exports.core_protection,
+        far_control: this.#exports.core_far_control,
         target_check: this.#exports.core_target_check,
         multiply_high: this.#exports.core_multiply_high,
         divide: this.#exports.core_divide,

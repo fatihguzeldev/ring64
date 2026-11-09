@@ -11,6 +11,7 @@ use super::layout::{
 };
 
 mod context;
+mod far_control;
 mod mapped;
 mod mmx;
 mod numeric;

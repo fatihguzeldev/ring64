@@ -1,4 +1,5 @@
 use super::*;
+mod far_bridge;
 mod protection_bridge;
 mod streaming_bridge;
 mod x87_bridge;
