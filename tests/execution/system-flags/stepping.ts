@@ -7,10 +7,13 @@ import {
   same,
   equal,
   bytes,
+  hex,
+  CODE32,
   CODE64,
   preserveNumeric,
   type Scenario,
 } from './fixture.js';
+import { loadedCode } from '../far-control/fixture.js';
 
 export function steppingScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
@@ -18,36 +21,46 @@ export function steppingScenarios(compiler: WebAssembly.Module): Scenario[] {
       name: 'system POPF samples incoming TF and traps before exhausted budget or stop',
       async run() {
         for (const incoming of [false, true])
-          for (const stop of [false, true]) {
-            await using(
-              compiler,
-              '9d90',
-              snapshot(),
-              async (cpu) => {
-                const numeric = preserveNumeric(cpu);
-                cpu.setState(initial(0x1000n, { 4: 0x6000n }, incoming ? 0x102n : 2n));
-                const pop = await cpu.run({
-                  budget: 1n,
-                  repeatBudget: 7n,
-                  ...(stop ? { stop: 0x1001n } : {}),
-                });
-                outcome(pop, incoming ? 'debug-exception' : 'budget', 1n, 1n, 7n);
-                equal(pop.state.flags, incoming ? 2n : 0x302n, 'popped flags');
-                equal(pop.state.registers[4], 0x6008n, 'one flags pop');
-                if (incoming) debug(pop, 0x1000n, 0x1001n, true, 2n);
-                else {
-                  equal(pop.debugException, undefined, 'POPF does not step newly set TF');
-                  const nop = await cpu.run({ budget: 1n, repeatBudget: 7n, stop: 0x1002n });
-                  outcome(nop, 'debug-exception', 1n, 1n, 7n);
-                  debug(nop, 0x1001n, 0x1002n, true, 0x302n);
-                }
-                const gated = await cpu.run({ budget: 0n });
-                equal(gated.debugException, undefined, 'trap not redelivered at gate');
-                numeric();
-              },
-              { data: [{ base: 0x6000n, bytes: bytes(incoming ? 2n : 0x302n, 8), write: false }] },
-            );
-          }
+          for (const budget of [1n, 2n])
+            for (const stop of [false, true]) {
+              await using(
+                compiler,
+                '9d90',
+                snapshot(),
+                async (cpu) => {
+                  const numeric = preserveNumeric(cpu);
+                  cpu.setState(initial(0x1000n, { 4: 0x6000n }, incoming ? 0x102n : 2n));
+                  const pop = await cpu.run({
+                    budget,
+                    repeatBudget: 7n,
+                    ...(stop ? { stop: incoming || budget === 1n ? 0x1001n : 0x1002n } : {}),
+                  });
+                  outcome(
+                    pop,
+                    incoming || budget === 2n ? 'debug-exception' : 'budget',
+                    budget,
+                    incoming || budget === 1n ? 1n : 2n,
+                    7n,
+                  );
+                  equal(pop.state.flags, incoming ? 2n : 0x302n, 'popped flags');
+                  equal(pop.state.registers[4], 0x6008n, 'one flags pop');
+                  if (incoming) debug(pop, 0x1000n, 0x1001n, true, 2n);
+                  else if (budget === 2n) debug(pop, 0x1001n, 0x1002n, true, 0x302n);
+                  else {
+                    equal(pop.debugException, undefined, 'POPF does not step newly set TF');
+                    const nop = await cpu.run({ budget: 1n, repeatBudget: 7n, stop: 0x1002n });
+                    outcome(nop, 'debug-exception', 1n, 1n, 7n);
+                    debug(nop, 0x1001n, 0x1002n, true, 0x302n);
+                  }
+                  const gated = await cpu.run({ budget: 0n });
+                  equal(gated.debugException, undefined, 'trap not redelivered at gate');
+                  numeric();
+                },
+                {
+                  data: [{ base: 0x6000n, bytes: bytes(incoming ? 2n : 0x302n, 8), write: false }],
+                },
+              );
+            }
       },
     },
     {
@@ -60,9 +73,11 @@ export function steppingScenarios(compiler: WebAssembly.Module): Scenario[] {
           'return',
           'far-jump',
           'far-call',
+          'far-compat',
+          'far-long',
           'outer',
         ] as const) {
-          const execution = snapshot();
+          const execution = snapshot(kind === 'far-long' ? 'compatibility' : 'long64');
           if (kind.startsWith('far')) execution.segments.cs.selector = 0x18;
           const code = {
             direct: 'e9fb1f0000',
@@ -71,17 +86,20 @@ export function steppingScenarios(compiler: WebAssembly.Module): Scenario[] {
             return: 'c3',
             'far-jump': '48ff2b',
             'far-call': '48ff1b',
+            'far-compat': '48ff2b',
+            'far-long': 'ff2b',
             outer: '48cb',
           }[kind];
+          const descriptor = kind === 'far-compat' ? CODE32 : CODE64;
           const data = [
             {
               base: 0x4008n,
-              bytes: kind === 'outer' ? 'ffff000000fbaf00ffff000000f3cf00' : CODE64,
+              bytes: kind === 'outer' ? 'ffff000000fbaf00ffff000000f3cf00' : descriptor,
             },
             {
               base: 0x6000n,
               bytes:
-                bytes(0x3000n, 8) +
+                bytes(0x3000n, kind === 'far-long' ? 4 : 8) +
                 (kind === 'outer'
                   ? bytes(0x0bn, 8) + bytes(0x7000n, 8) + bytes(0x13n, 8)
                   : '0800' + 'a5'.repeat(22)),
@@ -129,6 +147,26 @@ export function steppingScenarios(compiler: WebAssembly.Module): Scenario[] {
                 );
               if (kind.startsWith('far'))
                 equal(cpu.readContext().segments.cs.selector, 8, 'new code descriptor');
+              if (kind === 'far-compat' || kind === 'far-long') {
+                same(
+                  cpu.readContext(),
+                  {
+                    ...execution,
+                    mode: kind === 'far-long' ? 'long64' : 'compatibility',
+                    segments: {
+                      ...execution.segments,
+                      cs: loadedCode(kind === 'far-long' ? 64 : 32),
+                    },
+                  },
+                  'complete submode context precedes trap',
+                );
+                same(cpu.readMemory(0x4008n, 8), hex(descriptor), 'descriptor unchanged');
+                same(
+                  cpu.readMemory(0x6000n, data[1]!.bytes.length / 2),
+                  hex(data[1]!.bytes),
+                  'captured source and guards unchanged',
+                );
+              }
               if (kind === 'outer') {
                 equal(cpu.readContext().cpl, 3, 'outer CPL published');
                 equal(cpu.readContext().segments.ss.selector, 0x13, 'outer SS published');
@@ -137,6 +175,12 @@ export function steppingScenarios(compiler: WebAssembly.Module): Scenario[] {
               outcome(faulted, 'fetch-fault', 1n, 0n);
               equal(faulted.fault?.instructionPc, 0x3000n, 'later target fetch');
               equal(faulted.debugException, undefined, 'no trap for failed fetch');
+              if (kind === 'far-compat' || kind === 'far-long')
+                same(
+                  faulted.state,
+                  result.state,
+                  'new submode fetch failure preserves trap continuation',
+                );
               numeric();
             },
             { data },
