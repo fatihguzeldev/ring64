@@ -25,6 +25,8 @@ const layout = {
   rip: 136,
   remaining: 144,
   repeatRemaining: 168,
+  interruptibility: 164,
+  interruptibilityBytes: 4,
   xmm: 176,
   xmmBytes: 256,
   vectorScratch: 432,

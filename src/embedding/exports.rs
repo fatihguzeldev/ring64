@@ -18,6 +18,7 @@ mod numeric;
 mod numeric_image;
 mod protection;
 mod streaming;
+mod system_flags;
 mod vector;
 mod x87;
 mod x87_state;
@@ -35,6 +36,7 @@ struct Core {
     general_protection: Option<numeric::GeneralProtectionFault>,
     protection_fault: Option<crate::x86::protection::ProtectionFault>,
     system_memory_fault: Option<crate::x86::protection::SystemMemoryFault>,
+    debug_exception: Option<system_flags::DebugException>,
 }
 
 #[derive(Default)]
@@ -106,6 +108,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             general_protection: None,
             protection_fault: None,
             system_memory_fault: None,
+            debug_exception: None,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
         0
@@ -132,13 +135,23 @@ pub extern "C" fn core_import_state() -> i32 {
             flags: word(std::mem::offset_of!(RunState, flags)),
             rip: word(std::mem::offset_of!(RunState, rip)),
         };
+        let offset = std::mem::offset_of!(RunState, interruptibility);
+        let interruptibility =
+            u32::from_le_bytes(bridge.input[offset..offset + 4].try_into().unwrap());
         if let Err(message) = state.validate() {
             return bridge.error(message);
+        }
+        if !crate::x86::flags::valid_interruptibility(state.flags, interruptibility) {
+            return bridge.error("invalid interruptibility for imported flags");
         }
         let core = bridge.core.as_mut().unwrap();
         // generated execution is suspended for every export call. no reference to
         // this foreign-mutable buffer survives the call back into generated wasm.
-        unsafe { (&mut *core.state.get()).import(state) };
+        unsafe {
+            let target = &mut *core.state.get();
+            target.import(state);
+            target.interruptibility = interruptibility;
+        };
         core.fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
@@ -147,6 +160,7 @@ pub extern "C" fn core_import_state() -> i32 {
         core.system_memory_fault = None;
         core.divide_failed = false;
         core.segment_fault = None;
+        core.debug_exception = None;
         0
     })
 }
@@ -163,6 +177,7 @@ pub extern "C" fn core_clear_fault() {
         core.system_memory_fault = None;
         core.divide_failed = false;
         core.segment_fault = None;
+        core.debug_exception = None;
         unsafe {
             (*core.state.get()).target = 0;
             (*core.state.get()).fault_segment = Segment::Cs as u32;
@@ -338,6 +353,10 @@ pub extern "C" fn core_fault_info(reason: i32) {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_ref().unwrap();
         let fault = match reason {
+            super::layout::DEBUG_EXCEPTION => core
+                .debug_exception
+                .as_ref()
+                .map(system_flags::DebugException::json),
             super::layout::X87_EXCEPTION => unsafe {
                 x87_state::exception_json(&(*core.state.get()).x87)
             },

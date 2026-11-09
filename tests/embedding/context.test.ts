@@ -45,7 +45,12 @@ test('default context and identical imports preserve raw State and warm owners',
     cpu.setState(state);
     cpu.setContext({ gsBase: 0n, mode: 'long64', fsBase: 0n });
     assert.deepEqual(cpu.readState(), state);
-    assert.deepEqual(Object.keys(cpu.readState()).sort(), ['flags', 'registers', 'rip']);
+    assert.deepEqual(Object.keys(cpu.readState()).sort(), [
+      'flags',
+      'interruptibility',
+      'registers',
+      'rip',
+    ]);
     assert.deepEqual(cpu.inspectTranslations(), owners);
     const again = await cpu.run({ budget: 1n });
     assert.equal(again.resources.compilations, 0);

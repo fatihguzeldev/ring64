@@ -48,7 +48,7 @@ export function initial(rip = CODE, registers: Record<number, bigint> = {}, flag
   const banks = Array.from({ length: 16 }, (_, index) => 0x1122334400000000n + BigInt(index));
   banks[3] = DATA;
   for (const [index, value] of Object.entries(registers)) banks[Number(index)] = value;
-  return { registers: banks, flags, rip };
+  return { registers: banks, flags, rip, interruptibility: { sti: false, ss: false } };
 }
 
 export function changed(
@@ -59,7 +59,14 @@ export function changed(
 ): State {
   const banks = [...input.registers];
   for (const [index, value] of Object.entries(registers)) banks[Number(index)] = value;
-  return { registers: banks, flags, rip };
+  return {
+    registers: banks,
+    flags,
+    rip,
+    interruptibility: input.interruptibility
+      ? { ...input.interruptibility }
+      : { sti: false, ss: false },
+  };
 }
 
 export function state(actual: State, expected: State): void {

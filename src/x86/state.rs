@@ -17,8 +17,8 @@ impl Default for State {
 
 impl State {
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.flags & !0xcd7 != 0 {
-            return Err("flags contain bits outside the imported arithmetic and direction context");
+        if self.flags & !super::flags::IMPORTED_MASK != 0 {
+            return Err("flags contain reserved bits or the mode-owned VM bit");
         }
         if self.flags & 2 == 0 {
             return Err("flags must contain reserved bit one");
@@ -30,6 +30,30 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::State;
+
+    #[test]
+    fn system_flags_are_importable_without_a_second_vm_authority() {
+        for flags in [0x102, 0x202, 0x1002, 0x3d7fd7] {
+            assert_eq!(
+                State {
+                    flags,
+                    ..State::default()
+                }
+                .validate(),
+                Ok(())
+            );
+        }
+        for flags in [0x20002, 0x8002, 0x400002] {
+            assert!(
+                State {
+                    flags,
+                    ..State::default()
+                }
+                .validate()
+                .is_err()
+            );
+        }
+    }
 
     #[test]
     fn imported_state_admits_raw_register_and_instruction_pointer_bits() {
@@ -44,8 +68,8 @@ mod tests {
     }
 
     #[test]
-    fn imported_flags_require_bit_one_and_exclude_controls_and_reserved_bits() {
-        for flags in [0, 1, 0x8d5, 0xcd5, 0x102, 0x202, u64::MAX] {
+    fn imported_flags_require_bit_one_and_exclude_vm_and_reserved_bits() {
+        for flags in [0, 1, 0x8d5, 0xcd5, 0x8002, 0x20002, u64::MAX] {
             assert!(
                 State {
                     flags,

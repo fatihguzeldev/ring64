@@ -35,6 +35,7 @@ function state(): State {
     registers: Array.from({ length: 16 }, (_, index) => BigInt(index + 3)),
     flags: 2n,
     rip: CODE,
+    interruptibility: { sti: false, ss: false },
   };
 }
 

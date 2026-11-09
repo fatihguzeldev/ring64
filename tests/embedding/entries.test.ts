@@ -23,6 +23,7 @@ function state(rip: bigint): State {
     registers: Array.from({ length: 16 }, (_, index) => 0x1122334400000000n + BigInt(index)),
     flags: 0x8d7n,
     rip,
+    interruptibility: { sti: false, ss: false },
   };
 }
 

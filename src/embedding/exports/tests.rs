@@ -2,6 +2,7 @@ use super::*;
 mod far_bridge;
 mod protection_bridge;
 mod streaming_bridge;
+mod system_flags;
 mod x87_bridge;
 use crate::embedding::layout::{BUDGET, DATA, DISPATCH, DIVIDE_ERROR, REPEAT_BUDGET, STOP};
 
@@ -133,6 +134,7 @@ fn importing_state_cannot_import_a_stale_runtime_target() {
         bridge.input[flags..flags + 8].copy_from_slice(&0x8d7_u64.to_le_bytes());
         let rip = std::mem::offset_of!(RunState, rip);
         bridge.input[rip..rip + 8].copy_from_slice(&0x1000_u64.to_le_bytes());
+        bridge.input[164..168].copy_from_slice(&0_u32.to_le_bytes());
     });
     assert_eq!(core_import_state(), 0);
     BRIDGE.with_borrow(|bridge| {

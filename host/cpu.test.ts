@@ -16,15 +16,81 @@ test('CPU construction cannot bypass the factory lifecycle owner', () => {
   assert.throws(() => Reflect.construct(Cpu, [null, limits, 0]), /factory|createCpu/);
 });
 
-type Step = { reason: string; remaining: bigint; repeatRemaining: bigint };
+test('debug trap result retains the completed source and prepared continuation separately', async () => {
+  const { cpu } = await fixture([
+    { reason: 'debug-exception', remaining: 0n, repeatRemaining: 7n, rip: 0x2000n },
+  ]);
+  try {
+    const result = await cpu.run({ budget: 1n, repeatBudget: 7n, stop: 0x2000n });
+    assert.equal(result.reason, 'debug-exception');
+    assert.equal(result.retired, 1n);
+    assert.equal(result.remaining, 0n);
+    assert.equal(result.remainingRepeatBudget, 7n);
+    assert.equal(result.state.rip, 0x2000n);
+    assert.deepEqual(result.debugException, {
+      vector: 1,
+      class: 'trap',
+      cause: 'single-step',
+      instructionPc: 0x1000n,
+      resumePc: 0x2000n,
+      instructionCompleted: true,
+      resumeFlags: 0x102n,
+    });
+    assert.equal(result.fault, undefined);
+  } finally {
+    cpu.dispose();
+  }
+});
+
+test('boundary getters cannot publish an outer state import after run or disposal', async () => {
+  for (const action of ['run', 'dispose'] as const) {
+    const { cpu, stateImports } = await fixture([
+      { reason: 'budget', remaining: 0n, repeatRemaining: 1n },
+    ]);
+    let pending: Promise<unknown> | undefined;
+    const source = {
+      registers: Array<bigint>(16).fill(9n),
+      flags: 2n,
+      rip: 0x3000n,
+      interruptibility: {
+        get sti() {
+          if (action === 'run') pending = cpu.run({ budget: 1n, repeatBudget: 1n });
+          else cpu.dispose();
+          return false;
+        },
+        ss: true,
+      },
+    };
+    assert.throws(() => cpu.setState(source), action === 'run' ? /running/ : /disposed/);
+    assert.deepEqual(stateImports, []);
+    if (pending) await pending;
+    if (action === 'dispose') assert.throws(() => cpu.readState(), /disposed/);
+    cpu.dispose();
+  }
+});
+
+type Step = { reason: string; remaining: bigint; repeatRemaining: bigint; rip?: bigint };
 
 async function fixture(steps: Step[] = []) {
   let current = { rip: 0x1000n, remaining: 0n, repeatRemaining: 0n };
   let xmm = Array<bigint>(16).fill(0n);
   const entries: { budget: bigint; repeatBudget: bigint | undefined }[] = [];
+  const stateImports: unknown[] = [];
   const engine = {
     current: () => current,
     snapshot: () => ({ registers: Array<bigint>(16).fill(0n), flags: 2n, rip: current.rip }),
+    setState(state: unknown) {
+      stateImports.push(state);
+    },
+    debugException: () => ({
+      vector: 1,
+      class: 'trap',
+      cause: 'single-step',
+      instructionPc: 0x1000n,
+      resumePc: 0x2000n,
+      instructionCompleted: true,
+      resumeFlags: 0x102n,
+    }),
     readXmmState: () => [...xmm],
     setXmmState: (bank: bigint[]) => {
       xmm = [...bank];
@@ -70,7 +136,7 @@ async function fixture(steps: Step[] = []) {
       ram: { base: 0x8000n, bytes: new Uint8Array(1) },
       limits,
     });
-    return { cpu, entries };
+    return { cpu, entries, stateImports };
   } finally {
     Core.create = create;
   }

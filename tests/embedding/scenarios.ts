@@ -80,7 +80,7 @@ export function embeddingScenarios(core: WebAssembly.Module): Scenario[] {
         await using('b801000000', async (cpu) => {
           const input = initial();
           cpu.setState(input);
-          for (const flags of [0n, 0x202n, 0x1002n, 1n << 64n]) {
+          for (const flags of [0n, 0x8002n, 0x20002n, 1n << 64n]) {
             throws(() => cpu.setState({ ...input, flags }), 'invalid imported flags');
             state(cpu.readState(), input);
           }

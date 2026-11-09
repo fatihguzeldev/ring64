@@ -21,7 +21,7 @@ const limits: Limits = {
 function state(seed = 0x1122_3344_0000_0000n, flags = 2n): State {
   const registers = Array.from({ length: 16 }, (_, index) => seed + BigInt(index));
   registers[3] = RAM;
-  return { registers, flags, rip: CODE };
+  return { registers, flags, rip: CODE, interruptibility: { sti: false, ss: false } };
 }
 
 test('large host copies grow core memory without invalidating state or cached generated code', async () => {

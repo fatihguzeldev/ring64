@@ -21,6 +21,26 @@ export interface State {
   registers: bigint[];
   flags: bigint;
   rip: bigint;
+  interruptibility?: Interruptibility;
+}
+
+export interface Interruptibility {
+  sti: boolean;
+  ss: boolean;
+}
+
+export interface StateSnapshot extends State {
+  interruptibility: Interruptibility;
+}
+
+export interface DebugException {
+  vector: 1;
+  class: 'trap';
+  cause: 'single-step';
+  instructionPc: bigint;
+  resumePc: bigint;
+  instructionCompleted: boolean;
+  resumeFlags: bigint;
 }
 
 export interface Fault {
@@ -118,6 +138,8 @@ interface Layout {
   rip: number;
   remaining: number;
   repeatRemaining: number;
+  interruptibility: number;
+  interruptibilityBytes: number;
   reasons: string[];
 }
 
@@ -162,6 +184,13 @@ type CoreExports = WebAssembly.Exports & {
     inputSp: bigint,
     nextPc: bigint,
     segment: number,
+  ): number;
+  core_flags(operation: number, flags: bigint, input: bigint): number;
+  core_debug_step(
+    instructionPc: bigint,
+    resumePc: bigint,
+    instructionCompleted: number,
+    flags: bigint,
   ): number;
   core_protection(descriptor: number, offset: bigint, input: bigint, segment: number): number;
   core_clflush(offset: bigint, segment: number): number;
@@ -237,7 +266,7 @@ export function byteLength(value: unknown, name: string): asserts value is numbe
   }
 }
 
-export function captureState(state: State): State {
+export function captureState(state: State): StateSnapshot {
   const source = state.registers;
   if (!Array.isArray(source) || source.length !== 16)
     throw new TypeError('state requires sixteen registers');
@@ -251,7 +280,18 @@ export function captureState(state: State): State {
   unsigned64(flags, 'flags');
   const rip = state.rip;
   unsigned64(rip, 'rip');
-  return { registers, flags, rip };
+  const boundary = state.interruptibility;
+  let interruptibility: Interruptibility = { sti: false, ss: false };
+  if (boundary !== undefined) {
+    if (boundary === null || typeof boundary !== 'object' || Array.isArray(boundary))
+      throw new TypeError('interruptibility must contain boolean sti and ss');
+    const sti = boundary.sti;
+    const ss = boundary.ss;
+    if (typeof sti !== 'boolean' || typeof ss !== 'boolean')
+      throw new TypeError('interruptibility must contain boolean sti and ss');
+    interruptibility = { sti, ss };
+  }
+  return { registers, flags, rip, interruptibility };
 }
 
 export function captureMxcsr(value: number): number {
@@ -339,6 +379,8 @@ export class Core {
       'rip',
       'remaining',
       'repeatRemaining',
+      'interruptibility',
+      'interruptibilityBytes',
     ] as const) {
       if (
         !Number.isSafeInteger(this.#layout[name]) ||
@@ -362,6 +404,8 @@ export class Core {
       layout.rip !== 136 ||
       layout.remaining !== 144 ||
       layout.repeatRemaining !== 168 ||
+      layout.interruptibility !== 164 ||
+      layout.interruptibilityBytes !== 4 ||
       layout.xmm < layout.scalarSize ||
       layout.xmmBytes !== 256 ||
       layout.xmm + layout.xmmBytes > layout.size ||
@@ -419,6 +463,8 @@ export class Core {
       'core_clflush',
       'core_protection',
       'core_far_control',
+      'core_flags',
+      'core_debug_step',
       'core_float',
       'core_load_mxcsr',
       'core_store_mxcsr',
@@ -503,14 +549,19 @@ export class Core {
     return new DataView(this.#exports.memory.buffer, this.#statePointer, this.#layout.size);
   }
 
-  snapshot(): State {
+  snapshot(): StateSnapshot {
     const view = this.stateView();
+    const interruptibility = view.getUint32(this.#layout.interruptibility, true);
     return {
       registers: Array.from({ length: 16 }, (_, i) =>
         view.getBigUint64(this.#layout.registers + i * 8, true),
       ),
       flags: view.getBigUint64(this.#layout.flags, true),
       rip: view.getBigUint64(this.#layout.rip, true),
+      interruptibility: {
+        sti: (interruptibility & 1) !== 0,
+        ss: (interruptibility & 2) !== 0,
+      },
     };
   }
 
@@ -523,6 +574,11 @@ export class Core {
     }
     view.setBigUint64(this.#layout.flags, input.flags, true);
     view.setBigUint64(this.#layout.rip, input.rip, true);
+    view.setUint32(
+      this.#layout.interruptibility,
+      Number(input.interruptibility.sti) | (Number(input.interruptibility.ss) << 1),
+      true,
+    );
     if (this.#exports.core_import_state() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
   }
@@ -666,6 +722,8 @@ export class Core {
         clflush: this.#exports.core_clflush,
         protection: this.#exports.core_protection,
         far_control: this.#exports.core_far_control,
+        flags: this.#exports.core_flags,
+        debug_step: this.#exports.core_debug_step,
         target_check: this.#exports.core_target_check,
         multiply_high: this.#exports.core_multiply_high,
         divide: this.#exports.core_divide,
@@ -794,6 +852,24 @@ export class Core {
     return {
       ...this.info<Omit<ProtectionFault, 'instructionPc'>>(),
       instructionPc: this.current().rip,
+    };
+  }
+
+  debugException(reason: string): DebugException | undefined {
+    if (reason !== 'debug-exception') return undefined;
+    this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
+    const raw = this.info<
+      Omit<DebugException, 'instructionPc' | 'resumePc' | 'resumeFlags'> & {
+        instructionPc: string;
+        resumePc: string;
+        resumeFlags: string;
+      }
+    >();
+    return {
+      ...raw,
+      instructionPc: BigInt(raw.instructionPc),
+      resumePc: BigInt(raw.resumePc),
+      resumeFlags: BigInt(raw.resumeFlags),
     };
   }
 

@@ -19,9 +19,10 @@ pub const GENERAL_PROTECTION: i32 = 14;
 pub const X87_EXCEPTION: i32 = 15;
 pub const PROTECTION: i32 = 16;
 pub const SYSTEM_MEMORY: i32 = 17;
+pub const DEBUG_EXCEPTION: i32 = 18;
 pub const SCALAR_STATE_SIZE: usize = 176;
 
-pub const REASONS: [&str; 18] = [
+pub const REASONS: [&str; 19] = [
     "dispatch",
     "budget",
     "stop",
@@ -40,6 +41,7 @@ pub const REASONS: [&str; 18] = [
     "x87-exception",
     "protection-fault",
     "system-memory-fault",
+    "debug-exception",
 ];
 
 #[repr(C)]
@@ -50,6 +52,7 @@ pub struct RunState {
     pub remaining: u64,
     pub target: u64,
     pub fault_segment: u32,
+    pub interruptibility: u32,
     pub repeat_remaining: u64,
     pub xmm: [[u8; 16]; 16],
     pub vector_scratch: [u8; 16],
@@ -66,6 +69,7 @@ impl Default for RunState {
             remaining: 0,
             target: 0,
             fault_segment: 0,
+            interruptibility: 0,
             repeat_remaining: 0,
             xmm: [[0; 16]; 16],
             vector_scratch: [0; 16],
@@ -83,6 +87,7 @@ impl RunState {
         self.remaining = 0;
         self.target = 0;
         self.fault_segment = 0;
+        self.interruptibility = 0;
         self.repeat_remaining = 0;
     }
 
@@ -113,6 +118,8 @@ impl RunState {
             "remaining": std::mem::offset_of!(Self, remaining),
             "repeatRemaining": std::mem::offset_of!(Self, repeat_remaining),
             "faultSegment": std::mem::offset_of!(Self, fault_segment),
+            "interruptibility": std::mem::offset_of!(Self, interruptibility),
+            "interruptibilityBytes": size_of::<u32>(),
             "reasons": REASONS,
         })
     }
@@ -121,6 +128,22 @@ impl RunState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn interruptibility_uses_scalar_padding_without_moving_any_numeric_state() {
+        assert_eq!(std::mem::offset_of!(RunState, interruptibility), 164);
+        assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
+        assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
+        assert_eq!(size_of::<RunState>(), 560);
+        assert_eq!(REASONS[18], "debug-exception");
+        assert_eq!(RunState::descriptor()["interruptibilityBytes"], 4);
+        let mut state = RunState {
+            interruptibility: 2,
+            ..RunState::default()
+        };
+        state.import(State::default());
+        assert_eq!(state.interruptibility, 0);
+    }
 
     #[test]
     fn x87_projection_appends_after_mxcsr_and_scalar_import_preserves_pending_and_ghosts() {

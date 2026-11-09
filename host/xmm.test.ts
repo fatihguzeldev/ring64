@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { captureXmmState, Core } from './core.js';
+import { captureXmmState, Core, type Interruptibility } from './core.js';
 import { createCpu } from './cpu.js';
 import { captureInitialMemory } from './memory.js';
 
@@ -26,6 +26,8 @@ const layout = {
   rip: 136,
   remaining: 144,
   repeatRemaining: 168,
+  interruptibility: 164,
+  interruptibilityBytes: 4,
   xmm: 176,
   xmmBytes: 256,
   vectorScratch: 432,
@@ -88,6 +90,9 @@ async function mockedCore(
       assert.equal(inputLength, 176);
       new Uint8Array(memory.buffer, statePointer, 144).set(
         new Uint8Array(memory.buffer, inputPointer, 144),
+      );
+      new Uint8Array(memory.buffer, statePointer + 164, 4).set(
+        new Uint8Array(memory.buffer, inputPointer + 164, 4),
       );
       return 0;
     },
@@ -179,6 +184,8 @@ test('XMM layout rejects incompatible extents and cleans up the initialized core
     { ...layout, scalarSize: 448 },
     { ...layout, xmm: 193 },
     { ...layout, vectorScratch: 431 },
+    { ...layout, interruptibility: 160 },
+    { ...layout, interruptibilityBytes: 8 },
   ]) {
     const fixture = await mockedCore(descriptor);
     assert.ok(fixture.error instanceof Error);
@@ -195,8 +202,45 @@ test('XMM layout rejects incompatible extents and cleans up the initialized core
   }
 });
 
-test('required wide arithmetic helpers reject construction before core initialization', async () => {
-  for (const name of ['core_multiply_high', 'core_divide', 'core_divide_failed']) {
+test('scalar boundary transport uses existing padding and returns detached snapshots', async () => {
+  const fixture = await mockedCore();
+  assert.ok(fixture.core);
+  const { core, memory } = fixture;
+  try {
+    for (const [interruptibility, bits] of [
+      [{ sti: false, ss: false }, 0],
+      [{ sti: true, ss: false }, 1],
+      [{ sti: false, ss: true }, 2],
+    ] as [Interruptibility, number][]) {
+      core.setState({
+        registers: Array<bigint>(16).fill(9n),
+        flags: 0x202n,
+        rip: 0x1000n,
+        interruptibility,
+      });
+      assert.equal(new DataView(memory.buffer).getUint32(8192 + 164, true), bits);
+      const snapshot = core.snapshot();
+      assert.deepEqual(snapshot.interruptibility, interruptibility);
+      snapshot.interruptibility.sti = !snapshot.interruptibility.sti;
+      snapshot.registers[0] = 99n;
+      assert.deepEqual(core.snapshot().interruptibility, interruptibility);
+      assert.equal(core.snapshot().registers[0], 9n);
+    }
+    core.setState({ registers: Array<bigint>(16).fill(1n), flags: 2n, rip: 0x2000n });
+    assert.deepEqual(core.snapshot().interruptibility, { sti: false, ss: false });
+  } finally {
+    core.dispose();
+  }
+});
+
+test('required arithmetic and boundary helpers reject construction before core initialization', async () => {
+  for (const name of [
+    'core_multiply_high',
+    'core_divide',
+    'core_divide_failed',
+    'core_flags',
+    'core_debug_step',
+  ]) {
     const missing = await mockedCore(layout, 8192, undefined, name);
     missing.core?.dispose();
     assert.match(String(missing.error), new RegExp(name));

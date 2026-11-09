@@ -21,6 +21,8 @@ import {
   type SystemMemoryFault,
   type Span,
   type State,
+  type StateSnapshot,
+  type DebugException,
 } from './core.js';
 import { Translations, type Artifact } from './translations.js';
 import {
@@ -65,7 +67,7 @@ export interface RunResult {
   remaining: bigint;
   repeatIterations: bigint;
   remainingRepeatBudget: bigint;
-  state: State;
+  state: StateSnapshot;
   fault?: Fault;
   segmentFault?: SegmentFault;
   alignmentFault?: AlignmentFault;
@@ -74,6 +76,7 @@ export interface RunResult {
   x87Exception?: X87Exception;
   protectionFault?: ProtectionFault;
   systemMemoryFault?: SystemMemoryFault;
+  debugException?: DebugException;
   resources: {
     compilations: number;
     cacheHits: number;
@@ -262,7 +265,7 @@ export class Cpu {
     this.requireIdle();
     this.engineCall(() => this.#engine.setState(input));
   }
-  readState(): State {
+  readState(): StateSnapshot {
     this.requireIdle();
     return this.engineCall(() => this.#engine.snapshot());
   }
@@ -358,6 +361,8 @@ export class Cpu {
         reason === 'protection-fault' ? this.#engine.protectionFault(reason) : undefined;
       const systemMemoryFault =
         reason === 'system-memory-fault' ? this.#engine.systemMemoryFault(reason) : undefined;
+      const debugException =
+        reason === 'debug-exception' ? this.#engine.debugException(reason) : undefined;
       const result = {
         reason,
         retired: budget - remaining,
@@ -373,6 +378,7 @@ export class Cpu {
         ...(x87Exception ? { x87Exception } : {}),
         ...(protectionFault ? { protectionFault } : {}),
         ...(systemMemoryFault ? { systemMemoryFault } : {}),
+        ...(debugException ? { debugException } : {}),
         resources: { ...resources, ...this.#cache.resources() },
         timings,
       };
