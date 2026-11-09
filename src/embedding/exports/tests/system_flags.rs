@@ -106,3 +106,26 @@ fn boundary_profiles_guard_activation_without_invalidating_source_owners() {
         )
     });
 }
+
+#[test]
+fn entry_preparation_returns_the_current_profile_without_consuming_history() {
+    initialize(0x1000, &[0x90]);
+    for (flags, shadow, expected) in [
+        (2, 0, 0),
+        (0x102, 0, 1),
+        (0x10002, 0, 1),
+        (2, 2, 1),
+        (0x202, 1, 1),
+    ] {
+        scalar_input(flags, shadow);
+        assert_eq!(core_import_state(), 0);
+        core_load(0x7000, 8);
+        assert_eq!(core_clear_fault(), expected);
+        assert_eq!(metadata(DATA), serde_json::Value::Null);
+        BRIDGE.with_borrow(|bridge| {
+            let state = unsafe { &*bridge.core.as_ref().unwrap().state.get() };
+            assert_eq!(state.flags, flags);
+            assert_eq!(state.interruptibility, shadow);
+        });
+    }
+}

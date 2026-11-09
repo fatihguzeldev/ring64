@@ -116,7 +116,9 @@ fn numeric_diagnostics_clear_independently_of_accrued_status_on_all_architectura
                 BRIDGE.with_borrow_mut(|bridge| bridge.input = 0x0fa0u32.to_le_bytes().to_vec());
                 assert_eq!(numeric::core_import_mxcsr(), 0);
             }
-            "clear" => core_clear_fault(),
+            "clear" => {
+                core_clear_fault();
+            }
             "context" => {
                 BRIDGE.with_borrow_mut(|bridge| {
                     bridge.input = serde_json::to_vec(

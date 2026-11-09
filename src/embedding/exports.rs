@@ -169,7 +169,7 @@ pub extern "C" fn core_import_state() -> i32 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn core_clear_fault() {
+pub extern "C" fn core_clear_fault() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
@@ -185,7 +185,8 @@ pub extern "C" fn core_clear_fault() {
             (*core.state.get()).target = 0;
             (*core.state.get()).fault_segment = Segment::Cs as u32;
         };
-    });
+        i32::from(core.boundary_observed())
+    })
 }
 
 #[unsafe(no_mangle)]

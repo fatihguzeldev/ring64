@@ -277,6 +277,7 @@ async function publicFixture() {
       mxcsr = next;
     },
     clearFault() {},
+    prepareEntry: () => false,
     boundaryObserved: () => false,
     dispose() {},
     release() {},

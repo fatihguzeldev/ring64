@@ -386,12 +386,12 @@ export class Cpu {
       return result;
     };
     try {
-      this.#engine.clearFault();
       for (;;) {
+        const boundaryObserved = this.#engine.prepareEntry();
         const pc = this.#engine.current().rip;
         if (remaining === 0n) return finish('budget');
         if (stop !== undefined && pc === stop) return finish('stop');
-        let entry = this.#cache.get(pc, this.#engine.boundaryObserved());
+        let entry = this.#cache.get(pc, boundaryObserved);
         if (entry) {
           resources.cacheHits++;
         } else {
@@ -428,7 +428,7 @@ export class Cpu {
             timings.instantiationMs += performance.now() - at;
             if (!this.#cache.install(artifact)) return finish('resource-limit');
             installed = true;
-            entry = this.#cache.get(pc, this.#engine.boundaryObserved());
+            entry = this.#cache.get(pc, boundaryObserved);
             if (entry?.artifact !== artifact)
               throw new Error('installed artifact does not own its requested entry');
           } finally {
@@ -438,7 +438,6 @@ export class Cpu {
         const before = remaining;
         const repeatBefore = remainingRepeatBudget;
         const at = performance.now();
-        this.#engine.clearFault();
         this.#engine.activate(entry.artifact.metadata.owner);
         const reason = this.#engine.execute(
           entry.artifact.run,

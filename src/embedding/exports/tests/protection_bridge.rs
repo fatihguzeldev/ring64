@@ -121,7 +121,9 @@ fn valid_repairs_clear_all_descriptor_diagnostics_even_for_equal_context() {
             });
         });
         match repair {
-            "clear" => core_clear_fault(),
+            "clear" => {
+                core_clear_fault();
+            }
             "state" => {
                 BRIDGE.with_borrow_mut(|bridge| {
                     bridge.input = vec![0; SCALAR_STATE_SIZE];

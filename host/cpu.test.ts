@@ -90,7 +90,37 @@ test('a boundary profile change during asynchronous compile refuses stale public
   }
 });
 
-type Step = { reason: string; remaining: bigint; repeatRemaining: bigint; rip?: bigint };
+test('cached boundary variants consume one preparation token per entry without hot profile queries', async () => {
+  const steps = Array.from({ length: 4 }, (_, index) => ({
+    reason: index % 2 === 0 ? 'dispatch' : 'budget',
+    remaining: index % 2 === 0 ? 1n : 0n,
+    repeatRemaining: 0n,
+    boundaryObserved: index % 2 === 0,
+  }));
+  const f = await fixture(steps);
+  try {
+    const first = await f.cpu.run({ budget: 2n, repeatBudget: 0n });
+    assert.equal(first.resources.compilations, 2);
+    const cached = await f.cpu.run({ budget: 2n, repeatBudget: 0n });
+    assert.equal(cached.resources.compilations, 0);
+    assert.equal(cached.resources.nativeEntries, 2);
+    assert.deepEqual(f.preparedProfiles, [false, true, false, true]);
+    assert.deepEqual(f.queriedProfiles, [false, true], 'only cold post-await queries');
+    await f.cpu.run({ budget: 0n });
+    assert.deepEqual(f.preparedProfiles, [false, true, false, true, false]);
+    assert.deepEqual(f.queriedProfiles, [false, true]);
+  } finally {
+    f.cpu.dispose();
+  }
+});
+
+type Step = {
+  reason: string;
+  remaining: bigint;
+  repeatRemaining: bigint;
+  rip?: bigint;
+  boundaryObserved?: boolean;
+};
 
 async function fixture(steps: Step[] = []) {
   let current = { rip: 0x1000n, remaining: 0n, repeatRemaining: 0n };
@@ -99,6 +129,8 @@ async function fixture(steps: Step[] = []) {
   const stateImports: unknown[] = [];
   let boundaryObserved = false;
   const instantiatedProfiles: boolean[] = [];
+  const preparedProfiles: boolean[] = [];
+  const queriedProfiles: boolean[] = [];
   const engine = {
     current: () => current,
     snapshot: () => ({ registers: Array<bigint>(16).fill(0n), flags: 2n, rip: current.rip }),
@@ -119,6 +151,10 @@ async function fixture(steps: Step[] = []) {
       xmm = [...bank];
     },
     clearFault() {},
+    prepareEntry() {
+      preparedProfiles.push(boundaryObserved);
+      return boundaryObserved;
+    },
     fault() {},
     segmentFault() {},
     alignmentFault() {},
@@ -138,7 +174,10 @@ async function fixture(steps: Step[] = []) {
       },
     }),
     contextVersion: () => 0n,
-    boundaryObserved: () => boundaryObserved,
+    boundaryObserved: () => {
+      queriedProfiles.push(boundaryObserved);
+      return boundaryObserved;
+    },
     valid: () => true,
     instantiate: () => {
       instantiatedProfiles.push(boundaryObserved);
@@ -150,6 +189,7 @@ async function fixture(steps: Step[] = []) {
       entries.push({ budget, repeatBudget });
       const step = steps.shift();
       assert.ok(step, 'unexpected native entry');
+      if (step.boundaryObserved !== undefined) boundaryObserved = step.boundaryObserved;
       current = { ...current, ...step };
       return step.reason;
     },
@@ -169,6 +209,8 @@ async function fixture(steps: Step[] = []) {
       entries,
       stateImports,
       instantiatedProfiles,
+      preparedProfiles,
+      queriedProfiles,
       setBoundaryObserved(value: boolean) {
         boundaryObserved = value;
       },

@@ -54,6 +54,7 @@ async function mockedCore(
   memory = new WebAssembly.Memory({ initial: 1 }),
   missing?: string,
   inputPointer = 512,
+  preparedProfile = 0,
 ) {
   let disposed = 0;
   let initialized = 0;
@@ -70,6 +71,7 @@ async function mockedCore(
     },
     core_info_ptr: () => infoPointer,
     core_info_len: () => json.length,
+    core_clear_fault: () => preparedProfile,
     core_state_ptr: () => statePointer | 0,
     core_init_mapped() {
       initialized++;
@@ -240,6 +242,20 @@ test('a debug outcome is never decoded as an address-bearing memory fault', asyn
     assert.equal(fixture.core.fault('debug-exception'), undefined);
   } finally {
     fixture.core.dispose();
+  }
+});
+
+test('entry preparation consumes the profile returned by fault clearing and rejects malformed values', async () => {
+  for (const profile of [0, 1, 2]) {
+    const fixture = await mockedCore(layout, 8192, undefined, undefined, 512, profile);
+    assert.ok(fixture.core);
+    try {
+      if (profile < 2) assert.equal(fixture.core.prepareEntry(), profile === 1);
+      else assert.throws(() => fixture.core.prepareEntry(), /invalid boundary profile/);
+      assert.equal(fixture.core.clearFault(), undefined, 'legacy clearing ignores return');
+    } finally {
+      fixture.core.dispose();
+    }
   }
 });
 

@@ -167,6 +167,7 @@ async function cpuFixture() {
     snapshot: () => structuredClone(state),
     readXmmState: () => [...bank],
     clearFault() {},
+    prepareEntry: () => false,
     boundaryObserved: () => false,
     current: () => ({ rip: 0x1000n, remaining: 1n, repeatRemaining: 0n }),
     probe: () => 'dispatch',

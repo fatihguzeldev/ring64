@@ -221,7 +221,7 @@ type CoreExports = WebAssembly.Exports & {
     alignment: number,
     value: number,
   ): number;
-  core_clear_fault(): void;
+  core_clear_fault(): number;
   core_probe(pc: bigint): number;
   core_compile(
     pc: bigint,
@@ -651,6 +651,11 @@ export class Core {
 
   clearFault(): void {
     this.#exports.core_clear_fault();
+  }
+  prepareEntry(): boolean {
+    const value = this.#exports.core_clear_fault();
+    if (value !== 0 && value !== 1) throw new Error('core returned an invalid boundary profile');
+    return value === 1;
   }
   probe(pc: bigint): string {
     return this.reason(this.#exports.core_probe(pc));
