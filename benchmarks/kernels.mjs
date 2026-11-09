@@ -1,6 +1,7 @@
 import { x87Rows } from './x87.mjs';
 import { numericStateRows } from './numeric-state.mjs';
 import { streamingRows } from './streaming.mjs';
+import { protectionRows } from './protection.mjs';
 
 const MASK64 = (1n << 64n) - 1n;
 const MASK128 = (1n << 128n) - 1n;
@@ -273,7 +274,7 @@ const rows = [
 ];
 rows.push(...x87Rows);
 rows.push(...numericStateRows);
-rows.push(...streamingRows);
+rows.push(...streamingRows, ...protectionRows);
 export const workloadNames = rows.map((row) => row.name);
 function check(actual, expected, label) {
   if (actual !== expected) throw Error(`${label}: expected ${expected}, received ${actual}`);
@@ -377,12 +378,26 @@ export async function measure(
       requiresX87: !!row.requiresX87,
       requiresNumericState: !!row.requiresNumericState,
       requiresStreaming: !!row.requiresStreaming,
+      requiresProtection: !!row.requiresProtection,
       ...(row.guestMemoryPerIteration
         ? { guestMemoryPerIteration: row.guestMemoryPerIteration }
         : {}),
     });
     try {
       for (const side of sides) {
+        if (
+          row.requiresProtection &&
+          !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_protection')
+        ) {
+          if (side.label === 'current')
+            throw Error('current build is missing descriptor execution');
+          unavailable.push({
+            side: side.label,
+            workload: row.name,
+            reason: 'descriptor execution unavailable',
+          });
+          continue;
+        }
         if (
           row.requiresStreaming &&
           !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_masked_store')
@@ -418,9 +433,10 @@ export async function measure(
           },
           limits,
         });
+        const expectedContext = row.context?.(cpu);
         const hasX87 =
           typeof cpu.readX87State === 'function' && typeof cpu.setX87State === 'function';
-        active.push({ ...side, cpu, hasX87 });
+        active.push({ ...side, cpu, hasX87, expectedContext });
         if (row.requiresX87 && !hasX87) {
           if (side.label === 'current') throw Error('current build is missing x87 APIs');
           cpu.dispose();
@@ -505,8 +521,11 @@ export async function measure(
             'simdException',
             'generalProtectionFault',
             'x87Exception',
+            'protectionFault',
+            'systemMemoryFault',
           ])
             check(result[field], undefined, field);
+          row.verify?.(side.cpu, side.expectedContext);
           check(totals.compilations, sample === 0 ? 1 : 0, 'compilations');
           check(totals.dispatches, 0, 'dispatches');
           check(totals.nativeEntries, row.resume ? Number(budget) : 1, 'native entries');

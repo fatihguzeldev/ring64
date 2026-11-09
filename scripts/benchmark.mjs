@@ -121,7 +121,8 @@ async function browserRun() {
         pathname === '/kernels.mjs' ||
         pathname === '/x87.mjs' ||
         pathname === '/numeric-state.mjs' ||
-        pathname === '/streaming.mjs'
+        pathname === '/streaming.mjs' ||
+        pathname === '/protection.mjs'
       )
         file = resolve(root, 'benchmarks', pathname.slice(1));
       else {
@@ -199,7 +200,13 @@ const environment = {
   platform: os.platform(),
   arch: os.arch(),
 };
-const benchmarkFiles = ['kernels.mjs', 'x87.mjs', 'numeric-state.mjs', 'streaming.mjs'];
+const benchmarkFiles = [
+  'kernels.mjs',
+  'x87.mjs',
+  'numeric-state.mjs',
+  'streaming.mjs',
+  'protection.mjs',
+];
 const benchmarkHash = createHash('sha256');
 for (const file of benchmarkFiles) {
   benchmarkHash.update(file + '\0');
