@@ -14,6 +14,7 @@ mod mmx;
 mod multiply_divide;
 mod numeric_state;
 mod protection;
+mod software_events;
 mod stack;
 mod state;
 mod streaming;
@@ -84,9 +85,11 @@ struct Emitter {
     clflush: Option<u32>,
     protection: Option<u32>,
     far_control: Option<u32>,
+    software_event: Option<u32>,
     system_flags: Option<u32>,
     debug_step: Option<u32>,
     observed: bool,
+    mutable_controls: bool,
     publish_shadow: bool,
     sampled_tf: Option<u32>,
     incoming_shadow: Option<u32>,
@@ -272,6 +275,10 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::SystemFlags(_)));
+    let has_software_events = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::SoftwareEvent(_)));
     let float_type = has_float.then(|| {
         let index = next_type;
         types.ty().function(
@@ -354,6 +361,15 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
                 ValType::I64,
                 ValType::I32,
             ],
+            [ValType::I32],
+        );
+        next_type += 1;
+        index
+    });
+    let software_event_type = has_software_events.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [ValType::I32, ValType::I64, ValType::I64, ValType::I64],
             [ValType::I32],
         );
         next_type += 1;
@@ -577,6 +593,12 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let software_event = software_event_type.map(|index| {
+        imports.import("env", "software_event", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let system_flags = system_flags_type.map(|index| {
         imports.import("env", "flags", EntityType::Function(index));
         let function = run_index;
@@ -664,11 +686,14 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         clflush,
         protection,
         far_control,
+        software_event,
         system_flags,
         debug_step,
         observed,
+        mutable_controls: has_system_flags || has_software_events,
         publish_shadow: observed
             || has_system_flags
+            || has_software_events
             || unit
                 .instructions
                 .iter()
@@ -718,6 +743,11 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         emitter.gates(exit_depth);
         emitter.begin(instruction.operation, exit_depth);
         match instruction.operation {
+            Operation::SoftwareEvent(operation) => {
+                if emitter.software_event(operation, instruction.next_pc, exit_depth) {
+                    continue;
+                }
+            }
             Operation::SystemFlags(operation) => emitter.system_flags(operation, exit_depth),
             Operation::PopSs { width } => emitter.pop_ss(width, exit_depth),
             Operation::MaskedStore {

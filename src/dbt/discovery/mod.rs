@@ -87,6 +87,11 @@ pub(crate) fn discover_with_context(
             | Operation::JumpMemory { .. }
             | Operation::Return { .. }
             | Operation::Far(_) => {}
+            Operation::SoftwareEvent(event) => {
+                if event.kind == crate::x86::instruction::SoftwareEventKind::Into {
+                    pending.push_back(instruction.next_pc);
+                }
+            }
             _ => pending.push_back(instruction.next_pc),
         }
         instructions.insert(pc, instruction);
@@ -109,6 +114,11 @@ pub(crate) fn discover_with_context(
                 if let Operand::Immediate(target) = target {
                     leaders.insert(target);
                 }
+            }
+            Operation::SoftwareEvent(event)
+                if event.kind == crate::x86::instruction::SoftwareEventKind::Into =>
+            {
+                leaders.insert(instruction.next_pc);
             }
             _ => {}
         }

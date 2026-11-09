@@ -25,7 +25,7 @@ impl Emitter {
     }
 
     pub(super) fn system_bits(&mut self) {
-        if self.observed || self.system_flags.is_some() {
+        if self.observed || self.mutable_controls {
             self.op(Op::LocalGet(SYSTEM));
         } else {
             // Ordinary fast units do not change controls; do not keep them live across the loop.

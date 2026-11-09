@@ -769,6 +769,7 @@ impl FarInstruction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
     SystemFlags(SystemFlagsDescriptor),
+    SoftwareEvent(SoftwareEventDescriptor),
     PopSs {
         width: Width,
     },

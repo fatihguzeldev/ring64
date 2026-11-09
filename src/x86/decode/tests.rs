@@ -20,6 +20,7 @@ mod near_control;
 mod numeric_state;
 mod protection;
 mod scalar_data;
+mod software_events;
 mod stack;
 mod streaming;
 mod strings;

@@ -12,6 +12,7 @@ mod opcode;
 mod operand;
 mod prefix;
 mod protection;
+mod software_events;
 mod streaming;
 mod system_flags;
 mod vector;
