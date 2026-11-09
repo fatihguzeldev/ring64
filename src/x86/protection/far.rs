@@ -481,3 +481,6 @@ fn system_failure(failure: super::Failure) -> FarFailure {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod boundary_tests;
