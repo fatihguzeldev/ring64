@@ -132,6 +132,27 @@ impl Lookup {
         Ok((address, access_byte | 1))
     }
 
+    pub fn prepare_busy(
+        self,
+        context: &ExecutionContext,
+        image: &Image,
+        width: u32,
+        access_byte: u8,
+    ) -> Result<(u64, u8), Failure> {
+        let address = self.address(context, 0, width, Access::Write, SystemPhase::BusyWrite)?;
+        image.check_write(address, width).map_err(|f| {
+            self.fault(
+                u128::from(f.address),
+                f.width,
+                f.access,
+                f.cause,
+                f.failing,
+                SystemPhase::BusyWrite,
+            )
+        })?;
+        Ok((address + 5, access_byte | 2))
+    }
+
     pub fn set_accessed(
         self,
         context: &ExecutionContext,

@@ -6,6 +6,7 @@ mod access;
 mod descriptor;
 pub mod far;
 mod reload;
+mod task;
 
 #[cfg(test)]
 mod tests;
@@ -133,15 +134,17 @@ pub fn valid_in_mode(descriptor: ProtectionDescriptor, context: &ExecutionContex
     if width == Width::W8 || width == Width::W64 && !context.is_long64() {
         return false;
     }
-    if matches!(kind, ReadLdt | LoadLdt | Lar | Lsl | Verr | Verw)
-        && matches!(context.mode(), Mode::Real | Mode::Virtual8086)
+    if matches!(
+        kind,
+        ReadLdt | LoadLdt | ReadTask | LoadTask | Lar | Lsl | Verr | Verw
+    ) && matches!(context.mode(), Mode::Real | Mode::Virtual8086)
     {
         return false;
     }
     match kind {
         StoreGdt | StoreIdt | LoadGdt | LoadIdt => memory,
-        ReadLdt | ReadSegment(_) => !memory || width == Width::W16,
-        LoadLdt | Verr | Verw => width == Width::W16,
+        ReadLdt | ReadTask | ReadSegment(_) => !memory || width == Width::W16,
+        LoadLdt | LoadTask | Verr | Verw => width == Width::W16,
         LoadSegment(segment) => width == Width::W16 && segment != Segment::Cs,
         LoadFar(segment) => {
             memory
@@ -166,7 +169,7 @@ pub fn execute(
         width,
         memory,
     } = descriptor;
-    if matches!(kind, LoadGdt | LoadIdt | LoadLdt) && context.cpl() != 0 {
+    if matches!(kind, LoadGdt | LoadIdt | LoadLdt | LoadTask) && context.cpl() != 0 {
         return Err(Failure::Protection(ProtectionFault {
             vector: 13,
             error_code: 0,
@@ -226,9 +229,10 @@ pub fn execute(
                 ..Outcome::default()
             })
         }
-        ReadLdt | ReadSegment(_) => {
+        ReadLdt | ReadTask | ReadSegment(_) => {
             let selector = match kind {
                 ReadSegment(segment) => context.selector(segment),
+                ReadTask => context.tr().selector,
                 _ => context.ldtr().selector,
             };
             if memory {
@@ -253,7 +257,7 @@ pub fn execute(
             };
             query(context, image, kind, width, selector)
         }
-        LoadLdt | LoadSegment(_) => {
+        LoadLdt | LoadTask | LoadSegment(_) => {
             let selector = if memory {
                 let bytes = access::read_operand(context, image, offset, 2, operand_segment)?;
                 u16::from_le_bytes(bytes[..2].try_into().unwrap())
@@ -262,6 +266,7 @@ pub fn execute(
             };
             let changed = match kind {
                 LoadLdt => reload::ldt(context, image, selector)?,
+                LoadTask => task::load(context, image, selector)?,
                 LoadSegment(segment) => reload::segment(context, image, segment, selector)?,
                 _ => unreachable!(),
             };

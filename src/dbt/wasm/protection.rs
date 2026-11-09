@@ -36,7 +36,13 @@ impl Emitter {
         };
         if matches!(
             instruction.kind,
-            Kind::LoadLdt | Kind::LoadSegment(_) | Kind::Lar | Kind::Lsl | Kind::Verr | Kind::Verw
+            Kind::LoadLdt
+                | Kind::LoadTask
+                | Kind::LoadSegment(_)
+                | Kind::Lar
+                | Kind::Lsl
+                | Kind::Verr
+                | Kind::Verw
         ) && let Location::Register(register) = instruction.operand
         {
             self.data_register(register, Width::W16);
@@ -47,7 +53,7 @@ impl Emitter {
         self.numeric_state_result(exit_depth);
         let scratch = offset_of!(RunState, vector_scratch);
         let destination = match instruction.kind {
-            Kind::ReadLdt | Kind::ReadSegment(_) => match instruction.operand {
+            Kind::ReadLdt | Kind::ReadTask | Kind::ReadSegment(_) => match instruction.operand {
                 Location::Register(register) => Some(register),
                 _ => None,
             },

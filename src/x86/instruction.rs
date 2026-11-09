@@ -509,6 +509,8 @@ pub enum ProtectionKind {
     Lsl,
     Verr,
     Verw,
+    ReadTask,
+    LoadTask,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -535,6 +537,8 @@ impl ProtectionDescriptor {
             Lsl => 25,
             Verr => 26,
             Verw => 27,
+            ReadTask => 28,
+            LoadTask => 29,
         };
         let width = match self.width {
             Width::W16 => 0,
@@ -571,12 +575,14 @@ impl ProtectionDescriptor {
             25 => Lsl,
             26 => Verr,
             27 => Verw,
+            28 => ReadTask,
+            29 => LoadTask,
             _ => return None,
         };
         let valid = match kind {
             StoreGdt | StoreIdt | LoadGdt | LoadIdt => memory,
-            ReadLdt | ReadSegment(_) => !memory || width == Width::W16,
-            LoadLdt | Verr | Verw => width == Width::W16,
+            ReadLdt | ReadTask | ReadSegment(_) => !memory || width == Width::W16,
+            LoadLdt | LoadTask | Verr | Verw => width == Width::W16,
             LoadSegment(segment) => segment != Segment::Cs && width == Width::W16,
             LoadFar(segment) => {
                 memory

@@ -85,8 +85,12 @@ where
         let operands = ModRm::read(cursor, prefixes.rex)?;
         let (kind, width, register) = match opcode {
             0x00 => match operands.selector {
-                0 => (
-                    Kind::ReadLdt,
+                0 | 1 => (
+                    if operands.selector == 0 {
+                        Kind::ReadLdt
+                    } else {
+                        Kind::ReadTask
+                    },
                     if operands.mode == 3 {
                         prefixes.width()
                     } else {
@@ -94,7 +98,15 @@ where
                     },
                     0,
                 ),
-                2 => (Kind::LoadLdt, Width::W16, 0),
+                2 | 3 => (
+                    if operands.selector == 2 {
+                        Kind::LoadLdt
+                    } else {
+                        Kind::LoadTask
+                    },
+                    Width::W16,
+                    0,
+                ),
                 4 => (Kind::Verr, Width::W16, 0),
                 5 => (Kind::Verw, Width::W16, 0),
                 _ => return Err(DecodeError::Unsupported),
@@ -143,7 +155,14 @@ where
         if matches!(prefixes.mode, Mode::Real | Mode::Virtual8086)
             && matches!(
                 kind,
-                Kind::ReadLdt | Kind::LoadLdt | Kind::Lar | Kind::Lsl | Kind::Verr | Kind::Verw
+                Kind::ReadLdt
+                    | Kind::LoadLdt
+                    | Kind::ReadTask
+                    | Kind::LoadTask
+                    | Kind::Lar
+                    | Kind::Lsl
+                    | Kind::Verr
+                    | Kind::Verw
             )
         {
             return Err(DecodeError::Invalid);
