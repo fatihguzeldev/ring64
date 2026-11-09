@@ -422,6 +422,125 @@ pub struct X87Instruction {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProtectionKind {
+    StoreGdt,
+    StoreIdt,
+    LoadGdt,
+    LoadIdt,
+    ReadLdt,
+    LoadLdt,
+    ReadSegment(Segment),
+    LoadSegment(Segment),
+    LoadFar(Segment),
+    Lar,
+    Lsl,
+    Verr,
+    Verw,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProtectionDescriptor {
+    pub kind: ProtectionKind,
+    pub width: Width,
+    pub memory: bool,
+}
+
+impl ProtectionDescriptor {
+    pub fn encode(self) -> u32 {
+        use ProtectionKind::*;
+        let kind = match self.kind {
+            StoreGdt => 0,
+            StoreIdt => 1,
+            LoadGdt => 2,
+            LoadIdt => 3,
+            ReadLdt => 4,
+            LoadLdt => 5,
+            ReadSegment(segment) => 6 + segment as u32,
+            LoadSegment(segment) => 12 + segment as u32,
+            LoadFar(segment) => 18 + segment as u32,
+            Lar => 24,
+            Lsl => 25,
+            Verr => 26,
+            Verw => 27,
+        };
+        let width = match self.width {
+            Width::W16 => 0,
+            Width::W32 => 1,
+            Width::W64 => 2,
+            Width::W8 => panic!("byte protection operand"),
+        };
+        kind | (width << 5) | (u32::from(self.memory) << 7)
+    }
+
+    pub fn try_decode(encoded: u32) -> Option<Self> {
+        use ProtectionKind::*;
+        if encoded & !255 != 0 {
+            return None;
+        }
+        let width = match (encoded >> 5) & 3 {
+            0 => Width::W16,
+            1 => Width::W32,
+            2 => Width::W64,
+            _ => return None,
+        };
+        let memory = encoded & 128 != 0;
+        let kind = match encoded & 31 {
+            0 => StoreGdt,
+            1 => StoreIdt,
+            2 => LoadGdt,
+            3 => LoadIdt,
+            4 => ReadLdt,
+            5 => LoadLdt,
+            value @ 6..=11 => ReadSegment(Segment::from_id(value - 6)),
+            value @ 12..=17 => LoadSegment(Segment::from_id(value - 12)),
+            value @ 18..=23 => LoadFar(Segment::from_id(value - 18)),
+            24 => Lar,
+            25 => Lsl,
+            26 => Verr,
+            27 => Verw,
+            _ => return None,
+        };
+        let valid = match kind {
+            StoreGdt | StoreIdt | LoadGdt | LoadIdt => memory,
+            ReadLdt | ReadSegment(_) => !memory || width == Width::W16,
+            LoadLdt | Verr | Verw => width == Width::W16,
+            LoadSegment(segment) => {
+                !matches!(segment, Segment::Cs | Segment::Ss) && width == Width::W16
+            }
+            LoadFar(segment) => {
+                memory
+                    && segment != Segment::Cs
+                    && (width != Width::W64 || !matches!(segment, Segment::Ds | Segment::Es))
+            }
+            Lar | Lsl => true,
+        };
+        valid.then_some(Self {
+            kind,
+            width,
+            memory,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProtectionInstruction {
+    pub kind: ProtectionKind,
+    pub operand: Location,
+    pub register: u8,
+    pub width: Width,
+}
+
+impl ProtectionInstruction {
+    pub fn descriptor(self) -> ProtectionDescriptor {
+        ProtectionDescriptor {
+            kind: self.kind,
+            width: self.width,
+            memory: matches!(self.operand, Location::Memory(_)),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
     MaskedStore {
         data: u8,

@@ -5,5 +5,6 @@ pub mod instruction;
 pub mod masked;
 pub mod mmx;
 pub mod numeric_images;
+pub mod protection;
 pub mod state;
 pub mod x87;
