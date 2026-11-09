@@ -36,13 +36,13 @@ pub extern "C" fn core_x87(
         core.simd_exception = None;
         core.general_protection = None;
         core.divide_failed = false;
-        let before = unsafe {
+        let pending = unsafe {
             let state = &mut *core.state.get();
             state.target = 0;
             state.fault_segment = Segment::Cs as u32;
-            state.x87
+            state.x87.pending()
         };
-        if operation.is_waiting() && before.pending() != 0 {
+        if operation.is_waiting() && pending != 0 {
             return X87_EXCEPTION;
         }
         let width = operation.memory_bytes();
@@ -79,7 +79,8 @@ pub extern "C" fn core_x87(
                 }
             }
         };
-        let mut candidate = before;
+        // Operand admission cannot mutate x87; snapshot it only after those checks.
+        let mut candidate = unsafe { (*core.state.get()).x87 };
         let effect = x87::eval(&mut candidate, operation, source, flags);
         if operation.updates_environment() {
             candidate.instruction_pointer =
