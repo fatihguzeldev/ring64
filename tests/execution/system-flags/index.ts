@@ -11,6 +11,7 @@ import { numericBoundaryScenarios } from './numeric-boundaries.js';
 import { cacheScenarios } from './cache.js';
 import { acceptanceBoundaryScenarios } from './acceptance-boundaries.js';
 import { reviewScenarios } from './review.js';
+import { numericCompletionScenarios } from './numeric-completion.js';
 import type { Scenario } from './fixture.js';
 
 export function systemFlagScenarios(compiler: WebAssembly.Module): Scenario[] {
@@ -28,5 +29,6 @@ export function systemFlagScenarios(compiler: WebAssembly.Module): Scenario[] {
     ...cacheScenarios(compiler),
     ...acceptanceBoundaryScenarios(compiler),
     ...reviewScenarios(compiler),
+    ...numericCompletionScenarios(compiler),
   ];
 }
