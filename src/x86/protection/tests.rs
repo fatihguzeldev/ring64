@@ -246,7 +246,7 @@ fn query_system_tails_follow_type_visibility_and_extent_before_required_access()
             failing_address: 0x1010,
             phase: SystemPhase::DescriptorRead,
             table: Table::Gdt,
-            selector: 8,
+            reference: SystemReference::Selector(8),
         }))
     );
     context.set_gdtr(TableRegister {

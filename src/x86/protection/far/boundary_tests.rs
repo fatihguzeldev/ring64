@@ -503,7 +503,7 @@ fn late_stack_a_admission_failure_keeps_earlier_code_a_zero() {
         Err(FarFailure::SystemMemory(super::super::SystemMemoryFault {
             address: 0x1025,
             width: 1,
-            selector: 0x23,
+            reference: super::super::SystemReference::Selector(0x23),
             phase: super::super::SystemPhase::AccessedWrite,
             ..
         }))

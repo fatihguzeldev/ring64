@@ -1,4 +1,14 @@
-import { changed, equal, hex, initial, snapshot, state, using, type Scenario } from './fixture.js';
+import {
+  changed,
+  check,
+  equal,
+  hex,
+  initial,
+  snapshot,
+  state,
+  using,
+  type Scenario,
+} from './fixture.js';
 
 function projection(value: unknown): string {
   return JSON.stringify(value, (_, item: unknown) =>
@@ -225,7 +235,7 @@ export function queryScenarios(compiler: WebAssembly.Module): Scenario[] {
                 );
                 equal(result.systemMemoryFault?.width, 8, 'actual low or upper slice');
                 equal(result.systemMemoryFault?.phase, 'descriptor-read', 'internal phase');
-                equal(result.systemMemoryFault?.table, 'gdt', 'root');
+                check(result.systemMemoryFault?.table === 'gdt', 'root');
                 equal(result.systemMemoryFault?.selector, 8, 'original selector');
               } else {
                 equal(result.reason, 'budget', 'failed selector is a query result');

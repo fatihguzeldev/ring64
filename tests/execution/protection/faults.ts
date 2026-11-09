@@ -35,7 +35,7 @@ export function faultScenarios(compiler: WebAssembly.Module): Scenario[] {
           equal(failed.systemMemoryFault?.width, 8, 'low descriptor slice');
           equal(failed.systemMemoryFault?.failingAddress, 0x4008n, 'first absent byte');
           equal(failed.systemMemoryFault?.phase, 'descriptor-read', 'system phase');
-          equal(failed.systemMemoryFault?.table, 'gdt', 'table root');
+          check(failed.systemMemoryFault?.table === 'gdt', 'table root');
           equal(failed.systemMemoryFault?.selector, 8, 'selected descriptor');
           equal(failed.fault, undefined, 'no invented DS fault');
           equal(failed.protectionFault, undefined, 'exclusive diagnostic');

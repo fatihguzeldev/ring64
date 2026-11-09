@@ -83,23 +83,29 @@ export interface GeneralProtectionFault {
 
 export interface ProtectionFault {
   instructionPc: bigint;
-  vector: 11 | 12 | 13;
+  vector: 10 | 11 | 12 | 13;
   errorCode: number;
   phase: 'privilege' | 'selector' | 'descriptor' | 'target';
   selector?: number;
 }
 
-export interface SystemMemoryFault {
+interface SystemMemoryAccess {
   instructionPc: bigint;
   address: bigint;
   width: number;
   access: 'read' | 'write';
   cause: 'address-range' | 'noncanonical' | 'unmapped' | 'permission';
   failingAddress: bigint;
-  phase: 'descriptor-read' | 'descriptor-accessed-write';
-  table: 'gdt' | 'ldt';
-  selector: number;
 }
+type SystemMemoryReference =
+  | {
+      table: 'gdt' | 'ldt';
+      selector: number;
+      phase: 'descriptor-read' | 'descriptor-accessed-write' | 'descriptor-busy-write';
+    }
+  | { table: 'ivt' | 'idt'; vector: number; phase: 'gate-read' }
+  | { table: 'tss'; selector: number; phase: 'tss-read' };
+export type SystemMemoryFault = SystemMemoryAccess & SystemMemoryReference;
 
 export interface Span {
   base: bigint;
@@ -894,10 +900,11 @@ export class Core {
     if (reason !== 'system-memory-fault') return undefined;
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
     const raw = this.info<
-      Omit<SystemMemoryFault, 'instructionPc' | 'address' | 'failingAddress'> & {
-        address: string;
-        failingAddress: string;
-      }
+      Omit<SystemMemoryAccess, 'instructionPc' | 'address' | 'failingAddress'> &
+        SystemMemoryReference & {
+          address: string;
+          failingAddress: string;
+        }
     >();
     return {
       ...raw,

@@ -14,13 +14,19 @@ pub(super) fn fault_json(fault: &ProtectionFault) -> serde_json::Value {
 }
 
 pub(super) fn system_fault_json(fault: &SystemMemoryFault) -> serde_json::Value {
-    serde_json::json!({
+    let mut value = serde_json::json!({
         "address":format!("0x{:x}",fault.address), "width":fault.width,
         "access":match fault.access { Access::Read=>"read", Access::Write=>"write", Access::Execute=>"execute" },
         "cause":match fault.cause { Cause::AddressRange=>"address-range", Cause::Noncanonical=>"noncanonical", Cause::Unmapped=>"unmapped", Cause::Permission=>"permission" },
         "failingAddress":format!("0x{:x}",fault.failing_address),
-        "phase":fault.phase.as_str(), "table":fault.table.as_str(), "selector":fault.selector,
-    })
+        "phase":fault.phase.as_str(), "table":fault.table.as_str(),
+    });
+    let (key, reference) = match fault.reference {
+        semantics::SystemReference::Selector(selector) => ("selector", selector),
+        semantics::SystemReference::Vector(vector) => ("vector", u16::from(vector)),
+    };
+    value[key] = serde_json::json!(reference);
+    value
 }
 
 #[unsafe(no_mangle)]

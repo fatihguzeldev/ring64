@@ -18,7 +18,7 @@ fn system(
         failing_address: failing,
         phase,
         table: Table::Gdt,
-        selector,
+        reference: SystemReference::Selector(selector),
     })
 }
 

@@ -103,7 +103,7 @@ fn legacy_system_start_wraps_but_an_attempted_descriptor_span_does_not() {
             failing_address: 0x1_0000_0000,
             phase: SystemPhase::DescriptorRead,
             table: Table::Gdt,
-            selector: 8,
+            reference: SystemReference::Selector(8),
         }))
     );
 }

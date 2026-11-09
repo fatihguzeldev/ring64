@@ -53,6 +53,9 @@ pub struct ProtectionFault {
 pub enum Table {
     Gdt,
     Ldt,
+    Ivt,
+    Idt,
+    Tss,
 }
 
 impl Table {
@@ -60,6 +63,9 @@ impl Table {
         match self {
             Self::Gdt => "gdt",
             Self::Ldt => "ldt",
+            Self::Ivt => "ivt",
+            Self::Idt => "idt",
+            Self::Tss => "tss",
         }
     }
 }
@@ -68,6 +74,9 @@ impl Table {
 pub enum SystemPhase {
     DescriptorRead,
     AccessedWrite,
+    BusyWrite,
+    GateRead,
+    TssRead,
 }
 
 impl SystemPhase {
@@ -75,8 +84,17 @@ impl SystemPhase {
         match self {
             Self::DescriptorRead => "descriptor-read",
             Self::AccessedWrite => "descriptor-accessed-write",
+            Self::BusyWrite => "descriptor-busy-write",
+            Self::GateRead => "gate-read",
+            Self::TssRead => "tss-read",
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SystemReference {
+    Selector(u16),
+    Vector(u8),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -88,7 +106,7 @@ pub struct SystemMemoryFault {
     pub failing_address: u128,
     pub phase: SystemPhase,
     pub table: Table,
-    pub selector: u16,
+    pub reference: SystemReference,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

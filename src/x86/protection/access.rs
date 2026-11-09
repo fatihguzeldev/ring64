@@ -56,7 +56,7 @@ impl Lookup {
             failing_address,
             phase,
             table: self.table,
-            selector: self.selector,
+            reference: SystemReference::Selector(self.selector),
         })
     }
 

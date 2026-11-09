@@ -2,7 +2,7 @@ use super::tests::{context, image, run};
 use super::*;
 use crate::memory::{Cause, MappingInput, MemoryLimits, Permissions};
 use crate::x86::context::{SegmentCause, SegmentFault, TableRegister};
-use crate::x86::protection::{SystemMemoryFault, SystemPhase, Table};
+use crate::x86::protection::{SystemMemoryFault, SystemPhase, SystemReference, Table};
 
 fn mapping(base: u64, offset: u32, length: u32, read: bool, write: bool) -> MappingInput {
     MappingInput {
@@ -102,7 +102,7 @@ fn outer_return_captures_both_aliasing_descriptors_before_any_accessed_write() {
                     failing_address: 0x1015,
                     phase: SystemPhase::AccessedWrite,
                     table: Table::Gdt,
-                    selector: 0x13,
+                    reference: SystemReference::Selector(0x13),
                 }))
             );
             assert_eq!(context, original_context);
