@@ -17,6 +17,7 @@ mod modes;
 mod multiply_divide;
 mod near_control;
 mod numeric_state;
+mod protection;
 mod scalar_data;
 mod stack;
 mod streaming;
