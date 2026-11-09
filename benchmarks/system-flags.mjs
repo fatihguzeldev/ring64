@@ -8,6 +8,8 @@ const parity = (value) => {
   return count % 2 === 0 ? 4n : 0n;
 };
 const controls = 0x3c7602n;
+const encode = (value) =>
+  JSON.stringify(value, (_, v) => (typeof v === 'bigint' ? v.toString() : v));
 const add = (state, n) => {
   state.gpr[0] = n;
   state.flags = (state.flags & ~0x8d5n) | parity(n) | (n % 16n === 0n ? 16n : 0n);
@@ -24,6 +26,13 @@ const stableResources = (kind) => (totals, n, sample, final, units) => {
     throw Error('system FLAGS dispatch accounting');
   if (units.length !== artifacts || final.cachedArtifacts !== artifacts)
     throw Error('system FLAGS retained profiles');
+  const profiles = new Set(units.map((unit) => unit.boundaryObserved ?? false));
+  if (
+    kind === 'shadow'
+      ? !profiles.has(false) || !profiles.has(true)
+      : profiles.size !== 1 || !profiles.has(kind === 'step')
+  )
+    throw Error('system FLAGS profile identity');
   if (final.cachedBytes !== units.reduce((bytes, unit) => bytes + unit.byteLength, 0))
     throw Error('system FLAGS cache bytes');
   if (totals.generatedBytes !== (sample === 0 ? final.cachedBytes : 0))
@@ -99,4 +108,11 @@ export const systemFlagRows = [
   requiresSystemFlags: row.requiresSystemFlags !== false,
   flagMask: 0x3d7fd7n,
   maxIterations: row.maxIterations ?? 10001,
+  context(cpu) {
+    return cpu.readContext();
+  },
+  verify(cpu, expectedContext) {
+    if (encode(cpu.readContext()) !== encode(expectedContext))
+      throw Error('system FLAGS context preservation');
+  },
 }));
