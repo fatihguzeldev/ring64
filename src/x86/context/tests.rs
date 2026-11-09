@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::json;
+use serde_json::{Value, json};
 
 #[test]
 fn snapshot_default_has_visible_and_hidden_state_without_tables() {
@@ -16,7 +16,198 @@ fn snapshot_default_has_visible_and_hidden_state_without_tables() {
     );
 }
 
+#[test]
+fn snapshot_raw_hidden_state_and_unloaded_system_roots_roundtrip() {
+    let mut value = ExecutionContext::default().to_json();
+    value["cpl"] = json!(2);
+    value["gdtr"] = json!({"base":"0x800000000000","limit":65535});
+    value["idtr"] = json!({"base":"0xffffffffffffffff","limit":9});
+    value["ldtr"] = json!({"selector":65535,"valid":true,"base":"0x100000000","limit":0x12345678,"attributes":4095});
+    value["segments"]["ss"] = json!({"selector":2,"base":"0x0","limit":0,"default32":false,"usable":false,"type":"read-only","dpl":0,"present":false,"conforming":false,"accessed":false,"long":false,"granularity":false,"available":false});
+    value["segments"]["ds"]["base"] = json!("0x123456789abcdef0");
+    value["segments"]["ds"]["limit"] = json!(0x12345678);
+    value["segments"]["ds"]["conforming"] = json!(true);
+    value["segments"]["ds"]["available"] = json!(true);
+    let context = ExecutionContext::from_json(&value).unwrap();
+    assert_eq!(context.to_json(), value);
+    assert_eq!(context.stack_width(), Width::W64);
+    assert_eq!(context.segment_base(Segment::Ds), 0);
+    assert_eq!(context.gdtr().base, 0x800000000000);
+    assert_eq!(context.ldtr().attributes, 0xfff);
+    // No memory owner is supplied: importing loaded state cannot consult tables.
+    assert_eq!(ExecutionContext::from_json(&context.to_json()), Ok(context));
+}
 
+#[test]
+fn snapshot_partial_fields_and_legacy_aliases_never_select_shorthand_fallback() {
+    for key in ["cpl", "gdtr", "idtr", "ldtr"] {
+        let mut value = ExecutionContext::default().to_json();
+        value.as_object_mut().unwrap().remove(key);
+        assert!(
+            ExecutionContext::from_json(&value).is_err(),
+            "missing {key}"
+        );
+        let mut legacy = json!({"mode":"long64","fsBase":"0x0","gsBase":"0x0"});
+        legacy[key] = Value::Null;
+        assert!(
+            ExecutionContext::from_json(&legacy).is_err(),
+            "partial {key}"
+        );
+    }
+    for key in ["fsBase", "gsBase"] {
+        let mut value = ExecutionContext::default().to_json();
+        value[key] = Value::Null;
+        assert!(ExecutionContext::from_json(&value).is_err());
+    }
+    for key in [
+        "selector",
+        "dpl",
+        "present",
+        "conforming",
+        "accessed",
+        "long",
+        "granularity",
+        "available",
+    ] {
+        let mut value = protected().to_json();
+        value["segments"]["ds"].as_object_mut().unwrap().remove(key);
+        assert!(
+            ExecutionContext::from_json(&value).is_err(),
+            "missing {key}"
+        );
+        for root in ["cpl", "gdtr", "idtr", "ldtr"] {
+            value.as_object_mut().unwrap().remove(root);
+        }
+        assert!(
+            ExecutionContext::from_json(&value).is_err(),
+            "partial {key}"
+        );
+    }
+}
+
+#[test]
+fn snapshot_domains_distinguish_compatibility_system_bases_from_data_bases() {
+    for root in ["gdtr", "idtr", "ldtr"] {
+        let mut value = protected().to_json();
+        value[root]["base"] = json!("0x100000000");
+        assert!(ExecutionContext::from_json(&value).is_err());
+        value["mode"] = json!("compatibility");
+        let context = ExecutionContext::from_json(&value).unwrap();
+        assert_eq!(context.to_json(), value);
+        value["segments"]["ds"]["base"] = json!("0x100000000");
+        assert!(ExecutionContext::from_json(&value).is_err());
+    }
+    for (object, key, invalid) in [
+        ("gdtr", "limit", json!(65536)),
+        ("idtr", "base", json!("0x10000000000000000")),
+        ("ldtr", "selector", json!(65536)),
+        ("ldtr", "attributes", json!(4096)),
+        ("ldtr", "limit", json!(0x100000000u64)),
+        ("ldtr", "valid", json!(1)),
+    ] {
+        let mut value = ExecutionContext::default().to_json();
+        value[object][key] = invalid;
+        assert!(
+            ExecutionContext::from_json(&value).is_err(),
+            "{object}.{key}"
+        );
+    }
+    for (key, invalid) in [
+        ("selector", json!(65536)),
+        ("dpl", json!(4)),
+        ("present", json!(1)),
+        ("long", json!(1)),
+    ] {
+        let mut value = ExecutionContext::default().to_json();
+        value["segments"]["ds"][key] = invalid;
+        assert!(ExecutionContext::from_json(&value).is_err(), "{key}");
+    }
+}
+
+#[test]
+fn snapshot_all_fourteen_legacy_profiles_keep_cache_facts_and_normalize_metadata() {
+    let mut count = 1;
+    for mode in ["real", "protected", "compatibility", "virtual8086"] {
+        for code32 in [false, true] {
+            for stack32 in [false, true] {
+                if mode == "virtual8086" && (code32 || stack32) {
+                    continue;
+                }
+                let mut segments = serde_json::Map::new();
+                for segment in Segment::ALL {
+                    let vm = mode == "virtual8086";
+                    let default32 = if vm {
+                        false
+                    } else if segment == Segment::Cs {
+                        code32
+                    } else if segment == Segment::Ss {
+                        stack32
+                    } else {
+                        true
+                    };
+                    segments.insert(segment.name().into(), json!({
+                        "base":"0x0","limit":if vm {0xffff} else {u32::MAX},
+                        "default32":default32,"usable":true,
+                        "type":if !vm && segment == Segment::Cs {"readable-code"} else {"read-write"},
+                    }));
+                }
+                let value = json!({"mode":mode,"segments":segments});
+                let context = ExecutionContext::from_json(&value).unwrap();
+                assert_eq!(context.cpl(), if mode == "virtual8086" { 3 } else { 0 });
+                for segment in Segment::ALL {
+                    let expected = if mode == "real" || mode == "virtual8086" {
+                        0
+                    } else if segment == Segment::Cs {
+                        8
+                    } else if segment == Segment::Ss {
+                        16
+                    } else {
+                        24
+                    };
+                    assert_eq!(context.selector(segment), expected);
+                    let attrs = context.attributes(segment);
+                    assert!(attrs.present && attrs.accessed);
+                    assert_eq!(attrs.granularity, mode != "virtual8086");
+                    assert!(!attrs.long && !attrs.available && !attrs.conforming);
+                }
+                assert_eq!(context.gdtr(), TableRegister::default());
+                assert_eq!(context.ldtr(), LdtRegister::default());
+                assert_eq!(ExecutionContext::from_json(&context.to_json()), Ok(context));
+                count += 1;
+            }
+        }
+    }
+    assert_eq!(count, 14);
+}
+
+#[test]
+fn prepared_context_updates_report_changes_without_reloading_other_caches() {
+    let mut context = protected();
+    let ds = context.segment(Segment::Ds);
+    let attrs = context.attributes(Segment::Ds);
+    let table = TableRegister {
+        base: 0x7000,
+        limit: 0xffff,
+    };
+    assert!(context.set_gdtr(table));
+    assert!(!context.set_gdtr(table));
+    assert!(context.set_idtr(table));
+    assert!(!context.set_idtr(table));
+    let ldt = LdtRegister {
+        selector: 8,
+        valid: true,
+        base: 0x8000,
+        limit: 0x1234,
+        attributes: 0x82,
+    };
+    assert!(context.set_ldtr(ldt));
+    assert!(!context.set_ldtr(ldt));
+    assert_eq!(context.segment(Segment::Ds), ds);
+    assert!(!context.set_segment(Segment::Ds, 24, ds, attrs));
+    assert!(context.set_segment(Segment::Ds, 32, ds, attrs));
+    assert_eq!(context.selector(Segment::Ds), 32);
+    assert_eq!(context.gdtr(), table);
+}
 
 #[test]
 fn clflush_changes_only_the_execute_only_segment_read_rule() {
@@ -133,11 +324,15 @@ fn context_input_is_normalized_and_profiles_keep_loaded_facts() {
 fn virtual8086_has_synthetic_writable_cs_and_fixed_normalized_caches() {
     let mut value = protected().to_json();
     value["mode"] = json!("virtual8086");
+    value["cpl"] = json!(3);
     for segment in Segment::ALL {
         let s = &mut value["segments"][segment.name()];
         s["type"] = json!("read-write");
         s["limit"] = json!(0xffff);
         s["default32"] = json!(false);
+        s["selector"] = json!(0);
+        s["dpl"] = json!(3);
+        s["granularity"] = json!(false);
     }
     let context = ExecutionContext::from_json(&value).unwrap();
     assert_eq!(
