@@ -7,6 +7,7 @@ import { systemFlagRows } from './system-flags.mjs';
 import { softwareEventRows } from './software-events.mjs';
 import { eventDeliveryNames, measureEventDelivery } from './event-delivery.mjs';
 import { externalInterruptNames, measureExternalInterrupts } from './external-interrupts.mjs';
+import { accessFaultNames, measureAccessFaults } from './access-faults.mjs';
 
 const MASK64 = (1n << 64n) - 1n;
 const MASK128 = (1n << 128n) - 1n;
@@ -284,6 +285,7 @@ export const workloadNames = [
   ...rows.map((row) => row.name),
   ...eventDeliveryNames,
   ...externalInterruptNames,
+  ...accessFaultNames,
 ];
 function check(actual, expected, label) {
   if (actual !== expected) throw Error(`${label}: expected ${expected}, received ${actual}`);
@@ -696,6 +698,10 @@ export async function measure(
   definitions.push(...external.definitions);
   results.push(...external.samples);
   unavailable.push(...external.unavailable);
+  const access = await measureAccessFaults(sides, { iterations, samples, workloads, reverse });
+  definitions.push(...access.definitions);
+  results.push(...access.samples);
+  unavailable.push(...access.unavailable);
   return {
     definitions,
     unavailable,
