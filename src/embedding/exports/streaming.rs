@@ -34,15 +34,14 @@ pub extern "C" fn core_masked_store(
                 return X87_EXCEPTION;
             }
         }
-        let bytes = unsafe {
+        unsafe {
             let state = &*core.state.get();
             assert_eq!(
                 data_ptr,
                 state.vector_scratch.as_ptr() as u32,
                 "invalid masked scratch pointer"
             );
-            state.vector_scratch
-        };
+        }
         let Some(address) = core.segment_address(offset, width, segment, Access::Write, false)
         else {
             return if core.segment_fault.is_some() {
@@ -51,11 +50,15 @@ pub extern "C" fn core_masked_store(
                 DATA
             };
         };
-        let selection = masked::select(mask_bits as u16, width);
-        if let Err(fault) = core
-            .image
-            .write_fields(address, width, selection.fields(), &bytes)
-        {
+        let result = if mask_bits == 0 {
+            core.image.check_write(address, width)
+        } else {
+            let bytes = unsafe { (*core.state.get()).vector_scratch };
+            let selection = masked::select(mask_bits as u16, width);
+            core.image
+                .write_fields(address, width, selection.fields(), &bytes)
+        };
+        if let Err(fault) = result {
             core.fault = Some(fault);
             return DATA;
         }
