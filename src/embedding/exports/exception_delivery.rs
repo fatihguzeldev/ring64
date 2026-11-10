@@ -126,7 +126,7 @@ pub extern "C" fn core_stage_exception(reason: i32) -> i32 {
         {
             return -1;
         }
-        state.event = RawEventState::encode(EventState::Pending(event));
+        state.set_event(EventState::Pending(event));
         1
     })
 }
@@ -137,7 +137,7 @@ pub extern "C" fn core_deliver_exception() -> i32 {
         let core = bridge.core.as_mut().unwrap();
         let (event, sp, flags) = unsafe {
             let state = &*core.state.get();
-            let event = match state.event.decode() {
+            let event = match state.event_state() {
                 Ok(event @ (EventState::Pending(_) | EventState::PendingInterrupt(_))) => event,
                 _ => return -1,
             };
@@ -175,7 +175,7 @@ pub extern "C" fn core_deliver_exception() -> i32 {
                     state.registers[4] = outcome.sp;
                     state.flags = outcome.flags;
                     state.interruptibility = 0;
-                    state.event = RawEventState::default();
+                    state.set_event(EventState::Ready);
                 }
                 if outcome.context_changed {
                     core.image.retire_sources();
@@ -194,7 +194,7 @@ pub extern "C" fn core_deliver_exception() -> i32 {
                     }
                     _ => unreachable!("pending entry source"),
                 };
-                unsafe { (*core.state.get()).event = RawEventState::encode(next) };
+                unsafe { (*core.state.get()).set_event(next) };
                 if next == EventState::Shutdown {
                     SHUTDOWN
                 } else {

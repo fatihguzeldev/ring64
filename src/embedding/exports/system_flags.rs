@@ -1,5 +1,5 @@
 use super::*;
-use crate::embedding::layout::{DEBUG_EXCEPTION, PROTECTION, RawEventState};
+use crate::embedding::layout::{DEBUG_EXCEPTION, PROTECTION};
 use crate::x86::exception::EventState;
 use crate::x86::flags;
 use crate::x86::instruction::{SystemFlagsDescriptor, SystemFlagsKind};
@@ -61,7 +61,7 @@ pub extern "C" fn core_halt(input_flags: u64) -> i32 {
             }
         };
         unsafe {
-            (*core.state.get()).event = RawEventState::encode(event);
+            (*core.state.get()).set_event(event);
         }
         0
     })
@@ -135,8 +135,8 @@ pub extern "C" fn core_debug_step(
             resume_flags,
         });
         unsafe {
-            if (*core.state.get()).event.decode() == Ok(EventState::Halted) {
-                (*core.state.get()).event = RawEventState::default();
+            if (*core.state.get()).event_state() == Ok(EventState::Halted) {
+                (*core.state.get()).set_event(EventState::Ready);
             }
             if (*core.state.get()).delivery_enabled == 0 {
                 (*core.state.get()).interruptibility = 0;

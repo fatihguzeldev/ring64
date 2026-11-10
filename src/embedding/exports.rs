@@ -13,6 +13,7 @@ use super::layout::{
 };
 
 mod context;
+mod debug;
 mod exception_delivery;
 mod external_interrupts;
 mod far_control;
@@ -133,9 +134,13 @@ pub extern "C" fn core_state_ptr() -> u32 {
 pub extern "C" fn core_import_state() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let event_end = SCALAR_STATE_SIZE + size_of::<RawEventState>();
+        let old_end = event_end + size_of::<RawInterruptState>();
+        let source_end = old_end + size_of::<super::layout::debug::DebugSource>();
+        let new_end = source_end + size_of::<super::layout::debug::Continuation>();
         if bridge.input.len() != SCALAR_STATE_SIZE
             && bridge.input.len() != event_end
-            && bridge.input.len() != event_end + size_of::<RawInterruptState>()
+            && bridge.input.len() != old_end
+            && bridge.input.len() != new_end
         {
             return bridge.error("state input length differs");
         }
@@ -166,7 +171,7 @@ pub extern "C" fn core_import_state() -> i32 {
             }
         };
         let interrupts = if bridge.input.len() > event_end {
-            match RawInterruptState::from_bytes(&bridge.input[event_end..]) {
+            match RawInterruptState::from_bytes(&bridge.input[event_end..old_end]) {
                 Ok(raw) => raw,
                 Err(message) => return bridge.error(message),
             }
@@ -177,15 +182,48 @@ pub extern "C" fn core_import_state() -> i32 {
             Ok(state) => state,
             Err(message) => return bridge.error(message),
         };
-        if let Err(message) = event.decode().and_then(|event| {
-            event.validate(
-                state.rip,
-                state.flags,
-                &bridge.core.as_ref().unwrap().context,
-                interruptibility,
-                decoded_interrupts,
+        let (source, continuation) = if bridge.input.len() == new_end {
+            let source = match super::layout::debug::DebugSource::from_bytes(
+                &bridge.input[old_end..source_end],
+            ) {
+                Ok(s) => s,
+                Err(e) => return bridge.error(e),
+            };
+            let continuation = match super::layout::debug::Continuation::from_bytes(
+                &bridge.input[source_end..new_end],
+            ) {
+                Ok(s) => s,
+                Err(e) => return bridge.error(e),
+            };
+            (source, continuation)
+        } else {
+            (
+                super::layout::debug::DebugSource::default(),
+                super::layout::debug::Continuation::default(),
             )
-        }) {
+        };
+        let mut decoded = match event.decode() {
+            Ok(event) => event,
+            Err(message) => return bridge.error(message),
+        };
+        if let crate::x86::exception::EventState::Pending(ref mut pending) = decoded {
+            pending.debug = source.decode().unwrap();
+        } else if source != super::layout::debug::DebugSource::default() {
+            return bridge.error("debug source requires pending exception");
+        }
+        if let Err(message) = decoded.validate(
+            state.rip,
+            state.flags,
+            &bridge.core.as_ref().unwrap().context,
+            interruptibility,
+            decoded_interrupts,
+        ) {
+            return bridge.error(message);
+        }
+        if let Err(message) = continuation.validate(
+            interruptibility,
+            decoded == crate::x86::exception::EventState::Ready,
+        ) {
             return bridge.error(message);
         }
         let core = bridge.core.as_mut().unwrap();
@@ -195,7 +233,8 @@ pub extern "C" fn core_import_state() -> i32 {
             let target = &mut *core.state.get();
             target.import(state);
             target.interruptibility = interruptibility;
-            target.event = event;
+            target.set_event(decoded);
+            target.debug.continuation = continuation;
             target.interrupts = interrupts;
         };
         core.fault = None;

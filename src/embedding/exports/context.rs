@@ -67,7 +67,9 @@ pub extern "C" fn core_set_context() -> i32 {
         let core = bridge.core.as_mut().unwrap();
         unsafe {
             (*core.state.get()).interruptibility = 0;
-            (*core.state.get()).event = RawEventState::default();
+            (*core.state.get()).set_event(crate::x86::exception::EventState::Ready);
+            (*core.state.get()).debug.continuation =
+                super::super::layout::debug::Continuation::default();
             (*core.state.get()).interrupts.nmi_blocked = 0;
         };
         core.debug_exception = None;

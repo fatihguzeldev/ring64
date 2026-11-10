@@ -51,7 +51,7 @@ fn step(core: &mut Core, pc: u64, flags: u64, shadow: u32, shutdown: bool) -> i3
         return -1;
     }
     let state = unsafe { &mut *core.state.get() };
-    match state.event.decode() {
+    match state.event_state() {
         Ok(EventState::PendingInterrupt(_)) => return PENDING_INTERRUPT,
         Ok(EventState::Ready | EventState::Halted) => {}
         Ok(EventState::Shutdown) if shutdown => {}
@@ -67,7 +67,7 @@ fn step(core: &mut Core, pc: u64, flags: u64, shadow: u32, shutdown: bool) -> i3
     if state.delivery_enabled != 0 {
         let event = interrupts.accept(pc, flags, &core.context, shadow).unwrap();
         state.interrupts = RawInterruptState::encode(interrupts);
-        state.event = RawEventState::encode(EventState::PendingInterrupt(event));
+        state.set_event(EventState::PendingInterrupt(event));
     }
     PENDING_INTERRUPT
 }

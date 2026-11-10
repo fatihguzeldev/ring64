@@ -1,3 +1,4 @@
+pub mod debug;
 use crate::x86::exception::{
     EventState, ExceptionEvent, InterruptEvent, InterruptSource, InterruptState,
 };
@@ -234,6 +235,7 @@ pub struct RunState {
     pub event: RawEventState,
     pub delivery_enabled: u32,
     pub interrupts: RawInterruptState,
+    pub debug: debug::DebugState,
 }
 
 impl Default for RunState {
@@ -254,6 +256,7 @@ impl Default for RunState {
             event: RawEventState::default(),
             delivery_enabled: 0,
             interrupts: RawInterruptState::default(),
+            debug: debug::DebugState::default(),
         }
     }
 }
@@ -270,10 +273,34 @@ impl RunState {
         self.repeat_remaining = 0;
         self.event = RawEventState::default();
         self.interrupts = RawInterruptState::default();
+        self.debug.source = debug::DebugSource::default();
+        self.debug.continuation = debug::Continuation::default();
     }
 
+    pub fn event_state(&self) -> Result<EventState, &'static str> {
+        let mut event = self.event.decode()?;
+        let source = self.debug.source.decode()?;
+        if let EventState::Pending(ref mut pending) = event {
+            if source.is_some() && pending.vector != 1 {
+                return Err("debug source on non-debug exception");
+            }
+            pending.debug = source;
+        } else if source.is_some() {
+            return Err("debug source without pending exception");
+        }
+        Ok(event)
+    }
+    pub fn set_event(&mut self, event: EventState) {
+        self.debug.source = debug::DebugSource::encode(if let EventState::Pending(e) = event {
+            e.debug
+        } else {
+            None
+        });
+        self.event = RawEventState::encode(event);
+    }
     pub fn descriptor() -> serde_json::Value {
         serde_json::json!({
+            "debug": { "offset": std::mem::offset_of!(Self,debug), "layout": debug::DebugState::descriptor() },
             "size": size_of::<Self>(),
             "scalarSize": SCALAR_STATE_SIZE,
             "xmm": std::mem::offset_of!(Self, xmm),
@@ -334,7 +361,7 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, interruptibility), 164);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
         assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
-        assert_eq!(size_of::<RunState>(), 616);
+        assert_eq!(size_of::<RunState>(), 712);
         assert_eq!(REASONS[18], "debug-exception");
         assert_eq!(RunState::descriptor()["interruptibilityBytes"], 4);
         let mut state = RunState {
@@ -350,7 +377,7 @@ mod tests {
         let mut transport = RunState::default();
         assert_eq!(std::mem::offset_of!(RunState, mxcsr), 448);
         assert_eq!(std::mem::offset_of!(RunState, x87), 456);
-        assert_eq!(size_of::<RunState>(), 616);
+        assert_eq!(size_of::<RunState>(), 712);
         let projection = &RunState::descriptor()["x87"];
         assert_eq!(projection["bytes"], 104);
         assert_eq!(projection["controlWord"], 80);
@@ -369,7 +396,7 @@ mod tests {
         let mut state = RunState::default();
         assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
         assert_eq!(std::mem::offset_of!(RunState, vector_scratch), 432);
-        assert_eq!(size_of::<RunState>(), 616);
+        assert_eq!(size_of::<RunState>(), 712);
         assert_eq!(RunState::descriptor()["scalarSize"], 176);
         assert_eq!(RunState::descriptor()["xmmBytes"], 256);
         assert_eq!(state.xmm, [[0; 16]; 16]);
@@ -381,7 +408,7 @@ mod tests {
     #[test]
     fn repeated_work_extends_transport_after_existing_fields() {
         let descriptor = RunState::descriptor();
-        assert_eq!(descriptor["size"], 616);
+        assert_eq!(descriptor["size"], 712);
         assert_eq!(descriptor["repeatRemaining"], 168);
         assert_eq!(descriptor["reasons"][11], "repeat-budget");
     }
@@ -405,7 +432,7 @@ mod tests {
             ]
         );
         assert_eq!(RunState::descriptor()["reasons"][9], "divide-error");
-        assert_eq!(size_of::<RunState>(), 616);
+        assert_eq!(size_of::<RunState>(), 712);
     }
 
     #[test]
@@ -417,8 +444,8 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, target), 152);
         assert_eq!(std::mem::offset_of!(RunState, fault_segment), 160);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
-        assert_eq!(size_of::<RunState>(), 616);
-        assert_eq!(RunState::descriptor()["size"], 616);
+        assert_eq!(size_of::<RunState>(), 712);
+        assert_eq!(RunState::descriptor()["size"], 712);
     }
 
     #[test]
@@ -534,5 +561,20 @@ mod tests {
             .decode()
             .is_err()
         );
+    }
+}
+
+#[cfg(test)]
+mod debug_append_tests {
+    use super::*;
+    #[test]
+    fn debug_state_appends_without_moving_instruction_or_numeric_offsets() {
+        assert_eq!(size_of::<RunState>(), 712);
+        assert_eq!(RunState::descriptor()["debug"]["offset"], 616);
+        let mut state = RunState::default();
+        assert_eq!(RunState::descriptor()["xmm"], 176);
+        assert_eq!(RunState::descriptor()["x87"]["offset"], 456);
+        state.import(State::default());
+        assert_eq!(state.debug.registers.dr6, 0xffff0ff0);
     }
 }
