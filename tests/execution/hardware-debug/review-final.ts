@@ -16,99 +16,171 @@ import {
 } from '../exception-delivery/fixture.js';
 
 export function finalOwnerReviewScenarios(compiler: WebAssembly.Module): Scenario[] {
-  return [false, true].map((invalid) => ({
-    name: invalid
-      ? 'hardware debug final review invalid IRET target discards deferred and tentative hits before status publication'
-      : 'hardware debug final review IRET combines disabled historical slot with current stack hit and TF while preserving restored RF',
-    async run() {
-      const context = snapshot();
-      context.segments.cs = loadedCode(64);
-      context.segments.ss = loadedData(32, 16);
-      const frame = image([invalid ? 0x800000000000n : 0x2000n, 8n, 0x10202n, 0x7000n, 16n], 8);
-      const guardedFrame = 'a5'.repeat(8) + encoded(frame) + 'a5'.repeat(8);
-      await using(
-        compiler,
-        '48cf',
-        context,
-        async (cpu) => {
-          const bank = { addresses: [0n, 0x6020n, 0n, 0n], dr6: 0n, dr7: 0xb00404n };
-          cpu.setDebugState(bank);
-          cpu.setState({
-            ...initial(0x1000n, { 4: 0x6000n }, 0x302n, { sti: false, ss: true }),
-            debugContinuation: { breakpoints: 1, originPc: 0xff0n },
-            interrupts: { irq: null, nmiPending: false, nmiBlocked: true },
-          });
-          const before = cpu.readState();
-          const beforeContext = cpu.readContext();
-          const numeric = preserveNumeric(cpu);
-          const result = await cpu.run({ budget: 1n, eventDelivery: { budget: 0n } });
-          equal(result.reason, 'event-budget', 'selected source precedes budget');
-          equal(result.retired, invalid ? 0n : 1n, 'retirement');
-          equal(result.remaining, invalid ? 1n : 0n, 'remaining instruction allowance');
-          equal(result.repeatIterations, 0n, 'no repeat work');
-          equal(result.remainingRepeatBudget, 1n, 'repeat allowance untouched');
-          equal(result.deliveryAttempts, 0n, 'selected source needs no entry attempt');
-          equal(result.remainingDeliveryBudget, 0n, 'entry allowance untouched');
-          same(
-            result.state,
-            {
-              registers: before.registers.map((value, index) =>
-                !invalid && index === 4 ? 0x7000n : value,
-              ),
-              flags: invalid ? 0x302n : 0x10202n,
-              rip: invalid ? 0x1000n : 0x2000n,
-              interruptibility: { sti: false, ss: invalid },
-              interrupts: { irq: null, nmiPending: false, nmiBlocked: false },
-              event: {
-                kind: 'pending',
-                exception: invalid
-                  ? {
-                      vector: 13,
-                      instructionPc: 0x1000n,
-                      returnPc: 0x1000n,
-                      savedFlags: 0x10302n,
-                      errorCode: 0,
-                    }
-                  : {
-                      vector: 1,
-                      instructionPc: 0x1000n,
-                      returnPc: 0x2000n,
-                      savedFlags: 0x10202n,
-                      debug: {
-                        class: 'trap',
-                        cause: 'data-breakpoint',
-                        breakpoints: 3,
-                        singleStep: true,
-                        instructionCompleted: true,
-                        deferredOriginPc: 0xff0n,
+  return [false, true]
+    .map((invalid) => ({
+      name: invalid
+        ? 'hardware debug final review invalid IRET target discards deferred and tentative hits before status publication'
+        : 'hardware debug final review IRET combines disabled historical slot with current stack hit and TF while preserving restored RF',
+      async run() {
+        const context = snapshot();
+        context.segments.cs = loadedCode(64);
+        context.segments.ss = loadedData(32, 16);
+        const frame = image([invalid ? 0x800000000000n : 0x2000n, 8n, 0x10202n, 0x7000n, 16n], 8);
+        const guardedFrame = 'a5'.repeat(8) + encoded(frame) + 'a5'.repeat(8);
+        await using(
+          compiler,
+          '48cf',
+          context,
+          async (cpu) => {
+            const bank = { addresses: [0n, 0x6020n, 0n, 0n], dr6: 0n, dr7: 0xb00404n };
+            cpu.setDebugState(bank);
+            cpu.setState({
+              ...initial(0x1000n, { 4: 0x6000n }, 0x302n, { sti: false, ss: true }),
+              debugContinuation: { breakpoints: 1, originPc: 0xff0n },
+              interrupts: { irq: null, nmiPending: false, nmiBlocked: true },
+            });
+            const before = cpu.readState();
+            const beforeContext = cpu.readContext();
+            const numeric = preserveNumeric(cpu);
+            const result = await cpu.run({ budget: 1n, eventDelivery: { budget: 0n } });
+            equal(result.reason, 'event-budget', 'selected source precedes budget');
+            equal(result.retired, invalid ? 0n : 1n, 'retirement');
+            equal(result.remaining, invalid ? 1n : 0n, 'remaining instruction allowance');
+            equal(result.repeatIterations, 0n, 'no repeat work');
+            equal(result.remainingRepeatBudget, 1n, 'repeat allowance untouched');
+            equal(result.deliveryAttempts, 0n, 'selected source needs no entry attempt');
+            equal(result.remainingDeliveryBudget, 0n, 'entry allowance untouched');
+            same(
+              result.state,
+              {
+                registers: before.registers.map((value, index) =>
+                  !invalid && index === 4 ? 0x7000n : value,
+                ),
+                flags: invalid ? 0x302n : 0x10202n,
+                rip: invalid ? 0x1000n : 0x2000n,
+                interruptibility: { sti: false, ss: invalid },
+                interrupts: { irq: null, nmiPending: false, nmiBlocked: false },
+                event: {
+                  kind: 'pending',
+                  exception: invalid
+                    ? {
+                        vector: 13,
+                        instructionPc: 0x1000n,
+                        returnPc: 0x1000n,
+                        savedFlags: 0x10302n,
+                        errorCode: 0,
+                      }
+                    : {
+                        vector: 1,
+                        instructionPc: 0x1000n,
+                        returnPc: 0x2000n,
+                        savedFlags: 0x10202n,
+                        debug: {
+                          class: 'trap',
+                          cause: 'data-breakpoint',
+                          breakpoints: 3,
+                          singleStep: true,
+                          instructionCompleted: true,
+                          deferredOriginPc: 0xff0n,
+                        },
                       },
-                    },
+                },
               },
-            },
-            'complete scalar source, consumed history, restored RF and early NMI unblock',
-          );
-          same(cpu.readContext(), beforeContext, 'same-context return or uncommitted target fault');
-          same(
-            cpu.readDebugState(),
-            { ...bank, dr6: invalid ? 0xffff0ff0n : 0xffff4ff3n },
-            'only selected current and historical causes update status',
-          );
-          same(
-            cpu.readMemory(0x5ff8n, 56),
-            hex(guardedFrame),
-            'whole source frame and guards unchanged',
-          );
-          cpu.setState(result.state);
-          same(cpu.readState(), result.state, 'exact pending checkpoint round trip');
-          numeric();
+              'complete scalar source, consumed history, restored RF and early NMI unblock',
+            );
+            same(
+              cpu.readContext(),
+              beforeContext,
+              'same-context return or uncommitted target fault',
+            );
+            same(
+              cpu.readDebugState(),
+              { ...bank, dr6: invalid ? 0xffff0ff0n : 0xffff4ff3n },
+              'only selected current and historical causes update status',
+            );
+            same(
+              cpu.readMemory(0x5ff8n, 56),
+              hex(guardedFrame),
+              'whole source frame and guards unchanged',
+            );
+            cpu.setState(result.state);
+            same(cpu.readState(), result.state, 'exact pending checkpoint round trip');
+            numeric();
+          },
+          {
+            data: [
+              { base: 0x4008n, bytes: CODE64 + DATA32 },
+              { base: 0x5ff8n, bytes: guardedFrame },
+            ],
+          },
+        );
+      },
+    }))
+    .concat(
+      [false, true].map((hit) => ({
+        name: hit
+          ? 'hardware debug final review native dynamic backedge rechecks execute after one RF-suppressed instruction'
+          : 'hardware debug final review active execute miss keeps dynamic JMP routing in one native entry',
+        async run() {
+          await using(compiler, '48ffc97402ffe090', snapshot(), async (cpu) => {
+            const bank = {
+              addresses: [hit ? 0x1000n : 0x2000n, 0n, 0n, 0n],
+              dr6: 0n,
+              dr7: 0x401n,
+            };
+            cpu.setDebugState(bank);
+            cpu.setState(initial(0x1000n, { 0: 0x1000n, 1: 3n }, hit ? 0x10202n : 0x202n));
+            const before = cpu.readState();
+            const context = cpu.readContext();
+            const numeric = preserveNumeric(cpu);
+            const result = await cpu.run({ budget: 8n });
+            equal(result.reason, hit ? 'debug-exception' : 'budget', 'native dynamic route');
+            equal(result.retired, hit ? 3n : 8n, 'exact work before backedge source or exit');
+            equal(result.remaining, hit ? 5n : 0n, 'remaining instruction allowance');
+            equal(result.repeatIterations, 0n, 'no repeat work');
+            equal(result.remainingRepeatBudget, 8n, 'repeat allowance untouched');
+            same(
+              result.state,
+              {
+                ...before,
+                registers: before.registers.map((value, index) =>
+                  index === 1 ? (hit ? 2n : 0n) : value,
+                ),
+                flags: hit ? 0x202n : 0x246n,
+                rip: hit ? 0x1000n : 0x1007n,
+              },
+              'complete dynamic-loop state with RF consumed once',
+            );
+            if (hit) {
+              same(
+                result.debugException,
+                {
+                  vector: 1,
+                  class: 'fault',
+                  cause: 'execution-breakpoint',
+                  breakpoints: 1,
+                  instructionPc: 0x1000n,
+                  resumePc: 0x1000n,
+                  instructionCompleted: false,
+                  resumeFlags: 0x202n,
+                },
+                'exact native-backedge execute source with cleared saved RF',
+              );
+            } else {
+              equal(result.debugException, undefined, 'miss has no source');
+            }
+            equal(result.resources.nativeEntries, 1, 'dynamic edge stays native');
+            equal(result.resources.dispatches, 0, 'no host redispatch');
+            same(
+              cpu.readDebugState(),
+              { ...bank, dr6: hit ? 0xffff0ff1n : 0xffff0ff0n },
+              'exact current mask and unchanged bank',
+            );
+            same(cpu.readContext(), context, 'context unchanged');
+            same(cpu.readMemory(0x1000n, 8), hex('48ffc97402ffe090'), 'code untouched');
+            numeric();
+          });
         },
-        {
-          data: [
-            { base: 0x4008n, bytes: CODE64 + DATA32 },
-            { base: 0x5ff8n, bytes: guardedFrame },
-          ],
-        },
-      );
-    },
-  }));
+      })),
+    );
 }
