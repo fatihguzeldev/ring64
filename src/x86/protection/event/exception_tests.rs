@@ -380,3 +380,76 @@ fn external_vm_frame_uses_nine_dwords_with_vm_but_without_forced_rf() {
         Err(EventFailure::Unsupported)
     );
 }
+
+#[test]
+fn switched_legacy_stack_limits_keep_new_ss_and_ext_without_publishing_a_frame() {
+    for descriptor in [0x0040_9300_0000_41f7, 0x0040_9700_0000_41f7] {
+        for external in [false, true] {
+            let (mut context, mut image) = setup("protected", 3, 32, 0x0000_ee00_0008_2000);
+            image.write(0x1010, 8, descriptor).unwrap();
+            image.write(0x4004, 4, 0x4200).unwrap();
+            image.write(0x4008, 2, 16).unwrap();
+            context.set_tr(TaskRegister {
+                selector: 0x28,
+                valid: true,
+                base: 0x4000,
+                limit: 0x67,
+                attributes: 0x8b,
+            });
+            let before = context.clone();
+            let guard = image.read_bytes(0x4100, 256).unwrap();
+            let failure = if external {
+                enter_interrupt(
+                    &mut context,
+                    &mut image,
+                    InterruptEvent {
+                        source: InterruptSource::Irq(32),
+                        return_pc: 0x1000,
+                        saved_flags: 0x202,
+                    },
+                    0x4200,
+                    0x202,
+                )
+            } else {
+                execute(
+                    &mut context,
+                    &mut image,
+                    SoftwareEventDescriptor {
+                        kind: SoftwareEventKind::Interrupt,
+                        width: Width::W16,
+                        vector: 32,
+                    },
+                    EventInputs {
+                        flags: 0x202,
+                        sp: 0x4200,
+                        next_pc: 0x1002,
+                    },
+                )
+            }
+            .unwrap_err();
+            assert_eq!(
+                failure.architectural(&context),
+                Some(ProtectionFault {
+                    vector: 12,
+                    error_code: 16 | u16::from(external),
+                    phase: ProtectionPhase::Target,
+                    selector: Some(16),
+                }),
+                "{failure:?}"
+            );
+            assert!(matches!(
+                failure,
+                EventFailure::StackLimit {
+                    failure: crate::x86::context::SegmentFault {
+                        segment: Segment::Ss,
+                        cause: crate::x86::context::SegmentCause::Limit,
+                        ..
+                    },
+                    ..
+                }
+            ));
+            assert_eq!(context, before);
+            assert_eq!(image.read_bytes(0x4100, 256).unwrap(), guard);
+        }
+    }
+}

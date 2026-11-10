@@ -77,12 +77,14 @@ pub extern "C" fn core_stage_exception(reason: i32) -> i32 {
                             AccessFailure::Linear(fault),
                         )
                     }),
-                    SEGMENT => core.segment_fault.and_then(|fault| {
-                        crate::x86::protection::access_fault(
-                            &core.context,
-                            fault.segment,
-                            AccessFailure::Segment(fault),
-                        )
+                    SEGMENT => core.protection_fault.or_else(|| {
+                        core.segment_fault.and_then(|fault| {
+                            crate::x86::protection::access_fault(
+                                &core.context,
+                                fault.segment,
+                                AccessFailure::Segment(fault),
+                            )
+                        })
                     }),
                     TARGET => core
                         .context
@@ -180,7 +182,10 @@ pub extern "C" fn core_deliver_exception() -> i32 {
                 }
                 DISPATCH
             }
-            Err(EventFailure::Protection(fault)) => {
+            Err(EventFailure::Protection(fault))
+            | Err(EventFailure::StackLimit {
+                protection: fault, ..
+            }) => {
                 let next = match event {
                     EventState::Pending(event) => event.escalate(fault.vector, fault.error_code),
                     EventState::PendingInterrupt(event) => {

@@ -109,7 +109,7 @@ fn enter(
             phase: SystemPhase::GateRead,
         }
         .read(context, image, ext)?;
-        let mut frame = Frame::new(context, inputs.sp);
+        let mut frame = Frame::new(context, inputs.sp, None);
         for value in [
             saved_flags,
             u64::from(context.selector(Segment::Cs)),
@@ -254,7 +254,9 @@ fn enter(
     } else {
         inputs.sp
     };
-    let mut frame = Frame::new(&prepared, initial_sp);
+    // A new legacy stack's limit failure names NewSS; ordinary SS accesses use zero.
+    let new_stack_error = stack_loaded.map(|_| (prepared.selector(Segment::Ss) & !3) | ext);
+    let mut frame = Frame::new(&prepared, initial_sp, new_stack_error);
     if context.mode() == Mode::Virtual8086 {
         for segment in [Segment::Gs, Segment::Fs, Segment::Ds, Segment::Es] {
             frame.push(&prepared, u64::from(context.selector(segment)), width)?;

@@ -1,5 +1,5 @@
 use super::{ExecutionContext, Image, ProtectionFault, ProtectionPhase, SystemMemoryFault};
-use crate::x86::context::{AccessFailure, Mode, Segment};
+use crate::x86::context::{AccessFailure, Mode, Segment, SegmentFault};
 use crate::x86::exception::{ExceptionEvent, InterruptEvent};
 use crate::x86::instruction::{SoftwareEventDescriptor, SoftwareEventKind, Width};
 
@@ -42,6 +42,10 @@ pub enum EventFailure {
         segment: Segment,
         failure: AccessFailure,
     },
+    StackLimit {
+        failure: SegmentFault,
+        protection: ProtectionFault,
+    },
     Protection(ProtectionFault),
     SystemMemory(SystemMemoryFault),
     Unsupported,
@@ -51,6 +55,7 @@ impl EventFailure {
     pub fn architectural(self, context: &ExecutionContext) -> Option<ProtectionFault> {
         match self {
             Self::Protection(fault) => Some(fault),
+            Self::StackLimit { protection, .. } => Some(protection),
             Self::Operand { segment, failure } => super::access_fault(context, segment, failure),
             Self::SystemMemory(fault) => super::system_fault(context, fault),
             Self::Unsupported => None,

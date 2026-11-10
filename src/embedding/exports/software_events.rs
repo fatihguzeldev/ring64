@@ -60,6 +60,14 @@ pub extern "C" fn core_software_event(
                     DATA
                 };
             }
+            Err(EventFailure::StackLimit {
+                failure,
+                protection,
+            }) => {
+                core.segment_fault = Some(failure);
+                core.protection_fault = Some(protection);
+                return SEGMENT;
+            }
             Err(EventFailure::Protection(fault)) => {
                 core.protection_fault = Some(fault);
                 return PROTECTION;

@@ -14,10 +14,11 @@ pub(super) struct Frame {
     cursor: u64,
     raw: u64,
     pointer_width: Width,
+    new_stack_error: Option<u16>,
 }
 
 impl Frame {
-    pub fn new(context: &ExecutionContext, sp: u64) -> Self {
+    pub fn new(context: &ExecutionContext, sp: u64, new_stack_error: Option<u16>) -> Self {
         let pointer_width = context.stack_width();
         Self {
             writes: [Write::default(); 10],
@@ -25,6 +26,7 @@ impl Frame {
             cursor: sp & pointer_width.mask(),
             raw: sp,
             pointer_width,
+            new_stack_error,
         }
     }
 
@@ -45,6 +47,20 @@ impl Frame {
                 false,
             )
             .map_err(|failure| {
+                if let Some(error_code) = self.new_stack_error
+                    && let AccessFailure::Segment(segment) = failure
+                    && segment.cause == crate::x86::context::SegmentCause::Limit
+                {
+                    return EventFailure::StackLimit {
+                        failure: segment,
+                        protection: ProtectionFault {
+                            vector: 12,
+                            error_code,
+                            phase: ProtectionPhase::Target,
+                            selector: Some(context.selector(Segment::Ss)),
+                        },
+                    };
+                }
                 if context.mode() == Mode::Long64
                     && matches!(
                         failure,

@@ -145,7 +145,11 @@ export function correctnessReviewScenarios(compiler: WebAssembly.Module): Scenar
     {
       name: 'architectural access reviewed INT1 stack and handler canonical faults retain hard zero under EXT1',
       async run() {
-        for (const stack of [true, false]) {
+        for (const [stack, rawSp] of [
+          [true, 0x800000000000n],
+          [true, 0xffff800000000000n],
+          [false, 0x8000n],
+        ] as const) {
           const context = snapshot();
           context.segments.cs = loadedCode(64);
           context.segments.ss = loadedData(32);
@@ -155,7 +159,7 @@ export function correctnessReviewScenarios(compiler: WebAssembly.Module): Scenar
             'f1',
             context,
             async (cpu) => {
-              const state = initial(0x1000n, { 4: stack ? 0x800000000000n : 0x8000n }, 0x10202n);
+              const state = initial(0x1000n, { 4: rawSp }, 0x10202n);
               cpu.setState(state);
               const report = await cpu.run({ budget: 1n });
               equal(report.reason, 'protection-fault', 'INT1 selected target/stack check');
