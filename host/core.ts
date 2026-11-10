@@ -1,4 +1,16 @@
 import {
+  captureDebugState,
+  captureDebugContinuation,
+  readDebugSource,
+  writeDebugSource,
+  readDebugContinuation,
+  writeDebugContinuation,
+  validateDebugLayout,
+  type DebugState,
+  type DebugContinuation,
+  type DebugLayout,
+} from './debug.js';
+import {
   contextFromJson,
   type ContextInfo,
   type ExecutionContext,
@@ -33,6 +45,7 @@ import {
 } from './x87.js';
 
 export interface State {
+  debugContinuation?: DebugContinuation;
   registers: bigint[];
   flags: bigint;
   rip: bigint;
@@ -54,8 +67,11 @@ export interface StateSnapshot extends State {
 
 export interface DebugException {
   vector: 1;
-  class: 'trap';
-  cause: 'single-step';
+  class: 'trap' | 'fault';
+  cause: 'single-step' | 'execution-breakpoint' | 'general-detect' | 'data-breakpoint' | 'combined';
+  breakpoints?: number;
+  singleStep?: boolean;
+  deferredOriginPc?: bigint;
   instructionPc: bigint;
   resumePc: bigint;
   instructionCompleted: boolean;
@@ -151,6 +167,7 @@ export interface UnitMetadata {
 }
 
 interface Layout {
+  debug: DebugLayout;
   size: number;
   scalarSize: number;
   xmm: number;
@@ -195,6 +212,7 @@ type CoreExports = WebAssembly.Exports & {
   core_target_check(target: bigint): number;
   core_state_ptr(): number;
   core_import_state(): number;
+  core_import_debug(): number;
   core_import_xmm(): number;
   core_import_mxcsr(): number;
   core_import_x87(): number;
@@ -336,7 +354,17 @@ export function captureState(state: State): StateSnapshot {
     'interrupts' in state
       ? captureInterruptState(state.interrupts!)
       : { irq: null, nmiPending: false, nmiBlocked: false };
-  return { registers, flags, rip, interruptibility, event, interrupts };
+  const debugContinuation =
+    'debugContinuation' in state ? captureDebugContinuation(state.debugContinuation!) : undefined;
+  return {
+    registers,
+    flags,
+    rip,
+    interruptibility,
+    event,
+    interrupts,
+    ...(debugContinuation ? { debugContinuation } : {}),
+  };
 }
 
 export function captureMxcsr(value: number): number {
@@ -469,6 +497,11 @@ export class Core {
     if (layout.deliveryEnabled < layout.event.offset + layout.event.bytes)
       throw new Error('core returned an overlapping delivery control');
     validateInterruptLayout(layout.interrupts, layout.size, layout.deliveryEnabled + 4);
+    validateDebugLayout(
+      layout.debug,
+      layout.size,
+      layout.interrupts.offset + layout.interrupts.bytes,
+    );
     this.stateView();
   }
 
@@ -505,6 +538,7 @@ export class Core {
       'core_target_check',
       'core_state_ptr',
       'core_import_state',
+      'core_import_debug',
       'core_import_xmm',
       'core_import_mxcsr',
       'core_import_x87',
@@ -621,7 +655,18 @@ export class Core {
   snapshot(): StateSnapshot {
     const view = this.stateView();
     const interruptibility = view.getUint32(this.#layout.interruptibility, true);
+    const event = readEvent(view, this.#layout.event, this.#layout.event.offset);
+    const d = this.#layout.debug,
+      raw = d.layout;
+    const source = readDebugSource(view, raw.source, d.offset + raw.sourceOffset);
+    if (source && event.kind === 'pending') event.exception.debug = source;
+    const debugContinuation = readDebugContinuation(
+      view,
+      raw.continuation,
+      d.offset + raw.continuationOffset,
+    );
     return {
+      ...(debugContinuation ? { debugContinuation } : {}),
       registers: Array.from({ length: 16 }, (_, i) =>
         view.getBigUint64(this.#layout.registers + i * 8, true),
       ),
@@ -631,14 +676,17 @@ export class Core {
         sti: (interruptibility & 1) !== 0,
         ss: (interruptibility & 2) !== 0,
       },
-      event: readEvent(view, this.#layout.event, this.#layout.event.offset),
+      event,
       interrupts: readInterrupts(view, this.#layout.interrupts, this.#layout.interrupts.offset),
     };
   }
 
   setState(state: State): void {
     const input = captureState(state);
-    const size = this.#layout.scalarSize + this.#layout.event.bytes + this.#layout.interrupts.bytes;
+    const baseSize =
+      this.#layout.scalarSize + this.#layout.event.bytes + this.#layout.interrupts.bytes;
+    const debug = this.#layout.debug.layout;
+    const size = baseSize + debug.source.bytes + debug.continuation.bytes;
     const pointer = this.#exports.core_input(size) >>> 0;
     const view = new DataView(this.#exports.memory.buffer, pointer, size);
     for (let index = 0; index < 16; index++) {
@@ -669,10 +717,47 @@ export class Core {
       this.#layout.interrupts,
       input.interrupts,
     );
+    writeDebugSource(
+      new DataView(view.buffer, view.byteOffset + baseSize, debug.source.bytes),
+      debug.source,
+      input.event.kind === 'pending' ? input.event.exception.debug : undefined,
+    );
+    writeDebugContinuation(
+      new DataView(
+        view.buffer,
+        view.byteOffset + baseSize + debug.source.bytes,
+        debug.continuation.bytes,
+      ),
+      debug.continuation,
+      input.debugContinuation,
+    );
     if (this.#exports.core_import_state() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
   }
 
+  readDebugState(): DebugState {
+    const view = this.stateView(),
+      d = this.#layout.debug,
+      l = d.layout;
+    return {
+      addresses: Array.from({ length: 4 }, (_, i) =>
+        view.getBigUint64(d.offset + l.addresses + i * 8, true),
+      ),
+      dr6: view.getBigUint64(d.offset + l.dr6, true),
+      dr7: view.getBigUint64(d.offset + l.dr7, true),
+    };
+  }
+  setDebugState(state: DebugState): void {
+    const input = captureDebugState(state);
+    const pointer = this.#exports.core_input(48) >>> 0;
+    const view = new DataView(this.#exports.memory.buffer, pointer, 48);
+    const d = this.#layout.debug.layout;
+    input.addresses.forEach((a, i) => view.setBigUint64(d.addresses + i * 8, a, true));
+    view.setBigUint64(d.dr6, input.dr6, true);
+    view.setBigUint64(d.dr7, input.dr7, true);
+    if (this.#exports.core_import_debug() !== 0)
+      throw new TypeError(this.info<{ error: string }>().error);
+  }
   readXmmState(): bigint[] {
     const view = this.stateView();
     return Array.from({ length: 16 }, (_, index) => {

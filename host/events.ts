@@ -1,4 +1,6 @@
+import { captureDebugSource, type DebugSource } from './debug.js';
 export interface ExceptionEvent {
+  debug?: DebugSource;
   vector: 0 | 1 | 6 | 8 | 10 | 11 | 12 | 13 | 16 | 19;
   instructionPc: bigint;
   returnPc: bigint;
@@ -96,6 +98,7 @@ export function captureEventState(input: EventState): EventState {
   const returnPc = unsigned64(source.returnPc, 'event return PC');
   const savedFlags = unsigned64(source.savedFlags, 'event saved FLAGS');
   const exception: ExceptionEvent = { vector, instructionPc, returnPc, savedFlags };
+  if ('debug' in source) exception.debug = captureDebugSource(source.debug!);
   if ('errorCode' in source)
     exception.errorCode = word(source.errorCode!, 0xffff, 'event error code');
   return { kind, exception };

@@ -1,3 +1,4 @@
+import { captureDebugState, type DebugState } from './debug.js';
 import {
   captureContext,
   type ExecutionContext,
@@ -290,6 +291,17 @@ export class Cpu {
     const bank = captureXmmState(state);
     this.requireIdle();
     this.engineCall(() => this.#engine.setXmmState(bank));
+  }
+  readDebugState(): DebugState {
+    this.requireIdle();
+    return this.engineCall(() => this.#engine.readDebugState());
+  }
+  setDebugState(state: DebugState): void {
+    const generation = this.requireIdle();
+    const input = captureDebugState(state);
+    this.requireIdle(generation);
+    this.engineCall(() => this.#engine.setDebugState(input));
+    this.pruneTranslations();
   }
   readXmmState(): bigint[] {
     this.requireIdle();

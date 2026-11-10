@@ -36,3 +36,5 @@ export type {
   SegmentType,
   SegmentFault,
 } from './context.js';
+
+export type { DebugState, DebugContinuation, DebugSource } from './debug.js';
