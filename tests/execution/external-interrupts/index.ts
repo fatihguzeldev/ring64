@@ -2,6 +2,7 @@ import { activityScenarios } from './activity.js';
 import { sourceScenarios } from './sources.js';
 import { boundaryScenarios } from './boundaries.js';
 import { frontierScenarios } from './frontiers.js';
+import { stateScenarios } from './state.js';
 import type { Scenario } from './fixture.js';
 
 export function externalInterruptScenarios(compiler: WebAssembly.Module): Scenario[] {
@@ -10,5 +11,6 @@ export function externalInterruptScenarios(compiler: WebAssembly.Module): Scenar
     ...sourceScenarios(compiler),
     ...boundaryScenarios(compiler),
     ...frontierScenarios(compiler),
+    ...stateScenarios(compiler),
   ];
 }
