@@ -32,10 +32,15 @@ export function recoveryScenarios(compiler: WebAssembly.Module): Scenario[] {
           async (cpu) => {
             cpu.setDebugState({ addresses: [0x1000n, 0n, 0n, 0n], dr6: 0n, dr7: 0x401n });
             cpu.setState(initial(0x1000n, { 4: 0x8000n }, 0x202n));
-            const r = await cpu.run({ budget: 3n, eventDelivery: { budget: 2n } });
-            delivery(r, 'budget', 3n, 1n, 1n);
+            const r = await cpu.run({ budget: 4n, eventDelivery: { budget: 2n } });
+            delivery(r, 'budget', 4n, 1n, 1n);
             equal(r.state.rip, 0x1001n, 'exact retried NOP continuation');
             equal(r.state.flags, 0x202n, 'retry consumes RF');
+            equal(
+              r.state.registers[0],
+              0x11223344ffff0ff1n,
+              'guest reads selected B0 before RF repair',
+            );
             equal(cpu.readDebugState().dr7, 0x401n, 'comparator remains installed');
             same(
               cpu.readMemory(0x7ff4n, 12),
@@ -47,7 +52,7 @@ export function recoveryScenarios(compiler: WebAssembly.Module): Scenario[] {
             data: [
               { base: 0x4008n, bytes: CODE32 + DATA32 },
               { base: a, bytes: gate(32, 8, 0x2000n, 0) },
-              { base: 0x2000n, bytes: '814c240800000100cf', execute: true },
+              { base: 0x2000n, bytes: '0f21f0814c240800000100cf', execute: true },
               { base: STACK, bytes: FILL },
             ],
           },
