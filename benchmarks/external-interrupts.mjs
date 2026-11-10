@@ -371,14 +371,23 @@ export async function measureExternalInterrupts(
                 cpu.writeMemory(STACK - 12n, code.subarray(0, 12));
               if (row.kind === 'halted-nmi-wakeup' || row.kind === 'rep-idle-reentry') {
                 const prepared = await cpu.run({
-                  budget: row.kind === 'halted-nmi-wakeup' ? 2n : 1n,
+                  budget: 1n,
                   repeatBudget: 1n,
+                  ...(row.kind === 'halted-nmi-wakeup'
+                    ? { exceptionDelivery: { budget: 0n } }
+                    : {}),
                 });
                 equal(
                   prepared.reason,
-                  row.kind === 'halted-nmi-wakeup' ? 'halted' : 'repeat-budget',
+                  row.kind === 'halted-nmi-wakeup' ? 'budget' : 'repeat-budget',
                   'private preparation',
                 );
+                if (row.kind === 'halted-nmi-wakeup')
+                  equal(
+                    prepared.state.event,
+                    { kind: 'halted' },
+                    'last-budget HLT publishes activity before wake preparation',
+                  );
                 setupRetired += prepared.retired;
                 setupRepeated += prepared.repeatIterations;
                 sum(setupResources, prepared.resources);
