@@ -1,3 +1,5 @@
+import { reviewBoundaryScenarios } from './review-boundaries.js';
+import { activityReviewScenarios } from './review-activity.js';
 import { registerMatrixScenarios } from './register-matrix.js';
 import { correctnessReviewScenarios } from './review-correctness.js';
 import { transitionScenarios } from './transitions.js';
@@ -19,6 +21,8 @@ export function hardwareDebugScenarios(compiler: WebAssembly.Module): Scenario[]
     ...registerScenarios(compiler),
     ...registerMatrixScenarios(compiler),
     ...correctnessReviewScenarios(compiler),
+    ...reviewBoundaryScenarios(compiler),
+    ...activityReviewScenarios(compiler),
     ...executeScenarios(compiler),
     ...recoveryScenarios(compiler),
   ];
