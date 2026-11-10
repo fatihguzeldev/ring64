@@ -149,7 +149,8 @@ async function browserRun() {
         pathname === '/software-events.mjs' ||
         pathname === '/event-delivery.mjs' ||
         pathname === '/external-interrupts.mjs' ||
-        pathname === '/access-faults.mjs'
+        pathname === '/access-faults.mjs' ||
+        pathname === '/debug.mjs'
       )
         file = resolve(root, 'benchmarks', pathname.slice(1));
       else {
@@ -239,6 +240,7 @@ const benchmarkFiles = [
   'event-delivery.mjs',
   'external-interrupts.mjs',
   'access-faults.mjs',
+  'debug.mjs',
 ];
 const benchmarkHash = createHash('sha256');
 for (const file of benchmarkFiles) {
