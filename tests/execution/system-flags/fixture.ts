@@ -33,6 +33,7 @@ export function initial(
     ...input(rip, registers, flags),
     interruptibility: { ...interruptibility },
     event: { kind: 'ready' },
+    interrupts: { irq: null, nmiPending: false, nmiBlocked: false },
   };
 }
 

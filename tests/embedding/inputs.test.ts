@@ -37,6 +37,7 @@ function state(): State {
     rip: CODE,
     interruptibility: { sti: false, ss: false },
     event: { kind: 'ready' },
+    interrupts: { irq: null, nmiPending: false, nmiBlocked: false },
   };
 }
 

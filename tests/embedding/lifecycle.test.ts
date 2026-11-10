@@ -27,6 +27,7 @@ function state(seed = 0x1122_3344_0000_0000n, flags = 2n): State {
     rip: CODE,
     interruptibility: { sti: false, ss: false },
     event: { kind: 'ready' },
+    interrupts: { irq: null, nmiPending: false, nmiBlocked: false },
   };
 }
 

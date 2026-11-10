@@ -54,6 +54,7 @@ export function initial(rip = CODE, registers: Record<number, bigint> = {}, flag
     rip,
     interruptibility: { sti: false, ss: false },
     event: { kind: 'ready' },
+    interrupts: { irq: null, nmiPending: false, nmiBlocked: false },
   };
 }
 
@@ -73,6 +74,7 @@ export function changed(
       ? { ...input.interruptibility }
       : { sti: false, ss: false },
     event: structuredClone(input.event ?? { kind: 'ready' }),
+    interrupts: { ...(input.interrupts ?? { irq: null, nmiPending: false, nmiBlocked: false }) },
   };
 }
 
@@ -88,6 +90,35 @@ export function state(actual: State, expected: State): void {
   if (actualEvent.kind === 'pending' && expectedEvent.kind === 'pending')
     for (const name of ['vector', 'instructionPc', 'returnPc', 'savedFlags', 'errorCode'] as const)
       equal(actualEvent.exception[name], expectedEvent.exception[name], `pending event ${name}`);
+  if (actualEvent.kind === 'pending-interrupt' && expectedEvent.kind === 'pending-interrupt') {
+    equal(
+      actualEvent.interrupt.source.kind,
+      expectedEvent.interrupt.source.kind,
+      'interrupt source',
+    );
+    if (
+      actualEvent.interrupt.source.kind === 'irq' &&
+      expectedEvent.interrupt.source.kind === 'irq'
+    )
+      equal(
+        actualEvent.interrupt.source.vector,
+        expectedEvent.interrupt.source.vector,
+        'IRQ vector',
+      );
+    for (const name of ['returnPc', 'savedFlags'] as const)
+      equal(
+        actualEvent.interrupt[name],
+        expectedEvent.interrupt[name],
+        `pending interrupt ${name}`,
+      );
+  }
+  const empty = { irq: null, nmiPending: false, nmiBlocked: false };
+  for (const name of ['irq', 'nmiPending', 'nmiBlocked'] as const)
+    equal(
+      (actual.interrupts ?? empty)[name],
+      (expected.interrupts ?? empty)[name],
+      `interrupts ${name}`,
+    );
 }
 
 export function exit(

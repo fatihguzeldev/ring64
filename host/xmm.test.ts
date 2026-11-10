@@ -19,7 +19,7 @@ const options = () => ({
   limits,
 });
 const layout = {
-  size: 608,
+  size: 616,
   scalarSize: 176,
   registers: 0,
   flags: 128,
@@ -45,6 +45,8 @@ const layout = {
     instructionPointer: 88,
     dataPointer: 96,
   },
+  deliveryEnabled: 600,
+  interrupts: { offset: 604, bytes: 12, irq: 0, nmiPending: 4, nmiBlocked: 8 },
   event: {
     offset: 560,
     bytes: 40,
@@ -100,7 +102,7 @@ async function mockedCore(
       return 0;
     },
     core_import_state() {
-      assert.equal(inputLength, 216);
+      assert.equal(inputLength, 228);
       new Uint8Array(memory.buffer, statePointer, 144).set(
         new Uint8Array(memory.buffer, inputPointer, 144),
       );
@@ -113,6 +115,13 @@ async function mockedCore(
         descriptor.event.bytes,
       ).set(
         new Uint8Array(memory.buffer, inputPointer + descriptor.scalarSize, descriptor.event.bytes),
+      );
+      new Uint8Array(memory.buffer, statePointer + descriptor.interrupts.offset, 12).set(
+        new Uint8Array(
+          memory.buffer,
+          inputPointer + descriptor.scalarSize + descriptor.event.bytes,
+          12,
+        ),
       );
       return 0;
     },
@@ -374,6 +383,12 @@ test('required arithmetic and boundary helpers reject construction before core i
     'core_configure_delivery',
     'core_stage_exception',
     'core_deliver_exception',
+    'core_request_interrupt',
+    'core_request_nmi',
+    'core_external_boundary',
+    'core_shutdown_can_wake',
+    'core_external_step',
+    'core_halt',
   ]) {
     const missing = await mockedCore(layout, 8192, undefined, name);
     missing.core?.dispose();

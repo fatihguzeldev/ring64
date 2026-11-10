@@ -49,6 +49,7 @@ test('default context and identical imports preserve raw State and warm owners',
       'event',
       'flags',
       'interruptibility',
+      'interrupts',
       'registers',
       'rip',
     ]);

@@ -174,6 +174,9 @@ async function fixture(steps: Step[] = []) {
   const entries: { budget: bigint; repeatBudget: bigint | undefined }[] = [];
   const stateImports: unknown[] = [];
   let boundaryObserved = false;
+  let irq: number | null = null;
+  let nmiPending = false;
+  const deliveryConfigurations: boolean[] = [];
   const instantiatedProfiles: boolean[] = [];
   const preparedProfiles: boolean[] = [];
   const queriedProfiles: boolean[] = [];
@@ -185,9 +188,22 @@ async function fixture(steps: Step[] = []) {
       rip: current.rip,
       interruptibility: { sti: false, ss: false },
       event: { kind: 'ready' },
+      interrupts: { irq, nmiPending, nmiBlocked: false },
     }),
-    configureDelivery() {},
+    configureDelivery(enabled: boolean) {
+      deliveryConfigurations.push(enabled);
+    },
     eventKind: () => 'ready',
+    hasQueuedInterrupts: () => irq !== null || nmiPending,
+    externalBoundary: () => 'dispatch',
+    requestInterrupt(vector: number) {
+      if (irq !== null) return false;
+      irq = vector;
+      return true;
+    },
+    requestNmi() {
+      nmiPending = true;
+    },
     stageException: () => false,
     deliverException: () => 'dispatch',
     setState(state: unknown) {
@@ -267,6 +283,7 @@ async function fixture(steps: Step[] = []) {
       instantiatedProfiles,
       preparedProfiles,
       queriedProfiles,
+      deliveryConfigurations,
       setBoundaryObserved(value: boolean) {
         boundaryObserved = value;
       },
@@ -295,6 +312,171 @@ test('run reports both accounting pairs on exits before native execution', async
     cpu.dispose();
   }
 });
+
+test('canonical delivery and its legacy alias capture one budget and share accounting', async () => {
+  const f = await fixture();
+  try {
+    for (const alias of ['eventDelivery', 'exceptionDelivery'] as const) {
+      let optionReads = 0,
+        budgetReads = 0;
+      const options = {
+        budget: 0n,
+        get [alias]() {
+          optionReads++;
+          return {
+            get budget() {
+              budgetReads++;
+              return 7n;
+            },
+          };
+        },
+      };
+      const result = await f.cpu.run(options);
+      assert.equal(optionReads, 1);
+      assert.equal(budgetReads, 1);
+      assert.equal(result.deliveryAttempts, 0n);
+      assert.equal(result.remainingDeliveryBudget, 7n);
+    }
+    assert.deepEqual(f.deliveryConfigurations, [true, false, true, false]);
+    for (const options of [
+      { budget: 0n, eventDelivery: { budget: 1n }, exceptionDelivery: { budget: 1n } },
+      { budget: 0n, eventDelivery: null, exceptionDelivery: { budget: 1n } },
+    ])
+      await assert.rejects(f.cpu.run(options as never), /mutually exclusive/);
+    const omitted = await f.cpu.run({
+      budget: 0n,
+      eventDelivery: undefined,
+      exceptionDelivery: undefined,
+    });
+    assert.equal(omitted.deliveryAttempts, undefined);
+    assert.deepEqual(f.deliveryConfigurations, [true, false, true, false]);
+    for (const value of [
+      null,
+      [],
+      false,
+      {},
+      { budget: undefined },
+      { budget: 0 },
+      { budget: -1n },
+      { budget: 1n << 64n },
+    ])
+      await assert.rejects(f.cpu.run({ budget: 0n, eventDelivery: value } as never), TypeError);
+  } finally {
+    f.cpu.dispose();
+  }
+});
+
+test('idle intake preserves one IRQ slot coalesces NMI and validates even while occupied', async () => {
+  const f = await fixture();
+  try {
+    assert.equal(f.cpu.requestInterrupt(-0), true);
+    assert.equal(f.cpu.requestInterrupt(255), false);
+    assert.equal(f.cpu.requestInterrupt(0), false);
+    for (const vector of [-1, 256, 1.5, NaN, Infinity, '2', 2n, null, new Number(2)])
+      assert.throws(() => f.cpu.requestInterrupt(vector as number), TypeError);
+    f.cpu.requestNmi();
+    f.cpu.requestNmi();
+    assert.deepEqual(f.cpu.readState().interrupts, { irq: 0, nmiPending: true, nmiBlocked: false });
+    const result = await f.cpu.run({ budget: 0n, eventDelivery: { budget: 4n } });
+    assert.equal(result.deliveryAttempts, 0n);
+    assert.deepEqual(result.state.interrupts, { irq: 0, nmiPending: true, nmiBlocked: false });
+  } finally {
+    f.cpu.dispose();
+  }
+});
+
+test('nested intake during capture survives rejected scalar input and remains visible to admitted option capture', async () => {
+  const f = await fixture();
+  try {
+    assert.throws(
+      () =>
+        f.cpu.setState({
+          registers: Array<bigint>(16).fill(0n),
+          flags: 2n,
+          rip: 0x1000n,
+          get interrupts() {
+            f.cpu.requestNmi();
+            return { irq: null, nmiPending: 0, nmiBlocked: false };
+          },
+        } as never),
+      TypeError,
+    );
+    assert.deepEqual(f.stateImports, []);
+    assert.equal(f.cpu.readState().interrupts.nmiPending, true);
+    const result = await f.cpu.run({
+      budget: 0n,
+      get eventDelivery() {
+        assert.equal(f.cpu.requestInterrupt(13), true);
+        return { budget: 2n };
+      },
+    });
+    assert.equal(result.reason, 'budget');
+    assert.deepEqual(result.state.interrupts, { irq: 13, nmiPending: true, nmiBlocked: false });
+    assert.equal(result.deliveryAttempts, 0n);
+  } finally {
+    f.cpu.dispose();
+  }
+});
+
+test('active compile failed and disposed lifecycles reject external intake before state changes', async () => {
+  const f = await fixture([{ reason: 'budget', remaining: 0n, repeatRemaining: 0n }]);
+  const running = f.cpu.run({ budget: 1n, repeatBudget: 0n });
+  assert.throws(() => f.cpu.requestInterrupt(2), /running/);
+  assert.throws(() => f.cpu.requestNmi(), /running/);
+  await running;
+  assert.deepEqual(f.cpu.readState().interrupts, {
+    irq: null,
+    nmiPending: false,
+    nmiBlocked: false,
+  });
+  f.cpu.dispose();
+  assert.throws(() => f.cpu.requestInterrupt(2), /disposed/);
+  assert.throws(() => f.cpu.requestNmi(), /disposed/);
+  const failed = await fixture([{ reason: 'budget', remaining: 1n, repeatRemaining: 0n }]);
+  await assert.rejects(failed.cpu.run({ budget: 1n, repeatBudget: 0n }), /engine failed/);
+  assert.throws(() => failed.cpu.requestInterrupt(2), /failed/);
+  assert.throws(() => failed.cpu.requestNmi(), /failed/);
+  failed.cpu.dispose();
+});
+
+for (const field of ['eventDelivery', 'exceptionDelivery', 'budget'] as const)
+  test(`a cached completed run during ${field} alias capture rejects outer admission`, async () => {
+    const f = await fixture(
+      Array.from({ length: 2 }, () => ({ reason: 'budget', remaining: 0n, repeatRemaining: 0n })),
+    );
+    let nested: Promise<unknown> | undefined;
+    try {
+      await f.cpu.run({ budget: 1n, repeatBudget: 0n });
+      const start = () => {
+        nested = f.cpu.run({ budget: 1n, repeatBudget: 0n });
+      };
+      const delivery = {
+        get budget() {
+          if (field === 'budget') start();
+          return 1n;
+        },
+      };
+      await assert.rejects(
+        f.cpu.run({
+          budget: 1n,
+          get eventDelivery() {
+            if (field === 'eventDelivery') start();
+            return field === 'exceptionDelivery' ? undefined : delivery;
+          },
+          get exceptionDelivery() {
+            if (field === 'exceptionDelivery') start();
+            return field === 'exceptionDelivery' ? delivery : undefined;
+          },
+        }),
+        /run.*capture/,
+      );
+      await nested;
+      assert.equal(f.entries.length, 2);
+    } finally {
+      await nested;
+      f.cpu.dispose();
+    }
+  });
 
 test('run captures every option once and defaults repetition allowance to the captured budget', async () => {
   const { cpu } = await fixture();

@@ -9,12 +9,18 @@ import {
 import type { InitialMemory, MemoryBackingInput, MemoryMapping } from './memory.js';
 import {
   captureEventState,
+  captureInterruptState,
   eventKind,
   readEvent,
+  readInterrupts,
   validateEventLayout,
+  validateInterruptLayout,
   writeEvent,
+  writeInterrupts,
   type EventLayout,
   type EventState,
+  type InterruptLayout,
+  type InterruptState,
 } from './events.js';
 import {
   captureX87State,
@@ -32,6 +38,7 @@ export interface State {
   rip: bigint;
   interruptibility?: Interruptibility;
   event?: EventState;
+  interrupts?: InterruptState;
 }
 
 export interface Interruptibility {
@@ -42,6 +49,7 @@ export interface Interruptibility {
 export interface StateSnapshot extends State {
   interruptibility: Interruptibility;
   event: EventState;
+  interrupts: InterruptState;
 }
 
 export interface DebugException {
@@ -152,6 +160,8 @@ interface Layout {
   mxcsrBytes: number;
   x87: X87Layout;
   event: EventLayout;
+  interrupts: InterruptLayout;
+  deliveryEnabled: number;
   registers: number;
   flags: number;
   rip: number;
@@ -216,6 +226,12 @@ type CoreExports = WebAssembly.Exports & {
   core_configure_delivery(enabled: number): number;
   core_stage_exception(reason: number): number;
   core_deliver_exception(): number;
+  core_request_interrupt(vector: number): number;
+  core_request_nmi(): number;
+  core_external_boundary(): number;
+  core_shutdown_can_wake(): number;
+  core_external_step(pc: bigint, flags: bigint, shadow: number): number;
+  core_halt(flags: bigint): number;
   core_protection(descriptor: number, offset: bigint, input: bigint, segment: number): number;
   core_clflush(offset: bigint, segment: number): number;
   core_x87(
@@ -316,7 +332,11 @@ export function captureState(state: State): StateSnapshot {
     interruptibility = { sti, ss };
   }
   const event = 'event' in state ? captureEventState(state.event!) : { kind: 'ready' as const };
-  return { registers, flags, rip, interruptibility, event };
+  const interrupts =
+    'interrupts' in state
+      ? captureInterruptState(state.interrupts!)
+      : { irq: null, nmiPending: false, nmiBlocked: false };
+  return { registers, flags, rip, interruptibility, event, interrupts };
 }
 
 export function captureMxcsr(value: number): number {
@@ -407,6 +427,7 @@ export class Core {
       'repeatRemaining',
       'interruptibility',
       'interruptibilityBytes',
+      'deliveryEnabled',
     ] as const) {
       if (
         !Number.isSafeInteger(this.#layout[name]) ||
@@ -445,6 +466,9 @@ export class Core {
       throw new Error('core returned an incompatible transport layout');
     validateX87Layout(layout.x87, layout.size, layout.mxcsr + layout.mxcsrBytes);
     validateEventLayout(layout.event, layout.size, layout.x87.offset + layout.x87.bytes);
+    if (layout.deliveryEnabled < layout.event.offset + layout.event.bytes)
+      throw new Error('core returned an overlapping delivery control');
+    validateInterruptLayout(layout.interrupts, layout.size, layout.deliveryEnabled + 4);
     this.stateView();
   }
 
@@ -497,6 +521,12 @@ export class Core {
       'core_configure_delivery',
       'core_stage_exception',
       'core_deliver_exception',
+      'core_request_interrupt',
+      'core_request_nmi',
+      'core_external_boundary',
+      'core_shutdown_can_wake',
+      'core_external_step',
+      'core_halt',
       'core_float',
       'core_load_mxcsr',
       'core_store_mxcsr',
@@ -602,12 +632,13 @@ export class Core {
         ss: (interruptibility & 2) !== 0,
       },
       event: readEvent(view, this.#layout.event, this.#layout.event.offset),
+      interrupts: readInterrupts(view, this.#layout.interrupts, this.#layout.interrupts.offset),
     };
   }
 
   setState(state: State): void {
     const input = captureState(state);
-    const size = this.#layout.scalarSize + this.#layout.event.bytes;
+    const size = this.#layout.scalarSize + this.#layout.event.bytes + this.#layout.interrupts.bytes;
     const pointer = this.#exports.core_input(size) >>> 0;
     const view = new DataView(this.#exports.memory.buffer, pointer, size);
     for (let index = 0; index < 16; index++) {
@@ -628,6 +659,15 @@ export class Core {
       ),
       this.#layout.event,
       input.event,
+    );
+    writeInterrupts(
+      new DataView(
+        view.buffer,
+        view.byteOffset + this.#layout.scalarSize + this.#layout.event.bytes,
+        this.#layout.interrupts.bytes,
+      ),
+      this.#layout.interrupts,
+      input.interrupts,
     );
     if (this.#exports.core_import_state() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
@@ -720,6 +760,14 @@ export class Core {
       this.stateView().getUint32(this.#layout.event.offset + this.#layout.event.kind, true),
     );
   }
+  hasQueuedInterrupts(): boolean {
+    const view = this.stateView();
+    const layout = this.#layout.interrupts;
+    return (
+      view.getUint32(layout.offset + layout.irq, true) !== 0 ||
+      view.getUint32(layout.offset + layout.nmiPending, true) !== 0
+    );
+  }
   configureDelivery(enabled: boolean): void {
     if (this.#exports.core_configure_delivery(Number(enabled)) !== 0)
       throw new Error('core returned an invalid delivery configuration status');
@@ -734,6 +782,27 @@ export class Core {
   }
   deliverException(): string {
     return this.reason(this.#exports.core_deliver_exception());
+  }
+  requestInterrupt(vector: number): boolean {
+    const result = this.#exports.core_request_interrupt(vector);
+    if (result !== 0 && result !== 1) throw new Error('core returned an invalid IRQ intake status');
+    return result === 0;
+  }
+  requestNmi(): void {
+    if (this.#exports.core_request_nmi() !== 0)
+      throw new Error('core returned an invalid NMI intake status');
+  }
+  externalBoundary(): string {
+    const reason = this.reason(this.#exports.core_external_boundary());
+    if (!['dispatch', 'pending-interrupt', 'halted', 'shutdown'].includes(reason))
+      throw new Error('core returned an invalid external boundary status');
+    return reason;
+  }
+  shutdownCanWake(): boolean {
+    const result = this.#exports.core_shutdown_can_wake();
+    if (result !== 0 && result !== 1)
+      throw new Error('core returned an invalid shutdown wake status');
+    return result === 1;
   }
   probe(pc: bigint): string {
     return this.reason(this.#exports.core_probe(pc));
@@ -813,6 +882,8 @@ export class Core {
         software_event: this.#exports.core_software_event,
         flags: this.#exports.core_flags,
         debug_step: this.#exports.core_debug_step,
+        external_step: this.#exports.core_external_step,
+        halt: this.#exports.core_halt,
         target_check: this.#exports.core_target_check,
         multiply_high: this.#exports.core_multiply_high,
         divide: this.#exports.core_divide,

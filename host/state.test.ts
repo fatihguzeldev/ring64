@@ -11,6 +11,7 @@ test('scalar capture normalizes omitted boundaries and owns explicit interruptib
     ...input(),
     interruptibility: { sti: false, ss: false },
     event: { kind: 'ready' },
+    interrupts: { irq: null, nmiPending: false, nmiBlocked: false },
   });
   const interruptibility = { sti: false, ss: true };
   const source = { ...input(), interruptibility };

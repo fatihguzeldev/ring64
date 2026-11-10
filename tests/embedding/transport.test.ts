@@ -57,7 +57,7 @@ async function fixture(
       initializationError
         ? { error: 'fixture initialization rejected' }
         : {
-            size: 608,
+            size: 616,
             scalarSize: 176,
             xmm: 176,
             xmmBytes: 256,
@@ -76,6 +76,8 @@ async function fixture(
               instructionPointer: 88,
               dataPointer: 96,
             },
+            deliveryEnabled: 600,
+            interrupts: { offset: 604, bytes: 12, irq: 0, nmiPending: 4, nmiBlocked: 8 },
             event: {
               offset: 560,
               bytes: 40,
@@ -122,7 +124,8 @@ async function fixture(
     if (name === 'core_import_state')
       instructions = [
         ...copy(state, imported, 176).slice(0, -2),
-        ...copy(state + 560, imported + 176, 40),
+        ...copy(state + 560, imported + 176, 40).slice(0, -2),
+        ...copy(state + 604, imported + 216, 12),
       ];
     if (name === 'core_import_xmm') instructions = copy(state + 176, imported, 256);
     if (name === 'core_import_mxcsr') instructions = copy(state + 448, imported, 4);
@@ -132,7 +135,7 @@ async function fixture(
       instructions = [
         0x20,
         0,
-        ...constant(216),
+        ...constant(228),
         0x46,
         0x20,
         0,

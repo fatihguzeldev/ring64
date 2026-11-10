@@ -275,6 +275,16 @@ export class Cpu {
     this.requireIdle();
     return this.engineCall(() => this.#engine.snapshot());
   }
+  requestInterrupt(vector: number): boolean {
+    this.requireIdle();
+    if (typeof vector !== 'number' || !Number.isInteger(vector) || vector < 0 || vector > 255)
+      throw new TypeError('IRQ vector must be an unsigned 8-bit integer number');
+    return this.engineCall(() => this.#engine.requestInterrupt(vector === 0 ? 0 : vector));
+  }
+  requestNmi(): void {
+    this.requireIdle();
+    this.engineCall(() => this.#engine.requestNmi());
+  }
   setXmmState(state: bigint[]): void {
     this.requireIdle();
     const bank = captureXmmState(state);
@@ -327,26 +337,36 @@ export class Cpu {
     stop?: bigint | undefined;
     repeatBudget?: bigint | undefined;
     exceptionDelivery?: { budget: bigint } | undefined;
+    eventDelivery?: { budget: bigint } | undefined;
   }): Promise<RunResult> {
     const generation = this.requireIdle();
-    const { budget, stop, repeatBudget: suppliedRepeatBudget, exceptionDelivery } = options;
+    const {
+      budget,
+      stop,
+      repeatBudget: suppliedRepeatBudget,
+      exceptionDelivery,
+      eventDelivery,
+    } = options;
+    if (exceptionDelivery !== undefined && eventDelivery !== undefined)
+      throw new TypeError('eventDelivery and exceptionDelivery are mutually exclusive');
+    const selectedDelivery = eventDelivery === undefined ? exceptionDelivery : eventDelivery;
     let deliveryBudget: bigint | undefined;
-    if (exceptionDelivery !== undefined) {
+    if (selectedDelivery !== undefined) {
       if (
-        exceptionDelivery === null ||
-        typeof exceptionDelivery !== 'object' ||
-        Array.isArray(exceptionDelivery)
+        selectedDelivery === null ||
+        typeof selectedDelivery !== 'object' ||
+        Array.isArray(selectedDelivery)
       ) {
-        throw new TypeError('exceptionDelivery must contain a budget');
+        throw new TypeError('event delivery must contain a budget');
       }
-      deliveryBudget = exceptionDelivery.budget;
+      deliveryBudget = selectedDelivery.budget;
     }
     this.requireIdle(generation);
     unsigned64(budget, 'budget');
     if (stop !== undefined) unsigned64(stop, 'stop');
     const repeatBudget = suppliedRepeatBudget === undefined ? budget : suppliedRepeatBudget;
     unsigned64(repeatBudget, 'repeatBudget');
-    if (exceptionDelivery !== undefined) unsigned64(deliveryBudget, 'exception delivery budget');
+    if (selectedDelivery !== undefined) unsigned64(deliveryBudget, 'event delivery budget');
     if (this.#runGeneration === Number.MAX_SAFE_INTEGER)
       throw new Error('cpu run generation exhausted');
     this.#runGeneration++;
@@ -417,31 +437,55 @@ export class Cpu {
     try {
       if (deliveryBudget !== undefined) this.#engine.configureDelivery(true);
       let servicingEvent = false;
-      // This run owns event changes; only staging and delivery can replace the observed kind.
+      // Idle-only intake keeps queues stable except at explicit acceptance boundaries.
       let eventKind = this.#engine.eventKind();
+      let queuedInterrupts = this.#engine.hasQueuedInterrupts();
       for (;;) {
-        if (eventKind === 'shutdown') return finish('shutdown');
+        if (
+          eventKind === 'shutdown' &&
+          (deliveryBudget === undefined || !this.#engine.shutdownCanWake())
+        )
+          return finish('shutdown');
         const boundaryObserved = eventKind === 'ready' && this.#engine.prepareEntry();
         const pc = this.#engine.current().rip;
         if (!servicingEvent) {
           if (remaining === 0n) return finish('budget');
           if (stop !== undefined && pc === stop) return finish('stop');
         }
-        if (eventKind === 'pending') {
-          if (remainingDeliveryBudget === undefined) return finish('pending-exception');
+        if (eventKind === 'pending' || eventKind === 'pending-interrupt') {
+          if (remainingDeliveryBudget === undefined)
+            return finish(eventKind === 'pending' ? 'pending-exception' : 'pending-interrupt');
           if (remainingDeliveryBudget === 0n) return finish('event-budget');
           remainingDeliveryBudget--;
           const at = performance.now();
           const reason = this.#engine.deliverException();
           timings.executionMs += performance.now() - at;
+          if (reason === 'shutdown') {
+            eventKind = 'shutdown';
+            servicingEvent = false;
+            continue;
+          }
           if (reason !== 'dispatch') return finish(reason);
           eventKind = this.#engine.eventKind();
-          servicingEvent = eventKind === 'pending';
+          servicingEvent = eventKind === 'pending' || eventKind === 'pending-interrupt';
           this.pruneTranslations();
           resources.dispatches++;
           continue;
         }
         servicingEvent = false;
+        if (queuedInterrupts || eventKind === 'halted' || eventKind === 'shutdown') {
+          const reason = this.#engine.externalBoundary();
+          if (reason === 'pending-interrupt') {
+            eventKind = this.#engine.eventKind();
+            queuedInterrupts = this.#engine.hasQueuedInterrupts();
+            if (deliveryBudget === undefined) return finish(reason);
+            if (eventKind !== 'pending-interrupt')
+              throw new Error('core failed to accept eligible interrupt');
+            servicingEvent = true;
+            continue;
+          }
+          if (reason !== 'dispatch') return finish(reason);
+        }
         let entry = this.#cache.get(pc, boundaryObserved);
         if (entry) {
           resources.cacheHits++;
@@ -521,6 +565,26 @@ export class Cpu {
           throw new Error('generated execution violated its progress contract');
         }
         if (reason !== 'dispatch') {
+          if (reason === 'pending-interrupt' || reason === 'halted') {
+            eventKind = this.#engine.eventKind();
+            queuedInterrupts = this.#engine.hasQueuedInterrupts();
+            if (reason === 'pending-interrupt') {
+              if (deliveryBudget === undefined) return finish(reason);
+              if (eventKind !== 'pending-interrupt')
+                throw new Error('core failed to accept eligible interrupt');
+              servicingEvent = true;
+              continue;
+            }
+            if (queuedInterrupts && this.#engine.externalBoundary() === 'pending-interrupt') {
+              eventKind = this.#engine.eventKind();
+              queuedInterrupts = this.#engine.hasQueuedInterrupts();
+              if (deliveryBudget === undefined) return finish('pending-interrupt');
+              if (eventKind !== 'pending-interrupt')
+                throw new Error('core failed to accept eligible interrupt');
+              servicingEvent = true;
+            }
+            continue;
+          }
           if (deliveryBudget !== undefined && this.#engine.stageException(reason)) {
             eventKind = 'pending';
             servicingEvent = true;

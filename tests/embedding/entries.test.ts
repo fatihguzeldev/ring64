@@ -25,6 +25,7 @@ function state(rip: bigint): State {
     rip,
     interruptibility: { sti: false, ss: false },
     event: { kind: 'ready' },
+    interrupts: { irq: null, nmiPending: false, nmiBlocked: false },
   };
 }
 
