@@ -53,7 +53,7 @@ export function frontierScenarios(compiler: WebAssembly.Module): Scenario[] {
           }
         }
         for (const packet of [
-          { code: 'f0cf', reason: 'invalid-encoding', limited: false },
+          { code: 'f0cf', reason: 'event-budget', limited: false },
           { code: '66', reason: 'fetch-fault', limited: false },
           { code: 'cf', reason: 'resource-limit', limited: true },
         ]) {
@@ -64,7 +64,7 @@ export function frontierScenarios(compiler: WebAssembly.Module): Scenario[] {
             async (cpu) => {
               cpu.setState({ ...input(), interrupts: { ...EMPTY, nmiBlocked: true } });
               cpu.requestNmi();
-              const result = await cpu.run({ budget: 1n, eventDelivery: { budget: 1n } });
+              const result = await cpu.run({ budget: 1n, eventDelivery: { budget: 0n } });
               equal(result.reason, packet.reason, 'pre-begin frontier');
               same(
                 result.state.interrupts,
@@ -96,7 +96,7 @@ export function frontierScenarios(compiler: WebAssembly.Module): Scenario[] {
       async run() {
         for (const packet of [
           { code: 'f0', reason: 'fetch-fault', limited: false },
-          { code: '66'.repeat(15) + 'f4', reason: 'invalid-encoding', limited: false },
+          { code: '66'.repeat(15) + 'f4', reason: 'event-budget', limited: false },
           { code: 'f4', reason: 'resource-limit', limited: true },
         ]) {
           await using(
@@ -106,10 +106,20 @@ export function frontierScenarios(compiler: WebAssembly.Module): Scenario[] {
             async (cpu) => {
               cpu.setState(input());
               const before = cpu.readState();
-              const result = await cpu.run({ budget: 1n, eventDelivery: { budget: 1n } });
+              const result = await cpu.run({ budget: 1n, eventDelivery: { budget: 0n } });
               equal(result.reason, packet.reason, 'inherited pre-begin frontier');
               equal(result.retired, 0n, 'no HLT retirement');
-              same(result.state, before, 'no activity or scalar publication');
+              same(
+                { ...result.state, event: before.event },
+                before,
+                'no activity or scalar publication',
+              );
+              if (packet.reason === 'event-budget')
+                equal(
+                  result.state.event.kind === 'pending' && result.state.event.exception.vector,
+                  13,
+                  'length GP before HLT begin',
+                );
             },
             { ...(packet.limited ? { limits: { maxArtifactBytes: 1 } } : {}) },
           );

@@ -40,15 +40,15 @@ export function frontierScenarios(compiler: WebAssembly.Module): Scenario[] {
       },
     },
     {
-      name: 'generic invalid unsupported fetch data segment and mandatory alignment frontiers never fabricate automatic exceptions',
+      name: 'selected length segment and alignment faults stay distinct from private fetch data and unsupported frontiers',
       async run() {
-        for (const [code, reason, segmentLimit] of [
-          ['0f', 'fetch-fault', false],
-          ['66'.repeat(15) + '90', 'invalid-encoding', false],
-          ['0f05', 'unsupported', false],
-          ['a100600000', 'data-fault', false],
-          ['a100600000', 'segment-fault', true],
-          ['0f280501600000', 'alignment-fault', false],
+        for (const [code, reason, segmentLimit, selected] of [
+          ['0f', 'fetch-fault', false, false],
+          ['66'.repeat(15) + '90', 'invalid-encoding', false, true],
+          ['0f05', 'unsupported', false, false],
+          ['a100600000', 'data-fault', false, false],
+          ['a100600000', 'segment-fault', true, true],
+          ['0f280501600000', 'alignment-fault', false, true],
         ] as const) {
           const execution = snapshot('protected');
           if (segmentLimit) execution.segments.ds.limit = 0x5fff;
@@ -58,9 +58,17 @@ export function frontierScenarios(compiler: WebAssembly.Module): Scenario[] {
             execution,
             async (cpu) => {
               cpu.setState(initial(0x1000n, {}, 0x202n));
-              const result = await cpu.run({ budget: 1n, exceptionDelivery: { budget: 2n } });
-              delivery(result, reason, 0n, 0n, 2n);
-              ready(result);
+              const report = await cpu.run({ budget: 1n });
+              equal(report.reason, reason, 'inherited report diagnostic');
+              const result = await cpu.run({ budget: 1n, exceptionDelivery: { budget: 0n } });
+              delivery(result, selected ? 'event-budget' : reason, 0n, 0n, 0n);
+              if (selected)
+                equal(
+                  result.state.event.kind === 'pending' && result.state.event.exception.vector,
+                  13,
+                  'selected GP0',
+                );
+              else ready(result);
               equal(result.state.rip, 0x1000n, 'private frontier retains source');
             },
             { data: code.startsWith('0f28') ? [{ base: 0x6001n, bytes: 'a5'.repeat(16) }] : [] },

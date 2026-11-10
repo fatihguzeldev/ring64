@@ -22,6 +22,8 @@ import { softwareEventScenarios } from './execution/software-events/index.js';
 import { exceptionDeliveryScenarios } from './execution/exception-delivery/index.js';
 import { externalInterruptScenarios } from './execution/external-interrupts/index.js';
 
+import { accessFaultScenarios } from './execution/access-faults/index.js';
+
 export async function runScenarios(
   compiler: Uint8Array | WebAssembly.Module,
 ): Promise<{ passed: string[] }> {
@@ -53,6 +55,7 @@ export async function runScenarios(
     ...softwareEventScenarios(core),
     ...exceptionDeliveryScenarios(core),
     ...externalInterruptScenarios(core),
+    ...accessFaultScenarios(core),
   ];
   const passed: string[] = [];
   for (const { name, run } of scenarios) {
