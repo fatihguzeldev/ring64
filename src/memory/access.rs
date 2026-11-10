@@ -196,20 +196,16 @@ impl Image {
                     self.validity
                         .write(&backing.incarnation, begin as u32, length);
                 }
+                let target = &mut backing.bytes[begin..end];
+                let source = &bytes[start as usize..(start + length) as usize];
                 match length {
-                    1 => backing.bytes[begin] = bytes[start as usize],
-                    2 => backing.bytes[begin..begin + 2]
-                        .copy_from_slice(&bytes[start as usize..start as usize + 2]),
-                    4 => backing.bytes[begin..begin + 4]
-                        .copy_from_slice(&bytes[start as usize..start as usize + 4]),
-                    8 => backing.bytes[begin..begin + 8]
-                        .copy_from_slice(&bytes[start as usize..start as usize + 8]),
-                    10 => backing.bytes[begin..begin + 10]
-                        .copy_from_slice(&bytes[start as usize..start as usize + 10]),
-                    16 => backing.bytes[begin..begin + 16]
-                        .copy_from_slice(&bytes[start as usize..start as usize + 16]),
-                    _ => backing.bytes[begin..end]
-                        .copy_from_slice(&bytes[start as usize..(start + length) as usize]),
+                    1 => target[0] = source[0],
+                    2 => target[..2].copy_from_slice(&source[..2]),
+                    4 => target[..4].copy_from_slice(&source[..4]),
+                    8 => target[..8].copy_from_slice(&source[..8]),
+                    10 => target[..10].copy_from_slice(&source[..10]),
+                    16 => target[..16].copy_from_slice(&source[..16]),
+                    _ => target.copy_from_slice(source),
                 }
             }
             return Ok(());
