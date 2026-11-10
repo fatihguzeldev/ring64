@@ -182,6 +182,7 @@ impl Emitter {
             return;
         }
         let incoming = self.incoming_shadow.unwrap();
+        let result = self.boundary_result.unwrap();
         let ss = if self.ss_producer() { 4 } else { 0 };
         let helper = self.debug_step.expect("debug boundary import");
         self.op(Op::I64Const(self.current_pc as i64))
@@ -199,6 +200,9 @@ impl Emitter {
             .op(Op::I32Or)
             .op(Op::Call(helper))
             .op(Op::LocalTee(REASON))
+            .op(Op::LocalTee(result))
+            .op(Op::I32Const(0))
+            .op(Op::I32GtS)
             .op(Op::If(BlockType::Empty))
             .op(Op::LocalGet(0))
             .op(Op::I32Load(MemArg {
@@ -212,7 +216,9 @@ impl Emitter {
             .op(Op::LocalSet(SHADOW))
             .op(Op::End)
             .op(Op::Br(exit_depth + 1))
-            .op(Op::End);
+            .op(Op::End)
+            .op(Op::I32Const(0))
+            .op(Op::LocalSet(REASON));
     }
 
     pub(super) fn finish_instruction(&mut self, exit_depth: u32) -> bool {
@@ -234,9 +240,26 @@ impl Emitter {
             }
             self.trap(true, exit_depth);
             self.external_boundary(exit_depth);
-            self.gates(exit_depth);
-            self.exit(DISPATCH, exit_depth);
-            return true;
+            if ss
+                || matches!(self.current_operation, Operation::SystemFlags(d)
+                if matches!(d.kind, SystemFlagsKind::Pop | SystemFlagsKind::Sti))
+            {
+                self.gates(exit_depth);
+                self.exit(DISPATCH, exit_depth);
+                return true;
+            }
+            // Only an exact active comparator keeps this observed owner valid
+            // after ordinary RF/SS work. Other profiles retain their redispatch.
+            self.op(Op::LocalGet(self.boundary_result.unwrap()))
+                .op(Op::I32Const(
+                    crate::embedding::layout::debug::CONTINUE_ACTIVE,
+                ))
+                .op(Op::I32Ne)
+                .op(Op::If(BlockType::Empty));
+            self.gates(exit_depth + 1);
+            self.exit(DISPATCH, exit_depth + 1);
+            self.op(Op::End);
+            return false;
         }
         if ss {
             self.op(Op::I32Const(2)).op(Op::LocalSet(SHADOW));

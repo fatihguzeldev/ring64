@@ -1,3 +1,4 @@
+import { routingScenarios } from './routing.js';
 import { finalOwnerReviewScenarios } from './review-final.js';
 import { reviewBoundaryScenarios } from './review-boundaries.js';
 import { activityReviewScenarios } from './review-activity.js';
@@ -25,6 +26,7 @@ export function hardwareDebugScenarios(compiler: WebAssembly.Module): Scenario[]
     ...reviewBoundaryScenarios(compiler),
     ...activityReviewScenarios(compiler),
     ...finalOwnerReviewScenarios(compiler),
+    ...routingScenarios(compiler),
     ...executeScenarios(compiler),
     ...recoveryScenarios(compiler),
   ];

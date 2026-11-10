@@ -206,7 +206,13 @@ impl Core {
                 reserved: 0,
             }
         });
-        selected.map_or(0, |selection| self.publish_debug(selection))
+        if let Some(selection) = selected {
+            self.publish_debug(selection)
+        } else if state.debug.registers.active() {
+            super::super::layout::debug::CONTINUE_ACTIVE
+        } else {
+            0
+        }
     }
 }
 

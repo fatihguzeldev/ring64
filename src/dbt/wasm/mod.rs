@@ -99,6 +99,7 @@ struct Emitter {
     sampled_tf: Option<u32>,
     incoming_shadow: Option<u32>,
     next_shadow: Option<u32>,
+    boundary_result: Option<u32>,
     current_pc: u64,
     current_operation: Operation,
 }
@@ -724,9 +725,9 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
     let mut vector_registers = [None; 16];
     let mut next_local = 35 + 2 * u32::from(has_repeat);
     let boundary_locals = observed.then(|| {
-        let result = [next_local, next_local + 1, next_local + 2];
-        locals.push((3, ValType::I32));
-        next_local += 3;
+        let result = [next_local, next_local + 1, next_local + 2, next_local + 3];
+        locals.push((4, ValType::I32));
+        next_local += 4;
         result
     });
     for (bank, local) in vector_registers.iter_mut().enumerate() {
@@ -787,6 +788,7 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         sampled_tf: boundary_locals.map(|l| l[0]),
         incoming_shadow: boundary_locals.map(|l| l[1]),
         next_shadow: boundary_locals.map(|l| l[2]),
+        boundary_result: boundary_locals.map(|l| l[3]),
         current_pc: 0,
         current_operation: Operation::Nop,
         body: Function::new(locals),

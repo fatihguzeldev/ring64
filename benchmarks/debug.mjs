@@ -687,6 +687,11 @@ export async function measureDebug(sides, { iterations, samples, workloads, reve
             units.reduce((sum, unit) => sum + unit.byteLength, 0),
             'cached bytes',
           );
+          if (row.control && row.kind === 'loop') {
+            equal(resources.nativeEntries, 1, 'nonmatching loop remains in one native entry');
+            equal(resources.dispatches, 0, 'nonmatching loop has no host instruction dispatches');
+            equal(units.length, 1, 'nonmatching loop uses one cached artifact');
+          }
           results.push({
             side: side.label,
             workload: row.name,
