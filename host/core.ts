@@ -212,6 +212,7 @@ type CoreExports = WebAssembly.Exports & {
   core_target_check(target: bigint): number;
   core_state_ptr(): number;
   core_import_state(): number;
+  core_debug_register(operation: number, input: bigint, pc: bigint, flags: bigint): number;
   core_import_debug(): number;
   core_import_xmm(): number;
   core_import_mxcsr(): number;
@@ -538,6 +539,7 @@ export class Core {
       'core_target_check',
       'core_state_ptr',
       'core_import_state',
+      'core_debug_register',
       'core_import_debug',
       'core_import_xmm',
       'core_import_mxcsr',
@@ -967,6 +969,7 @@ export class Core {
         software_event: this.#exports.core_software_event,
         flags: this.#exports.core_flags,
         debug_step: this.#exports.core_debug_step,
+        debug_register: this.#exports.core_debug_register,
         external_step: this.#exports.core_external_step,
         halt: this.#exports.core_halt,
         target_check: this.#exports.core_target_check,

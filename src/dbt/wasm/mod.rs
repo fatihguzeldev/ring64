@@ -3,6 +3,7 @@ mod boundary;
 mod control;
 mod counts;
 mod data;
+mod debug;
 mod entry_lookup;
 mod exchange;
 mod far;
@@ -88,6 +89,7 @@ struct Emitter {
     software_event: Option<u32>,
     system_flags: Option<u32>,
     debug_step: Option<u32>,
+    debug_register: Option<u32>,
     external_step: Option<u32>,
     halt: Option<u32>,
     observed: bool,
@@ -273,6 +275,10 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::Far(_)));
+    let has_debug_register = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::DebugRegister { .. }));
     let has_system_flags = unit
         .instructions
         .iter()
@@ -394,6 +400,15 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         types
             .ty()
             .function([ValType::I32, ValType::I64, ValType::I64], [ValType::I32]);
+        next_type += 1;
+        index
+    });
+    let debug_register_type = has_debug_register.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [ValType::I32, ValType::I64, ValType::I64, ValType::I64],
+            [ValType::I32],
+        );
         next_type += 1;
         index
     });
@@ -633,6 +648,12 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let debug_register = debug_register_type.map(|index| {
+        imports.import("env", "debug_register", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let debug_step = debug_type.map(|index| {
         imports.import("env", "debug_step", EntityType::Function(index));
         let function = run_index;
@@ -729,6 +750,7 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         software_event,
         system_flags,
         debug_step,
+        debug_register,
         external_step,
         halt,
         observed,
@@ -793,6 +815,22 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
                 if emitter.software_event(operation, instruction.next_pc, exit_depth) {
                     continue;
                 }
+            }
+            Operation::DebugRegister {
+                register,
+                gpr,
+                write,
+                width,
+            } => {
+                emitter.debug_register(
+                    register,
+                    gpr,
+                    write,
+                    width,
+                    instruction.next_pc,
+                    exit_depth,
+                );
+                continue;
             }
             Operation::SystemFlags(operation) => emitter.system_flags(operation, exit_depth),
             Operation::PopSs { width } => emitter.pop_ss(width, exit_depth),

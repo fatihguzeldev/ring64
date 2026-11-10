@@ -769,6 +769,12 @@ impl FarInstruction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
     Halt,
+    DebugRegister {
+        register: u8,
+        gpr: u8,
+        write: bool,
+        width: Width,
+    },
     SystemFlags(SystemFlagsDescriptor),
     SoftwareEvent(SoftwareEventDescriptor),
     PopSs {

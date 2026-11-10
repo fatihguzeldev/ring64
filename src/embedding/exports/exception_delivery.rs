@@ -37,7 +37,7 @@ pub extern "C" fn core_stage_exception(reason: i32) -> i32 {
                     return -1;
                 };
                 ExceptionEvent {
-                    debug: None,
+                    debug: debug.source,
                     vector: 1,
                     instruction_pc: debug.instruction_pc,
                     return_pc: debug.resume_pc,

@@ -626,3 +626,30 @@ fn selected_floating_point_and_control_encodings_are_executable() {
         assert!(at(0x1000, code).is_ok(), "{code:02x?}");
     }
 }
+
+#[test]
+fn debug_register_forms_ignore_mod_address_tails_and_pin_reserved_indices() {
+    for code in [
+        &[0x0f, 0x21, 0x04][..],
+        &[0x66, 0x0f, 0x23, 0x48],
+        &[0x48, 0x0f, 0x21, 0xc0],
+    ] {
+        let decoded = at(0x1000, code).unwrap();
+        assert_eq!(decoded.next_pc, 0x1000 + code.len() as u64);
+        assert!(matches!(
+            decoded.operation,
+            Operation::DebugRegister {
+                width: Width::W64,
+                ..
+            }
+        ));
+    }
+    for code in [
+        &[0x44, 0x0f, 0x21, 0xc0][..],
+        &[0xf0, 0x0f, 0x23, 0xc0],
+        &[0x0f, 0x21, 0xe0],
+        &[0x0f, 0x23, 0xe8],
+    ] {
+        assert_eq!(at(0x1000, code), Err(DecodeError::Invalid));
+    }
+}

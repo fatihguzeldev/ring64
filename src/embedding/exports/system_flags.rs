@@ -8,13 +8,14 @@ use crate::x86::instruction::{SystemFlagsDescriptor, SystemFlagsKind};
 pub(super) struct DebugException {
     pub(super) instruction_pc: u64,
     pub(super) resume_pc: u64,
-    completed: bool,
+    pub(super) completed: bool,
+    pub(super) source: Option<crate::x86::debug::Source>,
     pub(super) resume_flags: u64,
 }
 
 impl DebugException {
     pub(super) fn json(&self) -> serde_json::Value {
-        serde_json::json!({
+        let mut value = serde_json::json!({
             "vector": 1,
             "class": "trap",
             "cause": "single-step",
@@ -22,7 +23,23 @@ impl DebugException {
             "resumePc": format!("0x{:x}", self.resume_pc),
             "instructionCompleted": self.completed,
             "resumeFlags": format!("0x{:x}", self.resume_flags),
-        })
+        });
+        if let Some(source) = self.source {
+            let fields = source.json();
+            for (key, field) in fields.as_object().unwrap() {
+                value[key] = field.clone();
+            }
+            if matches!(
+                source,
+                crate::x86::debug::Source::Data {
+                    single_step: true,
+                    ..
+                }
+            ) {
+                value["cause"] = serde_json::json!("combined");
+            }
+        }
+        value
     }
 }
 
@@ -129,6 +146,7 @@ pub extern "C" fn core_debug_step(
             resume_flags |= flags::RF;
         }
         core.debug_exception = Some(DebugException {
+            source: None,
             instruction_pc,
             resume_pc,
             completed: completed != 0,

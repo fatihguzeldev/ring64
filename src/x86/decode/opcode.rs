@@ -622,6 +622,26 @@ fn two_byte<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if matches!(opcode, 0x21 | 0x23) {
+        if prefixes.repeat.is_some() {
+            return Err(DecodeError::Unsupported);
+        }
+        let byte = cursor.byte()?;
+        let register = (byte >> 3) & 7;
+        if prefixes.lock || prefixes.rex.reg_extension() != 0 || matches!(register, 4 | 5) {
+            return Err(DecodeError::Invalid);
+        }
+        return Ok(Operation::DebugRegister {
+            register,
+            gpr: (byte & 7) | prefixes.rex.base_extension(),
+            write: opcode == 0x23,
+            width: if prefixes.long64 {
+                Width::W64
+            } else {
+                Width::W32
+            },
+        });
+    }
     if opcode == 0x0b && prefixes.repeat.is_none() {
         return Err(DecodeError::Undefined);
     }
