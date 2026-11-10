@@ -421,6 +421,12 @@ export async function measure(
     });
     try {
       for (const side of sides) {
+        const deliveryIdle = exceptionIdle && side.label === 'current';
+        if (
+          deliveryIdle &&
+          !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_stage_exception')
+        )
+          throw Error('current build is missing automatic exception delivery');
         if (
           row.requiresSoftwareEvents &&
           !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_software_event')
@@ -508,9 +514,6 @@ export async function measure(
         const expectedContext = row.context?.(cpu) ?? cpu.readContext?.();
         const hasX87 =
           typeof cpu.readX87State === 'function' && typeof cpu.setX87State === 'function';
-        const deliveryIdle =
-          exceptionIdle &&
-          WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_stage_exception');
         active.push({ ...side, cpu, hasX87, expectedContext, deliveryIdle });
         if (row.requiresX87 && !hasX87) {
           if (side.label === 'current') throw Error('current build is missing x87 APIs');
