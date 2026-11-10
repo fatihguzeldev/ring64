@@ -5,10 +5,10 @@ use crate::x86::instruction::{SystemFlagsDescriptor, SystemFlagsKind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct DebugException {
-    instruction_pc: u64,
-    resume_pc: u64,
+    pub(super) instruction_pc: u64,
+    pub(super) resume_pc: u64,
     completed: bool,
-    resume_flags: u64,
+    pub(super) resume_flags: u64,
 }
 
 impl DebugException {
@@ -112,7 +112,11 @@ pub extern "C" fn core_debug_step(
             completed: completed != 0,
             resume_flags,
         });
-        unsafe { (*core.state.get()).interruptibility = 0 };
+        unsafe {
+            if (*core.state.get()).delivery_enabled == 0 {
+                (*core.state.get()).interruptibility = 0;
+            }
+        };
         DEBUG_EXCEPTION
     })
 }

@@ -131,8 +131,17 @@ impl Emitter {
                 .op(Op::I32And);
         }
         self.op(Op::If(BlockType::Empty))
+            .op(Op::LocalGet(0))
+            .op(Op::I32Load(MemArg {
+                offset: offset_of!(RunState, delivery_enabled) as u64,
+                align: 2,
+                memory_index: 0,
+            }))
+            .op(Op::I32Eqz)
+            .op(Op::If(BlockType::Empty))
             .op(Op::I32Const(0))
             .op(Op::LocalSet(SHADOW))
+            .op(Op::End)
             .op(Op::I64Const(instruction_pc as i64))
             .op(Op::LocalGet(RIP))
             .op(Op::I32Const(i32::from(completed)));

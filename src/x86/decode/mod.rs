@@ -21,6 +21,7 @@ mod x87;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     Unsupported,
+    Undefined,
     Invalid,
     Fetch(Fault),
     Segment(SegmentFault),

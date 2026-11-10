@@ -1,3 +1,4 @@
+use crate::x86::exception::{EventState, ExceptionEvent};
 use crate::x86::state::State;
 use crate::x86::x87::State as X87State;
 
@@ -20,9 +21,12 @@ pub const X87_EXCEPTION: i32 = 15;
 pub const PROTECTION: i32 = 16;
 pub const SYSTEM_MEMORY: i32 = 17;
 pub const DEBUG_EXCEPTION: i32 = 18;
+pub const EVENT_BUDGET: i32 = 19;
+pub const PENDING_EXCEPTION: i32 = 20;
+pub const SHUTDOWN: i32 = 21;
 pub const SCALAR_STATE_SIZE: usize = 176;
 
-pub const REASONS: [&str; 19] = [
+pub const REASONS: [&str; 22] = [
     "dispatch",
     "budget",
     "stop",
@@ -42,7 +46,88 @@ pub const REASONS: [&str; 19] = [
     "protection-fault",
     "system-memory-fault",
     "debug-exception",
+    "event-budget",
+    "pending-exception",
+    "shutdown",
 ];
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(C)]
+pub struct RawEventState {
+    pub kind: u32,
+    pub vector: u32,
+    pub instruction_pc: u64,
+    pub return_pc: u64,
+    pub saved_flags: u64,
+    pub error_code: u32,
+    pub has_error_code: u32,
+}
+
+impl RawEventState {
+    pub fn decode(self) -> Result<EventState, &'static str> {
+        match self.kind {
+            0 if self == Self::default() => Ok(EventState::Ready),
+            2 if self
+                == (Self {
+                    kind: 2,
+                    ..Self::default()
+                }) =>
+            {
+                Ok(EventState::Shutdown)
+            }
+            1 if self.vector <= u8::MAX.into()
+                && self.error_code <= u16::MAX.into()
+                && self.has_error_code <= 1
+                && (self.has_error_code != 0 || self.error_code == 0) =>
+            {
+                Ok(EventState::Pending(ExceptionEvent {
+                    vector: self.vector as u8,
+                    instruction_pc: self.instruction_pc,
+                    return_pc: self.return_pc,
+                    saved_flags: self.saved_flags,
+                    error_code: (self.has_error_code != 0).then_some(self.error_code as u16),
+                }))
+            }
+            _ => Err("invalid event state transport"),
+        }
+    }
+
+    pub fn encode(event: EventState) -> Self {
+        match event {
+            EventState::Ready => Self::default(),
+            EventState::Shutdown => Self {
+                kind: 2,
+                ..Self::default()
+            },
+            EventState::Pending(event) => Self {
+                kind: 1,
+                vector: event.vector.into(),
+                instruction_pc: event.instruction_pc,
+                return_pc: event.return_pc,
+                saved_flags: event.saved_flags,
+                error_code: event.error_code.unwrap_or(0).into(),
+                has_error_code: event.error_code.is_some().into(),
+            },
+        }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, &'static str> {
+        if bytes.len() != size_of::<Self>() {
+            return Err("event input length differs");
+        }
+        let word = |offset| u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
+        let wide = |offset| u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap());
+        Ok(Self {
+            kind: word(0),
+            vector: word(4),
+            instruction_pc: wide(8),
+            return_pc: wide(16),
+            saved_flags: wide(24),
+            error_code: word(32),
+            has_error_code: word(36),
+        })
+    }
+}
 
 #[repr(C)]
 pub struct RunState {
@@ -58,6 +143,8 @@ pub struct RunState {
     pub vector_scratch: [u8; 16],
     pub mxcsr: u32,
     pub x87: X87State,
+    pub event: RawEventState,
+    pub delivery_enabled: u32,
 }
 
 impl Default for RunState {
@@ -75,6 +162,8 @@ impl Default for RunState {
             vector_scratch: [0; 16],
             mxcsr: 0x1f80,
             x87: X87State::default(),
+            event: RawEventState::default(),
+            delivery_enabled: 0,
         }
     }
 }
@@ -89,6 +178,7 @@ impl RunState {
         self.fault_segment = 0;
         self.interruptibility = 0;
         self.repeat_remaining = 0;
+        self.event = RawEventState::default();
     }
 
     pub fn descriptor() -> serde_json::Value {
@@ -112,6 +202,18 @@ impl RunState {
                 "instructionPointer": std::mem::offset_of!(X87State, instruction_pointer),
                 "dataPointer": std::mem::offset_of!(X87State, data_pointer),
             },
+            "event": {
+                "offset": std::mem::offset_of!(Self, event),
+                "bytes": size_of::<RawEventState>(),
+                "kind": std::mem::offset_of!(RawEventState, kind),
+                "vector": std::mem::offset_of!(RawEventState, vector),
+                "instructionPc": std::mem::offset_of!(RawEventState, instruction_pc),
+                "returnPc": std::mem::offset_of!(RawEventState, return_pc),
+                "savedFlags": std::mem::offset_of!(RawEventState, saved_flags),
+                "errorCode": std::mem::offset_of!(RawEventState, error_code),
+                "hasErrorCode": std::mem::offset_of!(RawEventState, has_error_code),
+            },
+            "deliveryEnabled": std::mem::offset_of!(Self, delivery_enabled),
             "registers": std::mem::offset_of!(Self, registers),
             "flags": std::mem::offset_of!(Self, flags),
             "rip": std::mem::offset_of!(Self, rip),
@@ -134,7 +236,7 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, interruptibility), 164);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
         assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
-        assert_eq!(size_of::<RunState>(), 560);
+        assert_eq!(size_of::<RunState>(), 608);
         assert_eq!(REASONS[18], "debug-exception");
         assert_eq!(RunState::descriptor()["interruptibilityBytes"], 4);
         let mut state = RunState {
@@ -150,7 +252,7 @@ mod tests {
         let mut transport = RunState::default();
         assert_eq!(std::mem::offset_of!(RunState, mxcsr), 448);
         assert_eq!(std::mem::offset_of!(RunState, x87), 456);
-        assert_eq!(size_of::<RunState>(), 560);
+        assert_eq!(size_of::<RunState>(), 608);
         let projection = &RunState::descriptor()["x87"];
         assert_eq!(projection["bytes"], 104);
         assert_eq!(projection["controlWord"], 80);
@@ -169,7 +271,7 @@ mod tests {
         let mut state = RunState::default();
         assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
         assert_eq!(std::mem::offset_of!(RunState, vector_scratch), 432);
-        assert_eq!(size_of::<RunState>(), 560);
+        assert_eq!(size_of::<RunState>(), 608);
         assert_eq!(RunState::descriptor()["scalarSize"], 176);
         assert_eq!(RunState::descriptor()["xmmBytes"], 256);
         assert_eq!(state.xmm, [[0; 16]; 16]);
@@ -181,7 +283,7 @@ mod tests {
     #[test]
     fn repeated_work_extends_transport_after_existing_fields() {
         let descriptor = RunState::descriptor();
-        assert_eq!(descriptor["size"], 560);
+        assert_eq!(descriptor["size"], 608);
         assert_eq!(descriptor["repeatRemaining"], 168);
         assert_eq!(descriptor["reasons"][11], "repeat-budget");
     }
@@ -205,7 +307,7 @@ mod tests {
             ]
         );
         assert_eq!(RunState::descriptor()["reasons"][9], "divide-error");
-        assert_eq!(size_of::<RunState>(), 560);
+        assert_eq!(size_of::<RunState>(), 608);
     }
 
     #[test]
@@ -217,8 +319,8 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, target), 152);
         assert_eq!(std::mem::offset_of!(RunState, fault_segment), 160);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
-        assert_eq!(size_of::<RunState>(), 560);
-        assert_eq!(RunState::descriptor()["size"], 560);
+        assert_eq!(size_of::<RunState>(), 608);
+        assert_eq!(RunState::descriptor()["size"], 608);
     }
 
     #[test]

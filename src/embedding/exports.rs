@@ -8,10 +8,12 @@ use crate::x86::decode::{self, DecodeError};
 use crate::x86::state::State;
 
 use super::layout::{
-    DATA, FETCH, INVALID, RESOURCE, RunState, SCALAR_STATE_SIZE, SEGMENT, TARGET, UNSUPPORTED,
+    DATA, FETCH, INVALID, RESOURCE, RawEventState, RunState, SCALAR_STATE_SIZE, SEGMENT, TARGET,
+    UNSUPPORTED,
 };
 
 mod context;
+mod exception_delivery;
 mod far_control;
 mod mapped;
 mod mmx;
@@ -30,6 +32,7 @@ struct Core {
     state: Box<UnsafeCell<RunState>>,
     fault: Option<Fault>,
     divide_failed: bool,
+    undefined_source: bool,
     context: ExecutionContext,
     context_version: u64,
     segment_fault: Option<SegmentFault>,
@@ -103,6 +106,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             state,
             fault: None,
             divide_failed: false,
+            undefined_source: false,
             context: ExecutionContext::default(),
             context_version: 0,
             segment_fault: None,
@@ -127,7 +131,9 @@ pub extern "C" fn core_state_ptr() -> u32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn core_import_state() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
-        if bridge.input.len() != SCALAR_STATE_SIZE {
+        if bridge.input.len() != SCALAR_STATE_SIZE
+            && bridge.input.len() != SCALAR_STATE_SIZE + size_of::<RawEventState>()
+        {
             return bridge.error("state input length differs");
         }
         let word =
@@ -148,6 +154,23 @@ pub extern "C" fn core_import_state() -> i32 {
         if !crate::x86::flags::valid_interruptibility(state.flags, interruptibility) {
             return bridge.error("invalid interruptibility for imported flags");
         }
+        let event = if bridge.input.len() == SCALAR_STATE_SIZE {
+            RawEventState::default()
+        } else {
+            match RawEventState::from_bytes(&bridge.input[SCALAR_STATE_SIZE..]) {
+                Ok(raw) => raw,
+                Err(message) => return bridge.error(message),
+            }
+        };
+        if let Err(message) = event.decode().and_then(|event| {
+            event.validate(
+                state.rip,
+                state.flags,
+                &bridge.core.as_ref().unwrap().context,
+            )
+        }) {
+            return bridge.error(message);
+        }
         let core = bridge.core.as_mut().unwrap();
         // generated execution is suspended for every export call. no reference to
         // this foreign-mutable buffer survives the call back into generated wasm.
@@ -155,6 +178,7 @@ pub extern "C" fn core_import_state() -> i32 {
             let target = &mut *core.state.get();
             target.import(state);
             target.interruptibility = interruptibility;
+            target.event = event;
         };
         core.fault = None;
         core.alignment_fault = None;
@@ -165,6 +189,7 @@ pub extern "C" fn core_import_state() -> i32 {
         core.divide_failed = false;
         core.segment_fault = None;
         core.debug_exception = None;
+        core.undefined_source = false;
         0
     })
 }
@@ -180,6 +205,7 @@ pub extern "C" fn core_clear_fault() -> i32 {
         core.protection_fault = None;
         core.system_memory_fault = None;
         core.divide_failed = false;
+        core.undefined_source = false;
         core.segment_fault = None;
         core.debug_exception = None;
         unsafe {
@@ -201,6 +227,7 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
         core.protection_fault = None;
         core.system_memory_fault = None;
         core.segment_fault = None;
+        core.undefined_source = false;
         unsafe { (*core.state.get()).fault_segment = Segment::Cs as u32 };
         match decode::decode_with_context(pc, &core.context, |offset| {
             core.context
@@ -216,6 +243,10 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
                 SEGMENT
             }
             Err(DecodeError::Unsupported) => UNSUPPORTED,
+            Err(DecodeError::Undefined) => {
+                core.undefined_source = true;
+                UNSUPPORTED
+            }
             Err(DecodeError::Invalid) => INVALID,
             Err(DecodeError::Fetch(fault)) => {
                 core.fault = Some(fault);

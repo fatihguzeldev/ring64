@@ -65,7 +65,10 @@ pub extern "C" fn core_set_context() -> i32 {
             Err(message) => return bridge.error(message),
         };
         let core = bridge.core.as_mut().unwrap();
-        unsafe { (*core.state.get()).interruptibility = 0 };
+        unsafe {
+            (*core.state.get()).interruptibility = 0;
+            (*core.state.get()).event = RawEventState::default();
+        };
         core.debug_exception = None;
         core.fault = None;
         core.alignment_fault = None;

@@ -615,6 +615,9 @@ fn two_byte<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if opcode == 0x0b && prefixes.repeat.is_none() {
+        return Err(DecodeError::Undefined);
+    }
     if let Some(result) = super::protection::two_byte(opcode, prefixes, cursor) {
         return result;
     }

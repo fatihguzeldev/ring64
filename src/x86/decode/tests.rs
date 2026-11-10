@@ -58,6 +58,24 @@ fn operation(bytes: &[u8]) -> Operation {
 }
 
 #[test]
+fn ud2_has_a_selected_exception_frontier_without_admitting_unknown_opcodes() {
+    for bytes in [&[0x0f, 0x0b][..], &[0xf0, 0x0f, 0x0b], &[0x66, 0x0f, 0x0b]] {
+        assert_eq!(at(0x1000, bytes), Err(DecodeError::Undefined));
+        assert_eq!(
+            at(0x1000, &bytes[..bytes.len() - 1]),
+            Err(DecodeError::Fetch(missing(0x1000 + bytes.len() as u64 - 1)))
+        );
+    }
+    for bytes in [
+        &[0xf3, 0x0f, 0x0b][..],
+        &[0xf0, 0xf0, 0x0f, 0x0b],
+        &[0x0f, 0xff],
+    ] {
+        assert_eq!(at(0x1000, bytes), Err(DecodeError::Unsupported));
+    }
+}
+
+#[test]
 fn immediate_moves_preserve_raw_bits_and_use_the_opcode_register_extension() {
     assert_eq!(
         operation(&[0xb8, 0xef, 0xcd, 0xab, 0x89]),
