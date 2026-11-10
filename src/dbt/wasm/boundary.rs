@@ -1,5 +1,5 @@
 use super::{DIRECTION, Emitter, FLAGS, REASON, REPEAT_REMAINING, RIP, SHADOW, SYSTEM};
-use crate::embedding::layout::{DISPATCH, RunState};
+use crate::embedding::layout::{DISPATCH, HALTED, RunState};
 use crate::x86::instruction::{Operation, ProtectionKind, Repeat, SystemFlagsKind};
 use std::mem::offset_of;
 use wasm_encoder::{BlockType, Instruction as Op, MemArg};
@@ -16,6 +16,40 @@ pub(super) fn ss_producer(operation: Operation) -> bool {
 }
 
 impl Emitter {
+    pub(super) fn external_boundary(&mut self, exit_depth: u32) {
+        let Some(helper) = self.external_step else { return; };
+        // Idle-only intake changes eligibility only at existing control/shadow boundaries.
+        self.op(Op::LocalGet(0))
+            .op(Op::I64Load(MemArg {
+                offset: offset_of!(RunState, interrupts) as u64,
+                align: 2,
+                memory_index: 0,
+            }))
+            .op(Op::I64Eqz)
+            .op(Op::I32Eqz)
+            .op(Op::If(BlockType::Empty))
+            .op(Op::LocalGet(RIP));
+        self.full_flags();
+        self.op(Op::LocalGet(SHADOW))
+            .op(Op::Call(helper))
+            .op(Op::LocalTee(REASON))
+            .op(Op::BrIf(exit_depth + 1))
+            .op(Op::End);
+    }
+
+    pub(super) fn halt(&mut self, next_pc: u64, exit_depth: u32) {
+        self.full_flags();
+        self.op(Op::Call(self.halt.expect("HLT import")))
+            .op(Op::LocalTee(REASON))
+            .op(Op::BrIf(exit_depth));
+        self.commit(next_pc);
+        self.op(Op::I32Const(0)).op(Op::LocalSet(SHADOW));
+        self.trap(true, exit_depth);
+        self.external_boundary(exit_depth);
+        self.gates(exit_depth);
+        self.exit(HALTED, exit_depth);
+    }
+
     pub(super) fn full_flags(&mut self) {
         self.op(Op::LocalGet(FLAGS))
             .op(Op::LocalGet(DIRECTION))
@@ -170,6 +204,7 @@ impl Emitter {
                 self.op(Op::I32Const(0)).op(Op::LocalSet(SHADOW));
             }
             self.trap(true, exit_depth);
+            self.external_boundary(exit_depth);
             self.gates(exit_depth);
             self.exit(DISPATCH, exit_depth);
             return true;
@@ -181,6 +216,7 @@ impl Emitter {
             || matches!(self.current_operation, Operation::SystemFlags(d)
                 if matches!(d.kind, SystemFlagsKind::Pop | SystemFlagsKind::Sti));
         if terminal {
+            self.external_boundary(exit_depth);
             self.gates(exit_depth);
             self.exit(DISPATCH, exit_depth);
         }

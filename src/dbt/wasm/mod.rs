@@ -88,6 +88,8 @@ struct Emitter {
     software_event: Option<u32>,
     system_flags: Option<u32>,
     debug_step: Option<u32>,
+    external_step: Option<u32>,
+    halt: Option<u32>,
     observed: bool,
     mutable_controls: bool,
     publish_shadow: bool,
@@ -279,6 +281,9 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::SoftwareEvent(_)));
+    let has_halt = unit.instructions.iter().any(|i| matches!(i.operation, Operation::Halt));
+    let has_boundary = observed || has_system_flags || has_software_events || has_halt
+        || unit.instructions.iter().any(|i| boundary::ss_producer(i.operation));
     let float_type = has_float.then(|| {
         let index = next_type;
         types.ty().function(
@@ -389,6 +394,18 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
             [ValType::I64, ValType::I64, ValType::I32, ValType::I64],
             [ValType::I32],
         );
+        next_type += 1;
+        index
+    });
+    let external_step_type = has_boundary.then(|| {
+        let index = next_type;
+        types.ty().function([ValType::I64, ValType::I64, ValType::I32], [ValType::I32]);
+        next_type += 1;
+        index
+    });
+    let halt_type = has_halt.then(|| {
+        let index = next_type;
+        types.ty().function([ValType::I64], [ValType::I32]);
         next_type += 1;
         index
     });
@@ -611,6 +628,18 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let external_step = external_step_type.map(|index| {
+        imports.import("env", "external_step", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let halt = halt_type.map(|index| {
+        imports.import("env", "halt", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let vector_access_reason = if vector_banks.loads || vector_banks.stores || store_mxcsr_used {
         Some(access_reason.unwrap_or_else(|| {
             imports.import("env", "access_reason", EntityType::Function(2));
@@ -689,6 +718,8 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         software_event,
         system_flags,
         debug_step,
+        external_step,
+        halt,
         observed,
         mutable_controls: has_system_flags || has_software_events,
         publish_shadow: observed
@@ -743,6 +774,10 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         emitter.gates(exit_depth);
         emitter.begin(instruction.operation, exit_depth);
         match instruction.operation {
+            Operation::Halt => {
+                emitter.halt(instruction.next_pc, exit_depth);
+                continue;
+            }
             Operation::SoftwareEvent(operation) => {
                 if emitter.software_event(operation, instruction.next_pc, exit_depth) {
                     continue;

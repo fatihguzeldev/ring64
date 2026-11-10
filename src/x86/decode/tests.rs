@@ -76,6 +76,16 @@ fn ud2_has_a_selected_exception_frontier_without_admitting_unknown_opcodes() {
 }
 
 #[test]
+fn halt_decodes_ignored_prefixes_and_keeps_lock_as_a_selected_undefined_frontier() {
+    for bytes in [&[0xf4][..], &[0x66, 0x67, 0xf3, 0x64, 0x48, 0xf4]] {
+        assert_eq!(operation(bytes), Operation::Halt);
+    }
+    assert_eq!(at(0x1000, &[0xf0, 0xf4]), Err(DecodeError::UndefinedEncoding));
+    assert_eq!(at(0x1000, &[0xf0]), Err(DecodeError::Fetch(missing(0x1001))));
+    assert_eq!(at(0x1000, &[0x66; 15]), Err(DecodeError::Invalid));
+}
+
+#[test]
 fn immediate_moves_preserve_raw_bits_and_use_the_opcode_register_extension() {
     assert_eq!(
         operation(&[0xb8, 0xef, 0xcd, 0xab, 0x89]),
@@ -404,7 +414,7 @@ fn relative_targets_use_the_following_pc_and_signed_displacements() {
 
 #[test]
 fn valid_forms_outside_the_subset_are_unsupported_without_operand_effects() {
-    for bytes in [&[0x82, 0xd0, 1][..], &[0xf4][..]] {
+    for bytes in [&[0x82, 0xd0, 1][..], &[0x82][..]] {
         assert_eq!(
             at(0x1000, bytes),
             Err(DecodeError::Unsupported),

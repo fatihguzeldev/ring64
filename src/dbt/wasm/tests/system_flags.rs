@@ -503,6 +503,7 @@ fn observation_is_an_artifact_profile_with_no_default_instruction_helper_or_vect
         }
         assert_eq!(imports.iter().any(|name| name == "debug_step"), observed);
         assert!(!imports.iter().any(|name| name == "flags"));
-        assert_eq!(calls, if observed { 3 } else { 0 });
+        assert_eq!(imports.iter().any(|name| name == "external_step"), observed);
+        assert_eq!(calls, if observed { 6 } else { 0 });
     }
 }

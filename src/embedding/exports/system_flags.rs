@@ -1,5 +1,6 @@
 use super::*;
-use crate::embedding::layout::{DEBUG_EXCEPTION, PROTECTION};
+use crate::embedding::layout::{DEBUG_EXCEPTION, PROTECTION, RawEventState};
+use crate::x86::exception::EventState;
 use crate::x86::flags;
 use crate::x86::instruction::{SystemFlagsDescriptor, SystemFlagsKind};
 
@@ -43,6 +44,27 @@ impl Core {
 #[unsafe(no_mangle)]
 pub extern "C" fn core_boundary_observed() -> i32 {
     BRIDGE.with_borrow(|bridge| i32::from(bridge.core.as_ref().unwrap().boundary_observed()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_halt(input_flags: u64) -> i32 {
+    if !valid_flags(input_flags) {
+        return -1;
+    }
+    BRIDGE.with_borrow_mut(|bridge| {
+        let core = bridge.core.as_mut().unwrap();
+        let event = match EventState::halt(&core.context) {
+            Ok(event) => event,
+            Err(fault) => {
+                core.protection_fault = Some(fault);
+                return PROTECTION;
+            }
+        };
+        unsafe {
+            (*core.state.get()).event = RawEventState::encode(event);
+        }
+        0
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -113,6 +135,9 @@ pub extern "C" fn core_debug_step(
             resume_flags,
         });
         unsafe {
+            if (*core.state.get()).event.decode() == Ok(EventState::Halted) {
+                (*core.state.get()).event = RawEventState::default();
+            }
             if (*core.state.get()).delivery_enabled == 0 {
                 (*core.state.get()).interruptibility = 0;
             }

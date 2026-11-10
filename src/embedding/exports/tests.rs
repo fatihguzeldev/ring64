@@ -202,7 +202,7 @@ fn mapped_configuration() -> serde_json::Value {
 #[test]
 fn mapped_exports_register_sources_and_report_active_write_status() {
     let config = mapped_configuration();
-    let length = mapped_input(config.clone(), &[0xb8, 1, 0, 0, 0, 0xf4, 0xa5, 0xa5]);
+    let length = mapped_input(config.clone(), &[0xb8, 1, 0, 0, 0, 0x82, 0xa5, 0xa5]);
     assert_eq!(mapped::core_init_mapped(0x1000, length), 0);
     assert_eq!(core_probe(0x1000), DISPATCH);
     assert_eq!(core_read_memory(0x1000, 1), 1);

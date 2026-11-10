@@ -73,6 +73,9 @@ impl Emitter {
             return;
         }
         // Entry clears TF; only IRET can retain the incoming instruction-step decision.
+        if operation.kind == SoftwareEventKind::Return {
+            self.external_boundary(exit_depth);
+        }
         self.gates(exit_depth);
         self.exit(DISPATCH, exit_depth);
     }

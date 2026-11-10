@@ -86,7 +86,8 @@ pub(crate) fn discover_with_context(
             Operation::JumpRegister { .. }
             | Operation::JumpMemory { .. }
             | Operation::Return { .. }
-            | Operation::Far(_) => {}
+            | Operation::Far(_)
+            | Operation::Halt => {}
             Operation::SoftwareEvent(event) => {
                 if event.kind == crate::x86::instruction::SoftwareEventKind::Into {
                     pending.push_back(instruction.next_pc);
@@ -243,7 +244,7 @@ mod tests {
 
     #[test]
     fn memory_transfers_never_discover_data_targets_and_count_branches_have_two_edges() {
-        let call = discover(&image(&[0xff, 0x10, 0xc3, 0xf4, 0xf5]), 0x1000, limits()).unwrap();
+        let call = discover(&image(&[0xff, 0x10, 0xc3, 0x82, 0xf5]), 0x1000, limits()).unwrap();
         assert_eq!(
             call.instructions.iter().map(|i| i.pc).collect::<Vec<_>>(),
             [0x1000, 0x1002]
@@ -255,7 +256,7 @@ mod tests {
         assert_eq!(jump.source_bytes, 2);
         for opcode in 0xe0..=0xe3 {
             let branch = discover(
-                &image(&[opcode, 2, 0xf5, 0xf4, 0xf5, 0xf4]),
+                &image(&[opcode, 2, 0xf5, 0x82, 0xf5, 0x82]),
                 0x1000,
                 limits(),
             )
@@ -322,7 +323,7 @@ mod tests {
 
     #[test]
     fn source_ranges_retain_exact_guest_bytes_without_baking_future_diagnostics() {
-        let mut bytes = vec![0xf4; 32];
+        let mut bytes = vec![0x82; 32];
         bytes[..2].copy_from_slice(&[0xeb, 14]);
         bytes[16..21].copy_from_slice(&[0xb8, 1, 0, 0, 0]);
         let unit = discover(&image(&bytes), 0x1000, limits()).unwrap();
@@ -342,7 +343,7 @@ mod tests {
         );
 
         let overlapping = discover(
-            &image(&[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0xf4, 0xf4]),
+            &image(&[0x75, 1, 0xb8, 0xb9, 3, 0, 0, 0x82, 0x82]),
             0x1000,
             limits(),
         )

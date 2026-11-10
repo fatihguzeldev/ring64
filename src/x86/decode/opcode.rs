@@ -15,6 +15,13 @@ pub(super) fn refine<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if opcode == 0xf4 {
+        return if prefixes.lock {
+            Err(DecodeError::UndefinedEncoding)
+        } else {
+            Ok(Operation::Halt)
+        };
+    }
     let operation = refine_inner(opcode, prefixes, cursor)?;
     if prefixes.lock && !lockable(operation) {
         Err(DecodeError::Invalid)
