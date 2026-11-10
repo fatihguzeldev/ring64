@@ -67,6 +67,8 @@ export interface RunResult {
   remaining: bigint;
   repeatIterations: bigint;
   remainingRepeatBudget: bigint;
+  deliveryAttempts?: bigint;
+  remainingDeliveryBudget?: bigint;
   state: StateSnapshot;
   fault?: Fault;
   segmentFault?: SegmentFault;
@@ -324,14 +326,27 @@ export class Cpu {
     budget: bigint;
     stop?: bigint | undefined;
     repeatBudget?: bigint | undefined;
+    exceptionDelivery?: { budget: bigint } | undefined;
   }): Promise<RunResult> {
     const generation = this.requireIdle();
-    const { budget, stop, repeatBudget: suppliedRepeatBudget } = options;
+    const { budget, stop, repeatBudget: suppliedRepeatBudget, exceptionDelivery } = options;
+    let deliveryBudget: bigint | undefined;
+    if (exceptionDelivery !== undefined) {
+      if (
+        exceptionDelivery === null ||
+        typeof exceptionDelivery !== 'object' ||
+        Array.isArray(exceptionDelivery)
+      ) {
+        throw new TypeError('exceptionDelivery must contain a budget');
+      }
+      deliveryBudget = exceptionDelivery.budget;
+    }
     this.requireIdle(generation);
     unsigned64(budget, 'budget');
     if (stop !== undefined) unsigned64(stop, 'stop');
     const repeatBudget = suppliedRepeatBudget === undefined ? budget : suppliedRepeatBudget;
     unsigned64(repeatBudget, 'repeatBudget');
+    if (exceptionDelivery !== undefined) unsigned64(deliveryBudget, 'exception delivery budget');
     if (this.#runGeneration === Number.MAX_SAFE_INTEGER)
       throw new Error('cpu run generation exhausted');
     this.#runGeneration++;
@@ -353,6 +368,7 @@ export class Cpu {
     };
     let remaining = budget;
     let remainingRepeatBudget = repeatBudget;
+    let remainingDeliveryBudget = deliveryBudget;
     const finish = (reason: string): RunResult => {
       this.pruneTranslations();
       const fault = this.#engine.fault(reason);
@@ -376,6 +392,12 @@ export class Cpu {
         remaining,
         repeatIterations: repeatBudget - remainingRepeatBudget,
         remainingRepeatBudget,
+        ...(deliveryBudget === undefined
+          ? {}
+          : {
+              deliveryAttempts: deliveryBudget - remainingDeliveryBudget!,
+              remainingDeliveryBudget: remainingDeliveryBudget!,
+            }),
         state: this.#engine.snapshot(),
         ...(fault ? { fault } : {}),
         ...(segmentFault ? { segmentFault } : {}),
@@ -393,17 +415,43 @@ export class Cpu {
       return result;
     };
     try {
+      if (deliveryBudget !== undefined) this.#engine.configureDelivery(true);
+      let servicingEvent = false;
       for (;;) {
-        const boundaryObserved = this.#engine.prepareEntry();
+        const eventKind = this.#engine.eventKind();
+        if (eventKind === 'shutdown') return finish('shutdown');
+        const boundaryObserved = eventKind === 'ready' && this.#engine.prepareEntry();
         const pc = this.#engine.current().rip;
-        if (remaining === 0n) return finish('budget');
-        if (stop !== undefined && pc === stop) return finish('stop');
+        if (!servicingEvent) {
+          if (remaining === 0n) return finish('budget');
+          if (stop !== undefined && pc === stop) return finish('stop');
+        }
+        if (eventKind === 'pending') {
+          if (remainingDeliveryBudget === undefined) return finish('pending-exception');
+          if (remainingDeliveryBudget === 0n) return finish('event-budget');
+          remainingDeliveryBudget--;
+          const at = performance.now();
+          const reason = this.#engine.deliverException();
+          timings.executionMs += performance.now() - at;
+          if (reason !== 'dispatch') return finish(reason);
+          servicingEvent = this.#engine.eventKind() === 'pending';
+          this.pruneTranslations();
+          resources.dispatches++;
+          continue;
+        }
+        servicingEvent = false;
         let entry = this.#cache.get(pc, boundaryObserved);
         if (entry) {
           resources.cacheHits++;
         } else {
           const probe = this.#engine.probe(pc);
-          if (probe !== 'dispatch') return finish(probe);
+          if (probe !== 'dispatch') {
+            if (deliveryBudget !== undefined && this.#engine.stageException(probe)) {
+              servicingEvent = true;
+              continue;
+            }
+            return finish(probe);
+          }
           if (resources.compilations >= this.#limits.maxTranslationsPerRun)
             return finish('resource-limit');
           resources.compilations++;
@@ -469,7 +517,13 @@ export class Cpu {
         ) {
           throw new Error('generated execution violated its progress contract');
         }
-        if (reason !== 'dispatch') return finish(reason);
+        if (reason !== 'dispatch') {
+          if (deliveryBudget !== undefined && this.#engine.stageException(reason)) {
+            servicingEvent = true;
+            continue;
+          }
+          return finish(reason);
+        }
         this.pruneTranslations();
         resources.dispatches++;
       }
@@ -477,7 +531,10 @@ export class Cpu {
       this.#lifecycle = 'failed';
       throw new Error('cpu engine failed', { cause });
     } finally {
-      if (this.#lifecycle === 'running') this.#lifecycle = 'idle';
+      if (this.#lifecycle === 'running') {
+        if (deliveryBudget !== undefined) this.#engine.configureDelivery(false);
+        this.#lifecycle = 'idle';
+      }
     }
   }
 
