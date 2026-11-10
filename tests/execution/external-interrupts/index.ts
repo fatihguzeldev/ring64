@@ -1,6 +1,7 @@
 import { activityScenarios } from './activity.js';
+import { sourceScenarios } from './sources.js';
 import type { Scenario } from './fixture.js';
 
 export function externalInterruptScenarios(compiler: WebAssembly.Module): Scenario[] {
-  return activityScenarios(compiler);
+  return [...activityScenarios(compiler), ...sourceScenarios(compiler)];
 }
