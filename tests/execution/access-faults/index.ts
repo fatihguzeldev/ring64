@@ -5,6 +5,7 @@ import { recoveryScenarios } from './recovery.js';
 import { entryScenarios } from './entry.js';
 import { correctnessReviewScenarios } from './correctness-review.js';
 import { boundaryNumericScenarios } from './boundary-numeric.js';
+import { boundaryReviewScenarios } from './boundary-review.js';
 export function accessFaultScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     ...decodeScenarios(compiler),
@@ -13,5 +14,6 @@ export function accessFaultScenarios(compiler: WebAssembly.Module): Scenario[] {
     ...entryScenarios(compiler),
     ...correctnessReviewScenarios(compiler),
     ...boundaryNumericScenarios(compiler),
+    ...boundaryReviewScenarios(compiler),
   ];
 }
