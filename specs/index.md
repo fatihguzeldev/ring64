@@ -22,6 +22,7 @@
 - [far control and code segments](far-control-and-code-segments/spec.md): code-descriptor CALL/JMP/RETF, outer returns, CS/CPL/submode changes and checked far frames.
 - [system flags and instruction boundaries](system-flags-and-instruction-boundaries/spec.md): FLAGS stack transfers, CLI/STI, system-flag preservation, TF traps, stack-load suppression and resumable instruction boundaries.
 - [software events and iret](software-events-and-iret/spec.md): software interrupt gates, task-register/TSS stack selection, IST, handler frames and interrupt returns across privilege and execution modes.
+- [event delivery and returns](event-delivery-and-returns/spec.md): opt-in processor-exception delivery, saved fault/trap boundaries, error-code frames, bounded pending delivery and selected double-fault/shutdown behavior.
 
 ## scope
 
