@@ -181,15 +181,25 @@ impl Emitter {
         if !self.observed {
             return;
         }
-        let instruction_pc = self.current_pc;
-        self.op(Op::LocalGet(self.sampled_tf.unwrap()));
-        if self.ss_producer() {
-            self.op(Op::LocalGet(self.incoming_shadow.unwrap()))
-                .op(Op::I32Const(2))
-                .op(Op::I32Eq)
-                .op(Op::I32And);
-        }
-        self.op(Op::If(BlockType::Empty))
+        let incoming = self.incoming_shadow.unwrap();
+        let ss = if self.ss_producer() { 4 } else { 0 };
+        let helper = self.debug_step.expect("debug boundary import");
+        self.op(Op::I64Const(self.current_pc as i64))
+            .op(Op::LocalGet(RIP))
+            .op(Op::I32Const(i32::from(completed)));
+        self.full_flags();
+        self.op(Op::LocalGet(self.sampled_tf.unwrap()))
+            .op(Op::LocalGet(incoming))
+            .op(Op::I32Const(2))
+            .op(Op::I32Eq)
+            .op(Op::I32Const(1))
+            .op(Op::I32Shl)
+            .op(Op::I32Or)
+            .op(Op::I32Const(ss))
+            .op(Op::I32Or)
+            .op(Op::Call(helper))
+            .op(Op::LocalTee(REASON))
+            .op(Op::If(BlockType::Empty))
             .op(Op::LocalGet(0))
             .op(Op::I32Load(MemArg {
                 offset: offset_of!(RunState, delivery_enabled) as u64,
@@ -201,12 +211,6 @@ impl Emitter {
             .op(Op::I32Const(0))
             .op(Op::LocalSet(SHADOW))
             .op(Op::End)
-            .op(Op::I64Const(instruction_pc as i64))
-            .op(Op::LocalGet(RIP))
-            .op(Op::I32Const(i32::from(completed)));
-        self.full_flags();
-        self.op(Op::Call(self.debug_step.expect("debug boundary import")))
-            .op(Op::LocalSet(REASON))
             .op(Op::Br(exit_depth + 1))
             .op(Op::End);
     }

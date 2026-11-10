@@ -11,6 +11,25 @@ pub extern "C" fn core_software_event(
     input_flags: u64,
     next_pc: u64,
 ) -> i32 {
+    core_software_event_impl::<false>(operation, input_sp, input_flags, next_pc)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_software_event_observed(
+    operation: u32,
+    input_sp: u64,
+    input_flags: u64,
+    next_pc: u64,
+) -> i32 {
+    core_software_event_impl::<true>(operation, input_sp, input_flags, next_pc)
+}
+
+fn core_software_event_impl<const OBSERVED: bool>(
+    operation: u32,
+    input_sp: u64,
+    input_flags: u64,
+    next_pc: u64,
+) -> i32 {
     let Some(operation) = SoftwareEventDescriptor::try_decode(operation) else {
         return -1;
     };
@@ -38,6 +57,7 @@ pub extern "C" fn core_software_event(
             (*core.state.get()).target = 0;
             (*core.state.get()).fault_segment = Segment::Cs as u32;
         }
+        let before = OBSERVED.then(|| core.context.clone());
         let outcome = match event::execute(
             &mut core.context,
             &mut core.image,
@@ -78,6 +98,9 @@ pub extern "C" fn core_software_event(
             }
             Err(EventFailure::Unsupported) => return UNSUPPORTED,
         };
+        if let Some(before) = before {
+            core.debug_iret(&before, operation, input_sp);
+        }
         unsafe {
             let state = &mut *core.state.get();
             state.vector_scratch[..8].copy_from_slice(&outcome.pc.to_le_bytes());

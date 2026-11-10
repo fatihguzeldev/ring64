@@ -5,6 +5,15 @@ use crate::x86::mmx::{self, Op};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_mmx(operation: u32, operand: u64, segment: u32) -> i32 {
+    core_mmx_impl::<false>(operation, operand, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_mmx_observed(operation: u32, operand: u64, segment: u32) -> i32 {
+    core_mmx_impl::<true>(operation, operand, segment)
+}
+
+fn core_mmx_impl<const OBSERVED: bool>(operation: u32, operand: u64, segment: u32) -> i32 {
     let Some(operation) = Op::try_decode(operation) else {
         return -1;
     };
@@ -112,6 +121,14 @@ pub extern "C" fn core_mmx(operation: u32, operand: u64, segment: u32) -> i32 {
                 } else {
                     (operand & !0xffff_ffff) | u64::from(outcome.value as u32)
                 };
+            }
+        }
+        if OBSERVED && let Some(address) = address {
+            if !operation.is_store() {
+                core.debug_operand(address, width, Access::Read);
+            }
+            if operation.is_store() {
+                core.debug_operand(address, width, Access::Write);
             }
         }
         if operation.is_store() && core.image.active_changed() {

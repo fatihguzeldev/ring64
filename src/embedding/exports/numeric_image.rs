@@ -4,6 +4,15 @@ use crate::x86::numeric_images::{self, ImageOp};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_numeric_image(operation: u32, offset: u64, segment: u32) -> i32 {
+    core_numeric_image_impl::<false>(operation, offset, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_numeric_image_observed(operation: u32, offset: u64, segment: u32) -> i32 {
+    core_numeric_image_impl::<true>(operation, offset, segment)
+}
+
+fn core_numeric_image_impl<const OBSERVED: bool>(operation: u32, offset: u64, segment: u32) -> i32 {
     let Some(operation) = ImageOp::try_decode(operation) else {
         return -1;
     };
@@ -69,6 +78,11 @@ pub extern "C" fn core_numeric_image(operation: u32, offset: u64, segment: u32) 
             unsafe {
                 (*core.state.get()).x87 = saved.x87;
             }
+            if OBSERVED {
+                for &(offset, length) in operation.spans() {
+                    core.debug_operand(address + u64::from(offset), length, Access::Write);
+                }
+            }
             if core.image.active_changed() { 2 } else { 0 }
         } else {
             let mut bytes = [0; 512];
@@ -94,6 +108,11 @@ pub extern "C" fn core_numeric_image(operation: u32, offset: u64, segment: u32) 
                         state.x87 = restored.x87;
                         state.xmm = restored.xmm;
                         state.mxcsr = restored.mxcsr;
+                    }
+                    if OBSERVED {
+                        for &(offset, length) in operation.spans() {
+                            core.debug_operand(address + u64::from(offset), length, Access::Read);
+                        }
                     }
                     0
                 }

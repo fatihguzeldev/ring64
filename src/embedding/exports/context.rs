@@ -92,6 +92,15 @@ pub extern "C" fn core_set_context() -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_segmented_load(offset: u64, width: u32, segment: u32) -> u64 {
+    core_segmented_load_impl::<false>(offset, width, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_segmented_load_observed(offset: u64, width: u32, segment: u32) -> u64 {
+    core_segmented_load_impl::<true>(offset, width, segment)
+}
+
+fn core_segmented_load_impl<const OBSERVED: bool>(offset: u64, width: u32, segment: u32) -> u64 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         let Some(address) = core.segment_address(
@@ -104,7 +113,12 @@ pub extern "C" fn core_segmented_load(offset: u64, width: u32, segment: u32) -> 
             return 0;
         };
         match core.image.read(address, width) {
-            Ok(value) => value,
+            Ok(value) => {
+                if OBSERVED {
+                    core.debug_operand(address, width, Access::Read);
+                }
+                value
+            }
             Err(fault) => {
                 core.fault = Some(fault);
                 0
@@ -115,6 +129,23 @@ pub extern "C" fn core_segmented_load(offset: u64, width: u32, segment: u32) -> 
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_segmented_load_for_write(offset: u64, width: u32, segment: u32) -> u64 {
+    core_segmented_load_for_write_impl::<false>(offset, width, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_segmented_load_for_write_observed(
+    offset: u64,
+    width: u32,
+    segment: u32,
+) -> u64 {
+    core_segmented_load_for_write_impl::<true>(offset, width, segment)
+}
+
+fn core_segmented_load_for_write_impl<const OBSERVED: bool>(
+    offset: u64,
+    width: u32,
+    segment: u32,
+) -> u64 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         let Some(address) = core.segment_address(
@@ -127,7 +158,12 @@ pub extern "C" fn core_segmented_load_for_write(offset: u64, width: u32, segment
             return 0;
         };
         match core.image.read_for_write(address, width) {
-            Ok(value) => value,
+            Ok(value) => {
+                if OBSERVED {
+                    core.debug_operand(address, width, Access::Read);
+                }
+                value
+            }
             Err(fault) => {
                 core.fault = Some(fault);
                 0
@@ -138,6 +174,25 @@ pub extern "C" fn core_segmented_load_for_write(offset: u64, width: u32, segment
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_segmented_store(offset: u64, width: u32, value: u64, segment: u32) -> i32 {
+    core_segmented_store_impl::<false>(offset, width, value, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_segmented_store_observed(
+    offset: u64,
+    width: u32,
+    value: u64,
+    segment: u32,
+) -> i32 {
+    core_segmented_store_impl::<true>(offset, width, value, segment)
+}
+
+fn core_segmented_store_impl<const OBSERVED: bool>(
+    offset: u64,
+    width: u32,
+    value: u64,
+    segment: u32,
+) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         let Some(address) = core.segment_address(
@@ -151,11 +206,10 @@ pub extern "C" fn core_segmented_store(offset: u64, width: u32, value: u64, segm
         };
         match core.image.write(address, width, value) {
             Ok(()) => {
-                if core.image.active_changed() {
-                    2
-                } else {
-                    1
+                if OBSERVED {
+                    core.debug_operand(address, width, Access::Write);
                 }
+                if core.image.active_changed() { 2 } else { 1 }
             }
             Err(fault) => {
                 core.fault = Some(fault);

@@ -424,7 +424,13 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
     let debug_type = observed.then(|| {
         let index = next_type;
         types.ty().function(
-            [ValType::I64, ValType::I64, ValType::I32, ValType::I64],
+            [
+                ValType::I64,
+                ValType::I64,
+                ValType::I32,
+                ValType::I64,
+                ValType::I32,
+            ],
             [ValType::I32],
         );
         next_type += 1;
@@ -670,7 +676,7 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         function
     });
     let debug_step = debug_type.map(|index| {
-        imports.import("env", "debug_step", EntityType::Function(index));
+        imports.import("env", "debug_finish", EntityType::Function(index));
         let function = run_index;
         run_index += 1;
         function

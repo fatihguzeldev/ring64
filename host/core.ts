@@ -212,6 +212,30 @@ type CoreExports = WebAssembly.Exports & {
   core_target_check(target: bigint): number;
   core_state_ptr(): number;
   core_import_state(): number;
+  core_load_observed: CoreExports['core_load'];
+  core_load_for_write_observed: CoreExports['core_load_for_write'];
+  core_store_observed: CoreExports['core_store'];
+  core_segmented_load_observed: CoreExports['core_segmented_load'];
+  core_segmented_load_for_write_observed: CoreExports['core_segmented_load_for_write'];
+  core_segmented_store_observed: CoreExports['core_segmented_store'];
+  core_vector_load_observed: CoreExports['core_vector_load'];
+  core_vector_store_observed: CoreExports['core_vector_store'];
+  core_load_mxcsr_observed: CoreExports['core_load_mxcsr'];
+  core_store_mxcsr_observed: CoreExports['core_store_mxcsr'];
+  core_x87_observed: CoreExports['core_x87'];
+  core_mmx_observed: CoreExports['core_mmx'];
+  core_numeric_image_observed: CoreExports['core_numeric_image'];
+  core_masked_store_observed: CoreExports['core_masked_store'];
+  core_protection_observed: CoreExports['core_protection'];
+  core_far_control_observed: CoreExports['core_far_control'];
+  core_software_event_observed: CoreExports['core_software_event'];
+  core_debug_finish(
+    pc: bigint,
+    resume: bigint,
+    completed: number,
+    flags: bigint,
+    decision: number,
+  ): number;
   core_debug_begin(pc: bigint, flags: bigint, shadow: number): number;
   core_debug_register(operation: number, input: bigint, pc: bigint, flags: bigint): number;
   core_import_debug(): number;
@@ -540,6 +564,24 @@ export class Core {
       'core_target_check',
       'core_state_ptr',
       'core_import_state',
+      'core_load_observed',
+      'core_load_for_write_observed',
+      'core_store_observed',
+      'core_segmented_load_observed',
+      'core_segmented_load_for_write_observed',
+      'core_segmented_store_observed',
+      'core_vector_load_observed',
+      'core_vector_store_observed',
+      'core_load_mxcsr_observed',
+      'core_store_mxcsr_observed',
+      'core_x87_observed',
+      'core_mmx_observed',
+      'core_numeric_image_observed',
+      'core_masked_store_observed',
+      'core_protection_observed',
+      'core_far_control_observed',
+      'core_software_event_observed',
+      'core_debug_finish',
       'core_debug_begin',
       'core_debug_register',
       'core_import_debug',
@@ -943,34 +985,56 @@ export class Core {
     };
   }
 
-  instantiate(module: WebAssembly.Module): GeneratedRun {
+  instantiate(module: WebAssembly.Module, observed = false): GeneratedRun {
+    const operands = observed
+      ? {
+          core_load: this.#exports.core_load_observed,
+          core_load_for_write: this.#exports.core_load_for_write_observed,
+          core_store: this.#exports.core_store_observed,
+          core_segmented_load: this.#exports.core_segmented_load_observed,
+          core_segmented_load_for_write: this.#exports.core_segmented_load_for_write_observed,
+          core_segmented_store: this.#exports.core_segmented_store_observed,
+          core_vector_load: this.#exports.core_vector_load_observed,
+          core_vector_store: this.#exports.core_vector_store_observed,
+          core_load_mxcsr: this.#exports.core_load_mxcsr_observed,
+          core_store_mxcsr: this.#exports.core_store_mxcsr_observed,
+          core_x87: this.#exports.core_x87_observed,
+          core_mmx: this.#exports.core_mmx_observed,
+          core_numeric_image: this.#exports.core_numeric_image_observed,
+          core_masked_store: this.#exports.core_masked_store_observed,
+          core_protection: this.#exports.core_protection_observed,
+          core_far_control: this.#exports.core_far_control_observed,
+          core_software_event: this.#exports.core_software_event_observed,
+        }
+      : this.#exports;
     const instance = new WebAssembly.Instance(module, {
       env: {
         memory: this.#exports.memory,
-        load: this.#exports.core_load,
-        load_for_write: this.#exports.core_load_for_write,
-        store: this.#exports.core_store,
+        load: operands.core_load,
+        load_for_write: operands.core_load_for_write,
+        store: operands.core_store,
         access_failed: this.#exports.core_access_failed,
-        segmented_load: this.#exports.core_segmented_load,
-        segmented_load_for_write: this.#exports.core_segmented_load_for_write,
-        segmented_store: this.#exports.core_segmented_store,
+        segmented_load: operands.core_segmented_load,
+        segmented_load_for_write: operands.core_segmented_load_for_write,
+        segmented_store: operands.core_segmented_store,
         segmented_access_failed: this.#exports.core_segmented_access_failed,
         access_reason: this.#exports.core_access_reason,
-        vector_load: this.#exports.core_vector_load,
-        vector_store: this.#exports.core_vector_store,
+        vector_load: operands.core_vector_load,
+        vector_store: operands.core_vector_store,
         float: this.#exports.core_float,
-        load_mxcsr: this.#exports.core_load_mxcsr,
-        store_mxcsr: this.#exports.core_store_mxcsr,
-        x87: this.#exports.core_x87,
-        mmx: this.#exports.core_mmx,
-        numeric_image: this.#exports.core_numeric_image,
-        masked_store: this.#exports.core_masked_store,
+        load_mxcsr: operands.core_load_mxcsr,
+        store_mxcsr: operands.core_store_mxcsr,
+        x87: operands.core_x87,
+        mmx: operands.core_mmx,
+        numeric_image: operands.core_numeric_image,
+        masked_store: operands.core_masked_store,
         clflush: this.#exports.core_clflush,
-        protection: this.#exports.core_protection,
-        far_control: this.#exports.core_far_control,
-        software_event: this.#exports.core_software_event,
+        protection: operands.core_protection,
+        far_control: operands.core_far_control,
+        software_event: operands.core_software_event,
         flags: this.#exports.core_flags,
         debug_step: this.#exports.core_debug_step,
+        debug_finish: this.#exports.core_debug_finish,
         debug_register: this.#exports.core_debug_register,
         debug_begin: this.#exports.core_debug_begin,
         external_step: this.#exports.core_external_step,
@@ -1108,17 +1172,20 @@ export class Core {
     if (reason !== 'debug-exception') return undefined;
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
     const raw = this.info<
-      Omit<DebugException, 'instructionPc' | 'resumePc' | 'resumeFlags'> & {
+      Omit<DebugException, 'instructionPc' | 'resumePc' | 'resumeFlags' | 'deferredOriginPc'> & {
+        deferredOriginPc?: string;
         instructionPc: string;
         resumePc: string;
         resumeFlags: string;
       }
     >();
+    const { deferredOriginPc, ...diagnostic } = raw;
     return {
-      ...raw,
+      ...diagnostic,
       instructionPc: BigInt(raw.instructionPc),
       resumePc: BigInt(raw.resumePc),
       resumeFlags: BigInt(raw.resumeFlags),
+      ...(deferredOriginPc === undefined ? {} : { deferredOriginPc: BigInt(deferredOriginPc) }),
     };
   }
 

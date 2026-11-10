@@ -539,7 +539,7 @@ export class Cpu {
               continue;
             at = performance.now();
             const artifact: Artifact = {
-              run: this.#engine.instantiate(module),
+              run: this.#engine.instantiate(module, output.metadata.boundaryObserved),
               metadata: output.metadata,
             };
             timings.instantiationMs += performance.now() - at;

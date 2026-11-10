@@ -73,7 +73,7 @@ fn event_imports_and_control_lifetimes_are_selected_without_default_bank_traffic
             }
         }
         assert_eq!(names.iter().any(|n| n == "software_event"), event);
-        assert_eq!(names.iter().any(|n| n == "debug_step"), observed);
+        assert_eq!(names.iter().any(|n| n == "debug_finish"), observed);
         assert!(!names.iter().any(|n| n == "flags"));
         assert!(!vector_traffic);
     }

@@ -12,6 +12,29 @@ pub extern "C" fn core_far_control(
     next_pc: u64,
     segment: u32,
 ) -> i32 {
+    core_far_control_impl::<false>(descriptor, offset, selector, input_sp, next_pc, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_far_control_observed(
+    descriptor: u32,
+    offset: u64,
+    selector: u32,
+    input_sp: u64,
+    next_pc: u64,
+    segment: u32,
+) -> i32 {
+    core_far_control_impl::<true>(descriptor, offset, selector, input_sp, next_pc, segment)
+}
+
+fn core_far_control_impl<const OBSERVED: bool>(
+    descriptor: u32,
+    offset: u64,
+    selector: u32,
+    input_sp: u64,
+    next_pc: u64,
+    segment: u32,
+) -> i32 {
     let Some(descriptor) = FarDescriptor::try_decode(descriptor) else {
         return -1;
     };
@@ -45,6 +68,7 @@ pub extern "C" fn core_far_control(
             (*core.state.get()).target = 0;
             (*core.state.get()).fault_segment = segment as u32;
         }
+        let before = OBSERVED.then(|| core.context.clone());
         let outcome = match far::execute(
             &mut core.context,
             &mut core.image,
@@ -79,6 +103,9 @@ pub extern "C" fn core_far_control(
             }
             Err(FarFailure::Unsupported) => return UNSUPPORTED,
         };
+        if let Some(before) = before {
+            core.debug_far(&before, descriptor, offset, input_sp, segment);
+        }
         unsafe {
             let scratch = &mut (*core.state.get()).vector_scratch;
             scratch[..8].copy_from_slice(&outcome.pc.to_le_bytes());

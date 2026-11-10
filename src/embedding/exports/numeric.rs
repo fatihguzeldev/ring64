@@ -102,6 +102,15 @@ pub extern "C" fn core_float(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_load_mxcsr(offset: u64, segment: u32) -> i32 {
+    core_load_mxcsr_impl::<false>(offset, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_load_mxcsr_observed(offset: u64, segment: u32) -> i32 {
+    core_load_mxcsr_impl::<true>(offset, segment)
+}
+
+fn core_load_mxcsr_impl<const OBSERVED: bool>(offset: u64, segment: u32) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.simd_exception = None;
@@ -132,6 +141,9 @@ pub extern "C" fn core_load_mxcsr(offset: u64, segment: u32) -> i32 {
             unsafe {
                 (*core.state.get()).mxcsr = value;
             }
+            if OBSERVED {
+                core.debug_operand(address, 4, Access::Read);
+            }
             0
         }
     })
@@ -139,6 +151,15 @@ pub extern "C" fn core_load_mxcsr(offset: u64, segment: u32) -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_store_mxcsr(offset: u64, segment: u32) -> i32 {
+    core_store_mxcsr_impl::<false>(offset, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_store_mxcsr_observed(offset: u64, segment: u32) -> i32 {
+    core_store_mxcsr_impl::<true>(offset, segment)
+}
+
+fn core_store_mxcsr_impl<const OBSERVED: bool>(offset: u64, segment: u32) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         let value = unsafe { (*core.state.get()).mxcsr.to_le_bytes() };
@@ -154,11 +175,10 @@ pub extern "C" fn core_store_mxcsr(offset: u64, segment: u32) -> i32 {
         };
         match core.image.write_bytes(address, &value) {
             Ok(()) => {
-                if core.image.active_changed() {
-                    2
-                } else {
-                    1
+                if OBSERVED {
+                    core.debug_operand(address, 4, Access::Write);
                 }
+                if core.image.active_changed() { 2 } else { 1 }
             }
             Err(fault) => {
                 core.fault = Some(fault);

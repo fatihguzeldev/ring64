@@ -22,6 +22,29 @@ pub extern "C" fn core_x87(
     flags: u64,
     rax: u64,
 ) -> i32 {
+    core_x87_impl::<false>(operation, offset, segment, instruction_pc, flags, rax)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_x87_observed(
+    operation: u32,
+    offset: u64,
+    segment: u32,
+    instruction_pc: u64,
+    flags: u64,
+    rax: u64,
+) -> i32 {
+    core_x87_impl::<true>(operation, offset, segment, instruction_pc, flags, rax)
+}
+
+fn core_x87_impl<const OBSERVED: bool>(
+    operation: u32,
+    offset: u64,
+    segment: u32,
+    instruction_pc: u64,
+    flags: u64,
+    rax: u64,
+) -> i32 {
     let Some(operation) = Op::try_decode(operation) else {
         return -1;
     };
@@ -112,6 +135,14 @@ pub extern "C" fn core_x87(
             }
             if effect.ax {
                 state.registers[0] = (rax & !0xffff) | (effect.value as u64 & 0xffff);
+            }
+        }
+        if OBSERVED && let Some(address) = address {
+            if !operation.is_store() {
+                core.debug_operand(address, width, Access::Read);
+            }
+            if effect.store {
+                core.debug_operand(address, width, Access::Write);
             }
         }
         if effect.store && core.image.active_changed() {

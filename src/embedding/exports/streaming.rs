@@ -10,6 +10,27 @@ pub extern "C" fn core_masked_store(
     mask_bits: u32,
     segment: u32,
 ) -> i32 {
+    core_masked_store_impl::<false>(offset, width, data_ptr, mask_bits, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_masked_store_observed(
+    offset: u64,
+    width: u32,
+    data_ptr: u32,
+    mask_bits: u32,
+    segment: u32,
+) -> i32 {
+    core_masked_store_impl::<true>(offset, width, data_ptr, mask_bits, segment)
+}
+
+fn core_masked_store_impl<const OBSERVED: bool>(
+    offset: u64,
+    width: u32,
+    data_ptr: u32,
+    mask_bits: u32,
+    segment: u32,
+) -> i32 {
     if !matches!(width, 8 | 16) || mask_bits >> width != 0 {
         return -1;
     }
@@ -61,6 +82,13 @@ pub extern "C" fn core_masked_store(
         if let Err(fault) = result {
             core.fault = Some(fault);
             return DATA;
+        }
+        if OBSERVED {
+            for index in 0..width {
+                if mask_bits & (1 << index) != 0 {
+                    core.debug_operand(address + u64::from(index), 1, Access::Write);
+                }
+            }
         }
         if width == 8 {
             unsafe {

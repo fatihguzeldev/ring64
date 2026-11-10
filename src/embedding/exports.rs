@@ -379,11 +379,25 @@ pub extern "C" fn core_compile(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_load(address: u64, width: u32) -> u64 {
+    core_load_impl::<false>(address, width)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_load_observed(address: u64, width: u32) -> u64 {
+    core_load_impl::<true>(address, width)
+}
+
+fn core_load_impl<const OBSERVED: bool>(address: u64, width: u32) -> u64 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
         match core.image.read(address, width) {
-            Ok(value) => value,
+            Ok(value) => {
+                if OBSERVED {
+                    core.debug_operand(address, width, Access::Read);
+                }
+                value
+            }
             Err(fault) => {
                 core.fault = Some(fault);
                 unsafe {
@@ -397,11 +411,25 @@ pub extern "C" fn core_load(address: u64, width: u32) -> u64 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_load_for_write(address: u64, width: u32) -> u64 {
+    core_load_for_write_impl::<false>(address, width)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_load_for_write_observed(address: u64, width: u32) -> u64 {
+    core_load_for_write_impl::<true>(address, width)
+}
+
+fn core_load_for_write_impl<const OBSERVED: bool>(address: u64, width: u32) -> u64 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
         match core.image.read_for_write(address, width) {
-            Ok(value) => value,
+            Ok(value) => {
+                if OBSERVED {
+                    core.debug_operand(address, width, Access::Read);
+                }
+                value
+            }
             Err(fault) => {
                 core.fault = Some(fault);
                 unsafe {
@@ -415,16 +443,24 @@ pub extern "C" fn core_load_for_write(address: u64, width: u32) -> u64 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_store(address: u64, width: u32, value: u64) -> i32 {
+    core_store_impl::<false>(address, width, value)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_store_observed(address: u64, width: u32, value: u64) -> i32 {
+    core_store_impl::<true>(address, width, value)
+}
+
+fn core_store_impl<const OBSERVED: bool>(address: u64, width: u32, value: u64) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
         match core.image.write(address, width, value) {
             Ok(()) => {
-                if core.image.active_changed() {
-                    2
-                } else {
-                    1
+                if OBSERVED {
+                    core.debug_operand(address, width, Access::Write);
                 }
+                if core.image.active_changed() { 2 } else { 1 }
             }
             Err(fault) => {
                 core.fault = Some(fault);

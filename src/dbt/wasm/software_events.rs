@@ -72,6 +72,12 @@ impl Emitter {
         if operation.kind == SoftwareEventKind::Return && self.finish_instruction(exit_depth) {
             return;
         }
+        if self.observed && operation.kind != SoftwareEventKind::Return {
+            // Entry clears TF, but a preceding SS operand hit still completes here.
+            let sampled_tf = self.sampled_tf.unwrap();
+            self.op(Op::I32Const(0)).op(Op::LocalSet(sampled_tf));
+            self.trap(true, exit_depth);
+        }
         // Entry clears TF; only IRET can retain the incoming instruction-step decision.
         if operation.kind == SoftwareEventKind::Return {
             self.external_boundary(exit_depth);

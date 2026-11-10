@@ -31,6 +31,25 @@ pub(super) fn system_fault_json(fault: &SystemMemoryFault) -> serde_json::Value 
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_protection(descriptor: u32, offset: u64, input: u64, segment: u32) -> i32 {
+    core_protection_impl::<false>(descriptor, offset, input, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_protection_observed(
+    descriptor: u32,
+    offset: u64,
+    input: u64,
+    segment: u32,
+) -> i32 {
+    core_protection_impl::<true>(descriptor, offset, input, segment)
+}
+
+fn core_protection_impl<const OBSERVED: bool>(
+    descriptor: u32,
+    offset: u64,
+    input: u64,
+    segment: u32,
+) -> i32 {
     let Some(descriptor) = ProtectionDescriptor::try_decode(descriptor) else {
         return -1;
     };
@@ -54,6 +73,7 @@ pub extern "C" fn core_protection(descriptor: u32, offset: u64, input: u64, segm
             (*core.state.get()).target = 0;
             (*core.state.get()).fault_segment = segment as u32;
         }
+        let before = OBSERVED.then(|| core.context.clone());
         let outcome = match semantics::execute(
             &mut core.context,
             &mut core.image,
@@ -80,6 +100,9 @@ pub extern "C" fn core_protection(descriptor: u32, offset: u64, input: u64, segm
                 return SYSTEM_MEMORY;
             }
         };
+        if let Some(before) = before {
+            core.debug_protection(&before, descriptor, offset, segment);
+        }
         unsafe {
             let scratch = &mut (*core.state.get()).vector_scratch;
             scratch[..8].copy_from_slice(&outcome.value.unwrap_or(0).to_le_bytes());

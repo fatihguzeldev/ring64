@@ -84,6 +84,25 @@ pub extern "C" fn core_import_xmm() -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_vector_load(offset: u64, width: u32, segment: u32, alignment: u32) -> u32 {
+    core_vector_load_impl::<false>(offset, width, segment, alignment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_vector_load_observed(
+    offset: u64,
+    width: u32,
+    segment: u32,
+    alignment: u32,
+) -> u32 {
+    core_vector_load_impl::<true>(offset, width, segment, alignment)
+}
+
+fn core_vector_load_impl<const OBSERVED: bool>(
+    offset: u64,
+    width: u32,
+    segment: u32,
+    alignment: u32,
+) -> u32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         let Some(address) = core.vector_address(offset, width, segment, alignment, Access::Read)
@@ -92,6 +111,9 @@ pub extern "C" fn core_vector_load(offset: u64, width: u32, segment: u32, alignm
         };
         match core.image.read_vector(address, width) {
             Ok(bytes) => unsafe {
+                if OBSERVED {
+                    core.debug_operand(address, width, Access::Read);
+                }
                 let state = &mut *core.state.get();
                 state.vector_scratch = bytes;
                 state.vector_scratch.as_ptr() as u32
@@ -106,6 +128,27 @@ pub extern "C" fn core_vector_load(offset: u64, width: u32, segment: u32, alignm
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_vector_store(
+    offset: u64,
+    width: u32,
+    segment: u32,
+    alignment: u32,
+    value_ptr: u32,
+) -> i32 {
+    core_vector_store_impl::<false>(offset, width, segment, alignment, value_ptr)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_vector_store_observed(
+    offset: u64,
+    width: u32,
+    segment: u32,
+    alignment: u32,
+    value_ptr: u32,
+) -> i32 {
+    core_vector_store_impl::<true>(offset, width, segment, alignment, value_ptr)
+}
+
+fn core_vector_store_impl<const OBSERVED: bool>(
     offset: u64,
     width: u32,
     segment: u32,
@@ -129,11 +172,10 @@ pub extern "C" fn core_vector_store(
         };
         match core.image.write_bytes(address, &bytes[..width as usize]) {
             Ok(()) => {
-                if core.image.active_changed() {
-                    2
-                } else {
-                    1
+                if OBSERVED {
+                    core.debug_operand(address, width, Access::Write);
                 }
+                if core.image.active_changed() { 2 } else { 1 }
             }
             Err(fault) => {
                 core.fault = Some(fault);
