@@ -18,7 +18,7 @@ const options = () => ({
   },
 });
 const layout = {
-  size: 560,
+  size: 608,
   scalarSize: 176,
   registers: 0,
   flags: 128,
@@ -43,6 +43,17 @@ const layout = {
     opcode: 86,
     instructionPointer: 88,
     dataPointer: 96,
+  },
+  event: {
+    offset: 560,
+    bytes: 40,
+    kind: 0,
+    vector: 4,
+    instructionPc: 8,
+    returnPc: 16,
+    savedFlags: 24,
+    errorCode: 32,
+    hasErrorCode: 36,
   },
   reasons: ['dispatch', 'simd-exception', 'general-protection'],
 };
@@ -159,6 +170,10 @@ async function cpuFixture() {
   const state = { registers: Array<bigint>(16).fill(7n), flags: 0xcd7n, rip: 0x1000n };
   const bank = Array<bigint>(16).fill(0xa5n);
   const engine = {
+    configureDelivery() {},
+    eventKind: () => 'ready',
+    stageException: () => false,
+    deliverException: () => 'dispatch',
     readMxcsr: () => value,
     setMxcsr(next: number) {
       value = next;

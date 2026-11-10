@@ -10,6 +10,7 @@ test('scalar capture normalizes omitted boundaries and owns explicit interruptib
   assert.deepEqual(captureState(input()), {
     ...input(),
     interruptibility: { sti: false, ss: false },
+    event: { kind: 'ready' },
   });
   const interruptibility = { sti: false, ss: true };
   const source = { ...input(), interruptibility };

@@ -36,6 +36,7 @@ function state(): State {
     flags: 2n,
     rip: CODE,
     interruptibility: { sti: false, ss: false },
+    event: { kind: 'ready' },
   };
 }
 

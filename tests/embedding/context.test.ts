@@ -46,6 +46,7 @@ test('default context and identical imports preserve raw State and warm owners',
     cpu.setContext({ gsBase: 0n, mode: 'long64', fsBase: 0n });
     assert.deepEqual(cpu.readState(), state);
     assert.deepEqual(Object.keys(cpu.readState()).sort(), [
+      'event',
       'flags',
       'interruptibility',
       'registers',

@@ -179,7 +179,17 @@ async function fixture(steps: Step[] = []) {
   const queriedProfiles: boolean[] = [];
   const engine = {
     current: () => current,
-    snapshot: () => ({ registers: Array<bigint>(16).fill(0n), flags: 2n, rip: current.rip }),
+    snapshot: () => ({
+      registers: Array<bigint>(16).fill(0n),
+      flags: 2n,
+      rip: current.rip,
+      interruptibility: { sti: false, ss: false },
+      event: { kind: 'ready' },
+    }),
+    configureDelivery() {},
+    eventKind: () => 'ready',
+    stageException: () => false,
+    deliverException: () => 'dispatch',
     setState(state: unknown) {
       stateImports.push(state);
     },

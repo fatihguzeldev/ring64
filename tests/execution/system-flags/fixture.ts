@@ -29,7 +29,11 @@ export function initial(
   flags = 2n,
   interruptibility = { sti: false, ss: false },
 ): StateSnapshot {
-  return { ...input(rip, registers, flags), interruptibility: { ...interruptibility } };
+  return {
+    ...input(rip, registers, flags),
+    interruptibility: { ...interruptibility },
+    event: { kind: 'ready' },
+  };
 }
 
 export function outcome(

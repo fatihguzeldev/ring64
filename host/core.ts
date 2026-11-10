@@ -8,6 +8,15 @@ import {
 } from './context.js';
 import type { InitialMemory, MemoryBackingInput, MemoryMapping } from './memory.js';
 import {
+  captureEventState,
+  eventKind,
+  readEvent,
+  validateEventLayout,
+  writeEvent,
+  type EventLayout,
+  type EventState,
+} from './events.js';
+import {
   captureX87State,
   readX87,
   writeX87,
@@ -22,6 +31,7 @@ export interface State {
   flags: bigint;
   rip: bigint;
   interruptibility?: Interruptibility;
+  event?: EventState;
 }
 
 export interface Interruptibility {
@@ -31,6 +41,7 @@ export interface Interruptibility {
 
 export interface StateSnapshot extends State {
   interruptibility: Interruptibility;
+  event: EventState;
 }
 
 export interface DebugException {
@@ -140,6 +151,7 @@ interface Layout {
   mxcsr: number;
   mxcsrBytes: number;
   x87: X87Layout;
+  event: EventLayout;
   registers: number;
   flags: number;
   rip: number;
@@ -201,6 +213,9 @@ type CoreExports = WebAssembly.Exports & {
     instructionCompleted: number,
     flags: bigint,
   ): number;
+  core_configure_delivery(enabled: number): number;
+  core_stage_exception(reason: number): number;
+  core_deliver_exception(): number;
   core_protection(descriptor: number, offset: bigint, input: bigint, segment: number): number;
   core_clflush(offset: bigint, segment: number): number;
   core_x87(
@@ -300,7 +315,8 @@ export function captureState(state: State): StateSnapshot {
       throw new TypeError('interruptibility must contain boolean sti and ss');
     interruptibility = { sti, ss };
   }
-  return { registers, flags, rip, interruptibility };
+  const event = 'event' in state ? captureEventState(state.event!) : { kind: 'ready' as const };
+  return { registers, flags, rip, interruptibility, event };
 }
 
 export function captureMxcsr(value: number): number {
@@ -428,6 +444,7 @@ export class Core {
     )
       throw new Error('core returned an incompatible transport layout');
     validateX87Layout(layout.x87, layout.size, layout.mxcsr + layout.mxcsrBytes);
+    validateEventLayout(layout.event, layout.size, layout.x87.offset + layout.x87.bytes);
     this.stateView();
   }
 
@@ -477,6 +494,9 @@ export class Core {
       'core_software_event',
       'core_flags',
       'core_debug_step',
+      'core_configure_delivery',
+      'core_stage_exception',
+      'core_deliver_exception',
       'core_float',
       'core_load_mxcsr',
       'core_store_mxcsr',
@@ -581,13 +601,15 @@ export class Core {
         sti: (interruptibility & 1) !== 0,
         ss: (interruptibility & 2) !== 0,
       },
+      event: readEvent(view, this.#layout.event, this.#layout.event.offset),
     };
   }
 
   setState(state: State): void {
     const input = captureState(state);
-    const pointer = this.#exports.core_input(this.#layout.scalarSize) >>> 0;
-    const view = new DataView(this.#exports.memory.buffer, pointer, this.#layout.scalarSize);
+    const size = this.#layout.scalarSize + this.#layout.event.bytes;
+    const pointer = this.#exports.core_input(size) >>> 0;
+    const view = new DataView(this.#exports.memory.buffer, pointer, size);
     for (let index = 0; index < 16; index++) {
       view.setBigUint64(this.#layout.registers + index * 8, input.registers[index]!, true);
     }
@@ -597,6 +619,15 @@ export class Core {
       this.#layout.interruptibility,
       Number(input.interruptibility.sti) | (Number(input.interruptibility.ss) << 1),
       true,
+    );
+    writeEvent(
+      new DataView(
+        view.buffer,
+        view.byteOffset + this.#layout.scalarSize,
+        this.#layout.event.bytes,
+      ),
+      this.#layout.event,
+      input.event,
     );
     if (this.#exports.core_import_state() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
@@ -665,6 +696,17 @@ export class Core {
     };
   }
 
+  private diagnosticPc(): bigint {
+    const view = this.stateView();
+    const event = this.#layout.event;
+    return view.getBigUint64(
+      view.getUint32(event.offset + event.kind, true) === 1
+        ? event.offset + event.instructionPc
+        : this.#layout.rip,
+      true,
+    );
+  }
+
   clearFault(): void {
     this.#exports.core_clear_fault();
   }
@@ -672,6 +714,26 @@ export class Core {
     const value = this.#exports.core_clear_fault();
     if (value !== 0 && value !== 1) throw new Error('core returned an invalid boundary profile');
     return value === 1;
+  }
+  eventKind(): EventState['kind'] {
+    return eventKind(
+      this.stateView().getUint32(this.#layout.event.offset + this.#layout.event.kind, true),
+    );
+  }
+  configureDelivery(enabled: boolean): void {
+    if (this.#exports.core_configure_delivery(Number(enabled)) !== 0)
+      throw new Error('core returned an invalid delivery configuration status');
+  }
+  stageException(reason: string): boolean {
+    const id = this.#layout.reasons.indexOf(reason);
+    if (id < 0) throw new Error('cannot stage an unknown execution reason');
+    const status = this.#exports.core_stage_exception(id);
+    if (status !== 0 && status !== 1)
+      throw new Error('core returned an invalid exception staging status');
+    return status === 1;
+  }
+  deliverException(): string {
+    return this.reason(this.#exports.core_deliver_exception());
   }
   probe(pc: bigint): string {
     return this.reason(this.#exports.core_probe(pc));
@@ -791,7 +853,7 @@ export class Core {
       ? undefined
       : {
           ...raw,
-          instructionPc: this.current().rip,
+          instructionPc: this.diagnosticPc(),
           address: BigInt(raw.address),
           failingAddress: BigInt(raw.failingAddress),
         };
@@ -830,7 +892,7 @@ export class Core {
     >();
     return {
       ...raw,
-      instructionPc: this.current().rip,
+      instructionPc: this.diagnosticPc(),
       offset: BigInt(raw.offset),
       failingOffset: BigInt(raw.failingOffset),
     };
@@ -847,7 +909,7 @@ export class Core {
     >();
     return {
       ...raw,
-      instructionPc: this.current().rip,
+      instructionPc: this.diagnosticPc(),
       offset: BigInt(raw.offset),
       address: BigInt(raw.address),
     };
@@ -858,7 +920,7 @@ export class Core {
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
     return {
       ...this.info<Omit<SimdException, 'instructionPc'>>(),
-      instructionPc: this.current().rip,
+      instructionPc: this.diagnosticPc(),
     };
   }
 
@@ -867,7 +929,7 @@ export class Core {
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
     return {
       ...this.info<Omit<GeneralProtectionFault, 'instructionPc'>>(),
-      instructionPc: this.current().rip,
+      instructionPc: this.diagnosticPc(),
     };
   }
 
@@ -876,7 +938,7 @@ export class Core {
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
     return {
       ...this.info<Omit<ProtectionFault, 'instructionPc'>>(),
-      instructionPc: this.current().rip,
+      instructionPc: this.diagnosticPc(),
     };
   }
 
@@ -910,7 +972,7 @@ export class Core {
     >();
     return {
       ...raw,
-      instructionPc: this.current().rip,
+      instructionPc: this.diagnosticPc(),
       address: BigInt(raw.address),
       failingAddress: BigInt(raw.failingAddress),
     };
@@ -927,7 +989,7 @@ export class Core {
     >();
     return {
       ...raw,
-      instructionPc: this.current().rip,
+      instructionPc: this.diagnosticPc(),
       instructionPointer: BigInt(raw.instructionPointer),
       dataPointer: BigInt(raw.dataPointer),
     };

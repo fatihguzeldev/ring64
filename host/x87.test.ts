@@ -6,7 +6,7 @@ import { captureInitialMemory } from './memory.js';
 import { createCpu } from './cpu.js';
 
 const layout = {
-  size: 560,
+  size: 608,
   scalarSize: 176,
   registers: 0,
   flags: 128,
@@ -31,6 +31,17 @@ const layout = {
     opcode: 86,
     instructionPointer: 88,
     dataPointer: 96,
+  },
+  event: {
+    offset: 560,
+    bytes: 40,
+    kind: 0,
+    vector: 4,
+    instructionPc: 8,
+    returnPc: 16,
+    savedFlags: 24,
+    errorCode: 32,
+    hasErrorCode: 36,
   },
   reasons: ['dispatch', 'x87-exception'],
 };
@@ -259,6 +270,10 @@ async function publicFixture() {
     mxcsr = 0x1f80;
   let imports = 0;
   const engine = {
+    configureDelivery() {},
+    eventKind: () => 'ready',
+    stageException: () => false,
+    deliverException: () => 'dispatch',
     readX87State: () => structuredClone(x87),
     setX87State(next: X87State) {
       x87 = structuredClone(next);

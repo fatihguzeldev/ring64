@@ -57,7 +57,7 @@ async function fixture(
       initializationError
         ? { error: 'fixture initialization rejected' }
         : {
-            size: 560,
+            size: 608,
             scalarSize: 176,
             xmm: 176,
             xmmBytes: 256,
@@ -75,6 +75,17 @@ async function fixture(
               opcode: 86,
               instructionPointer: 88,
               dataPointer: 96,
+            },
+            event: {
+              offset: 560,
+              bytes: 40,
+              kind: 0,
+              vector: 4,
+              instructionPc: 8,
+              returnPc: 16,
+              savedFlags: 24,
+              errorCode: 32,
+              hasErrorCode: 36,
             },
             registers: 0,
             flags: 128,
@@ -108,7 +119,11 @@ async function fixture(
   ];
   const bodies = exports.map((name) => {
     let instructions = constant(values[name] ?? 0);
-    if (name === 'core_import_state') instructions = copy(state, imported, 176);
+    if (name === 'core_import_state')
+      instructions = [
+        ...copy(state, imported, 176).slice(0, -2),
+        ...copy(state + 560, imported + 176, 40),
+      ];
     if (name === 'core_import_xmm') instructions = copy(state + 176, imported, 256);
     if (name === 'core_import_mxcsr') instructions = copy(state + 448, imported, 4);
     if (name === 'core_import_x87') instructions = copy(state + 456, imported, 104);
@@ -117,7 +132,7 @@ async function fixture(
       instructions = [
         0x20,
         0,
-        ...constant(176),
+        ...constant(216),
         0x46,
         0x20,
         0,
@@ -222,6 +237,7 @@ for (const high of ['input', 'state', 'info', 'output', 'later-input'] as const)
       assert.deepEqual(cpu.readX87State(), x87);
       const state = initial(0x1234n, { 0: 0x8877_6655_4433_2211n }, 0x8d7n);
       state.interruptibility = { sti: false, ss: true };
+      state.event = { kind: 'ready' };
       cpu.setState(state);
       assert.deepEqual(cpu.readState(), state);
       assert.deepEqual(cpu.readX87State(), x87);

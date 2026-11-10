@@ -19,7 +19,7 @@ const options = () => ({
   limits,
 });
 const layout = {
-  size: 560,
+  size: 608,
   scalarSize: 176,
   registers: 0,
   flags: 128,
@@ -45,6 +45,17 @@ const layout = {
     instructionPointer: 88,
     dataPointer: 96,
   },
+  event: {
+    offset: 560,
+    bytes: 40,
+    kind: 0,
+    vector: 4,
+    instructionPc: 8,
+    returnPc: 16,
+    savedFlags: 24,
+    errorCode: 32,
+    hasErrorCode: 36,
+  },
   reasons: ['dispatch', 'alignment-fault'],
 };
 
@@ -61,7 +72,7 @@ async function mockedCore(
   let imported = 0;
   let inputLength = 0;
   const infoPointer = 4096;
-  const json = new TextEncoder().encode(JSON.stringify(descriptor));
+  let json = new TextEncoder().encode(JSON.stringify(descriptor));
   new Uint8Array(memory.buffer, infoPointer, json.length).set(json);
   const methods: Record<string, unknown> = {
     memory,
@@ -89,12 +100,19 @@ async function mockedCore(
       return 0;
     },
     core_import_state() {
-      assert.equal(inputLength, 176);
+      assert.equal(inputLength, 216);
       new Uint8Array(memory.buffer, statePointer, 144).set(
         new Uint8Array(memory.buffer, inputPointer, 144),
       );
       new Uint8Array(memory.buffer, statePointer + 164, 4).set(
         new Uint8Array(memory.buffer, inputPointer + 164, 4),
+      );
+      new Uint8Array(
+        memory.buffer,
+        statePointer + descriptor.event.offset,
+        descriptor.event.bytes,
+      ).set(
+        new Uint8Array(memory.buffer, inputPointer + descriptor.scalarSize, descriptor.event.bytes),
       );
       return 0;
     },
@@ -116,6 +134,10 @@ async function mockedCore(
       imported: () => imported,
       disposed: () => disposed,
       initialized: () => initialized,
+      setInfo(value: unknown) {
+        json = new TextEncoder().encode(JSON.stringify(value));
+        new Uint8Array(memory.buffer, infoPointer, json.length).set(json);
+      },
     };
   } catch (error) {
     return {
@@ -153,7 +175,7 @@ test('XMM capture reads array length and each slot once and rejects incomplete o
   assert.deepEqual(captureXmmState(bounds), bounds);
 });
 
-test('XMM transport is little endian, owns snapshots, and keeps scalar imports at 176 bytes', async () => {
+test('XMM transport is little endian, owns snapshots, and preserves XMM state across scalar/event imports', async () => {
   const fixture = await mockedCore();
   assert.ok(fixture.core);
   const { core, memory } = fixture;
@@ -188,6 +210,10 @@ test('XMM layout rejects incompatible extents and cleans up the initialized core
     { ...layout, vectorScratch: 431 },
     { ...layout, interruptibility: 160 },
     { ...layout, interruptibilityBytes: 8 },
+    { ...layout, event: { ...layout.event, offset: 552 } },
+    { ...layout, event: { ...layout.event, savedFlags: 16 } },
+    { ...layout, event: { ...layout.event, bytes: 41 } },
+    { ...layout, size: 599 },
   ]) {
     const fixture = await mockedCore(descriptor);
     assert.ok(fixture.error instanceof Error);
@@ -230,6 +256,49 @@ test('scalar boundary transport uses existing padding and returns detached snaps
     }
     core.setState({ registers: Array<bigint>(16).fill(1n), flags: 2n, rip: 0x2000n });
     assert.deepEqual(core.snapshot().interruptibility, { sti: false, ss: false });
+  } finally {
+    core.dispose();
+  }
+});
+
+test('pending trap transport retains source provenance through private IDT refusal', async () => {
+  const fixture = await mockedCore();
+  assert.ok(fixture.core);
+  assert.ok(fixture.setInfo);
+  const core = fixture.core;
+  try {
+    const event = {
+      kind: 'pending' as const,
+      exception: {
+        vector: 1 as const,
+        instructionPc: 0x1000n,
+        returnPc: 0x1010n,
+        savedFlags: 0x302n,
+      },
+    };
+    core.setState({ registers: Array<bigint>(16).fill(0n), flags: 0x302n, rip: 0x1010n, event });
+    assert.equal(core.eventKind(), 'pending');
+    assert.deepEqual(core.snapshot().event, event);
+    const captured = core.snapshot().event;
+    assert.equal(captured.kind, 'pending');
+    if (captured.kind === 'pending') captured.exception.instructionPc = 0n;
+    assert.deepEqual(core.snapshot().event, event, 'snapshot owns the nested pending event');
+    fixture.setInfo({
+      table: 'idt',
+      vector: 1,
+      phase: 'gate-read',
+      address: '0x4000',
+      width: 16,
+      access: 'read',
+      cause: 'unmapped',
+      failingAddress: '0x4000',
+    });
+    const fault = core.systemMemoryFault('system-memory-fault');
+    assert.equal(fault?.instructionPc, 0x1000n);
+    assert.equal(core.current().rip, 0x1010n, 'continuation remains separately observable');
+    core.setState({ registers: Array<bigint>(16).fill(0n), flags: 2n, rip: 0x2000n });
+    assert.deepEqual(core.snapshot().event, { kind: 'ready' });
+    assert.equal(core.systemMemoryFault('system-memory-fault')?.instructionPc, 0x2000n);
   } finally {
     core.dispose();
   }
@@ -302,6 +371,9 @@ test('required arithmetic and boundary helpers reject construction before core i
     'core_debug_step',
     'core_software_event',
     'core_boundary_observed',
+    'core_configure_delivery',
+    'core_stage_exception',
+    'core_deliver_exception',
   ]) {
     const missing = await mockedCore(layout, 8192, undefined, name);
     missing.core?.dispose();

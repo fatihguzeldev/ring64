@@ -24,6 +24,7 @@ function state(rip: bigint): State {
     flags: 0x8d7n,
     rip,
     interruptibility: { sti: false, ss: false },
+    event: { kind: 'ready' },
   };
 }
 

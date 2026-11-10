@@ -48,7 +48,13 @@ export function initial(rip = CODE, registers: Record<number, bigint> = {}, flag
   const banks = Array.from({ length: 16 }, (_, index) => 0x1122334400000000n + BigInt(index));
   banks[3] = DATA;
   for (const [index, value] of Object.entries(registers)) banks[Number(index)] = value;
-  return { registers: banks, flags, rip, interruptibility: { sti: false, ss: false } };
+  return {
+    registers: banks,
+    flags,
+    rip,
+    interruptibility: { sti: false, ss: false },
+    event: { kind: 'ready' },
+  };
 }
 
 export function changed(
@@ -66,6 +72,7 @@ export function changed(
     interruptibility: input.interruptibility
       ? { ...input.interruptibility }
       : { sti: false, ss: false },
+    event: structuredClone(input.event ?? { kind: 'ready' }),
   };
 }
 
@@ -75,6 +82,12 @@ export function state(actual: State, expected: State): void {
     equal(actual.registers[index], expected.registers[index], `register ${index}`);
   equal(actual.flags, expected.flags, 'flags');
   equal(actual.rip, expected.rip, 'rip');
+  const actualEvent = actual.event ?? { kind: 'ready' };
+  const expectedEvent = expected.event ?? { kind: 'ready' };
+  equal(actualEvent.kind, expectedEvent.kind, 'event kind');
+  if (actualEvent.kind === 'pending' && expectedEvent.kind === 'pending')
+    for (const name of ['vector', 'instructionPc', 'returnPc', 'savedFlags', 'errorCode'] as const)
+      equal(actualEvent.exception[name], expectedEvent.exception[name], `pending event ${name}`);
 }
 
 export function exit(
