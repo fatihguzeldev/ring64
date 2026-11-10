@@ -1,7 +1,7 @@
 use super::*;
 use crate::embedding::layout::{PROTECTION, SYSTEM_MEMORY};
 use crate::x86::flags;
-use crate::x86::instruction::SoftwareEventDescriptor;
+use crate::x86::instruction::{SoftwareEventDescriptor, SoftwareEventKind};
 use crate::x86::protection::event::{self, EventFailure, EventInputs};
 
 #[unsafe(no_mangle)]
@@ -21,6 +21,9 @@ pub extern "C" fn core_software_event(
         let core = bridge.core.as_mut().unwrap();
         if !event::valid_in_mode(operation, &core.context) {
             return -1;
+        }
+        if operation.kind == SoftwareEventKind::Return {
+            unsafe { (*core.state.get()).interrupts.nmi_blocked = 0 };
         }
         core.fault = None;
         core.segment_fault = None;

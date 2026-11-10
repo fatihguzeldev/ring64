@@ -1,6 +1,6 @@
 use super::*;
 use crate::x86::context::{TableRegister, TaskRegister};
-use crate::x86::exception::ExceptionEvent;
+use crate::x86::exception::{ExceptionEvent, InterruptEvent, InterruptSource};
 use crate::x86::protection::tests::{context, image, mapping};
 
 fn setup(mode: &str, cpl: u8, vector: u8, gate: u64) -> (ExecutionContext, Image) {
@@ -267,4 +267,55 @@ fn trap_frame_keeps_captured_rf_while_handler_uses_live_flags_and_has_no_error_s
     assert_eq!(image.read(0x41f4, 4).unwrap(), 0x1010);
     assert_eq!(image.read(0x41fc, 4).unwrap(), 0x302);
     assert_eq!(image.read(0x41f0, 4).unwrap(), 0xa5a5_a5a5);
+}
+
+#[test]
+fn external_reserved_vectors_bypass_gate_dpl_and_never_add_an_error_slot() {
+    for vector in [0, 2, 8, 13, 31] {
+        let (mut context, mut image) = setup("protected", 3, vector, 0x0000_8e00_0008_2000);
+        image.write(0x1008, 8, 0x00cf_fb00_0000_ffff).unwrap();
+        let event = InterruptEvent {
+            source: InterruptSource::Irq(vector),
+            return_pc: 0x1234,
+            saved_flags: 0x10202,
+        };
+        let out = enter_interrupt(&mut context, &mut image, event, 0x4200, 0x10202).unwrap();
+        assert_eq!((out.pc, out.sp, out.flags), (0x2000, 0x41f4, 2));
+        assert_eq!(image.read(0x41f4, 4).unwrap(), 0x1234);
+        assert_eq!(image.read(0x41f8, 4).unwrap(), 8);
+        assert_eq!(image.read(0x41fc, 4).unwrap(), 0x10202);
+        assert_eq!(image.read(0x41f0, 4).unwrap(), 0xa5a5_a5a5);
+    }
+}
+
+#[test]
+fn external_vm_frame_uses_nine_dwords_with_vm_but_without_forced_rf() {
+    let (mut context, mut image) = setup("virtual8086", 3, 2, 0x0000_8e00_0008_2000);
+    context.set_tr(TaskRegister {
+        selector: 0x28,
+        valid: true,
+        base: 0x3000,
+        limit: 0x67,
+        attributes: 0x8b,
+    });
+    image.write(0x3004, 4, 0x4200).unwrap();
+    image.write(0x3008, 2, 16).unwrap();
+    let event = InterruptEvent {
+        source: InterruptSource::Nmi,
+        return_pc: 0x1234,
+        saved_flags: 0x20202,
+    };
+    let out = enter_interrupt(&mut context, &mut image, event, 0x7000, 0x202).unwrap();
+    assert_eq!((out.sp, out.flags), (0x41dc, 2));
+    for (i, expected) in [0x1234, 0, 0x20202, 0x7000, 0, 0, 0, 0, 0]
+        .into_iter()
+        .enumerate()
+    {
+        assert_eq!(image.read(0x41dc + i as u64 * 4, 4).unwrap(), expected);
+    }
+    let (mut context, mut image) = setup("virtual8086", 3, 2, 0x0000_8600_0008_2000);
+    assert_eq!(
+        enter_interrupt(&mut context, &mut image, event, 0x7000, 0x202),
+        Err(EventFailure::Unsupported)
+    );
 }

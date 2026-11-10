@@ -34,9 +34,29 @@ pub(super) fn enter_exception(
     )
 }
 
+pub(super) fn enter_interrupt(
+    context: &mut ExecutionContext,
+    image: &mut Image,
+    event: InterruptEvent,
+    sp: u64,
+    live_flags: u64,
+) -> Result<EventOutcome, EventFailure> {
+    enter(
+        context,
+        image,
+        Source::Interrupt(event),
+        EventInputs {
+            flags: live_flags,
+            sp,
+            next_pc: event.return_pc,
+        },
+    )
+}
+
 enum Source {
     Software(SoftwareEventDescriptor),
     Exception(ExceptionEvent),
+    Interrupt(InterruptEvent),
 }
 
 fn enter(
@@ -61,6 +81,14 @@ fn enter(
             false,
             event.saved_flags,
             event.error_code,
+        ),
+        Source::Interrupt(event) => (
+            event.source.vector(),
+            1,
+            false,
+            false,
+            event.saved_flags,
+            None,
         ),
     };
     let root = context.idtr();
@@ -146,7 +174,7 @@ fn enter(
     if kind == 5 {
         return Err(EventFailure::Unsupported);
     }
-    if matches!(source, Source::Exception(_))
+    if matches!(source, Source::Exception(_) | Source::Interrupt(_))
         && context.mode() == Mode::Virtual8086
         && matches!(kind, 6 | 7)
     {

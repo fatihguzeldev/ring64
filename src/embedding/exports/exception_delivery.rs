@@ -1,6 +1,6 @@
 use super::*;
 use crate::embedding::layout::{
-    DEBUG_EXCEPTION, DISPATCH, DIVIDE_ERROR, GENERAL_PROTECTION, PROTECTION, SHUTDOWN,
+    DEBUG_EXCEPTION, DISPATCH, DIVIDE_ERROR, GENERAL_PROTECTION, INVALID, PROTECTION, SHUTDOWN,
     SIMD_EXCEPTION, SYSTEM_MEMORY, X87_EXCEPTION,
 };
 use crate::x86::exception::{EventState, ExceptionEvent};
@@ -63,7 +63,7 @@ pub extern "C" fn core_stage_exception(reason: i32) -> i32 {
                 ExceptionEvent::fault(19, pc, state.flags, &core.context, None)
             }
             X87_EXCEPTION => ExceptionEvent::fault(16, pc, state.flags, &core.context, None),
-            UNSUPPORTED if core.undefined_source => {
+            UNSUPPORTED | INVALID if core.undefined_source => {
                 state.flags &= !flags::RF;
                 ExceptionEvent::fault(6, pc, state.flags, &core.context, None)
             }
@@ -86,8 +86,9 @@ pub extern "C" fn core_deliver_exception() -> i32 {
         let core = bridge.core.as_mut().unwrap();
         let (event, sp, flags) = unsafe {
             let state = &*core.state.get();
-            let Ok(EventState::Pending(event)) = state.event.decode() else {
-                return -1;
+            let event = match state.event.decode() {
+                Ok(event @ (EventState::Pending(_) | EventState::PendingInterrupt(_))) => event,
+                _ => return -1,
             };
             (event, state.registers[4], state.flags)
         };
@@ -101,7 +102,16 @@ pub extern "C" fn core_deliver_exception() -> i32 {
         core.debug_exception = None;
         core.divide_failed = false;
         core.undefined_source = false;
-        match event::enter_exception(&mut core.context, &mut core.image, event, sp, flags) {
+        let outcome = match event {
+            EventState::Pending(event) => {
+                event::enter_exception(&mut core.context, &mut core.image, event, sp, flags)
+            }
+            EventState::PendingInterrupt(event) => {
+                event::enter_interrupt(&mut core.context, &mut core.image, event, sp, flags)
+            }
+            _ => unreachable!("pending entry source"),
+        };
+        match outcome {
             Ok(outcome) => {
                 unsafe {
                     let state = &mut *core.state.get();
@@ -118,7 +128,13 @@ pub extern "C" fn core_deliver_exception() -> i32 {
                 DISPATCH
             }
             Err(EventFailure::Protection(fault)) => {
-                let next = event.escalate(fault.vector, fault.error_code);
+                let next = match event {
+                    EventState::Pending(event) => event.escalate(fault.vector, fault.error_code),
+                    EventState::PendingInterrupt(event) => {
+                        event.escalate(fault.vector, fault.error_code)
+                    }
+                    _ => unreachable!("pending entry source"),
+                };
                 unsafe { (*core.state.get()).event = RawEventState::encode(next) };
                 if next == EventState::Shutdown {
                     SHUTDOWN

@@ -14,6 +14,7 @@ use super::layout::{
 
 mod context;
 mod exception_delivery;
+mod external_interrupts;
 mod far_control;
 mod mapped;
 mod mmx;

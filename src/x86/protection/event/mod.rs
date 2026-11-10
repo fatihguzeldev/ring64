@@ -1,6 +1,6 @@
 use super::{ExecutionContext, Image, ProtectionFault, ProtectionPhase, SystemMemoryFault};
 use crate::x86::context::{AccessFailure, Mode, Segment};
-use crate::x86::exception::ExceptionEvent;
+use crate::x86::exception::{ExceptionEvent, InterruptEvent};
 use crate::x86::instruction::{SoftwareEventDescriptor, SoftwareEventKind, Width};
 
 mod entry;
@@ -91,6 +91,22 @@ pub fn enter_exception(
         return Err(EventFailure::Unsupported);
     }
     entry::enter_exception(context, image, event, sp, live_flags)
+}
+
+pub fn enter_interrupt(
+    context: &mut ExecutionContext,
+    image: &mut Image,
+    event: InterruptEvent,
+    sp: u64,
+    live_flags: u64,
+) -> Result<EventOutcome, EventFailure> {
+    if event
+        .validate(event.return_pc, live_flags, context)
+        .is_err()
+    {
+        return Err(EventFailure::Unsupported);
+    }
+    entry::enter_interrupt(context, image, event, sp, live_flags)
 }
 
 fn fault(
