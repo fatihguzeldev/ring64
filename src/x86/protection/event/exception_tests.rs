@@ -229,6 +229,67 @@ fn long_exception_aligns_stack_and_appends_one_qword_code_without_saving_live_rf
 }
 
 #[test]
+fn noncanonical_entry_stack_has_a_hard_zero_even_for_int1_and_processor_sources() {
+    for sp in [0x8000_0000_0000, 0xffff_8000_0000_0000] {
+        let (mut context, mut image) = setup("long64", 0, 1, 0x0000_8e00_0008_2000);
+        let failure = execute(
+            &mut context,
+            &mut image,
+            SoftwareEventDescriptor {
+                kind: SoftwareEventKind::Int1,
+                width: Width::W16,
+                vector: 1,
+            },
+            EventInputs {
+                flags: 0x202,
+                sp,
+                next_pc: 0x1001,
+            },
+        )
+        .unwrap_err();
+        assert_eq!(
+            failure,
+            EventFailure::Protection(ProtectionFault {
+                vector: 12,
+                error_code: 0,
+                phase: ProtectionPhase::Target,
+                selector: None
+            })
+        );
+    }
+}
+
+#[test]
+fn noncanonical_int1_handler_target_has_a_hard_zero_not_ext() {
+    let (mut context, mut image) = setup("long64", 0, 1, 0x0000_8e00_0008_2000);
+    image.write(0x2018, 4, 0x8000).unwrap();
+    let failure = execute(
+        &mut context,
+        &mut image,
+        SoftwareEventDescriptor {
+            kind: SoftwareEventKind::Int1,
+            width: Width::W16,
+            vector: 1,
+        },
+        EventInputs {
+            flags: 0x202,
+            sp: 0x4200,
+            next_pc: 0x1001,
+        },
+    )
+    .unwrap_err();
+    assert_eq!(
+        failure,
+        EventFailure::Protection(ProtectionFault {
+            vector: 13,
+            error_code: 0,
+            phase: ProtectionPhase::Target,
+            selector: None
+        })
+    );
+}
+
+#[test]
 fn malformed_processor_image_is_rejected_before_gate_or_stack_access() {
     let mut context = context("protected", 0);
     let old = context.clone();

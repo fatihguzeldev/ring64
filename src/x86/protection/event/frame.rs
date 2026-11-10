@@ -33,7 +33,6 @@ impl Frame {
         context: &ExecutionContext,
         value: u64,
         width: Width,
-        ext: u16,
     ) -> Result<(), EventFailure> {
         self.cursor =
             self.cursor.wrapping_sub(u64::from(width.bytes())) & self.pointer_width.mask();
@@ -55,7 +54,7 @@ impl Frame {
                         })
                     )
                 {
-                    fault(12, ext, ProtectionPhase::Target, None)
+                    fault(12, 0, ProtectionPhase::Target, None)
                 } else {
                     EventFailure::Operand {
                         segment: Segment::Ss,

@@ -158,7 +158,12 @@ pub extern "C" fn core_deliver_exception() -> i32 {
                 event::enter_interrupt(&mut core.context, &mut core.image, event, sp, flags)
             }
             _ => unreachable!("pending entry source"),
-        };
+        }
+        .map_err(|failure| {
+            failure
+                .architectural(&core.context)
+                .map_or(failure, EventFailure::Protection)
+        });
         match outcome {
             Ok(outcome) => {
                 unsafe {

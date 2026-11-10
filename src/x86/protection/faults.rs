@@ -20,11 +20,7 @@ pub fn access_fault(
         AccessFailure::Linear(fault)
             if context.is_long64() && fault.cause == Cause::Noncanonical =>
         {
-            if segment == Segment::Ss {
-                12
-            } else {
-                13
-            }
+            if segment == Segment::Ss { 12 } else { 13 }
         }
         AccessFailure::Segment(fault) if !context.is_long64() => match fault.cause {
             SegmentCause::Limit => {

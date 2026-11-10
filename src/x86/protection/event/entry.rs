@@ -115,7 +115,7 @@ fn enter(
             u64::from(context.selector(Segment::Cs)),
             inputs.next_pc,
         ] {
-            frame.push(context, value, Width::W16, ext)?;
+            frame.push(context, value, Width::W16)?;
         }
         frame.admit(image)?;
         let pc = u64::from(u16::from_le_bytes(gate[..2].try_into().unwrap()));
@@ -235,7 +235,7 @@ fn enter(
             inputs.sp
         };
         if !crate::memory::canonical48(sp) {
-            return Err(fault(12, ext, ProtectionPhase::Target, None));
+            return Err(fault(12, 0, ProtectionPhase::Target, None));
         }
         if switch {
             let mut cache = context.segment(Segment::Ss);
@@ -257,38 +257,28 @@ fn enter(
     let mut frame = Frame::new(&prepared, initial_sp);
     if context.mode() == Mode::Virtual8086 {
         for segment in [Segment::Gs, Segment::Fs, Segment::Ds, Segment::Es] {
-            frame.push(&prepared, u64::from(context.selector(segment)), width, ext)?;
+            frame.push(&prepared, u64::from(context.selector(segment)), width)?;
             let mut cache = context.segment(segment);
             cache.usable = false;
             prepared.set_segment(segment, 0, cache, context.attributes(segment));
         }
     }
     if switch || ia32e(context) {
-        frame.push(
-            &prepared,
-            u64::from(context.selector(Segment::Ss)),
-            width,
-            ext,
-        )?;
-        frame.push(&prepared, inputs.sp, width, ext)?;
+        frame.push(&prepared, u64::from(context.selector(Segment::Ss)), width)?;
+        frame.push(&prepared, inputs.sp, width)?;
     }
-    frame.push(&prepared, saved_flags, width, ext)?;
-    frame.push(
-        &prepared,
-        u64::from(context.selector(Segment::Cs)),
-        width,
-        ext,
-    )?;
-    frame.push(&prepared, inputs.next_pc, width, ext)?;
+    frame.push(&prepared, saved_flags, width)?;
+    frame.push(&prepared, u64::from(context.selector(Segment::Cs)), width)?;
+    frame.push(&prepared, inputs.next_pc, width)?;
     if let Some(error_code) = error_code {
-        frame.push(&prepared, u64::from(error_code), width, ext)?;
+        frame.push(&prepared, u64::from(error_code), width)?;
     }
     if if ia32e(context) {
         !crate::memory::canonical48(pc)
     } else {
         pc > u64::from(d.limit)
     } {
-        return Err(fault(13, ext, ProtectionPhase::Target, None));
+        return Err(fault(13, 0, ProtectionPhase::Target, None));
     }
     let code_write = if !d.accessed() {
         Some(

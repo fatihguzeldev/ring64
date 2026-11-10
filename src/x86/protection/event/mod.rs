@@ -47,6 +47,17 @@ pub enum EventFailure {
     Unsupported,
 }
 
+impl EventFailure {
+    pub fn architectural(self, context: &ExecutionContext) -> Option<ProtectionFault> {
+        match self {
+            Self::Protection(fault) => Some(fault),
+            Self::Operand { segment, failure } => super::access_fault(context, segment, failure),
+            Self::SystemMemory(fault) => super::system_fault(context, fault),
+            Self::Unsupported => None,
+        }
+    }
+}
+
 pub fn valid_in_mode(descriptor: SoftwareEventDescriptor, context: &ExecutionContext) -> bool {
     descriptor.width != Width::W8
         && SoftwareEventDescriptor::try_decode(descriptor.encode()) == Some(descriptor)
