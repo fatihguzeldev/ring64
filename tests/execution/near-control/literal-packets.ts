@@ -427,15 +427,15 @@ export function literalPackets(compiler: WebAssembly.Module): Scenario[] {
           const cpu = await createCpu({
             compiler,
             context: LONG,
-            entry: 0x10f2n,
+            entry: 0x1080n,
             memory: {
               backings: [
-                { id: 'code', bytes: hex('ff10f5f4a5a5a5a5a5a5') },
-                { id: 'pointer', bytes: hex('f410000000000000') },
+                { id: 'code', bytes: hex('ff10f582a5a5a5a5a5a5') },
+                { id: 'pointer', bytes: hex('8210000000000000') },
               ],
               mappings: [
                 {
-                  base: 0x10f2n,
+                  base: 0x1080n,
                   backing: 'code',
                   offset: 0,
                   length: 10,
@@ -461,7 +461,7 @@ export function literalPackets(compiler: WebAssembly.Module): Scenario[] {
             limits: LIMITS,
           });
           try {
-            const before = input(0x10f2n, { 0: 0x6000n, 4: 0x3008n }, 0xcd7n);
+            const before = input(0x1080n, { 0: 0x6000n, 4: 0x3008n }, 0xcd7n);
             cpu.setState(before);
             outcome(
               await cpu.run({ budget, repeatBudget: 0n }),
@@ -470,9 +470,9 @@ export function literalPackets(compiler: WebAssembly.Module): Scenario[] {
               1n,
               0n,
               0n,
-              changed(before, 0x10f4n, { 4: 0x3000n }),
+              changed(before, 0x1082n, { 4: 0x3000n }),
             );
-            memory(cpu, 0x10f4n, 'f410000000000000');
+            memory(cpu, 0x1082n, '8210000000000000');
           } finally {
             cpu.dispose();
           }

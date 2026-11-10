@@ -131,7 +131,7 @@ export function translationsScenarios(core: WebAssembly.Module): Scenario[] {
           },
           { limits: { maxInstructions: 1, maxTranslationsPerRun: 1 } },
         );
-        for (const suffix of ['f4', '48b8'])
+        for (const suffix of ['82', '48b8'])
           await using(
             `b801000000${suffix}`,
             async (cpu) => {
@@ -139,7 +139,7 @@ export function translationsScenarios(core: WebAssembly.Module): Scenario[] {
               cpu.setState(input);
               exit(
                 await cpu.run({ budget: 3n }),
-                suffix === 'f4' ? 'unsupported' : 'fetch-fault',
+                suffix === '82' ? 'unsupported' : 'fetch-fault',
                 3n,
                 1n,
                 changed(input, CODE + 5n, { 0: 1n }),

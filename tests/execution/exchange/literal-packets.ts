@@ -257,7 +257,7 @@ export function literalPackets(compiler: WebAssembly.Module): Scenario[] {
     {
       name: 'exchange literal failed CAS identity store invalidates a retained executable alias owner',
       async run() {
-        const code = 'f00fb11eb902000000f4';
+        const code = 'f00fb11eb90200000082';
         const cpu = await createCpu({
           compiler,
           context: LONG,

@@ -562,8 +562,8 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
       name: 'code-writing memory PUSH and POP retire completely before the changed successor is fetched',
       async run() {
         for (const pop of [false, true]) {
-          const code = (pop ? '8f00' : 'ff30') + 'f5f4' + 'a5'.repeat(6);
-          const value = 'f4' + 'a5'.repeat(7);
+          const code = (pop ? '8f00' : 'ff30') + 'f582' + 'a5'.repeat(6);
+          const value = '82' + 'a5'.repeat(7);
           const cpu = await createCpu({
             compiler,
             entry: 0x1000n,

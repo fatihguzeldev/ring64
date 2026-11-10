@@ -483,7 +483,7 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
       async run() {
         await using(
           compiler,
-          '90f00fb11ef4',
+          '90f00fb11e82',
           LONG,
           async (cpu) => {
             const before = input(0x1000n, { 0: 0x1122334400000001n, 3: 3n, 6: 0x6000n }, 0xcd7n);

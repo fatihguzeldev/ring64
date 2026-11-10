@@ -187,7 +187,7 @@ export function controlScenarios(core: WebAssembly.Module): Scenario[] {
     {
       name: 'unsupported encodings and reached truncation remain controlled outcomes',
       run: async () => {
-        for (const code of ['f4', '8f', 'f70b', '66f7c8', '4889', '4883c0']) {
+        for (const code of ['82', '8f', 'f70b', '66f7c8', '4889', '4883c0']) {
           await using(code, async (cpu) => {
             const input = initial();
             cpu.setState(input);
@@ -211,7 +211,7 @@ export function controlScenarios(core: WebAssembly.Module): Scenario[] {
     {
       name: 'stop can precede unsupported or truncated code before resuming into failure',
       run: async () => {
-        for (const suffix of ['f4', '48b8'])
+        for (const suffix of ['82', '48b8'])
           await using(`b801000000${suffix}`, async (cpu) => {
             const input = initial();
             cpu.setState(input);
@@ -219,7 +219,7 @@ export function controlScenarios(core: WebAssembly.Module): Scenario[] {
             exit(await cpu.run({ budget: 2n, stop: CODE + 5n }), 'stop', 2n, 1n, after);
             exit(
               await cpu.run({ budget: 1n }),
-              suffix === 'f4' ? 'unsupported' : 'fetch-fault',
+              suffix === '82' ? 'unsupported' : 'fetch-fault',
               1n,
               0n,
               after,
@@ -231,7 +231,7 @@ export function controlScenarios(core: WebAssembly.Module): Scenario[] {
     {
       name: 'discovery does not execute unreachable unsupported or truncated bytes',
       run: async () => {
-        await using('eb01f4b801000000', async (cpu) => {
+        await using('eb0182b801000000', async (cpu) => {
           const input = initial();
           cpu.setState(input);
           exit(

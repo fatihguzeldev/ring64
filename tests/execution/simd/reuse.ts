@@ -105,7 +105,7 @@ export function reuseScenarios(compiler: WebAssembly.Module): Scenario[] {
           for (const gate of ['budget', 'stop', 'continue'] as const) {
             const original = 'b801000000' + '90'.repeat(11),
               replacement = identity ? original : 'b802000000' + '90'.repeat(11);
-            const code = '90f30f7f03' + original + 'f4';
+            const code = '90f30f7f03' + original + '82';
             // First eight bytes alias the active owner; final eight are ordinary data.
             const maps = [
               { base: 0x1000n, backing: 'code', offset: 0, length: 22, permissions: rx },

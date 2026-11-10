@@ -105,7 +105,7 @@ export function literalScenarios(compiler: WebAssembly.Module): Scenario[] {
       run: async () => {
         const bytes = new Uint8Array(64).fill(0xa5);
         bytes.set(hex('fe034883e90175f8'));
-        bytes[8] = 0xf4;
+        bytes[8] = 0x82;
         bytes[32] = 0;
         await using(
           compiler,

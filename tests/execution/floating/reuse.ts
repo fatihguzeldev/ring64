@@ -20,7 +20,7 @@ export function reuseScenarios(compiler: WebAssembly.Module): Scenario[] {
     {
       name: 'MXCSR identity code stores invalidate retained executable owners and preserve old unmasked status',
       async run() {
-        const code = '0fae1b90900000f4';
+        const code = '0fae1b9090000082';
         const cpu = await createCpu({
           compiler,
           context: LONG,
@@ -230,8 +230,8 @@ export function reuseScenarios(compiler: WebAssembly.Module): Scenario[] {
             const prefix = half ? '0f1303' : '0fae1b',
               next = 0x1000n + BigInt(prefix.length / 2),
               original = half ? 'b801000000909090' : 'fc909090',
-              stored = half ? 'b802000000909090' : 'f4909090',
-              code = prefix + original + 'f4';
+              stored = half ? 'b802000000909090' : '82909090',
+              code = prefix + original + '82';
             const cpu = await createCpu({
               compiler,
               context: LONG,
@@ -262,8 +262,8 @@ export function reuseScenarios(compiler: WebAssembly.Module): Scenario[] {
               const raw = banks(),
                 before = input(0x1000n, { 3: 0x6000n }, 0xcd7n);
               if (half) raw[0] = (raw[0]! & ~0xffffffffffffffffn) | 0x90909000000002b8n;
-              // STMXCSR replaces decoded CLD with unimplemented HLT; STI is now selected.
-              const csr = half ? 0x1f80 : 0x90f4;
+              // STMXCSR replaces decoded CLD with an unsupported opcode, preserving the source frontier.
+              const csr = half ? 0x1f80 : 0x9082;
               cpu.setState(before);
               cpu.setXmmState(raw);
               cpu.setMxcsr(csr);
@@ -289,8 +289,8 @@ export function reuseScenarios(compiler: WebAssembly.Module): Scenario[] {
                     gate === 'continue' ? { 0: 2n } : {},
                   ),
                 );
-              const actualStored = half ? stored : 'f4900000';
-              memory(cpu, 0x1000n, prefix + actualStored + 'f4');
+              const actualStored = half ? stored : '82900000';
+              memory(cpu, 0x1000n, prefix + actualStored + '82');
               xmm(cpu, raw);
               mxcsr(cpu, csr);
               if (gate !== 'continue')
