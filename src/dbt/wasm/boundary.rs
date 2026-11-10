@@ -17,7 +17,9 @@ pub(super) fn ss_producer(operation: Operation) -> bool {
 
 impl Emitter {
     pub(super) fn external_boundary(&mut self, exit_depth: u32) {
-        let Some(helper) = self.external_step else { return; };
+        let Some(helper) = self.external_step else {
+            return;
+        };
         // Idle-only intake changes eligibility only at existing control/shadow boundaries.
         self.op(Op::LocalGet(0))
             .op(Op::I64Load(MemArg {

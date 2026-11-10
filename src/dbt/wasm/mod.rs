@@ -281,9 +281,18 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::SoftwareEvent(_)));
-    let has_halt = unit.instructions.iter().any(|i| matches!(i.operation, Operation::Halt));
-    let has_boundary = observed || has_system_flags || has_software_events || has_halt
-        || unit.instructions.iter().any(|i| boundary::ss_producer(i.operation));
+    let has_halt = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Halt));
+    let has_boundary = observed
+        || has_system_flags
+        || has_software_events
+        || has_halt
+        || unit
+            .instructions
+            .iter()
+            .any(|i| boundary::ss_producer(i.operation));
     let float_type = has_float.then(|| {
         let index = next_type;
         types.ty().function(
@@ -399,7 +408,9 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
     });
     let external_step_type = has_boundary.then(|| {
         let index = next_type;
-        types.ty().function([ValType::I64, ValType::I64, ValType::I32], [ValType::I32]);
+        types
+            .ty()
+            .function([ValType::I64, ValType::I64, ValType::I32], [ValType::I32]);
         next_type += 1;
         index
     });

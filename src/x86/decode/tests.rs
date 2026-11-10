@@ -80,8 +80,14 @@ fn halt_decodes_ignored_prefixes_and_keeps_lock_as_a_selected_undefined_frontier
     for bytes in [&[0xf4][..], &[0x66, 0x67, 0xf3, 0x64, 0x48, 0xf4]] {
         assert_eq!(operation(bytes), Operation::Halt);
     }
-    assert_eq!(at(0x1000, &[0xf0, 0xf4]), Err(DecodeError::UndefinedEncoding));
-    assert_eq!(at(0x1000, &[0xf0]), Err(DecodeError::Fetch(missing(0x1001))));
+    assert_eq!(
+        at(0x1000, &[0xf0, 0xf4]),
+        Err(DecodeError::UndefinedEncoding)
+    );
+    assert_eq!(
+        at(0x1000, &[0xf0]),
+        Err(DecodeError::Fetch(missing(0x1001)))
+    );
     assert_eq!(at(0x1000, &[0x66; 15]), Err(DecodeError::Invalid));
 }
 
