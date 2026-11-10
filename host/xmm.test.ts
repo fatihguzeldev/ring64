@@ -1,3 +1,4 @@
+import { DEBUG_LAYOUT } from '../tests/support/debug-layout.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { captureXmmState, Core, type Interruptibility } from './core.js';
@@ -19,7 +20,8 @@ const options = () => ({
   limits,
 });
 const layout = {
-  size: 616,
+  size: 712,
+  debug: DEBUG_LAYOUT,
   scalarSize: 176,
   registers: 0,
   flags: 128,
@@ -102,7 +104,10 @@ async function mockedCore(
       return 0;
     },
     core_import_state() {
-      assert.equal(inputLength, 228);
+      assert.equal(inputLength, 276);
+      new Uint8Array(memory.buffer, statePointer + 664, 48).set(
+        new Uint8Array(memory.buffer, inputPointer + 228, 48),
+      );
       new Uint8Array(memory.buffer, statePointer, 144).set(
         new Uint8Array(memory.buffer, inputPointer, 144),
       );

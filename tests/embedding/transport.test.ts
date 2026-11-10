@@ -1,3 +1,4 @@
+import { DEBUG_LAYOUT } from '../support/debug-layout.js';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
@@ -57,7 +58,8 @@ async function fixture(
       initializationError
         ? { error: 'fixture initialization rejected' }
         : {
-            size: 616,
+            size: 712,
+            debug: DEBUG_LAYOUT,
             scalarSize: 176,
             xmm: 176,
             xmmBytes: 256,
@@ -125,7 +127,8 @@ async function fixture(
       instructions = [
         ...copy(state, imported, 176).slice(0, -2),
         ...copy(state + 560, imported + 176, 40).slice(0, -2),
-        ...copy(state + 604, imported + 216, 12),
+        ...copy(state + 604, imported + 216, 12).slice(0, -2),
+        ...copy(state + 664, imported + 228, 48),
       ];
     if (name === 'core_import_xmm') instructions = copy(state + 176, imported, 256);
     if (name === 'core_import_mxcsr') instructions = copy(state + 448, imported, 4);
@@ -135,7 +138,7 @@ async function fixture(
       instructions = [
         0x20,
         0,
-        ...constant(228),
+        ...constant(276),
         0x46,
         0x20,
         0,

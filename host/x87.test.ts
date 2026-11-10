@@ -1,3 +1,4 @@
+import { DEBUG_LAYOUT } from '../tests/support/debug-layout.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { captureX87State, type X87State } from './x87.js';
@@ -6,7 +7,8 @@ import { captureInitialMemory } from './memory.js';
 import { createCpu } from './cpu.js';
 
 const layout = {
-  size: 616,
+  size: 712,
+  debug: DEBUG_LAYOUT,
   scalarSize: 176,
   registers: 0,
   flags: 128,
