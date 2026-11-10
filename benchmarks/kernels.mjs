@@ -5,6 +5,7 @@ import { protectionRows } from './protection.mjs';
 import { farRows } from './far-control.mjs';
 import { systemFlagRows } from './system-flags.mjs';
 import { softwareEventRows } from './software-events.mjs';
+import { eventDeliveryNames, measureEventDelivery } from './event-delivery.mjs';
 
 const MASK64 = (1n << 64n) - 1n;
 const MASK128 = (1n << 128n) - 1n;
@@ -278,7 +279,7 @@ const rows = [
 rows.push(...x87Rows);
 rows.push(...numericStateRows);
 rows.push(...streamingRows, ...protectionRows, ...farRows, ...systemFlagRows, ...softwareEventRows);
-export const workloadNames = rows.map((row) => row.name);
+export const workloadNames = [...rows.map((row) => row.name), ...eventDeliveryNames];
 function check(actual, expected, label) {
   if (actual !== expected) throw Error(`${label}: expected ${expected}, received ${actual}`);
 }
@@ -347,7 +348,13 @@ const sum = (a, b) => {
 
 export async function measure(
   sides,
-  { iterations = 1000001, samples = 11, workloads = workloadNames } = {},
+  {
+    iterations = 1000001,
+    samples = 11,
+    workloads = workloadNames,
+    exceptionIdle = false,
+    reverse = false,
+  } = {},
 ) {
   for (const [name, value, max] of [
     ['iterations', iterations, 10000000],
@@ -361,6 +368,16 @@ export async function measure(
     definitions = [],
     unavailable = [];
   for (const row of rows.filter((row) => workloads.includes(row.name))) {
+    if (exceptionIdle && row.step) {
+      unavailable.push(
+        ...sides.map((side) => ({
+          side: side.label,
+          workload: row.name,
+          reason: 'TF stepping detects events; excluded from the no-event comparison',
+        })),
+      );
+      continue;
+    }
     const n =
       BigInt(
         Math.min(iterations, row.maxIterations ?? iterations, row.resume ? 3000 : iterations),
@@ -397,6 +414,7 @@ export async function measure(
       requiresSystemFlags: !!row.requiresSystemFlags,
       requiresSoftwareEvents: !!row.requiresSoftwareEvents,
       step: !!row.step,
+      exceptionIdle,
       ...(row.guestMemoryPerIteration
         ? { guestMemoryPerIteration: row.guestMemoryPerIteration }
         : {}),
@@ -490,7 +508,10 @@ export async function measure(
         const expectedContext = row.context?.(cpu) ?? cpu.readContext?.();
         const hasX87 =
           typeof cpu.readX87State === 'function' && typeof cpu.setX87State === 'function';
-        active.push({ ...side, cpu, hasX87, expectedContext });
+        const deliveryIdle =
+          exceptionIdle &&
+          WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_stage_exception');
+        active.push({ ...side, cpu, hasX87, expectedContext, deliveryIdle });
         if (row.requiresX87 && !hasX87) {
           if (side.label === 'current') throw Error('current build is missing x87 APIs');
           cpu.dispose();
@@ -499,7 +520,7 @@ export async function measure(
         }
       }
       for (let sample = 0; sample < samples; sample++)
-        for (const side of sample % 2 ? [...active].reverse() : active) {
+        for (const side of (sample + Number(reverse)) % 2 ? [...active].reverse() : active) {
           const input = initial(n, row.repeat, sample);
           if (row.ramBytes) input.ram = new Uint8Array(row.ramBytes);
           row.setup?.(input, n, sample);
@@ -521,7 +542,11 @@ export async function measure(
             for (let i = 0n; i < budget; i++) {
               const sourcePc = result?.state.rip ?? CODE;
               const callAt = performance.now();
-              result = await side.cpu.run({ budget: 1n, repeatBudget: 0n });
+              result = await side.cpu.run({
+                budget: 1n,
+                repeatBudget: 0n,
+                ...(side.deliveryIdle ? { exceptionDelivery: { budget: 0n } } : {}),
+              });
               elapsedMs += performance.now() - callAt;
               check(result.reason, row.step ? 'debug-exception' : 'budget', 'resume reason');
               check(result.retired, 1n, 'resume retired');
@@ -541,7 +566,11 @@ export async function measure(
             }
           } else {
             const callAt = performance.now();
-            result = await side.cpu.run({ budget, repeatBudget });
+            result = await side.cpu.run({
+              budget,
+              repeatBudget,
+              ...(side.deliveryIdle ? { exceptionDelivery: { budget: 0n } } : {}),
+            });
             elapsedMs = performance.now() - callAt;
             sum(totals, result.resources);
             sum(timings, result.timings);
@@ -552,6 +581,11 @@ export async function measure(
           if (!row.resume) check(result.retired, budget, 'retired');
           check(result.repeatIterations, repeatBudget, 'repeated elements');
           check(result.remainingRepeatBudget, 0n, 'remaining repeat budget');
+          check(result.state.event?.kind ?? 'ready', 'ready', 'no retained exception');
+          if (side.deliveryIdle) {
+            check(result.deliveryAttempts, 0n, 'no automatic entry attempts');
+            check(result.remainingDeliveryBudget, 0n, 'unused zero delivery allowance');
+          }
           check(
             result.state.rip,
             CODE + BigInt(code.length - (row.suffix?.length ?? 0) / 2),
@@ -617,6 +651,7 @@ export async function measure(
             sample,
             window: sample === 0 ? 'first' : sample < 4 ? 'early' : 'later',
             elapsedMs,
+            exceptionDelivery: side.deliveryIdle ? 'enabled-no-event' : 'report',
             ...(row.resume ? { wallMs } : {}),
             creationMs: side.cpu.creationMs,
             resources: { ...result.resources, ...totals },
@@ -633,11 +668,17 @@ export async function measure(
       active.forEach((side) => side.cpu.dispose());
     }
   }
+  const events = await measureEventDelivery(sides, { iterations, samples, workloads, reverse });
+  definitions.push(...events.definitions);
+  results.push(...events.samples);
+  unavailable.push(...events.unavailable);
   return {
     definitions,
     unavailable,
     samples: results,
     limits,
+    exceptionIdle,
+    reverse,
     ceiling:
       'Synthetic private-memory kernels in selected imported profiles. Timings exclude reset/import/output guards, but include run snapshots and phase costs. FP loops include their recorded reset/control instructions. Undefined multiply/divide flags are masked. First completion is not an independent cold-start sample. No game/native-SIMD/peak-allocation claim.',
   };

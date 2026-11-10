@@ -17,6 +17,10 @@ function options(args) {
       value.browser = true;
       continue;
     }
+    if (key === '--exception-idle' || key === '--reverse') {
+      value[key === '--reverse' ? 'reverse' : 'exceptionIdle'] = true;
+      continue;
+    }
     if (key === '--help') {
       value.help = true;
       continue;
@@ -45,7 +49,7 @@ function options(args) {
 const config = options(process.argv.slice(2));
 if (config.help) {
   console.log(
-    'node scripts/benchmark.mjs [--browser] [--baseline BUILT_REPO] [--iterations N] [--samples N] [--workloads NAME,NAME] [--output FILE]',
+    'node scripts/benchmark.mjs [--browser] [--baseline BUILT_REPO] [--exception-idle] [--reverse] [--iterations N] [--samples N] [--workloads NAME,NAME] [--output FILE]',
   );
   console.log(workloadNames.join('\n'));
   process.exit(0);
@@ -63,12 +67,17 @@ async function manifest(path, label) {
     host.update(name + '\0');
     host.update(await readFile(resolve(path, 'build/host', name)));
   }
-  let commit;
+  let commit, workingTree;
   try {
     commit = execFileSync('git', ['-C', path, 'rev-parse', 'HEAD'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
+    const status = execFileSync('git', ['-C', path, 'status', '--porcelain'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    workingTree = { dirty: status.length !== 0, changes: status ? status.split('\n') : [] };
   } catch {
     commit = 'unknown';
   }
@@ -76,6 +85,7 @@ async function manifest(path, label) {
     label,
     path,
     commit,
+    workingTree,
     coreSha256: hash(core),
     coreBytes: core.length,
     hostSha256: host.digest('hex'),
@@ -90,6 +100,8 @@ const knobs = {
   iterations: config.iterations,
   samples: config.samples,
   workloads: config.workloads,
+  exceptionIdle: config.exceptionIdle ?? false,
+  reverse: config.reverse ?? false,
 };
 async function nodeRun() {
   const sides = await Promise.all(
@@ -125,7 +137,8 @@ async function browserRun() {
         pathname === '/protection.mjs' ||
         pathname === '/far-control.mjs' ||
         pathname === '/system-flags.mjs' ||
-        pathname === '/software-events.mjs'
+        pathname === '/software-events.mjs' ||
+        pathname === '/event-delivery.mjs'
       )
         file = resolve(root, 'benchmarks', pathname.slice(1));
       else {
@@ -212,6 +225,7 @@ const benchmarkFiles = [
   'far-control.mjs',
   'system-flags.mjs',
   'software-events.mjs',
+  'event-delivery.mjs',
 ];
 const benchmarkHash = createHash('sha256');
 for (const file of benchmarkFiles) {
