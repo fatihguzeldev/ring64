@@ -22,6 +22,7 @@ mod x87;
 pub enum DecodeError {
     Unsupported,
     Undefined,
+    UndefinedEncoding,
     Invalid,
     Fetch(Fault),
     Segment(SegmentFault),

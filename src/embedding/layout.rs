@@ -1,4 +1,6 @@
-use crate::x86::exception::{EventState, ExceptionEvent};
+use crate::x86::exception::{
+    EventState, ExceptionEvent, InterruptEvent, InterruptSource, InterruptState,
+};
 use crate::x86::state::State;
 use crate::x86::x87::State as X87State;
 
@@ -24,9 +26,11 @@ pub const DEBUG_EXCEPTION: i32 = 18;
 pub const EVENT_BUDGET: i32 = 19;
 pub const PENDING_EXCEPTION: i32 = 20;
 pub const SHUTDOWN: i32 = 21;
+pub const PENDING_INTERRUPT: i32 = 22;
+pub const HALTED: i32 = 23;
 pub const SCALAR_STATE_SIZE: usize = 176;
 
-pub const REASONS: [&str; 22] = [
+pub const REASONS: [&str; 24] = [
     "dispatch",
     "budget",
     "stop",
@@ -49,6 +53,8 @@ pub const REASONS: [&str; 22] = [
     "event-budget",
     "pending-exception",
     "shutdown",
+    "pending-interrupt",
+    "halted",
 ];
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -75,6 +81,31 @@ impl RawEventState {
             {
                 Ok(EventState::Shutdown)
             }
+            3 if self
+                == (Self {
+                    kind: 3,
+                    ..Self::default()
+                }) =>
+            {
+                Ok(EventState::Halted)
+            }
+            4 | 5
+                if self.vector <= u8::MAX.into()
+                    && (self.kind == 4 || self.vector == 2)
+                    && self.instruction_pc == 0
+                    && self.error_code == 0
+                    && self.has_error_code == 0 =>
+            {
+                Ok(EventState::PendingInterrupt(InterruptEvent {
+                    source: if self.kind == 4 {
+                        InterruptSource::Irq(self.vector as u8)
+                    } else {
+                        InterruptSource::Nmi
+                    },
+                    return_pc: self.return_pc,
+                    saved_flags: self.saved_flags,
+                }))
+            }
             1 if self.vector <= u8::MAX.into()
                 && self.error_code <= u16::MAX.into()
                 && self.has_error_code <= 1
@@ -97,6 +128,21 @@ impl RawEventState {
             EventState::Ready => Self::default(),
             EventState::Shutdown => Self {
                 kind: 2,
+                ..Self::default()
+            },
+            EventState::Halted => Self {
+                kind: 3,
+                ..Self::default()
+            },
+            EventState::PendingInterrupt(event) => Self {
+                kind: if matches!(event.source, InterruptSource::Irq(_)) {
+                    4
+                } else {
+                    5
+                },
+                vector: event.source.vector().into(),
+                return_pc: event.return_pc,
+                saved_flags: event.saved_flags,
                 ..Self::default()
             },
             EventState::Pending(event) => Self {
@@ -129,6 +175,47 @@ impl RawEventState {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(C)]
+pub struct RawInterruptState {
+    pub irq: u32,
+    pub nmi_pending: u32,
+    pub nmi_blocked: u32,
+}
+
+impl RawInterruptState {
+    pub fn decode(self) -> Result<InterruptState, &'static str> {
+        if self.irq > 256 || self.nmi_pending > 1 || self.nmi_blocked > 1 {
+            return Err("invalid interrupt state transport");
+        }
+        Ok(InterruptState {
+            irq: self.irq.checked_sub(1).map(|vector| vector as u8),
+            nmi_pending: self.nmi_pending != 0,
+            nmi_blocked: self.nmi_blocked != 0,
+        })
+    }
+
+    pub fn encode(state: InterruptState) -> Self {
+        Self {
+            irq: state.irq.map_or(0, |vector| u32::from(vector) + 1),
+            nmi_pending: state.nmi_pending.into(),
+            nmi_blocked: state.nmi_blocked.into(),
+        }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, &'static str> {
+        if bytes.len() != size_of::<Self>() {
+            return Err("interrupt input length differs");
+        }
+        let word = |offset| u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
+        Ok(Self {
+            irq: word(0),
+            nmi_pending: word(4),
+            nmi_blocked: word(8),
+        })
+    }
+}
+
 #[repr(C)]
 pub struct RunState {
     pub registers: [u64; 16],
@@ -145,6 +232,7 @@ pub struct RunState {
     pub x87: X87State,
     pub event: RawEventState,
     pub delivery_enabled: u32,
+    pub interrupts: RawInterruptState,
 }
 
 impl Default for RunState {
@@ -164,6 +252,7 @@ impl Default for RunState {
             x87: X87State::default(),
             event: RawEventState::default(),
             delivery_enabled: 0,
+            interrupts: RawInterruptState::default(),
         }
     }
 }
@@ -179,6 +268,7 @@ impl RunState {
         self.interruptibility = 0;
         self.repeat_remaining = 0;
         self.event = RawEventState::default();
+        self.interrupts = RawInterruptState::default();
     }
 
     pub fn descriptor() -> serde_json::Value {
@@ -214,6 +304,13 @@ impl RunState {
                 "hasErrorCode": std::mem::offset_of!(RawEventState, has_error_code),
             },
             "deliveryEnabled": std::mem::offset_of!(Self, delivery_enabled),
+            "interrupts": {
+                "offset": std::mem::offset_of!(Self, interrupts),
+                "bytes": size_of::<RawInterruptState>(),
+                "irq": std::mem::offset_of!(RawInterruptState, irq),
+                "nmiPending": std::mem::offset_of!(RawInterruptState, nmi_pending),
+                "nmiBlocked": std::mem::offset_of!(RawInterruptState, nmi_blocked),
+            },
             "registers": std::mem::offset_of!(Self, registers),
             "flags": std::mem::offset_of!(Self, flags),
             "rip": std::mem::offset_of!(Self, rip),
@@ -236,7 +333,7 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, interruptibility), 164);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
         assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
-        assert_eq!(size_of::<RunState>(), 608);
+        assert_eq!(size_of::<RunState>(), 616);
         assert_eq!(REASONS[18], "debug-exception");
         assert_eq!(RunState::descriptor()["interruptibilityBytes"], 4);
         let mut state = RunState {
@@ -252,7 +349,7 @@ mod tests {
         let mut transport = RunState::default();
         assert_eq!(std::mem::offset_of!(RunState, mxcsr), 448);
         assert_eq!(std::mem::offset_of!(RunState, x87), 456);
-        assert_eq!(size_of::<RunState>(), 608);
+        assert_eq!(size_of::<RunState>(), 616);
         let projection = &RunState::descriptor()["x87"];
         assert_eq!(projection["bytes"], 104);
         assert_eq!(projection["controlWord"], 80);
@@ -271,7 +368,7 @@ mod tests {
         let mut state = RunState::default();
         assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
         assert_eq!(std::mem::offset_of!(RunState, vector_scratch), 432);
-        assert_eq!(size_of::<RunState>(), 608);
+        assert_eq!(size_of::<RunState>(), 616);
         assert_eq!(RunState::descriptor()["scalarSize"], 176);
         assert_eq!(RunState::descriptor()["xmmBytes"], 256);
         assert_eq!(state.xmm, [[0; 16]; 16]);
@@ -283,7 +380,7 @@ mod tests {
     #[test]
     fn repeated_work_extends_transport_after_existing_fields() {
         let descriptor = RunState::descriptor();
-        assert_eq!(descriptor["size"], 608);
+        assert_eq!(descriptor["size"], 616);
         assert_eq!(descriptor["repeatRemaining"], 168);
         assert_eq!(descriptor["reasons"][11], "repeat-budget");
     }
@@ -307,7 +404,7 @@ mod tests {
             ]
         );
         assert_eq!(RunState::descriptor()["reasons"][9], "divide-error");
-        assert_eq!(size_of::<RunState>(), 608);
+        assert_eq!(size_of::<RunState>(), 616);
     }
 
     #[test]
@@ -319,8 +416,8 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, target), 152);
         assert_eq!(std::mem::offset_of!(RunState, fault_segment), 160);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
-        assert_eq!(size_of::<RunState>(), 608);
-        assert_eq!(RunState::descriptor()["size"], 608);
+        assert_eq!(size_of::<RunState>(), 616);
+        assert_eq!(RunState::descriptor()["size"], 616);
     }
 
     #[test]
@@ -344,5 +441,97 @@ mod tests {
         assert_eq!(transport.repeat_remaining, 0);
         assert_eq!(transport.target, 0);
         assert_eq!(RunState::default().target, 0);
+    }
+
+    #[test]
+    fn external_transport_keeps_source_identity_and_rejects_noncanonical_payloads() {
+        let irq = RawEventState {
+            kind: 4,
+            vector: 13,
+            return_pc: 0x1000,
+            saved_flags: 0x202,
+            ..RawEventState::default()
+        };
+        assert_eq!(
+            irq.decode().unwrap(),
+            EventState::PendingInterrupt(InterruptEvent {
+                source: InterruptSource::Irq(13),
+                return_pc: 0x1000,
+                saved_flags: 0x202,
+            })
+        );
+        for raw in [
+            RawEventState {
+                kind: 5,
+                vector: 2,
+                ..irq
+            },
+            RawEventState {
+                kind: 3,
+                ..RawEventState::default()
+            },
+        ] {
+            assert_eq!(RawEventState::encode(raw.decode().unwrap()), raw);
+        }
+        for raw in [
+            RawEventState {
+                instruction_pc: 1,
+                ..irq
+            },
+            RawEventState {
+                has_error_code: 1,
+                ..irq
+            },
+            RawEventState {
+                error_code: 1,
+                ..irq
+            },
+            RawEventState { vector: 256, ..irq },
+            RawEventState { kind: 5, ..irq },
+            RawEventState { kind: 3, ..irq },
+        ] {
+            assert!(raw.decode().is_err(), "{raw:?}");
+        }
+        let interrupts = RawInterruptState {
+            irq: 256,
+            nmi_pending: 1,
+            nmi_blocked: 1,
+        };
+        assert_eq!(
+            interrupts.decode().unwrap(),
+            InterruptState {
+                irq: Some(255),
+                nmi_pending: true,
+                nmi_blocked: true
+            }
+        );
+        assert_eq!(
+            RawInterruptState::encode(interrupts.decode().unwrap()),
+            interrupts
+        );
+        assert!(
+            RawInterruptState {
+                irq: 257,
+                ..interrupts
+            }
+            .decode()
+            .is_err()
+        );
+        assert!(
+            RawInterruptState {
+                nmi_pending: 2,
+                ..interrupts
+            }
+            .decode()
+            .is_err()
+        );
+        assert!(
+            RawInterruptState {
+                nmi_blocked: 2,
+                ..interrupts
+            }
+            .decode()
+            .is_err()
+        );
     }
 }

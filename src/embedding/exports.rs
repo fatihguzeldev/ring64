@@ -8,8 +8,8 @@ use crate::x86::decode::{self, DecodeError};
 use crate::x86::state::State;
 
 use super::layout::{
-    DATA, FETCH, INVALID, RESOURCE, RawEventState, RunState, SCALAR_STATE_SIZE, SEGMENT, TARGET,
-    UNSUPPORTED,
+    DATA, FETCH, INVALID, RESOURCE, RawEventState, RawInterruptState, RunState, SCALAR_STATE_SIZE,
+    SEGMENT, TARGET, UNSUPPORTED,
 };
 
 mod context;
@@ -131,8 +131,10 @@ pub extern "C" fn core_state_ptr() -> u32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn core_import_state() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
+        let event_end = SCALAR_STATE_SIZE + size_of::<RawEventState>();
         if bridge.input.len() != SCALAR_STATE_SIZE
-            && bridge.input.len() != SCALAR_STATE_SIZE + size_of::<RawEventState>()
+            && bridge.input.len() != event_end
+            && bridge.input.len() != event_end + size_of::<RawInterruptState>()
         {
             return bridge.error("state input length differs");
         }
@@ -157,16 +159,30 @@ pub extern "C" fn core_import_state() -> i32 {
         let event = if bridge.input.len() == SCALAR_STATE_SIZE {
             RawEventState::default()
         } else {
-            match RawEventState::from_bytes(&bridge.input[SCALAR_STATE_SIZE..]) {
+            match RawEventState::from_bytes(&bridge.input[SCALAR_STATE_SIZE..event_end]) {
                 Ok(raw) => raw,
                 Err(message) => return bridge.error(message),
             }
+        };
+        let interrupts = if bridge.input.len() > event_end {
+            match RawInterruptState::from_bytes(&bridge.input[event_end..]) {
+                Ok(raw) => raw,
+                Err(message) => return bridge.error(message),
+            }
+        } else {
+            RawInterruptState::default()
+        };
+        let decoded_interrupts = match interrupts.decode() {
+            Ok(state) => state,
+            Err(message) => return bridge.error(message),
         };
         if let Err(message) = event.decode().and_then(|event| {
             event.validate(
                 state.rip,
                 state.flags,
                 &bridge.core.as_ref().unwrap().context,
+                interruptibility,
+                decoded_interrupts,
             )
         }) {
             return bridge.error(message);
@@ -179,6 +195,7 @@ pub extern "C" fn core_import_state() -> i32 {
             target.import(state);
             target.interruptibility = interruptibility;
             target.event = event;
+            target.interrupts = interrupts;
         };
         core.fault = None;
         core.alignment_fault = None;
@@ -246,6 +263,10 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
             Err(DecodeError::Undefined) => {
                 core.undefined_source = true;
                 UNSUPPORTED
+            }
+            Err(DecodeError::UndefinedEncoding) => {
+                core.undefined_source = true;
+                INVALID
             }
             Err(DecodeError::Invalid) => INVALID,
             Err(DecodeError::Fetch(fault)) => {

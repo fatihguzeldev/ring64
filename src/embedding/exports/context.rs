@@ -68,6 +68,7 @@ pub extern "C" fn core_set_context() -> i32 {
         unsafe {
             (*core.state.get()).interruptibility = 0;
             (*core.state.get()).event = RawEventState::default();
+            (*core.state.get()).interrupts.nmi_blocked = 0;
         };
         core.debug_exception = None;
         core.fault = None;
