@@ -64,7 +64,7 @@ const rows = [
 export const eventDeliveryNames = rows.map((row) => row.name);
 
 function program(row) {
-  const code = new Uint8Array(64).fill(0xf4);
+  const code = new Uint8Array(64).fill(0x82);
   const body = hex(row.body);
   code.set(body);
   if (!row.repeat && !row.escalation && !row.repair && !row.alias)
@@ -402,6 +402,8 @@ export async function measureEventDelivery(
               : input.flags;
           expected.interruptibility = { sti: false, ss: false };
           expected.event = { kind: row.shutdown ? 'shutdown' : 'ready' };
+          if ('interrupts' in result.state)
+            expected.interrupts = { irq: null, nmiPending: false, nmiBlocked: false };
           if (!row.shutdown) {
             const framePc = row.escalation
               ? CODE

@@ -6,6 +6,7 @@ import { farRows } from './far-control.mjs';
 import { systemFlagRows } from './system-flags.mjs';
 import { softwareEventRows } from './software-events.mjs';
 import { eventDeliveryNames, measureEventDelivery } from './event-delivery.mjs';
+import { externalInterruptNames, measureExternalInterrupts } from './external-interrupts.mjs';
 
 const MASK64 = (1n << 64n) - 1n;
 const MASK128 = (1n << 128n) - 1n;
@@ -279,7 +280,11 @@ const rows = [
 rows.push(...x87Rows);
 rows.push(...numericStateRows);
 rows.push(...streamingRows, ...protectionRows, ...farRows, ...systemFlagRows, ...softwareEventRows);
-export const workloadNames = [...rows.map((row) => row.name), ...eventDeliveryNames];
+export const workloadNames = [
+  ...rows.map((row) => row.name),
+  ...eventDeliveryNames,
+  ...externalInterruptNames,
+];
 function check(actual, expected, label) {
   if (actual !== expected) throw Error(`${label}: expected ${expected}, received ${actual}`);
 }
@@ -353,6 +358,7 @@ export async function measure(
     samples = 11,
     workloads = workloadNames,
     exceptionIdle = false,
+    matchedDelivery = false,
     reverse = false,
   } = {},
 ) {
@@ -368,7 +374,7 @@ export async function measure(
     definitions = [],
     unavailable = [];
   for (const row of rows.filter((row) => workloads.includes(row.name))) {
-    if (exceptionIdle && row.step) {
+    if ((exceptionIdle || matchedDelivery) && row.step) {
       unavailable.push(
         ...sides.map((side) => ({
           side: side.label,
@@ -415,13 +421,14 @@ export async function measure(
       requiresSoftwareEvents: !!row.requiresSoftwareEvents,
       step: !!row.step,
       exceptionIdle,
+      matchedDelivery,
       ...(row.guestMemoryPerIteration
         ? { guestMemoryPerIteration: row.guestMemoryPerIteration }
         : {}),
     });
     try {
       for (const side of sides) {
-        const deliveryIdle = exceptionIdle && side.label === 'current';
+        const deliveryIdle = matchedDelivery || (exceptionIdle && side.label === 'current');
         if (
           deliveryIdle &&
           !WebAssembly.Module.exports(side.compiler).some((e) => e.name === 'core_stage_exception')
@@ -585,6 +592,11 @@ export async function measure(
           check(result.repeatIterations, repeatBudget, 'repeated elements');
           check(result.remainingRepeatBudget, 0n, 'remaining repeat budget');
           check(result.state.event?.kind ?? 'ready', 'ready', 'no retained exception');
+          if ('interrupts' in result.state) {
+            check(result.state.interrupts.irq, null, 'empty IRQ slot');
+            check(result.state.interrupts.nmiPending, false, 'empty NMI latch');
+            check(result.state.interrupts.nmiBlocked, false, 'no NMI blocking');
+          }
           if (side.deliveryIdle) {
             check(result.deliveryAttempts, 0n, 'no automatic entry attempts');
             check(result.remainingDeliveryBudget, 0n, 'unused zero delivery allowance');
@@ -675,12 +687,22 @@ export async function measure(
   definitions.push(...events.definitions);
   results.push(...events.samples);
   unavailable.push(...events.unavailable);
+  const external = await measureExternalInterrupts(sides, {
+    iterations,
+    samples,
+    workloads,
+    reverse,
+  });
+  definitions.push(...external.definitions);
+  results.push(...external.samples);
+  unavailable.push(...external.unavailable);
   return {
     definitions,
     unavailable,
     samples: results,
     limits,
     exceptionIdle,
+    matchedDelivery,
     reverse,
     ceiling:
       'Synthetic private-memory kernels in selected imported profiles. Timings exclude reset/import/output guards, but include run snapshots and phase costs. FP loops include their recorded reset/control instructions. Undefined multiply/divide flags are masked. First completion is not an independent cold-start sample. No game/native-SIMD/peak-allocation claim.',

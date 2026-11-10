@@ -17,8 +17,14 @@ function options(args) {
       value.browser = true;
       continue;
     }
-    if (key === '--exception-idle' || key === '--reverse') {
-      value[key === '--reverse' ? 'reverse' : 'exceptionIdle'] = true;
+    if (key === '--exception-idle' || key === '--matched-delivery' || key === '--reverse') {
+      value[
+        key === '--reverse'
+          ? 'reverse'
+          : key === '--matched-delivery'
+            ? 'matchedDelivery'
+            : 'exceptionIdle'
+      ] = true;
       continue;
     }
     if (key === '--help') {
@@ -44,12 +50,14 @@ function options(args) {
       throw Error(`${key} must be an integer in 1..${max}`);
   for (const name of value.workloads)
     if (!workloadNames.includes(name)) throw Error(`unknown workload: ${name}`);
+  if (value.exceptionIdle && value.matchedDelivery)
+    throw Error('--exception-idle and --matched-delivery are mutually exclusive');
   return value;
 }
 const config = options(process.argv.slice(2));
 if (config.help) {
   console.log(
-    'node scripts/benchmark.mjs [--browser] [--baseline BUILT_REPO] [--exception-idle] [--reverse] [--iterations N] [--samples N] [--workloads NAME,NAME] [--output FILE]',
+    'node scripts/benchmark.mjs [--browser] [--baseline BUILT_REPO] [--exception-idle | --matched-delivery] [--reverse] [--iterations N] [--samples N] [--workloads NAME,NAME] [--output FILE]',
   );
   console.log(workloadNames.join('\n'));
   process.exit(0);
@@ -101,6 +109,7 @@ const knobs = {
   samples: config.samples,
   workloads: config.workloads,
   exceptionIdle: config.exceptionIdle ?? false,
+  matchedDelivery: config.matchedDelivery ?? false,
   reverse: config.reverse ?? false,
 };
 async function nodeRun() {
@@ -138,7 +147,8 @@ async function browserRun() {
         pathname === '/far-control.mjs' ||
         pathname === '/system-flags.mjs' ||
         pathname === '/software-events.mjs' ||
-        pathname === '/event-delivery.mjs'
+        pathname === '/event-delivery.mjs' ||
+        pathname === '/external-interrupts.mjs'
       )
         file = resolve(root, 'benchmarks', pathname.slice(1));
       else {
@@ -226,6 +236,7 @@ const benchmarkFiles = [
   'system-flags.mjs',
   'software-events.mjs',
   'event-delivery.mjs',
+  'external-interrupts.mjs',
 ];
 const benchmarkHash = createHash('sha256');
 for (const file of benchmarkFiles) {
