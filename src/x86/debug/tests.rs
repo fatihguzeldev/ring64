@@ -20,7 +20,6 @@ fn fixed_profile_normalizes_reserved_fields_without_rejecting_raw_address_bits()
 fn comparison_is_linear_directional_and_only_for_enabled_valid_ranges() {
     let mut s = State {
         addresses: [0x6000, 0x6004, 0x7000, 0x800000000000],
-        dr7: 0x33_9_0_0455,
         ..State::default()
     };
     // Slot0 execute, slot1 write8, slot2 read/write4, slot3 invalid execute configuration.

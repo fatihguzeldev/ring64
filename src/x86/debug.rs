@@ -36,7 +36,8 @@ impl State {
         let width = [1, 2, 8, 4][(configuration >> 2) as usize];
         let start = self.addresses[slot];
         let end = start.checked_add(width - 1)?;
-        (start % width == 0 && canonical48(start) && canonical48(end)).then_some((start, end, kind))
+        (start.is_multiple_of(width) && canonical48(start) && canonical48(end))
+            .then_some((start, end, kind))
     }
     pub fn active(&self) -> bool {
         (0..4).any(|slot| self.slot(slot).is_some())
