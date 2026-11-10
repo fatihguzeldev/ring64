@@ -9,7 +9,7 @@ fn halt_retires_before_private_gates_and_tf_wakes_before_external_service() {
         operation: Operation::Halt,
     }]);
     let mut packets = vec![];
-    for (flags, budget, reason) in [(2, 2, HALTED), (2, 1, BUDGET), (0x302, 1, DEBUG_EXCEPTION)] {
+    for (flags, budget, reason) in [(2, 2, HALTED), (2, 1, HALTED), (0x302, 1, DEBUG_EXCEPTION)] {
         let bytes = emit_observed(&u, flags & 0x100 != 0);
         let mut p = execution_case(
             &bytes,

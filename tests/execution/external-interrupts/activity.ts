@@ -21,6 +21,27 @@ import {
 export function activityScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     {
+      name: 'external opted-in HLT publishes halt through final budget and stop without exception staging',
+      async run() {
+        await using(compiler, 'f4', execution(), async (cpu) => {
+          for (const options of [
+            { budget: 1n, eventDelivery: { budget: 0n } },
+            { budget: 1n, eventDelivery: { budget: 1n } },
+            { budget: 1n, exceptionDelivery: { budget: 1n } },
+            { budget: 2n, stop: 0x1001n, eventDelivery: { budget: 1n } },
+          ]) {
+            cpu.setState(input());
+            const result = await cpu.run(options);
+            equal(result.reason, options.budget === 1n ? 'budget' : 'stop', 'post-HLT host gate');
+            equal(result.retired, 1n, 'HLT retired once');
+            equal(result.deliveryAttempts, 0n, 'HLT does not stage a processor exception');
+            equal(result.state.rip, 0x1001n, 'completed continuation');
+            same(result.state.event, { kind: 'halted' }, 'halt activity survives host gates');
+          }
+        });
+      },
+    },
+    {
       name: 'external HLT publishes persistent next-PC activity without fetching its successor',
       async run() {
         await using(compiler, 'f4', execution(), async (cpu) => {

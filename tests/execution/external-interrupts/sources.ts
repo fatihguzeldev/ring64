@@ -28,6 +28,72 @@ const absent = '00200800000e0000';
 export function sourceScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     {
+      name: 'external NMI ignores STI inhibition and trap-gate IF permits a later IRQ before handler bytes',
+      async run() {
+        await using(
+          compiler,
+          '90',
+          execution(),
+          async (cpu) => {
+            cpu.setState(input(0x1100n, { 4: 0x8000n }, 0x202n, { sti: true, ss: false }));
+            cpu.requestInterrupt(0x20);
+            cpu.requestNmi();
+            const captured = await cpu.run({ budget: 1n, eventDelivery: { budget: 0n } });
+            equal(captured.reason, 'event-budget', 'NMI eligible inside the selected STI profile');
+            same(
+              captured.state.event,
+              {
+                kind: 'pending-interrupt',
+                interrupt: { source: { kind: 'nmi' }, returnPc: 0x1100n, savedFlags: 0x202n },
+              },
+              'NMI selected independently of IF and IRQ',
+            );
+            same(
+              captured.state.interruptibility,
+              { sti: true, ss: false },
+              'acceptance does not clear STI interval',
+            );
+            const entered = await cpu.run({
+              budget: 1n,
+              stop: 0x2000n,
+              eventDelivery: { budget: 1n },
+            });
+            equal(entered.reason, 'stop', 'NMI handler gate precedes fresh IRQ arbitration');
+            equal(entered.state.flags, 0x202n, 'trap gate preserves IF');
+            same(
+              entered.state.interrupts,
+              { irq: 0x20, nmiPending: false, nmiBlocked: true },
+              'only NMI consumed',
+            );
+            const nested = await cpu.run({
+              budget: 1n,
+              stop: 0x3000n,
+              eventDelivery: { budget: 1n },
+            });
+            equal(
+              nested.reason,
+              'stop',
+              'preserved IF permits IRQ before unmapped NMI-handler bytes',
+            );
+            equal(nested.retired, 0n, 'no source or handler instruction fetched');
+            same(
+              cpu.readMemory(0x7fe8n, 12),
+              image([0x2000n, 8n, 0x202n], 4),
+              'IRQ saves trap-handler boundary',
+            );
+          },
+          {
+            data: [
+              DESCRIPTORS,
+              { base: STACK, bytes: FILL },
+              { base: 0x8010n, bytes: gate(32, 8, 0x2000n, 0, true) },
+              { base: 0x8100n, bytes: gate(32, 8, 0x3000n, 0) },
+            ],
+          },
+        );
+      },
+    },
+    {
       name: 'external eligible IRQ reports without consumption and accepts before unmapped guest fetch only when opted in',
       async run() {
         await using(

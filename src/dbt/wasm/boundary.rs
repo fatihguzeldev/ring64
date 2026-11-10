@@ -48,7 +48,7 @@ impl Emitter {
         self.op(Op::I32Const(0)).op(Op::LocalSet(SHADOW));
         self.trap(true, exit_depth);
         self.external_boundary(exit_depth);
-        self.gates(exit_depth);
+        // Observe the activity writer before the host applies budget/stop gates.
         self.exit(HALTED, exit_depth);
     }
 
