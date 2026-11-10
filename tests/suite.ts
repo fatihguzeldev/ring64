@@ -19,6 +19,7 @@ import { protectionScenarios } from './execution/protection/index.js';
 import { streamingScenarios } from './execution/streaming/index.js';
 import { systemFlagScenarios } from './execution/system-flags/index.js';
 import { softwareEventScenarios } from './execution/software-events/index.js';
+import { exceptionDeliveryScenarios } from './execution/exception-delivery/index.js';
 
 export async function runScenarios(
   compiler: Uint8Array | WebAssembly.Module,
@@ -49,6 +50,7 @@ export async function runScenarios(
     ...farControlScenarios(core),
     ...systemFlagScenarios(core),
     ...softwareEventScenarios(core),
+    ...exceptionDeliveryScenarios(core),
   ];
   const passed: string[] = [];
   for (const { name, run } of scenarios) {
