@@ -214,3 +214,124 @@ fn disabled_configuration_and_unselected_reasons_never_consume_retained_state() 
     assert_eq!(core_stage_exception(DIVIDE_ERROR), 0);
     assert_eq!(event(), pending);
 }
+
+#[test]
+fn late_error_slot_refusal_preserves_source_owner_and_numeric_banks_until_repaired_commit() {
+    initialize(0x1000, &[0x90]);
+    let maps = || {
+        use crate::memory::{MappingInput, Permissions};
+        [(0x2000, 0, 16), (0x3000, 64, 112), (0x41f4, 260, 12)]
+            .into_iter()
+            .map(|(base, offset, length)| MappingInput {
+                base,
+                offset,
+                length,
+                backing: "bytes".into(),
+                permissions: Permissions {
+                    read: true,
+                    write: true,
+                    execute: true,
+                },
+            })
+            .collect::<Vec<_>>()
+    };
+    BRIDGE.with_borrow_mut(|bridge| {
+        let core = bridge.core.as_mut().unwrap();
+        let mut context = ExecutionContext::default().to_json();
+        context["mode"] = serde_json::json!("protected");
+        context["segments"]["ss"]["default32"] = serde_json::json!(true);
+        core.context = ExecutionContext::from_json(&context).unwrap();
+        core.context.set_gdtr(TableRegister {
+            base: 0x2000,
+            limit: 15,
+        });
+        core.context.set_idtr(TableRegister {
+            base: 0x3000,
+            limit: 111,
+        });
+        let mut bytes = vec![0xa5; 512];
+        bytes[8..16].copy_from_slice(&0x00cf_9a00_0000_ffffu64.to_le_bytes());
+        bytes[168..176].copy_from_slice(&0x0000_8e00_0008_5000u64.to_le_bytes());
+        core.image = Image::mapped(
+            vec![("bytes".into(), bytes)],
+            maps(),
+            crate::memory::MemoryLimits {
+                max_backing_bytes: 512,
+                max_backings: 1,
+                max_mappings: 4,
+            },
+        )
+        .unwrap();
+        let source = core.image.register_source([(0x200d, 1)]).unwrap();
+        assert_eq!(source, 1);
+        assert!(core.image.activate(source));
+        core.protection_fault = Some(crate::x86::protection::ProtectionFault {
+            vector: 13,
+            error_code: 0,
+            phase: crate::x86::protection::ProtectionPhase::Descriptor,
+            selector: None,
+        });
+        let state = unsafe { &mut *core.state.get() };
+        state.registers = [0x1234; 16];
+        state.registers[4] = 0x4200;
+        state.flags = 2;
+        state.xmm = [[0x5a; 16]; 16];
+        state.mxcsr = 0xffc5;
+        state.x87.set_raw(3, 0x4000_8123_4567_89ab_cdef);
+    });
+    assert_eq!(core_configure_delivery(1), 0);
+    assert_eq!(core_stage_exception(PROTECTION), 1);
+    let pending = event();
+    let before = BRIDGE.with_borrow(|bridge| {
+        let core = bridge.core.as_ref().unwrap();
+        let state = unsafe { &*core.state.get() };
+        (core.context.clone(), state.x87)
+    });
+    assert_eq!(core_deliver_exception(), DATA);
+    assert_eq!(event(), pending);
+    assert_eq!(metadata(DATA)["address"], "0x41f0");
+    BRIDGE.with_borrow(|bridge| {
+        let core = bridge.core.as_ref().unwrap();
+        let state = unsafe { &*core.state.get() };
+        assert_eq!(core.context, before.0);
+        assert!(core.image.owner_valid(1));
+        assert_eq!(core.image.read(0x200d, 1).unwrap(), 0x9a);
+        for address in [0x41f4, 0x41f8, 0x41fc] {
+            assert_eq!(core.image.read(address, 4).unwrap(), 0xa5a5_a5a5);
+        }
+        assert_eq!(state.registers[4], 0x4200);
+        assert_eq!(state.xmm, [[0x5a; 16]; 16]);
+        assert_eq!(state.mxcsr, 0xffc5);
+        assert_eq!(state.x87, before.1);
+    });
+    BRIDGE.with_borrow_mut(|bridge| {
+        let core = bridge.core.as_mut().unwrap();
+        let mut repaired = maps();
+        let mut error = repaired[2].clone();
+        error.base = 0x41f0;
+        error.offset = 256;
+        error.length = 4;
+        repaired.push(error);
+        core.image.set_mappings(repaired).unwrap();
+    });
+    assert_eq!(core_deliver_exception(), DISPATCH);
+    assert_eq!(event(), EventState::Ready);
+    assert_eq!(metadata(DATA), serde_json::Value::Null);
+    BRIDGE.with_borrow(|bridge| {
+        let core = bridge.core.as_ref().unwrap();
+        let state = unsafe { &*core.state.get() };
+        assert_eq!(
+            (state.rip, state.registers[4], state.flags),
+            (0x5000, 0x41f0, 2)
+        );
+        for (index, expected) in [0, 0x1000, 8, 0x10002].into_iter().enumerate() {
+            assert_eq!(
+                core.image.read(0x41f0 + index as u64 * 4, 4).unwrap(),
+                expected
+            );
+        }
+        assert_eq!(core.image.read(0x200d, 1).unwrap(), 0x9b);
+        assert_eq!(state.x87, before.1);
+        assert_eq!(state.xmm, [[0x5a; 16]; 16]);
+    });
+}

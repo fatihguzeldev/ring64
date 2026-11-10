@@ -3,6 +3,8 @@ import { basicScenarios } from './basic.js';
 import { boundaryScenarios } from './boundaries.js';
 import { numericScenarios } from './numeric.js';
 import { escalationScenarios } from './escalation.js';
+import { modeScenarios } from './modes.js';
+import { memoryScenarios } from './memory.js';
 
 export function exceptionDeliveryScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
@@ -10,5 +12,7 @@ export function exceptionDeliveryScenarios(compiler: WebAssembly.Module): Scenar
     ...boundaryScenarios(compiler),
     ...numericScenarios(compiler),
     ...escalationScenarios(compiler),
+    ...modeScenarios(compiler),
+    ...memoryScenarios(compiler),
   ];
 }
