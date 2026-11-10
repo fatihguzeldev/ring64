@@ -101,7 +101,13 @@ fn core_protection_impl<const OBSERVED: bool>(
             }
         };
         if let Some(before) = before {
-            core.debug_protection(&before, descriptor, offset, segment);
+            core.debug_candidate |= crate::x86::protection::operands::protection(
+                unsafe { &(*core.state.get()).debug.registers },
+                &before,
+                descriptor,
+                offset,
+                segment,
+            );
         }
         unsafe {
             let scratch = &mut (*core.state.get()).vector_scratch;

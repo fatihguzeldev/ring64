@@ -4,14 +4,7 @@ use crate::x86::exception::EventState;
 use crate::x86::flags;
 use crate::x86::instruction::{SystemFlagsDescriptor, SystemFlagsKind};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct DebugException {
-    pub(super) instruction_pc: u64,
-    pub(super) resume_pc: u64,
-    pub(super) completed: bool,
-    pub(super) source: Option<crate::x86::debug::Source>,
-    pub(super) resume_flags: u64,
-}
+pub(super) use crate::x86::debug::Selection as DebugException;
 
 impl DebugException {
     pub(super) fn json(&self) -> serde_json::Value {

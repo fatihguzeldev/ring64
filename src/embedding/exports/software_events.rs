@@ -99,7 +99,13 @@ fn core_software_event_impl<const OBSERVED: bool>(
             Err(EventFailure::Unsupported) => return UNSUPPORTED,
         };
         if let Some(before) = before {
-            core.debug_iret(&before, operation, input_sp);
+            core.debug_candidate |= crate::x86::protection::operands::iret(
+                unsafe { &(*core.state.get()).debug.registers },
+                &before,
+                &core.context,
+                operation,
+                input_sp,
+            );
         }
         unsafe {
             let state = &mut *core.state.get();

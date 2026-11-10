@@ -104,7 +104,15 @@ fn core_far_control_impl<const OBSERVED: bool>(
             Err(FarFailure::Unsupported) => return UNSUPPORTED,
         };
         if let Some(before) = before {
-            core.debug_far(&before, descriptor, offset, input_sp, segment);
+            core.debug_candidate |= crate::x86::protection::operands::far(
+                unsafe { &(*core.state.get()).debug.registers },
+                &before,
+                &core.context,
+                descriptor,
+                offset,
+                input_sp,
+                segment,
+            );
         }
         unsafe {
             let scratch = &mut (*core.state.get()).vector_scratch;

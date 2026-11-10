@@ -5,6 +5,7 @@ use crate::memory::{Access, Cause, Image};
 mod access;
 mod descriptor;
 mod faults;
+pub mod operands;
 pub use faults::{access_fault, alignment_fault, system_fault};
 pub mod event;
 pub mod far;

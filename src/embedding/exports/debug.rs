@@ -34,37 +34,33 @@ impl Core {
         flags: u64,
         source: Option<crate::x86::debug::Source>,
     ) -> i32 {
-        use crate::x86::{debug::Source, flags};
-        let (slots, step, gd) = match source {
-            Some(Source::Execute(slots)) => (slots, false, false),
-            Some(Source::GeneralDetect) => (0, false, true),
-            Some(Source::Data {
-                slots, single_step, ..
-            }) => (slots, single_step, false),
-            None => (0, true, false),
-        };
+        let selection = crate::x86::debug::Selection::new(
+            pc,
+            resume,
+            completed,
+            crate::x86::flags::architectural(flags, &self.context),
+            source,
+        );
+        self.publish_debug(selection)
+    }
+    fn publish_debug(&mut self, selection: crate::x86::debug::Selection) -> i32 {
         let state = unsafe { &mut *self.state.get() };
-        state.debug.registers.select(slots, step, gd);
-        if source.is_some_and(crate::x86::debug::Source::fault) {
+        state.debug.registers.select_source(selection.source);
+        if selection
+            .source
+            .is_some_and(crate::x86::debug::Source::fault)
+        {
             state.debug.continuation = crate::embedding::layout::debug::Continuation::default();
         }
-        if !source.is_some_and(crate::x86::debug::Source::fault) && state.delivery_enabled == 0 {
+        if !selection
+            .source
+            .is_some_and(crate::x86::debug::Source::fault)
+            && state.delivery_enabled == 0
+        {
             state.interruptibility = 0;
         }
         self.debug_candidate = 0;
-        let mut resume_flags = flags::architectural(flags, &self.context);
-        if matches!(source, Some(Source::GeneralDetect))
-            || !completed && !matches!(source, Some(Source::Execute(_)))
-        {
-            resume_flags |= flags::RF;
-        }
-        self.debug_exception = Some(super::system_flags::DebugException {
-            source,
-            instruction_pc: pc,
-            resume_pc: resume,
-            completed,
-            resume_flags,
-        });
+        self.debug_exception = Some(selection);
         if state.event.kind == 3 {
             state.set_event(crate::x86::exception::EventState::Ready);
         }
@@ -181,47 +177,34 @@ impl Core {
         flags: u64,
         decision: u32,
     ) -> i32 {
-        use crate::embedding::layout::debug::Continuation;
-        let step = decision & 1 != 0;
-        let incoming_ss = decision & 2 != 0;
-        let first_ss = decision & 4 != 0 && !incoming_ss;
-        let slots = std::mem::take(&mut self.debug_candidate);
+        use crate::x86::debug::{Completion, Deferred, complete};
         let state = unsafe { &mut *self.state.get() };
-        let deferred = state.debug.continuation;
-        if first_ss || !completed && incoming_ss && !step {
-            if slots != 0 {
-                state.debug.continuation = Continuation {
-                    slots: deferred.slots | u32::from(slots),
-                    reserved: 0,
-                    origin: if deferred.slots != 0 {
-                        deferred.origin
-                    } else {
-                        pc
-                    },
-                };
-            }
-            return 0;
-        }
-        let slots = slots | deferred.slots as u8;
-        state.debug.continuation = Continuation::default();
-        if slots != 0 {
-            self.select_debug(
+        let raw = state.debug.continuation;
+        let mut deferred = (raw.slots != 0).then_some(Deferred {
+            slots: raw.slots as u8,
+            origin: raw.origin,
+        });
+        let selected = complete(
+            std::mem::take(&mut self.debug_candidate),
+            &mut deferred,
+            Completion {
                 pc,
                 resume,
                 completed,
-                flags,
-                Some(crate::x86::debug::Source::Data {
-                    slots,
-                    single_step: step,
-                    completed,
-                    origin: (deferred.slots != 0).then_some(deferred.origin),
-                }),
-            )
-        } else if step {
-            self.select_debug(pc, resume, completed, flags, None)
-        } else {
-            0
-        }
+                flags: crate::x86::flags::architectural(flags, &self.context),
+                single_step: decision & 1 != 0,
+                incoming_ss: decision & 2 != 0,
+                ss_producer: decision & 4 != 0,
+            },
+        );
+        state.debug.continuation = deferred.map_or_else(Default::default, |d| {
+            super::super::layout::debug::Continuation {
+                slots: u32::from(d.slots),
+                origin: d.origin,
+                reserved: 0,
+            }
+        });
+        selected.map_or(0, |selection| self.publish_debug(selection))
     }
 }
 
@@ -240,118 +223,4 @@ pub extern "C" fn core_debug_finish(
             .unwrap()
             .finish_debug(pc, resume, completed != 0, flags, decision)
     })
-}
-
-impl Core {
-    // These operations commit a context transition inside their semantic helper. Use
-    // the admitted operand's old context, without observing descriptor-table traffic.
-    fn debug_offset(
-        &mut self,
-        before: &ExecutionContext,
-        offset: u64,
-        width: u32,
-        segment: Segment,
-        access: Access,
-    ) {
-        if let Ok(address) = before.translate(offset, width, segment, access, false) {
-            self.debug_operand(address, width, access);
-        }
-    }
-    pub(super) fn debug_protection(
-        &mut self,
-        before: &ExecutionContext,
-        descriptor: crate::x86::instruction::ProtectionDescriptor,
-        offset: u64,
-        segment: Segment,
-    ) {
-        use crate::x86::instruction::ProtectionKind::*;
-        let (width, access) = match descriptor.kind {
-            StoreGdt | StoreIdt => (if before.is_long64() { 10 } else { 6 }, Access::Write),
-            LoadGdt | LoadIdt => (if before.is_long64() { 10 } else { 6 }, Access::Read),
-            ReadLdt | ReadTask | ReadSegment(_) if descriptor.memory => (2, Access::Write),
-            Lar | Lsl | Verr | Verw | LoadLdt | LoadTask | LoadSegment(_) if descriptor.memory => {
-                (2, Access::Read)
-            }
-            LoadFar(_) => (u32::from(descriptor.width.bytes()) + 2, Access::Read),
-            _ => return,
-        };
-        self.debug_offset(before, offset, width, segment, access);
-    }
-    pub(super) fn debug_far(
-        &mut self,
-        before: &ExecutionContext,
-        descriptor: crate::x86::instruction::FarDescriptor,
-        offset: u64,
-        sp: u64,
-        segment: Segment,
-    ) {
-        use crate::x86::instruction::FarKind;
-        let size = u64::from(descriptor.width.bytes());
-        let mask = before.stack_width().mask();
-        if descriptor.memory {
-            self.debug_offset(before, offset, size as u32 + 2, segment, Access::Read);
-        }
-        if descriptor.kind == FarKind::Call {
-            for index in 1..=2 {
-                self.debug_offset(
-                    before,
-                    sp.wrapping_sub(index * size) & mask,
-                    size as u32,
-                    Segment::Ss,
-                    Access::Write,
-                );
-            }
-        } else if descriptor.kind == FarKind::Return {
-            for index in 0..2 {
-                self.debug_offset(
-                    before,
-                    sp.wrapping_add(index * size) & mask,
-                    size as u32,
-                    Segment::Ss,
-                    Access::Read,
-                );
-            }
-            if self.context.cpl() > before.cpl() {
-                for index in 2..4 {
-                    self.debug_offset(
-                        before,
-                        sp.wrapping_add(index * size).wrapping_add(offset) & mask,
-                        size as u32,
-                        Segment::Ss,
-                        Access::Read,
-                    );
-                }
-            }
-        }
-    }
-    pub(super) fn debug_iret(
-        &mut self,
-        before: &ExecutionContext,
-        operation: crate::x86::instruction::SoftwareEventDescriptor,
-        sp: u64,
-    ) {
-        use crate::x86::{context::Mode, instruction::SoftwareEventKind};
-        if operation.kind != SoftwareEventKind::Return {
-            return;
-        }
-        let count = if before.mode() == Mode::Protected && self.context.mode() == Mode::Virtual8086
-        {
-            9
-        } else if before.is_long64() || self.context.cpl() > before.cpl() {
-            5
-        } else {
-            3
-        };
-        let size = u64::from(operation.width.bytes());
-        let mask = before.stack_width().mask();
-        for index in 0..count {
-            self.debug_offset(
-                before,
-                sp.wrapping_add(index * size) & mask,
-                size as u32,
-                Segment::Ss,
-                Access::Read,
-            );
-        }
-    }
 }

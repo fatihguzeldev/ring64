@@ -1,3 +1,6 @@
+mod completion;
+pub use completion::{Completion, Deferred, Selection, complete};
+
 use crate::memory::{Access, canonical48};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -67,6 +70,17 @@ impl State {
             | u64::from(slots & 15)
             | if single_step { 1 << 14 } else { 0 }
             | if general_detect { 1 << 13 } else { 0 };
+    }
+    pub fn select_source(&mut self, source: Option<Source>) {
+        let (slots, step, gd) = match source {
+            Some(Source::Execute(slots)) => (slots, false, false),
+            Some(Source::GeneralDetect) => (0, false, true),
+            Some(Source::Data {
+                slots, single_step, ..
+            }) => (slots, single_step, false),
+            None => (0, true, false),
+        };
+        self.select(slots, step, gd);
     }
     pub fn general_detect(&self) -> bool {
         self.dr7 & (1 << 13) != 0
@@ -192,3 +206,6 @@ mod tests;
 
 #[cfg(test)]
 mod source_tests;
+
+#[cfg(test)]
+mod completion_tests;
