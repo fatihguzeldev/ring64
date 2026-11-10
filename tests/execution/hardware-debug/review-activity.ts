@@ -42,7 +42,11 @@ export function activityReviewScenarios(compiler: WebAssembly.Module): Scenario[
             equal(inactive.state.rip, 0x1002n, 'inactive instruction boundary');
             equal(cpu.readDebugState().dr6, 0xffff0ff0n, 'no synthetic hit after deactivation');
             same(inactive.state.registers, registers, 'same literal scalar outcome');
-            same(cpu.readMemory(0x3000n, 4), Uint8Array.of(0x78, 0x56, 0x34, 0x12), 'read never writes');
+            same(
+              cpu.readMemory(0x3000n, 4),
+              Uint8Array.of(0x78, 0x56, 0x34, 0x12),
+              'read never writes',
+            );
           },
           { data: [{ base: 0x3000n, bytes: '78563412' }] },
         );
