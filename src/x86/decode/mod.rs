@@ -23,6 +23,7 @@ pub enum DecodeError {
     Unsupported,
     Undefined,
     UndefinedEncoding,
+    /// Recognized illegal form; unknown or unimplemented forms use Unsupported.
     Invalid,
     InstructionLength,
     Fetch(Fault),

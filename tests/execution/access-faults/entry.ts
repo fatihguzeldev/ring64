@@ -7,7 +7,6 @@ import {
   withGate,
   gate,
   CODE32,
-  CODE64,
   DATA32,
   STACK,
   FILL,
