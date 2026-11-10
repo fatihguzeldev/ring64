@@ -7,6 +7,7 @@ import { modeScenarios } from './modes.js';
 import { memoryScenarios } from './memory.js';
 import { stateScenarios } from './state.js';
 import { frontierScenarios } from './frontiers.js';
+import { lifecycleScenarios } from './lifecycle.js';
 
 export function exceptionDeliveryScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
@@ -18,5 +19,6 @@ export function exceptionDeliveryScenarios(compiler: WebAssembly.Module): Scenar
     ...memoryScenarios(compiler),
     ...stateScenarios(compiler),
     ...frontierScenarios(compiler),
+    ...lifecycleScenarios(compiler),
   ];
 }
