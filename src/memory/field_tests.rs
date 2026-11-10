@@ -383,3 +383,99 @@ fn selected_writes_admit_unused_nominal_tails_before_touching_fields_at_the_last
         }
     }
 }
+
+#[test]
+fn scattered_byte_and_mixed_fields_keep_offsets_aliases_nominal_tail_and_hints() {
+    let bytes = [0xa0, 0x31, 0xc2, 0x53, 0xe4, 0x75, 0x86, 0x17];
+    for (fields, selected_bytes) in [
+        (&[(0, 1), (2, 1), (4, 1), (6, 1)][..], &[0, 2, 4, 6][..]),
+        (&[(0, 1), (2, 2), (6, 1)][..], &[0, 2, 3, 6][..]),
+    ] {
+        for base in [0x1000, u64::MAX - 10] {
+            for mapped in [10, 11] {
+                let mut selected_source = mapping(0x2000, 14, 1, true, false);
+                selected_source.permissions.execute = true;
+                let mut padding_source = mapping(0x3000, 15, 1, false, false);
+                padding_source.permissions.execute = true;
+                let mut image = image(
+                    32,
+                    vec![
+                        mapping(base, 5, mapped, false, true),
+                        selected_source,
+                        padding_source,
+                        mapping(0x4000, 0, 8, true, false),
+                    ],
+                );
+                let selected = image.register_source([(0x2000, 1)]).unwrap();
+                let padding = image.register_source([(0x3000, 1)]).unwrap();
+                assert!(image.activate(selected));
+                image.read(0x2000, 1).unwrap();
+                image.read(0x4000, 1).unwrap();
+                let hints = (image.last_mapping.get(), image.previous_mapping.get());
+                let mut expected = image.backings[0].bytes.clone();
+                let address = base + 3;
+                let result = image.write_fields(address, 8, fields, &bytes);
+                if mapped == 11 {
+                    assert_eq!(result, Ok(()));
+                    for &byte in selected_bytes {
+                        expected[8 + byte] = bytes[byte];
+                    }
+                } else {
+                    assert_eq!(
+                        result,
+                        Err(Fault {
+                            address,
+                            width: 8,
+                            access: Access::Write,
+                            cause: Cause::Unmapped,
+                            failing: u128::from(base) + 10,
+                        })
+                    );
+                }
+                assert_eq!(image.backings[0].bytes, expected);
+                assert_eq!(image.owner_valid(selected), mapped != 11);
+                assert!(image.owner_valid(padding));
+                assert_eq!(image.active_changed(), mapped == 11);
+                assert_eq!(
+                    (image.last_mapping.get(), image.previous_mapping.get()),
+                    hints
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn fixed_width_and_default_fields_use_exact_source_offsets_and_preserve_padding() {
+    let mut image = image(96, vec![mapping(0x1000, 5, 67, false, true)]);
+    let bytes: Vec<u8> = (0x80..0xc0).collect();
+    let mut expected = image.backings[0].bytes.clone();
+    expected[9] = 0x81;
+    expected[12..22].copy_from_slice(&[0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d]);
+    expected[28..30].copy_from_slice(&[0x94, 0x95]);
+    expected[32..36].copy_from_slice(&[0x98, 0x99, 0x9a, 0x9b]);
+    expected[36..39].copy_from_slice(&[0x9c, 0x9d, 0x9e]);
+    expected[40..48].copy_from_slice(&[0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7]);
+    expected[56..72].copy_from_slice(&[
+        0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe,
+        0xbf,
+    ]);
+    assert_eq!(
+        image.write_fields(
+            0x1003,
+            64,
+            &[
+                (1, 1),
+                (4, 10),
+                (20, 2),
+                (24, 4),
+                (28, 3),
+                (32, 8),
+                (48, 16)
+            ],
+            &bytes,
+        ),
+        Ok(())
+    );
+    assert_eq!(image.backings[0].bytes, expected);
+}
