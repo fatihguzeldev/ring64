@@ -10,9 +10,11 @@ pub extern "C" fn core_import_debug() -> i32 {
         let word =
             |offset| u64::from_le_bytes(bridge.input[offset..offset + 8].try_into().unwrap());
         let mut input = State {
-            addresses: std::array::from_fn(|i| word(i * 8)),
-            dr6: word(32),
-            dr7: word(40),
+            addresses: std::array::from_fn(|i| {
+                word(std::mem::offset_of!(State, addresses) + i * 8)
+            }),
+            dr6: word(std::mem::offset_of!(State, dr6)),
+            dr7: word(std::mem::offset_of!(State, dr7)),
         };
         if input.dr6 > u32::MAX.into() || input.dr7 > u32::MAX.into() {
             return bridge.error("debug control input exceeds unsigned32");

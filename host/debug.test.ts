@@ -1,6 +1,12 @@
+import { DEBUG_LAYOUT } from '../tests/support/debug-layout.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { captureDebugState, captureDebugSource, captureDebugContinuation } from './debug.js';
+import {
+  captureDebugState,
+  captureDebugSource,
+  captureDebugContinuation,
+  validateDebugLayout,
+} from './debug.js';
 
 test('debug bank capture detaches all four raw addresses and reads caller values once', () => {
   let reads = 0;
@@ -50,4 +56,22 @@ test('debug source variants and historical continuations capture shape without c
     TypeError,
   );
   assert.throws(() => captureDebugContinuation({ breakpoints: 0, originPc: 0n }), TypeError);
+});
+
+test('debug layout keeps the bank import prefix separate from captured source and continuation', () => {
+  assert.doesNotThrow(() => validateDebugLayout(DEBUG_LAYOUT, 712, 616));
+  for (const fields of [
+    { addresses: 64, dr6: 48, dr7: 56, sourceOffset: 0, continuationOffset: 32 },
+    { addresses: 0, dr6: 32, dr7: 40, sourceOffset: 64, continuationOffset: 48 },
+  ]) {
+    assert.throws(
+      () =>
+        validateDebugLayout(
+          { offset: 616, layout: { ...DEBUG_LAYOUT.layout, ...fields } },
+          712,
+          616,
+        ),
+      /debug layout/,
+    );
+  }
 });

@@ -795,9 +795,9 @@ export class Core {
   }
   setDebugState(state: DebugState): void {
     const input = captureDebugState(state);
-    const pointer = this.#exports.core_input(48) >>> 0;
-    const view = new DataView(this.#exports.memory.buffer, pointer, 48);
     const d = this.#layout.debug.layout;
+    const pointer = this.#exports.core_input(d.sourceOffset) >>> 0;
+    const view = new DataView(this.#exports.memory.buffer, pointer, d.sourceOffset);
     input.addresses.forEach((a, i) => view.setBigUint64(d.addresses + i * 8, a, true));
     view.setBigUint64(d.dr6, input.dr6, true);
     view.setBigUint64(d.dr7, input.dr7, true);

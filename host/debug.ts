@@ -133,6 +133,15 @@ export function validateDebugLayout(value: DebugLayout, size: number, after: num
     value.offset + d.bytes > size
   )
     throw new Error('incompatible debug layout');
+  // The debug-bank import is the prefix preceding the captured source.
+  // Reject otherwise disjoint layouts that put bank fields in the checkpoint tail.
+  if (d.continuationOffset < d.sourceOffset + s.bytes)
+    throw new Error('invalid debug layout ordering');
+  bounds(d.sourceOffset, [
+    [d.addresses, 32],
+    [d.dr6, 8],
+    [d.dr7, 8],
+  ]);
   bounds(d.bytes, [
     [d.addresses, 32],
     [d.dr6, 8],
