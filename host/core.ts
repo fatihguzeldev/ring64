@@ -370,6 +370,7 @@ export class Core {
   readonly #exports: CoreExports;
   readonly #layout: Layout;
   readonly #statePointer: number;
+  #stateDataView?: DataView;
 
   private constructor(exports: CoreExports) {
     this.#exports = exports;
@@ -557,7 +558,14 @@ export class Core {
   }
 
   private stateView(): DataView {
-    return new DataView(this.#exports.memory.buffer, this.#statePointer, this.#layout.size);
+    const buffer = this.#exports.memory.buffer;
+    let view = this.#stateDataView;
+    // memory.grow(0) can replace the buffer without changing its size.
+    if (view === undefined || view.buffer !== buffer) {
+      view = new DataView(buffer, this.#statePointer, this.#layout.size);
+      this.#stateDataView = view;
+    }
+    return view;
   }
 
   snapshot(): StateSnapshot {

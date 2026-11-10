@@ -245,6 +245,40 @@ test('a debug outcome is never decoded as an address-bearing memory fault', asyn
   }
 });
 
+test('PC projection follows live writes and memory growth without changing allowances', async () => {
+  const fixture = await mockedCore();
+  assert.ok(fixture.core);
+  try {
+    const view = new DataView(fixture.memory.buffer, 8192, layout.size);
+    view.setBigUint64(layout.rip, 0xffff800012345678n, true);
+    view.setBigUint64(layout.remaining, 0x8877665544332211n, true);
+    view.setBigUint64(layout.repeatRemaining, 0x1020304050607080n, true);
+    assert.equal(fixture.core.current().rip, 0xffff800012345678n);
+    view.setBigUint64(layout.rip, 0xfedcba9876543210n, true);
+    assert.equal(fixture.core.current().rip, 0xfedcba9876543210n);
+    fixture.memory.grow(0);
+    new DataView(fixture.memory.buffer, 8192, layout.size).setBigUint64(
+      layout.rip,
+      0x8000000000000001n,
+      true,
+    );
+    assert.equal(fixture.core.current().rip, 0x8000000000000001n);
+    fixture.memory.grow(1);
+    new DataView(fixture.memory.buffer, 8192, layout.size).setBigUint64(
+      layout.rip,
+      0x123456789abcdef0n,
+      true,
+    );
+    assert.deepEqual(fixture.core.current(), {
+      rip: 0x123456789abcdef0n,
+      remaining: 0x8877665544332211n,
+      repeatRemaining: 0x1020304050607080n,
+    });
+  } finally {
+    fixture.core.dispose();
+  }
+});
+
 test('entry preparation consumes the profile returned by fault clearing and rejects malformed values', async () => {
   for (const profile of [0, 1, 2]) {
     const fixture = await mockedCore(layout, 8192, undefined, undefined, 512, profile);
