@@ -1,5 +1,6 @@
 use super::{ExecutionContext, Image, ProtectionFault, ProtectionPhase, SystemMemoryFault};
 use crate::x86::context::{AccessFailure, Mode, Segment};
+use crate::x86::exception::ExceptionEvent;
 use crate::x86::instruction::{SoftwareEventDescriptor, SoftwareEventKind, Width};
 
 mod entry;
@@ -13,6 +14,9 @@ mod tests;
 
 #[cfg(test)]
 mod entry_priority_tests;
+
+#[cfg(test)]
+mod exception_tests;
 
 #[cfg(test)]
 mod return_tests;
@@ -71,6 +75,22 @@ pub fn execute(
         });
     }
     entry::execute(context, image, descriptor, inputs)
+}
+
+pub fn enter_exception(
+    context: &mut ExecutionContext,
+    image: &mut Image,
+    event: ExceptionEvent,
+    sp: u64,
+    live_flags: u64,
+) -> Result<EventOutcome, EventFailure> {
+    if event
+        .validate(event.return_pc, live_flags, context)
+        .is_err()
+    {
+        return Err(EventFailure::Unsupported);
+    }
+    entry::enter_exception(context, image, event, sp, live_flags)
 }
 
 fn fault(

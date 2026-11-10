@@ -12,16 +12,63 @@ pub(super) fn execute(
     event: SoftwareEventDescriptor,
     inputs: EventInputs,
 ) -> Result<EventOutcome, EventFailure> {
-    let ext = u16::from(event.kind == SoftwareEventKind::Int1);
+    enter(context, image, Source::Software(event), inputs)
+}
+
+pub(super) fn enter_exception(
+    context: &mut ExecutionContext,
+    image: &mut Image,
+    event: ExceptionEvent,
+    sp: u64,
+    live_flags: u64,
+) -> Result<EventOutcome, EventFailure> {
+    enter(
+        context,
+        image,
+        Source::Exception(event),
+        EventInputs {
+            flags: live_flags,
+            sp,
+            next_pc: event.return_pc,
+        },
+    )
+}
+
+enum Source {
+    Software(SoftwareEventDescriptor),
+    Exception(ExceptionEvent),
+}
+
+fn enter(
+    context: &mut ExecutionContext,
+    image: &mut Image,
+    source: Source,
+    inputs: EventInputs,
+) -> Result<EventOutcome, EventFailure> {
+    let (vector, ext, check_dpl, check_iopl, saved_flags, error_code) = match source {
+        Source::Software(event) => (
+            event.vector,
+            u16::from(event.kind == SoftwareEventKind::Int1),
+            event.kind != SoftwareEventKind::Int1,
+            event.kind == SoftwareEventKind::Interrupt,
+            crate::x86::flags::architectural(inputs.flags, context),
+            None,
+        ),
+        Source::Exception(event) => (
+            event.vector,
+            1,
+            false,
+            false,
+            event.saved_flags,
+            event.error_code,
+        ),
+    };
     let root = context.idtr();
-    if context.mode() == Mode::Virtual8086
-        && event.kind == SoftwareEventKind::Interrupt
-        && (inputs.flags >> 12) & 3 != 3
-    {
+    if context.mode() == Mode::Virtual8086 && check_iopl && (inputs.flags >> 12) & 3 != 3 {
         return Err(fault(13, 0, ProtectionPhase::Privilege, None));
     }
     if context.mode() == Mode::Real {
-        let offset = u32::from(event.vector) * 4;
+        let offset = u32::from(vector) * 4;
         if offset + 3 > u32::from(root.limit) {
             return Err(fault(13, 0, ProtectionPhase::Selector, None));
         }
@@ -30,13 +77,13 @@ pub(super) fn execute(
             offset,
             width: 4,
             table: Table::Ivt,
-            reference: SystemReference::Vector(event.vector),
+            reference: SystemReference::Vector(vector),
             phase: SystemPhase::GateRead,
         }
         .read(context, image, ext)?;
         let mut frame = Frame::new(context, inputs.sp);
         for value in [
-            inputs.flags,
+            saved_flags,
             u64::from(context.selector(Segment::Cs)),
             inputs.next_pc,
         ] {
@@ -62,8 +109,8 @@ pub(super) fn execute(
         });
     }
     let gate_width = if ia32e(context) { 16 } else { 8 };
-    let offset = u32::from(event.vector) * gate_width;
-    let idt_error = (u16::from(event.vector) * 8) | 2 | ext;
+    let offset = u32::from(vector) * gate_width;
+    let idt_error = (u16::from(vector) * 8) | 2 | ext;
     if offset + gate_width - 1 > u32::from(root.limit) {
         return Err(fault(13, idt_error, ProtectionPhase::Selector, None));
     }
@@ -72,7 +119,7 @@ pub(super) fn execute(
         offset,
         width: gate_width,
         table: Table::Idt,
-        reference: SystemReference::Vector(event.vector),
+        reference: SystemReference::Vector(vector),
         phase: SystemPhase::GateRead,
     }
     .read(context, image, ext)?;
@@ -90,13 +137,19 @@ pub(super) fn execute(
     if !valid_type || ia32e(context) && (bytes[4] & 0xf8 != 0 || bytes[12..16] != [0; 4]) {
         return Err(fault(13, idt_error, ProtectionPhase::Descriptor, None));
     }
-    if event.kind != SoftwareEventKind::Int1 && (access >> 5) & 3 < context.cpl() {
+    if check_dpl && (access >> 5) & 3 < context.cpl() {
         return Err(fault(13, idt_error, ProtectionPhase::Privilege, None));
     }
     if access & 0x80 == 0 {
         return Err(fault(11, idt_error, ProtectionPhase::Descriptor, None));
     }
     if kind == 5 {
+        return Err(EventFailure::Unsupported);
+    }
+    if matches!(source, Source::Exception(_))
+        && context.mode() == Mode::Virtual8086
+        && matches!(kind, 6 | 7)
+    {
         return Err(EventFailure::Unsupported);
     }
     let selector = u16::from_le_bytes(bytes[2..4].try_into().unwrap());
@@ -191,17 +244,7 @@ pub(super) fn execute(
         )?;
         frame.push(&prepared, inputs.sp, width, ext)?;
     }
-    frame.push(
-        &prepared,
-        inputs.flags
-            | if context.mode() == Mode::Virtual8086 {
-                0x20000
-            } else {
-                0
-            },
-        width,
-        ext,
-    )?;
+    frame.push(&prepared, saved_flags, width, ext)?;
     frame.push(
         &prepared,
         u64::from(context.selector(Segment::Cs)),
@@ -209,6 +252,9 @@ pub(super) fn execute(
         ext,
     )?;
     frame.push(&prepared, inputs.next_pc, width, ext)?;
+    if let Some(error_code) = error_code {
+        frame.push(&prepared, u64::from(error_code), width, ext)?;
+    }
     if if ia32e(context) {
         !crate::memory::canonical48(pc)
     } else {

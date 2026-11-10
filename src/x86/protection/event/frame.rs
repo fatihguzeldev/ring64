@@ -9,7 +9,7 @@ struct Write {
 }
 
 pub(super) struct Frame {
-    writes: [Write; 9],
+    writes: [Write; 10],
     count: usize,
     cursor: u64,
     raw: u64,
@@ -20,7 +20,7 @@ impl Frame {
     pub fn new(context: &ExecutionContext, sp: u64) -> Self {
         let pointer_width = context.stack_width();
         Self {
-            writes: [Write::default(); 9],
+            writes: [Write::default(); 10],
             count: 0,
             cursor: sp & pointer_width.mask(),
             raw: sp,
