@@ -417,8 +417,9 @@ export class Cpu {
     try {
       if (deliveryBudget !== undefined) this.#engine.configureDelivery(true);
       let servicingEvent = false;
+      // This run owns event changes; only staging and delivery can replace the observed kind.
+      let eventKind = this.#engine.eventKind();
       for (;;) {
-        const eventKind = this.#engine.eventKind();
         if (eventKind === 'shutdown') return finish('shutdown');
         const boundaryObserved = eventKind === 'ready' && this.#engine.prepareEntry();
         const pc = this.#engine.current().rip;
@@ -434,7 +435,8 @@ export class Cpu {
           const reason = this.#engine.deliverException();
           timings.executionMs += performance.now() - at;
           if (reason !== 'dispatch') return finish(reason);
-          servicingEvent = this.#engine.eventKind() === 'pending';
+          eventKind = this.#engine.eventKind();
+          servicingEvent = eventKind === 'pending';
           this.pruneTranslations();
           resources.dispatches++;
           continue;
@@ -447,6 +449,7 @@ export class Cpu {
           const probe = this.#engine.probe(pc);
           if (probe !== 'dispatch') {
             if (deliveryBudget !== undefined && this.#engine.stageException(probe)) {
+              eventKind = 'pending';
               servicingEvent = true;
               continue;
             }
@@ -519,6 +522,7 @@ export class Cpu {
         }
         if (reason !== 'dispatch') {
           if (deliveryBudget !== undefined && this.#engine.stageException(reason)) {
+            eventKind = 'pending';
             servicingEvent = true;
             continue;
           }
