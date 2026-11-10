@@ -372,6 +372,7 @@ mod tests {
     use super::*;
 
     mod narrow;
+    mod preflight;
     mod read_for_write;
 
     #[test]
