@@ -33,7 +33,7 @@ struct Core {
     state: Box<UnsafeCell<RunState>>,
     fault: Option<Fault>,
     divide_failed: bool,
-    undefined_source: bool,
+    decode_fault: Option<decode::DecodeFault>,
     context: ExecutionContext,
     context_version: u64,
     segment_fault: Option<SegmentFault>,
@@ -107,7 +107,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             state,
             fault: None,
             divide_failed: false,
-            undefined_source: false,
+            decode_fault: None,
             context: ExecutionContext::default(),
             context_version: 0,
             segment_fault: None,
@@ -207,7 +207,7 @@ pub extern "C" fn core_import_state() -> i32 {
         core.divide_failed = false;
         core.segment_fault = None;
         core.debug_exception = None;
-        core.undefined_source = false;
+        core.decode_fault = None;
         0
     })
 }
@@ -223,7 +223,7 @@ pub extern "C" fn core_clear_fault() -> i32 {
         core.protection_fault = None;
         core.system_memory_fault = None;
         core.divide_failed = false;
-        core.undefined_source = false;
+        core.decode_fault = None;
         core.segment_fault = None;
         core.debug_exception = None;
         unsafe {
@@ -245,31 +245,33 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
         core.protection_fault = None;
         core.system_memory_fault = None;
         core.segment_fault = None;
-        core.undefined_source = false;
+        core.decode_fault = None;
         unsafe { (*core.state.get()).fault_segment = Segment::Cs as u32 };
-        match decode::decode_with_context(pc, &core.context, |offset| {
+        let decoded = decode::decode_with_context(pc, &core.context, |offset| {
             core.context
                 .fetch(&core.image, offset)
                 .map_err(|failure| match failure {
                     AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
                     AccessFailure::Segment(fault) => DecodeError::Segment(fault),
                 })
-        }) {
+        });
+        core.decode_fault = decoded
+            .as_ref()
+            .err()
+            .and_then(|error| error.architectural_fault());
+        match decoded {
             Ok(_) => 0,
             Err(DecodeError::Segment(fault)) => {
                 core.segment_fault = Some(fault);
                 SEGMENT
             }
             Err(DecodeError::Unsupported) => UNSUPPORTED,
-            Err(DecodeError::Undefined) => {
-                core.undefined_source = true;
-                UNSUPPORTED
-            }
-            Err(DecodeError::UndefinedEncoding) => {
-                core.undefined_source = true;
-                INVALID
-            }
-            Err(DecodeError::Invalid) => INVALID,
+            Err(DecodeError::Undefined) => UNSUPPORTED,
+            Err(
+                DecodeError::UndefinedEncoding
+                | DecodeError::Invalid
+                | DecodeError::InstructionLength,
+            ) => INVALID,
             Err(DecodeError::Fetch(fault)) => {
                 core.fault = Some(fault);
                 FETCH

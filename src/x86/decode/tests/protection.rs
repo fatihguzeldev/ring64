@@ -294,5 +294,5 @@ fn protection_prefix_order_and_rex_roles_are_independent_for_each_operand() {
     exact.extend([0x0f, 0x02, 0xc0]);
     assert_eq!(at(0x1000, &exact).unwrap().encoded_len(), 15);
     exact.insert(0, 0x66);
-    assert_eq!(at(0x1000, &exact), Err(DecodeError::Invalid));
+    assert_eq!(at(0x1000, &exact), Err(DecodeError::InstructionLength));
 }

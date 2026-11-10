@@ -1,4 +1,5 @@
 use super::*;
+mod access_faults;
 mod exception_delivery;
 mod exception_review;
 mod external_interrupts;

@@ -347,15 +347,15 @@ fn accepted_blocked_nmi_retries_repaired_ivt_and_publishes_one_fixed_word_frame(
 }
 
 #[test]
-fn lock_halt_selected_ud_keeps_report_rf_and_does_not_broaden_other_invalid_frontiers() {
+fn selected_lock_and_length_faults_keep_private_prefix_and_report_rf_frontiers() {
     use super::super::exception_delivery::core_stage_exception;
     for (bytes, reason, selected) in [
-        (&[0xf0, 0xf4][..], INVALID, true),
-        (&[0x66, 0xf0, 0xf4][..], INVALID, true),
-        (&[0xf0, 0x90][..], INVALID, false),
-        (&[0xf0, 0xf0, 0xf4][..], UNSUPPORTED, false),
-        (&[0xf0][..], FETCH, false),
-        (&[0x66; 15][..], INVALID, false),
+        (&[0xf0, 0xf4][..], INVALID, Some(6)),
+        (&[0x66, 0xf0, 0xf4][..], INVALID, Some(6)),
+        (&[0xf0, 0x90][..], INVALID, Some(6)),
+        (&[0xf0, 0xf0, 0xf4][..], UNSUPPORTED, None),
+        (&[0xf0][..], FETCH, None),
+        (&[0x66; 15][..], INVALID, Some(13)),
     ] {
         initialize(0x1000, bytes);
         BRIDGE.with_borrow_mut(|bridge| unsafe {
@@ -370,10 +370,10 @@ fn lock_halt_selected_ud_keeps_report_rf_and_does_not_broaden_other_invalid_fron
             )
         });
         assert_eq!(core_configure_delivery(1), 0);
-        assert_eq!(core_stage_exception(reason), i32::from(selected));
+        assert_eq!(core_stage_exception(reason), i32::from(selected.is_some()));
         BRIDGE.with_borrow(|bridge| {
             let state = unsafe { &*bridge.core.as_ref().unwrap().state.get() };
-            if selected {
+            if let Some(vector) = selected {
                 assert_eq!(
                     (
                         state.event.kind,
@@ -381,7 +381,7 @@ fn lock_halt_selected_ud_keeps_report_rf_and_does_not_broaden_other_invalid_fron
                         state.event.saved_flags,
                         state.flags
                     ),
-                    (1, 6, 0x10202, 0x202)
+                    (1, vector, 0x10202, 0x202)
                 );
             } else {
                 assert_eq!((state.event.kind, state.flags), (0, 0x10202));

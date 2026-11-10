@@ -258,7 +258,7 @@ fn far_required_address_immediate_and_lock_tails_preserve_first_fetch_and_length
     exact.extend([0xca, 0xff, 0xff]);
     assert_eq!(at(0x1000, &exact).unwrap().encoded_len(), 15);
     exact.insert(0, 0x66);
-    assert_eq!(at(0x1000, &exact), Err(DecodeError::Invalid));
+    assert_eq!(at(0x1000, &exact), Err(DecodeError::InstructionLength));
     assert_eq!(at(u64::MAX, &[0xcb]).unwrap().next_pc, 0);
     assert!(
         matches!(at(u64::MAX,&[0xca]),Err(DecodeError::Fetch(Fault{cause:Cause::AddressRange,failing,..})) if failing==1u128<<64)

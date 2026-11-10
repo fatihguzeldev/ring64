@@ -88,7 +88,7 @@ fn halt_decodes_ignored_prefixes_and_keeps_lock_as_a_selected_undefined_frontier
         at(0x1000, &[0xf0]),
         Err(DecodeError::Fetch(missing(0x1001)))
     );
-    assert_eq!(at(0x1000, &[0x66; 15]), Err(DecodeError::Invalid));
+    assert_eq!(at(0x1000, &[0x66; 15]), Err(DecodeError::InstructionLength));
 }
 
 #[test]

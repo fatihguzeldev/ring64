@@ -24,8 +24,36 @@ pub enum DecodeError {
     Undefined,
     UndefinedEncoding,
     Invalid,
+    InstructionLength,
     Fetch(Fault),
     Segment(SegmentFault),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DecodeFault {
+    UndefinedOpcode,
+    InstructionLength,
+}
+
+impl DecodeFault {
+    pub fn vector_and_code(self) -> (u8, Option<u16>) {
+        match self {
+            Self::UndefinedOpcode => (6, None),
+            Self::InstructionLength => (13, Some(0)),
+        }
+    }
+}
+
+impl DecodeError {
+    pub fn architectural_fault(self) -> Option<DecodeFault> {
+        match self {
+            Self::Undefined | Self::UndefinedEncoding | Self::Invalid => {
+                Some(DecodeFault::UndefinedOpcode)
+            }
+            Self::InstructionLength => Some(DecodeFault::InstructionLength),
+            Self::Unsupported | Self::Fetch(_) | Self::Segment(_) => None,
+        }
+    }
 }
 
 pub fn decode<F>(pc: u64, mut read: F) -> Result<Instruction, DecodeError>

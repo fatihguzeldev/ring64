@@ -23,7 +23,7 @@ where
 
     pub(super) fn byte(&mut self) -> Result<u8, DecodeError> {
         if self.consumed == 15 {
-            return Err(DecodeError::Invalid);
+            return Err(DecodeError::InstructionLength);
         }
         // Required bytes never wrap; a completed next IP may wrap independently.
         let address = u128::from(self.pc) + u128::from(self.consumed);

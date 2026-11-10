@@ -377,7 +377,7 @@ fn required_x87_address_tails_precede_lock_rejection_but_unselected_forms_stop_a
     longest.extend([0xd9, 0xe8]);
     assert_eq!(at(0x1000, &longest).unwrap().encoded_len(), 15);
     longest.insert(0, 0x66);
-    assert_eq!(at(0x1000, &longest), Err(DecodeError::Invalid));
+    assert_eq!(at(0x1000, &longest), Err(DecodeError::InstructionLength));
     assert_eq!(
         at(u64::MAX, &[0xd9]),
         Err(DecodeError::Fetch(crate::memory::Fault {

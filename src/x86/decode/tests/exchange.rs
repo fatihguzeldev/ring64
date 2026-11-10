@@ -318,7 +318,7 @@ fn exchange_required_bytes_and_length_limit_preserve_exact_boundaries() {
             full.extend(&bytes);
             assert!(at(0x1000, &full).is_ok());
             full.insert(0, 0x66);
-            assert_eq!(at(0x1000, &full), Err(DecodeError::Invalid));
+            assert_eq!(at(0x1000, &full), Err(DecodeError::InstructionLength));
         }
     }
 }

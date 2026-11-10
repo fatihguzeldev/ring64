@@ -349,7 +349,7 @@ fn near_forms_keep_fifteen_byte_and_required_fetch_boundaries() {
         let pc = u64::MAX - 14;
         assert_eq!(at(pc, &bytes).unwrap().next_pc, 0);
         bytes.insert(0, 0x2e);
-        assert_eq!(at(0x1000, &bytes), Err(DecodeError::Invalid));
+        assert_eq!(at(0x1000, &bytes), Err(DecodeError::InstructionLength));
     }
 }
 

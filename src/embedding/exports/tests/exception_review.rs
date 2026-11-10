@@ -57,11 +57,11 @@ fn ud2_staging_preserves_private_prefix_fetch_and_report_frontiers() {
         core_clear_fault();
         assert_eq!(event(), retained);
     }
-    for (bytes, reason) in [
-        (&[0xf3, 0x0f, 0x0b][..], UNSUPPORTED),
-        (&[0xf0, 0xf0, 0x0f, 0x0b], UNSUPPORTED),
-        (&[0x0f], FETCH),
-        (&[0x66; 15][..], INVALID),
+    for (bytes, reason, vector) in [
+        (&[0xf3, 0x0f, 0x0b][..], UNSUPPORTED, None),
+        (&[0xf0, 0xf0, 0x0f, 0x0b], UNSUPPORTED, None),
+        (&[0x0f], FETCH, None),
+        (&[0x66; 15][..], INVALID, Some(13)),
     ] {
         initialize(0x1000, bytes);
         assert_eq!(core_configure_delivery(1), 0);
@@ -69,12 +69,19 @@ fn ud2_staging_preserves_private_prefix_fetch_and_report_frontiers() {
             (*bridge.core.as_mut().unwrap().state.get()).flags = 0x10202;
         });
         assert_eq!(core_probe(0x1000), reason);
-        assert_eq!(core_stage_exception(reason), 0);
-        assert_eq!(event(), EventState::Ready);
+        assert_eq!(core_stage_exception(reason), i32::from(vector.is_some()));
+        if let Some(vector) = vector {
+            let EventState::Pending(selected) = event() else {
+                panic!("selected length fault")
+            };
+            assert_eq!((selected.vector, selected.error_code), (vector, Some(0)));
+        } else {
+            assert_eq!(event(), EventState::Ready);
+        }
         BRIDGE.with_borrow(|bridge| {
             assert_eq!(
                 unsafe { (*bridge.core.as_ref().unwrap().state.get()).flags },
-                0x10202
+                if vector.is_some() { 0x202 } else { 0x10202 }
             );
         });
     }

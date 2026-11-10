@@ -1,7 +1,7 @@
 use super::*;
 use crate::embedding::layout::{
-    DEBUG_EXCEPTION, DISPATCH, DIVIDE_ERROR, GENERAL_PROTECTION, INVALID, PROTECTION, SHUTDOWN,
-    SIMD_EXCEPTION, SYSTEM_MEMORY, X87_EXCEPTION,
+    ALIGNMENT, DEBUG_EXCEPTION, DISPATCH, DIVIDE_ERROR, GENERAL_PROTECTION, INVALID, PROTECTION,
+    SHUTDOWN, SIMD_EXCEPTION, SYSTEM_MEMORY, X87_EXCEPTION,
 };
 use crate::x86::exception::{EventState, ExceptionEvent};
 use crate::x86::flags;
@@ -63,9 +63,57 @@ pub extern "C" fn core_stage_exception(reason: i32) -> i32 {
                 ExceptionEvent::fault(19, pc, state.flags, &core.context, None)
             }
             X87_EXCEPTION => ExceptionEvent::fault(16, pc, state.flags, &core.context, None),
-            UNSUPPORTED | INVALID if core.undefined_source => {
+            UNSUPPORTED | INVALID if core.decode_fault.is_some() => {
+                let (vector, code) = core.decode_fault.unwrap().vector_and_code();
                 state.flags &= !flags::RF;
-                ExceptionEvent::fault(6, pc, state.flags, &core.context, None)
+                ExceptionEvent::fault(vector, pc, state.flags, &core.context, code)
+            }
+            DATA | FETCH | SEGMENT | TARGET | ALIGNMENT | SYSTEM_MEMORY => {
+                let selected = match reason {
+                    DATA | FETCH => core.fault.and_then(|fault| {
+                        crate::x86::protection::access_fault(
+                            &core.context,
+                            Segment::from_id(state.fault_segment),
+                            AccessFailure::Linear(fault),
+                        )
+                    }),
+                    SEGMENT => core.segment_fault.and_then(|fault| {
+                        crate::x86::protection::access_fault(
+                            &core.context,
+                            fault.segment,
+                            AccessFailure::Segment(fault),
+                        )
+                    }),
+                    TARGET => core
+                        .context
+                        .check_target(state.target)
+                        .err()
+                        .and_then(|failure| {
+                            crate::x86::protection::access_fault(
+                                &core.context,
+                                Segment::Cs,
+                                failure,
+                            )
+                        }),
+                    ALIGNMENT => core
+                        .alignment_fault
+                        .as_ref()
+                        .map(|_| crate::x86::protection::alignment_fault()),
+                    SYSTEM_MEMORY => core.system_memory_fault.and_then(|fault| {
+                        crate::x86::protection::system_fault(&core.context, fault)
+                    }),
+                    _ => unreachable!(),
+                };
+                let Some(fault) = selected else {
+                    return 0;
+                };
+                ExceptionEvent::fault(
+                    fault.vector,
+                    pc,
+                    state.flags,
+                    &core.context,
+                    Some(fault.error_code),
+                )
             }
             _ => return 0,
         };
@@ -101,7 +149,7 @@ pub extern "C" fn core_deliver_exception() -> i32 {
         core.system_memory_fault = None;
         core.debug_exception = None;
         core.divide_failed = false;
-        core.undefined_source = false;
+        core.decode_fault = None;
         let outcome = match event {
             EventState::Pending(event) => {
                 event::enter_exception(&mut core.context, &mut core.image, event, sp, flags)

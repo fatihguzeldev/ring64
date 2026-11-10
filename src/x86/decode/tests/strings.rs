@@ -258,7 +258,7 @@ fn string_prefix_failures_distinguish_invalid_unsupported_fetch_and_length() {
             reads.push(address);
             Ok(bytes[(address - 0x1000) as usize])
         }),
-        Err(DecodeError::Invalid)
+        Err(DecodeError::InstructionLength)
     );
     assert_eq!(reads, (0x1000..0x100f).collect::<Vec<_>>());
 }

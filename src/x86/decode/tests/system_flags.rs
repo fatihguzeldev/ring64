@@ -157,7 +157,7 @@ fn pop_ss_nonlong_slot_width_and_deciding_opcode_frontiers() {
     fifteen.push(0x9c);
     assert_eq!(at(0x1000, &fifteen).unwrap().encoded_len(), 15);
     fifteen.insert(0, 0x66);
-    assert_eq!(at(0x1000, &fifteen), Err(DecodeError::Invalid));
+    assert_eq!(at(0x1000, &fifteen), Err(DecodeError::InstructionLength));
     assert_eq!(
         at(0x1000, &[0xf0, 0xf3, 0x9c]),
         Err(DecodeError::Unsupported)

@@ -176,7 +176,7 @@ fn streaming_fetch_boundaries_and_prefix_policy_keep_their_deciding_bytes() {
     exact.extend([0xf3, 0x90]);
     assert_eq!(operation(&exact), Operation::Nop);
     exact.insert(0, 0x66);
-    assert_eq!(at(0x1000, &exact), Err(DecodeError::Invalid));
+    assert_eq!(at(0x1000, &exact), Err(DecodeError::InstructionLength));
     assert_eq!(operation(&[0xf2, 0xf3, 0x90]), Operation::Nop);
     assert_eq!(
         at(0x1000, &[0xf3, 0xf2, 0x90]),

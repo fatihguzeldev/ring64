@@ -481,7 +481,7 @@ fn repeated_prefixes_respect_the_fifteen_byte_limit_without_an_extra_fetch() {
                 reads += 1;
                 Ok(0x66)
             }),
-            Err(DecodeError::Invalid)
+            Err(DecodeError::InstructionLength)
         );
         assert_eq!(reads, 15);
         for length in 0..15 {
