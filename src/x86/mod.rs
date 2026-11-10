@@ -1,4 +1,5 @@
 pub mod context;
+pub mod debug;
 pub mod decode;
 pub mod exception;
 pub mod flags;
