@@ -112,6 +112,7 @@ impl RawEventState {
                 && (self.has_error_code != 0 || self.error_code == 0) =>
             {
                 Ok(EventState::Pending(ExceptionEvent {
+                    debug: None,
                     vector: self.vector as u8,
                     instruction_pc: self.instruction_pc,
                     return_pc: self.return_pc,

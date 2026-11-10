@@ -108,6 +108,63 @@ impl Source {
     pub fn fault(self) -> bool {
         matches!(self, Self::Execute(_) | Self::GeneralDetect)
     }
+    pub fn validate(
+        self,
+        event: super::exception::ExceptionEvent,
+        live: u64,
+    ) -> Result<(), &'static str> {
+        let valid_slots = |slots| slots != 0 && slots <= 15;
+        let valid = match self {
+            Self::Execute(slots) => {
+                valid_slots(slots)
+                    && event.instruction_pc == event.return_pc
+                    && live & super::flags::RF == 0
+                    && event.saved_flags & super::flags::RF == 0
+            }
+            Self::GeneralDetect => {
+                event.instruction_pc == event.return_pc
+                    && live & super::flags::RF == 0
+                    && event.saved_flags & super::flags::RF != 0
+            }
+            Self::Data {
+                slots, completed, ..
+            } => {
+                valid_slots(slots)
+                    && if completed {
+                        event.saved_flags == live
+                    } else {
+                        event.instruction_pc == event.return_pc
+                            && live & super::flags::RF == 0
+                            && event.saved_flags & super::flags::RF != 0
+                    }
+            }
+        };
+        if valid {
+            Ok(())
+        } else {
+            Err("inconsistent pending debug source image")
+        }
+    }
+    pub fn validate_shadow(self, shadow: u32) -> Result<(), &'static str> {
+        if shadow == 2
+            && matches!(
+                self,
+                Self::Execute(_)
+                    | Self::Data {
+                        single_step: false,
+                        ..
+                    }
+                    | Self::Data {
+                        completed: true,
+                        ..
+                    }
+            )
+        {
+            Err("inconsistent pending debug inhibition")
+        } else {
+            Ok(())
+        }
+    }
     pub fn json(self) -> serde_json::Value {
         match self {
             Self::Execute(slots) => {
@@ -132,3 +189,6 @@ impl Source {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod source_tests;

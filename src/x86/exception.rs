@@ -4,6 +4,7 @@ use super::protection::{ProtectionFault, ProtectionPhase};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExceptionEvent {
+    pub debug: Option<super::debug::Source>,
     pub vector: u8,
     pub instruction_pc: u64,
     pub return_pc: u64,
@@ -106,6 +107,7 @@ impl InterruptEvent {
     pub fn escalate(self, vector: u8, error_code: u16) -> EventState {
         assert!(matches!(vector, 10..=13), "selected entry protection fault");
         EventState::Pending(ExceptionEvent {
+            debug: None,
             vector,
             instruction_pc: self.return_pc,
             return_pc: self.return_pc,
@@ -148,6 +150,12 @@ impl ExceptionEvent {
         if self.vector != 1 && self.saved_flags & flags::RF == 0 {
             return Err("fault image requires rf");
         }
+        if let Some(source) = self.debug {
+            if self.vector != 1 || self.error_code.is_some() {
+                return Err("debug source requires vector one without an error slot");
+            }
+            source.validate(self, architectural)?;
+        }
         Ok(())
     }
 
@@ -159,6 +167,7 @@ impl ExceptionEvent {
         error_code: Option<u16>,
     ) -> Self {
         Self {
+            debug: None,
             vector,
             instruction_pc: pc,
             return_pc: pc,
@@ -174,6 +183,7 @@ impl ExceptionEvent {
         }
         let double_fault = matches!(self.vector, 0 | 10..=13);
         EventState::Pending(Self {
+            debug: None,
             vector: if double_fault { 8 } else { vector },
             error_code: Some(if double_fault { 0 } else { error_code }),
             saved_flags: self.saved_flags | flags::RF,
@@ -204,7 +214,13 @@ impl EventState {
         interrupts: InterruptState,
     ) -> Result<(), &'static str> {
         match self {
-            Self::Pending(event) => event.validate(rip, live_flags, context),
+            Self::Pending(event) => {
+                event.validate(rip, live_flags, context)?;
+                if let Some(source) = event.debug {
+                    source.validate_shadow(shadow)?;
+                }
+                Ok(())
+            }
             Self::PendingInterrupt(event) => {
                 event.validate(rip, live_flags, context)?;
                 if shadow == 2 {
@@ -241,34 +257,42 @@ mod tests {
         assert!(event.validate(0x1000, 0x202, &context).is_ok());
         for changed in [
             ExceptionEvent {
+                debug: None,
                 vector: 14,
                 ..event
             },
             ExceptionEvent {
+                debug: None,
                 return_pc: 0x1001,
                 ..event
             },
             ExceptionEvent {
+                debug: None,
                 saved_flags: 0x202,
                 ..event
             },
             ExceptionEvent {
+                debug: None,
                 saved_flags: 0x10203,
                 ..event
             },
             ExceptionEvent {
+                debug: None,
                 saved_flags: 0x30202,
                 ..event
             },
             ExceptionEvent {
+                debug: None,
                 saved_flags: 0x10200,
                 ..event
             },
             ExceptionEvent {
+                debug: None,
                 saved_flags: 1 << 63 | 0x10202,
                 ..event
             },
             ExceptionEvent {
+                debug: None,
                 error_code: None,
                 ..event
             },
@@ -304,6 +328,7 @@ mod tests {
             assert!(event.validate(0x1000, flags::TF | 2, &context).is_ok());
             assert!(
                 ExceptionEvent {
+                    debug: None,
                     error_code: if error_code.is_some() { None } else { Some(0) },
                     ..event
                 }
@@ -311,6 +336,7 @@ mod tests {
                 .is_err()
             );
             let without_rf = ExceptionEvent {
+                debug: None,
                 saved_flags: flags::TF | 2,
                 ..event
             };
@@ -338,6 +364,7 @@ mod tests {
         let context = ExecutionContext::default();
         for vector in [1, 6, 16, 19, 0, 10, 11, 12, 13, 8] {
             let event = ExceptionEvent {
+                debug: None,
                 vector,
                 instruction_pc: 0x1000,
                 return_pc: 0x1010,
@@ -459,6 +486,7 @@ mod tests {
             assert_eq!(
                 event.escalate(11, 0x6b),
                 EventState::Pending(ExceptionEvent {
+                    debug: None,
                     vector: 11,
                     instruction_pc: 0x1234,
                     return_pc: 0x1234,
