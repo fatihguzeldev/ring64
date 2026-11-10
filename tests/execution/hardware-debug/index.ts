@@ -1,3 +1,5 @@
+import { registerMatrixScenarios } from './register-matrix.js';
+import { correctnessReviewScenarios } from './review-correctness.js';
 import { transitionScenarios } from './transitions.js';
 import { operandScenarios } from './operands.js';
 import { shadowScenarios } from './shadows.js';
@@ -15,6 +17,8 @@ export function hardwareDebugScenarios(compiler: WebAssembly.Module): Scenario[]
     ...shadowScenarios(compiler),
     ...transitionScenarios(compiler),
     ...registerScenarios(compiler),
+    ...registerMatrixScenarios(compiler),
+    ...correctnessReviewScenarios(compiler),
     ...executeScenarios(compiler),
     ...recoveryScenarios(compiler),
   ];
