@@ -138,6 +138,7 @@ pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
             system_memory_fault: None,
             debug_exception: None,
             observed_owners: HashSet::new(),
+            debug_candidate: 0,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
         0

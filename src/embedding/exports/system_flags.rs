@@ -1,5 +1,5 @@
 use super::*;
-use crate::embedding::layout::{DEBUG_EXCEPTION, PROTECTION};
+use crate::embedding::layout::PROTECTION;
 use crate::x86::exception::EventState;
 use crate::x86::flags;
 use crate::x86::instruction::{SystemFlagsDescriptor, SystemFlagsKind};
@@ -50,7 +50,10 @@ fn valid_flags(flags: u64) -> bool {
 impl Core {
     pub(super) fn boundary_observed(&self) -> bool {
         let state = unsafe { &*self.state.get() };
-        state.flags & (flags::TF | flags::RF) != 0 || state.interruptibility != 0
+        state.flags & (flags::TF | flags::RF) != 0
+            || state.interruptibility != 0
+            || state.debug.registers.active()
+            || state.debug.continuation.slots != 0
     }
 
     pub(super) fn owner_matches_boundary(&self, owner: u64) -> bool {
@@ -141,25 +144,6 @@ pub extern "C" fn core_debug_step(
     }
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
-        let mut resume_flags = flags::architectural(flags, &core.context);
-        if completed == 0 {
-            resume_flags |= flags::RF;
-        }
-        core.debug_exception = Some(DebugException {
-            source: None,
-            instruction_pc,
-            resume_pc,
-            completed: completed != 0,
-            resume_flags,
-        });
-        unsafe {
-            if (*core.state.get()).event_state() == Ok(EventState::Halted) {
-                (*core.state.get()).set_event(EventState::Ready);
-            }
-            if (*core.state.get()).delivery_enabled == 0 {
-                (*core.state.get()).interruptibility = 0;
-            }
-        };
-        DEBUG_EXCEPTION
+        core.select_debug(instruction_pc, resume_pc, completed != 0, flags, None)
     })
 }

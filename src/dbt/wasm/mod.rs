@@ -90,6 +90,7 @@ struct Emitter {
     system_flags: Option<u32>,
     debug_step: Option<u32>,
     debug_register: Option<u32>,
+    debug_begin: Option<u32>,
     external_step: Option<u32>,
     halt: Option<u32>,
     observed: bool,
@@ -412,6 +413,14 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         next_type += 1;
         index
     });
+    let debug_begin_type = observed.then(|| {
+        let index = next_type;
+        types
+            .ty()
+            .function([ValType::I64, ValType::I64, ValType::I32], [ValType::I32]);
+        next_type += 1;
+        index
+    });
     let debug_type = observed.then(|| {
         let index = next_type;
         types.ty().function(
@@ -654,6 +663,12 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let debug_begin = debug_begin_type.map(|index| {
+        imports.import("env", "debug_begin", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let debug_step = debug_type.map(|index| {
         imports.import("env", "debug_step", EntityType::Function(index));
         let function = run_index;
@@ -751,6 +766,7 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         system_flags,
         debug_step,
         debug_register,
+        debug_begin,
         external_step,
         halt,
         observed,

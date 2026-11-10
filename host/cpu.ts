@@ -504,7 +504,10 @@ export class Cpu {
         } else {
           const probe = this.#engine.probe(pc);
           if (probe !== 'dispatch') {
-            if (deliveryBudget !== undefined && this.#engine.stageException(probe)) {
+            if (
+              (deliveryBudget !== undefined || boundaryObserved) &&
+              this.#engine.stageException(probe)
+            ) {
               eventKind = 'pending';
               servicingEvent = true;
               continue;
@@ -597,7 +600,10 @@ export class Cpu {
             }
             continue;
           }
-          if (deliveryBudget !== undefined && this.#engine.stageException(reason)) {
+          if (
+            (deliveryBudget !== undefined || boundaryObserved) &&
+            this.#engine.stageException(reason)
+          ) {
             eventKind = 'pending';
             servicingEvent = true;
             continue;

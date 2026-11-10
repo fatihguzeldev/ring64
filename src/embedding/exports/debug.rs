@@ -26,7 +26,7 @@ pub extern "C" fn core_import_debug() -> i32 {
 }
 
 impl Core {
-    fn select_debug(
+    pub(super) fn select_debug(
         &mut self,
         pc: u64,
         resume: u64,
@@ -45,6 +45,13 @@ impl Core {
         };
         let state = unsafe { &mut *self.state.get() };
         state.debug.registers.select(slots, step, gd);
+        if source.is_some_and(crate::x86::debug::Source::fault) {
+            state.debug.continuation = crate::embedding::layout::debug::Continuation::default();
+        }
+        if !source.is_some_and(crate::x86::debug::Source::fault) && state.delivery_enabled == 0 {
+            state.interruptibility = 0;
+        }
+        self.debug_candidate = 0;
         let mut resume_flags = flags::architectural(flags, &self.context);
         if matches!(source, Some(Source::GeneralDetect))
             || !completed && !matches!(source, Some(Source::Execute(_)))
@@ -62,6 +69,32 @@ impl Core {
             state.set_event(crate::x86::exception::EventState::Ready);
         }
         crate::embedding::layout::DEBUG_EXCEPTION
+    }
+    pub(super) fn debug_execute(&mut self, pc: u64, flags: u64, shadow: u32) -> i32 {
+        if flags & crate::x86::flags::RF != 0 || shadow == 2 {
+            return 0;
+        }
+        let slots = self
+            .context
+            .translate(pc, 0, Segment::Cs, Access::Execute, false)
+            .ok()
+            .map_or(0, |linear| unsafe {
+                (*self.state.get())
+                    .debug
+                    .registers
+                    .matches(linear, 1, Access::Execute)
+            });
+        if slots == 0 {
+            0
+        } else {
+            self.select_debug(
+                pc,
+                pc,
+                false,
+                flags,
+                Some(crate::x86::debug::Source::Execute(slots)),
+            )
+        }
     }
 }
 #[unsafe(no_mangle)]
@@ -119,5 +152,14 @@ pub extern "C" fn core_debug_register(operation: u32, input: u64, pc: u64, flags
                 .copy_from_slice(&state.debug.registers.read(register).to_le_bytes());
         }
         0
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_debug_begin(pc: u64, flags: u64, shadow: u32) -> i32 {
+    BRIDGE.with_borrow_mut(|bridge| {
+        let core = bridge.core.as_mut().unwrap();
+        core.debug_candidate = 0;
+        core.debug_execute(pc, flags, shadow)
     })
 }

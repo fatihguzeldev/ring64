@@ -86,8 +86,24 @@ impl Emitter {
             .op(Op::LocalGet(SHADOW))
             .op(Op::I32Or)
             .op(Op::I32Eqz)
-            .op(Op::I32Eqz)
-            .op(Op::I32Const(observed))
+            .op(Op::I32Eqz);
+        if self.observed {
+            self.op(Op::LocalGet(0))
+                .op(Op::I64Load(MemArg {
+                    offset: (offset_of!(RunState, debug)
+                        + offset_of!(crate::embedding::layout::debug::DebugState, registers)
+                        + offset_of!(crate::x86::debug::State, dr7))
+                        as u64,
+                    align: 3,
+                    memory_index: 0,
+                }))
+                .op(Op::I64Const(255))
+                .op(Op::I64And)
+                .op(Op::I64Eqz)
+                .op(Op::I32Eqz)
+                .op(Op::I32Or);
+        }
+        self.op(Op::I32Const(observed))
             .op(Op::I32Ne)
             .op(Op::If(BlockType::Empty));
         self.exit(DISPATCH, exit_depth + 1);
@@ -105,6 +121,13 @@ impl Emitter {
         if !self.observed {
             return;
         }
+        self.op(Op::I64Const(self.current_pc as i64));
+        self.full_flags();
+        let debug_begin = self.debug_begin.expect("debug begin import");
+        self.op(Op::LocalGet(SHADOW))
+            .op(Op::Call(debug_begin))
+            .op(Op::LocalTee(REASON))
+            .op(Op::BrIf(exit_depth));
         let sampled_tf = self.sampled_tf.unwrap();
         let incoming_shadow = self.incoming_shadow.unwrap();
         let next_shadow = self.next_shadow.unwrap();

@@ -23,11 +23,9 @@ pub extern "C" fn core_stage_exception(reason: i32) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         let state = unsafe { &mut *core.state.get() };
-        if state.delivery_enabled == 0 {
-            return 0;
-        }
+        let enabled = state.delivery_enabled != 0;
         if state.event.kind != 0 {
-            return -1;
+            return if enabled { -1 } else { 0 };
         }
         let pc = state.rip;
         let event = match reason {
@@ -66,7 +64,9 @@ pub extern "C" fn core_stage_exception(reason: i32) -> i32 {
             X87_EXCEPTION => ExceptionEvent::fault(16, pc, state.flags, &core.context, None),
             UNSUPPORTED | INVALID if core.decode_fault.is_some() => {
                 let (vector, code) = core.decode_fault.unwrap().vector_and_code();
-                state.flags &= !flags::RF;
+                if enabled {
+                    state.flags &= !flags::RF;
+                }
                 ExceptionEvent::fault(vector, pc, state.flags, &core.context, code)
             }
             DATA | FETCH | SEGMENT | TARGET | ALIGNMENT | SYSTEM_MEMORY => {
@@ -120,6 +120,13 @@ pub extern "C" fn core_stage_exception(reason: i32) -> i32 {
             }
             _ => return 0,
         };
+        if reason != DEBUG_EXCEPTION || event.debug.is_some_and(crate::x86::debug::Source::fault) {
+            state.debug.continuation = super::super::layout::debug::Continuation::default();
+            core.debug_candidate = 0;
+        }
+        if !enabled {
+            return 0;
+        }
         if event
             .validate(state.rip, state.flags, &core.context)
             .is_err()
@@ -176,6 +183,9 @@ pub extern "C" fn core_deliver_exception() -> i32 {
                     state.flags = outcome.flags;
                     state.interruptibility = 0;
                     state.set_event(EventState::Ready);
+                    if matches!(event,EventState::Pending(e) if e.vector==1) {
+                        state.debug.registers.enter();
+                    }
                 }
                 if outcome.context_changed {
                     core.image.retire_sources();

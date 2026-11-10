@@ -83,6 +83,10 @@ pub extern "C" fn core_software_event(
             state.vector_scratch[..8].copy_from_slice(&outcome.pc.to_le_bytes());
             state.vector_scratch[8..].copy_from_slice(&outcome.sp.to_le_bytes());
             state.flags = outcome.flags;
+            if operation.kind == SoftwareEventKind::Int1 {
+                state.debug.registers.enter();
+                state.debug.continuation = super::super::layout::debug::Continuation::default();
+            }
         }
         if outcome.context_changed {
             core.image.retire_sources();

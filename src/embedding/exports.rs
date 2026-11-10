@@ -45,6 +45,7 @@ struct Core {
     system_memory_fault: Option<crate::x86::protection::SystemMemoryFault>,
     debug_exception: Option<system_flags::DebugException>,
     observed_owners: HashSet<u64>,
+    debug_candidate: u8,
 }
 
 #[derive(Default)]
@@ -119,6 +120,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             system_memory_fault: None,
             debug_exception: None,
             observed_owners: HashSet::new(),
+            debug_candidate: 0,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
         0
@@ -255,6 +257,7 @@ pub extern "C" fn core_import_state() -> i32 {
 pub extern "C" fn core_clear_fault() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
+        core.debug_candidate = 0;
         core.fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
@@ -286,6 +289,16 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
         core.segment_fault = None;
         core.decode_fault = None;
         unsafe { (*core.state.get()).fault_segment = Segment::Cs as u32 };
+        let (flags, shadow) = unsafe {
+            (
+                (*core.state.get()).flags,
+                (*core.state.get()).interruptibility,
+            )
+        };
+        let debug = core.debug_execute(pc, flags, shadow);
+        if debug != 0 {
+            return debug;
+        }
         let decoded = decode::decode_with_context(pc, &core.context, |offset| {
             core.context
                 .fetch(&core.image, offset)
