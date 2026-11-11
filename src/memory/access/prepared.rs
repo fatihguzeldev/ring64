@@ -30,8 +30,10 @@ impl Image {
     pub(crate) fn prepare_physical_update(
         &self,
         address: u64,
+        width: u32,
     ) -> Result<PreparedPhysicalUpdate, Fault> {
-        self.prepare_physical_write(address, 8, true)
+        assert!(matches!(width, 4 | 8));
+        self.prepare_physical_write(address, width, true)
             .map(PreparedPhysicalUpdate)
     }
 
@@ -55,8 +57,12 @@ impl Image {
 
     pub(crate) fn publish_physical_update(&mut self, prepared: &PreparedPhysicalUpdate, bits: u64) {
         let span = &prepared.0;
-        let current = self.scalar_after_preflight(span.address, 8, span.first);
-        self.write_after_preflight(span.address, &(current | bits).to_le_bytes(), span.first);
+        let current = self.scalar_after_preflight(span.address, span.width, span.first);
+        self.write_after_preflight(
+            span.address,
+            &(current | bits).to_le_bytes()[..span.width as usize],
+            span.first,
+        );
     }
 }
 
@@ -133,7 +139,7 @@ mod tests {
             mapping(0x3000, 0, 8, true, true),
         ]);
         image.physical_write(0x2000, 8, 0x1234000000000027).unwrap();
-        let prepared = image.prepare_physical_update(0x2000).unwrap();
+        let prepared = image.prepare_physical_update(0x2000, 8).unwrap();
         image.physical_write(0x3000, 8, 0x9234000000000827).unwrap();
         let owner = image.register_source([(0x3000, 8)]).unwrap();
         image.activate(owner);
@@ -150,11 +156,22 @@ mod tests {
     }
 
     #[test]
+    fn dword_update_uses_only_its_admitted_four_bytes_and_current_value() {
+        let mut image = image(vec![mapping(0x2000, 0, 4, true, true)]);
+        image.physical_write(0x2000, 4, 0x12345027).unwrap();
+        let prepared = image.prepare_physical_update(0x2000, 4).unwrap();
+        image.physical_write(0x2000, 4, 0xabcdf827).unwrap();
+        image.publish_physical_update(&prepared, 0x40);
+        assert_eq!(image.physical_read(0x2000, 4).unwrap(), 0xabcdf867);
+        assert!(image.physical_read(0x2004, 1).is_err());
+    }
+
+    #[test]
     fn physical_update_admission_requires_read_and_write_but_payload_admission_needs_only_write() {
         let image = image(vec![mapping(0x2000, 0, 8, false, true)]);
         assert!(image.prepare_physical_write(0x2000, 8, false).is_ok());
         assert_eq!(
-            image.prepare_physical_update(0x2000).unwrap_err().access,
+            image.prepare_physical_update(0x2000, 8).unwrap_err().access,
             Access::Write
         );
         assert!(image.prepare_physical_write(0x2000, 8, true).is_err());

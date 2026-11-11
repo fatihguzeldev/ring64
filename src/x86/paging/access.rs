@@ -162,7 +162,10 @@ impl<'a> Memory<'a> {
             if fragment.translation.dirty && participates(fragment, fields) {
                 let update = storage
                     .image
-                    .prepare_physical_update(fragment.translation.leaf)
+                    .prepare_physical_update(
+                        fragment.translation.leaf,
+                        fragment.translation.entry_width,
+                    )
                     .map_err(|f| {
                         AccessFailure::Paging(
                             fragment

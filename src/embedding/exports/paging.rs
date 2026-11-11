@@ -245,6 +245,7 @@ pub(super) fn parse_bank(value: &serde_json::Value) -> Result<paging::State, &'s
         cr3: word("cr3")?,
         cr4: word("cr4")?,
         efer: word("efer")?,
+        pdpte: None,
     };
     state.validate()?;
     Ok(state)

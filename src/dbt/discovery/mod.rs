@@ -73,7 +73,7 @@ pub(crate) fn discover_with_profile(
                         .map_err(DecodeError::Fetch)?;
                     fetched.push(translated.physical);
                     for entry in translated.entries() {
-                        table_bytes.extend(*entry..*entry + 8);
+                        table_bytes.extend(*entry..*entry + u64::from(translated.entry_width));
                     }
                     return Ok(byte);
                 }

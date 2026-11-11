@@ -19,6 +19,7 @@ pub struct State {
     pub cr3: u64,
     pub cr4: u64,
     pub efer: u64,
+    pub pdpte: Option<[u64; 4]>,
 }
 
 impl Default for State {
@@ -29,6 +30,7 @@ impl Default for State {
             cr3: 0,
             cr4: CR4_FIXED,
             efer: EFER_FIXED,
+            pdpte: None,
         }
     }
 }
@@ -42,7 +44,8 @@ pub enum ControlFailure {
 
 impl State {
     pub fn validate(self) -> Result<(), &'static str> {
-        if self.cr0 & !(CR0_WP | CR0_NUMERIC) != CR0_FIXED & !CR0_NUMERIC
+        if self.pdpte.is_some()
+            || self.cr0 & !(CR0_WP | CR0_NUMERIC) != CR0_FIXED & !CR0_NUMERIC
             || self.cr3 & !CR3_ALLOWED != 0
             || self.cr4 & !CR4_NUMERIC != CR4_FIXED & !CR4_NUMERIC
             || self.efer & !(EFER_NXE | EFER_SCE) != EFER_FIXED
@@ -183,6 +186,7 @@ mod tests {
             cr3: 0x0008000000003018,
             cr4: 0x628,
             efer: 0x500,
+            pdpte: None,
         }
     }
 

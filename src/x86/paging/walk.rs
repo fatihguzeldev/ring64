@@ -58,6 +58,7 @@ pub struct Translation {
     pub leaf: u64,
     pub dirty: bool,
     pub remaining: u64,
+    pub entry_width: u32,
     entries: [u64; 4],
     count: usize,
 }
@@ -77,7 +78,11 @@ impl Request {
                 | (u32::from(self.access == Access::Write) << 1)
                 | (u32::from(self.user) << 2)
                 | (u32::from(reserved) << 3)
-                | (u32::from(self.access == Access::Execute && state.efer & (1 << 11) != 0) << 4),
+                | (u32::from(
+                    self.access == Access::Execute
+                        && (state.efer & (1 << 10) != 0 || state.cr4 & (1 << 5) != 0)
+                        && state.efer & (1 << 11) != 0,
+                ) << 4),
         })
     }
 
@@ -92,8 +97,8 @@ impl Request {
 }
 
 pub fn peek(image: &Image, state: &State, request: Request) -> Result<Translation, Failure> {
-    walk_with::<false, false>(state, request, |address, _| {
-        image.physical_read(address, 8).map(Some)
+    walk_with::<false, false>(state, request, |address, width, _| {
+        image.physical_read(address, width).map(Some)
     })
     .map(|translation| translation.expect("observational walk cannot restart"))
 }
@@ -119,14 +124,14 @@ fn actual_walk<const FETCH: bool>(
     request: Request,
     mut current: impl FnMut(&Image) -> bool,
 ) -> Result<Option<Translation>, Failure> {
-    walk_with::<true, FETCH>(state, request, |address, accessed| {
+    walk_with::<true, FETCH>(state, request, |address, width, accessed| {
         if accessed {
-            image.physical_check_write(address, 8)?;
-            let current_word = image.physical_read(address, 8)?;
-            image.physical_write(address, 8, current_word | ACCESSED)?;
+            image.physical_check_write(address, width)?;
+            let current_word = image.physical_read(address, width)?;
+            image.physical_write(address, width, current_word | ACCESSED)?;
             Ok(current(image).then_some(current_word | ACCESSED))
         } else {
-            image.physical_read(address, 8).map(Some)
+            image.physical_read(address, width).map(Some)
         }
     })
 }
@@ -134,18 +139,42 @@ fn actual_walk<const FETCH: bool>(
 fn walk_with<const EFFECTS: bool, const FETCH: bool>(
     state: &State,
     request: Request,
-    mut entry_access: impl FnMut(u64, bool) -> Result<Option<u64>, Fault>,
+    mut entry_access: impl FnMut(u64, u32, bool) -> Result<Option<u64>, Fault>,
 ) -> Result<Option<Translation>, Failure> {
-    let mut table = state.cr3 & ADDRESS;
+    let ia32e = state.efer & (1 << 10) != 0;
+    let pae = state.cr4 & (1 << 5) != 0;
+    let entry_width = if ia32e || pae { 8 } else { 4 };
+    let shifts: &[u32] = if ia32e {
+        &[39, 30, 21, 12]
+    } else if pae {
+        &[21, 12]
+    } else {
+        &[22, 12]
+    };
+    let mut table = if ia32e {
+        state.cr3 & ADDRESS
+    } else {
+        state.cr3 & 0xfffff000
+    };
+    if !ia32e && pae {
+        let root =
+            state.pdpte.expect("validated legacy PAE quartet")[(request.linear >> 30 & 3) as usize];
+        if root & 1 == 0 {
+            return Err(request.page_fault(state, false, false));
+        }
+        table = root & ADDRESS;
+    }
     let mut user = true;
     let mut writable = true;
     let mut executable = true;
     let mut entries = [0; 4];
     let mut words = [0; 4];
-    for (index, shift) in [39, 30, 21, 12].into_iter().enumerate() {
-        let address = table + ((request.linear >> shift) & 511) * 8;
+    for (index, &shift) in shifts.iter().enumerate() {
+        let address = table
+            + ((request.linear >> shift) & if entry_width == 4 { 1023 } else { 511 })
+                * u64::from(entry_width);
         entries[index] = address;
-        let Some(entry) = entry_access(address, false)
+        let Some(entry) = entry_access(address, entry_width, false)
             .map_err(|f| request.physical_failure(f, PhysicalPhase::WalkRead))?
         else {
             return Ok(None);
@@ -154,17 +183,25 @@ fn walk_with<const EFFECTS: bool, const FETCH: bool>(
         if entry & 1 == 0 {
             return Err(request.page_fault(state, false, false));
         }
-        let large = index < 3 && entry & (1 << 7) != 0;
-        let leaf = index == 3 || large;
-        let reserved_address = large && entry & (((1u64 << shift) - 1) & !0x1fff) != 0;
-        if index == 0 && large
+        let large = index + 1 < shifts.len()
+            && entry & (1 << 7) != 0
+            && (entry_width == 8 || state.cr4 & (1 << 4) != 0);
+        let leaf = index + 1 == shifts.len() || large;
+        let reserved_address = large
+            && if entry_width == 4 {
+                entry & (1 << 21) != 0
+            } else {
+                entry & (((1u64 << shift) - 1) & !0x1fff) != 0
+            };
+        if ia32e && index == 0 && large
             || reserved_address
+            || !ia32e && pae && entry & 0x7ff0000000000000 != 0
             || state.efer & (1 << 11) == 0 && entry & (1 << 63) != 0
         {
             return Err(request.page_fault(state, true, true));
         }
         if EFFECTS && entry & ACCESSED == 0 {
-            if entry_access(address, true)
+            if entry_access(address, entry_width, true)
                 .map_err(|f| request.physical_failure(f, PhysicalPhase::AccessedWrite))?
                 .is_none()
             {
@@ -173,7 +210,7 @@ fn walk_with<const EFFECTS: bool, const FETCH: bool>(
             if FETCH {
                 // An A alias can redirect this byte's already-read hierarchy before a lower fault.
                 for used in 0..=index {
-                    let Some(current) = entry_access(entries[used], false)
+                    let Some(current) = entry_access(entries[used], entry_width, false)
                         .map_err(|f| request.physical_failure(f, PhysicalPhase::WalkRead))?
                     else {
                         return Ok(None);
@@ -198,10 +235,15 @@ fn walk_with<const EFFECTS: bool, const FETCH: bool>(
             }
             let offset_mask = (1u64 << shift) - 1;
             return Ok(Some(Translation {
-                physical: (entry & ADDRESS & !offset_mask) | (request.linear & offset_mask),
+                physical: (if entry_width == 4 && large {
+                    (entry & 0xffc00000) | ((entry & 0x001fe000) << 19)
+                } else {
+                    entry & ADDRESS & !offset_mask
+                }) | (request.linear & offset_mask),
                 leaf: address,
                 dirty: entry & DIRTY == 0,
                 remaining: (1u64 << shift) - (request.linear & offset_mask),
+                entry_width,
                 entries,
                 count: index + 1,
             }));
@@ -385,3 +427,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "legacy_tests.rs"]
+mod legacy_tests;
