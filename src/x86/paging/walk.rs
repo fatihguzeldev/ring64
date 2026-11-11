@@ -92,14 +92,14 @@ impl Request {
 }
 
 pub fn peek(image: &Image, state: &State, request: Request) -> Result<Translation, Failure> {
-    walk_with::<false>(state, request, |address, _| {
+    walk_with::<false, false>(state, request, |address, _| {
         image.physical_read(address, 8).map(Some)
     })
     .map(|translation| translation.expect("observational walk cannot restart"))
 }
 
 pub fn walk(image: &mut Image, state: &State, request: Request) -> Result<Translation, Failure> {
-    fetch_walk(image, state, request, |_| true)
+    actual_walk::<false>(image, state, request, |_| true)
         .map(|translation| translation.expect("ordinary access does not abandon a walk"))
 }
 
@@ -108,9 +108,18 @@ pub fn fetch_walk(
     image: &mut Image,
     state: &State,
     request: Request,
+    current: impl FnMut(&Image) -> bool,
+) -> Result<Option<Translation>, Failure> {
+    actual_walk::<true>(image, state, request, current)
+}
+
+fn actual_walk<const FETCH: bool>(
+    image: &mut Image,
+    state: &State,
+    request: Request,
     mut current: impl FnMut(&Image) -> bool,
 ) -> Result<Option<Translation>, Failure> {
-    walk_with::<true>(state, request, |address, accessed| {
+    walk_with::<true, FETCH>(state, request, |address, accessed| {
         if accessed {
             image.physical_check_write(address, 8)?;
             let current_word = image.physical_read(address, 8)?;
@@ -122,7 +131,7 @@ pub fn fetch_walk(
     })
 }
 
-fn walk_with<const EFFECTS: bool>(
+fn walk_with<const EFFECTS: bool, const FETCH: bool>(
     state: &State,
     request: Request,
     mut entry_access: impl FnMut(u64, bool) -> Result<Option<u64>, Fault>,
@@ -132,6 +141,7 @@ fn walk_with<const EFFECTS: bool>(
     let mut writable = true;
     let mut executable = true;
     let mut entries = [0; 4];
+    let mut words = [0; 4];
     for (index, shift) in [39, 30, 21, 12].into_iter().enumerate() {
         let address = table + ((request.linear >> shift) & 511) * 8;
         entries[index] = address;
@@ -140,6 +150,7 @@ fn walk_with<const EFFECTS: bool>(
         else {
             return Ok(None);
         };
+        words[index] = entry;
         if entry & 1 == 0 {
             return Err(request.page_fault(state, false, false));
         }
@@ -152,13 +163,26 @@ fn walk_with<const EFFECTS: bool>(
         {
             return Err(request.page_fault(state, true, true));
         }
-        if EFFECTS
-            && entry & ACCESSED == 0
-            && entry_access(address, true)
+        if EFFECTS && entry & ACCESSED == 0 {
+            if entry_access(address, true)
                 .map_err(|f| request.physical_failure(f, PhysicalPhase::AccessedWrite))?
                 .is_none()
-        {
-            return Ok(None);
+            {
+                return Ok(None);
+            }
+            if FETCH {
+                // An A alias can redirect this byte's already-read hierarchy before a lower fault.
+                for used in 0..=index {
+                    let Some(current) = entry_access(entries[used], false)
+                        .map_err(|f| request.physical_failure(f, PhysicalPhase::WalkRead))?
+                    else {
+                        return Ok(None);
+                    };
+                    if (current ^ words[used]) & !ACCESSED != 0 {
+                        return Ok(None);
+                    }
+                }
+            }
         }
         user &= entry & 4 != 0;
         writable &= entry & 2 != 0;
