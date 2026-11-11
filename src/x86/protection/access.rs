@@ -40,10 +40,8 @@ impl DescriptorWrite {
     }
 
     pub fn commit(self, image: &mut impl GuestMemory) {
-        let mut bytes = [0; 16];
-        bytes[self.offset as usize] = self.byte;
         image
-            .write_system_fields(self.address, self.width, &[(self.offset, 1)], &bytes)
+            .publish_system_byte(self.address, self.width, self.offset, self.byte)
             .expect("admitted descriptor publication");
     }
 }
@@ -208,12 +206,10 @@ impl Lookup {
         image: &mut impl GuestMemory,
         access_byte: u8,
     ) -> Result<(), Failure> {
-        let write = self.prepare_accessed(context, image, access_byte)?;
+        let address = self.address(context, 5, 1, Access::Write, SystemPhase::AccessedWrite)?;
         image
-            .prepare_publication()
-            .map_err(|failure| write.failure(failure))?;
-        write.commit(image);
-        Ok(())
+            .write_system(address, 1, u64::from(access_byte | 1))
+            .map_err(|failure| self.access_failure(failure, SystemPhase::AccessedWrite))
     }
 }
 

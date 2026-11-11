@@ -336,14 +336,16 @@ impl GuestMemory for Memory<'_> {
     fn write_system(&mut self, address: u64, width: u32, value: u64) -> Result<(), AccessFailure> {
         self.write_at(address, width, &[(0, width)], &value.to_le_bytes(), false)
     }
-    fn write_system_fields(
+    fn publish_system_byte(
         &mut self,
         address: u64,
         width: u32,
-        fields: &[(u32, u32)],
-        bytes: &[u8],
+        offset: u32,
+        byte: u8,
     ) -> Result<(), AccessFailure> {
-        self.write_at(address, width, fields, bytes, false)
+        let mut bytes = [0; 16];
+        bytes[offset as usize] = byte;
+        self.write_at(address, width, &[(offset, 1)], &bytes, false)
     }
     fn check_frame_write(&self, address: u64, width: u32, cpl: u8) -> Result<(), AccessFailure> {
         self.capture_write(address, width, cpl == 3)

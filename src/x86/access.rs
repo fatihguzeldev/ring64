@@ -42,14 +42,15 @@ pub trait GuestMemory {
     fn write_system(&mut self, address: u64, width: u32, value: u64) -> Result<(), AccessFailure> {
         self.write(address, width, value)
     }
-    fn write_system_fields(
+    /// Publish the descriptor byte after its owner admitted the complete nominal span.
+    fn publish_system_byte(
         &mut self,
         address: u64,
-        width: u32,
-        fields: &[(u32, u32)],
-        bytes: &[u8],
+        _nominal_width: u32,
+        offset: u32,
+        byte: u8,
     ) -> Result<(), AccessFailure> {
-        self.write_fields(address, width, fields, bytes)
+        self.write_system(address + u64::from(offset), 1, u64::from(byte))
     }
     fn check_frame_write(&self, address: u64, width: u32, _cpl: u8) -> Result<(), AccessFailure> {
         self.check_write(address, width)
