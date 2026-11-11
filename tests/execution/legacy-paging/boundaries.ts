@@ -1,14 +1,5 @@
 import { createCpu } from '../../../host/index.js';
-import {
-  legacyOptions,
-  legacyCpu,
-  little,
-  hex,
-  initial,
-  equal,
-  check,
-  type Scenario,
-} from './fixture.js';
+import { legacyOptions, little, hex, initial, equal, check, type Scenario } from './fixture.js';
 
 export function legacyBoundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
