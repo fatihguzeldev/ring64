@@ -27,6 +27,7 @@
 - [architectural access and legality faults](architectural-access-and-legality-faults/spec.md): producer-typed #UD/#GP/#SS, access/decode priority, guest repair and IRET retry across current instruction families and entry escalation.
 
 - [hardware breakpoints and debug](hardware-breakpoints-and-debug/spec.md): DR state and MOV DR, execute/GD faults, operand-data watchpoints, combined TF causes, SS-deferred checkpoints and guest handler recovery in a bounded instruction-access profile.
+- [long-mode paging and permissions](long-mode-paging-and-permissions/spec.md): opt-in four-level IA32e physical memory, page permissions/A-D, coherent control consumers, #PF/CR2, handler repair and executable translation dependencies.
 
 ## scope
 
@@ -44,7 +45,7 @@
 | x87 and mmx                            | raw extended state, stack/tags/control/status, arithmetic, conversions and special functions, pending exceptions, mmx aliases and state images. numeric results and stack effects follow each instruction's commit rules.                | `x87-state-and-execution`, `x87-special-functions`, `mmx-and-numeric-state-images`                                                                                                                                                                |
 | simd and extended state                | sse/sse2 integer and floating-point operations, vector aliases, lane rules, mxcsr, enable controls and save/restore. avx and wider extensions each require instruction coverage, lane behavior and matching control/state-image support. | `simd-integer-and-data`, `simd-floating-point-and-controls`, `masked-and-streaming-memory`, `extended-state-save-and-restore`                                                                                                                     |
 | atomics and memory ordering            | atomic/rmw operations, lock legality, fences, alignment and split accesses. parallel vcpus require ordering and atomicity rules for every conflicting ordinary and atomic access.                                                        | `scalar-exchange-and-locked-rmw`, `masked-and-streaming-memory`, `atomic-memory-operations`                                                                                                                                                       |
-| system and privileged operations       | control/debug registers, msrs, cpuid, system transfers, i/o, clocks and processor controls. reported capabilities must match instruction, memory, event and numeric behavior.                                                            | `system-state-and-identity`, `hardware-breakpoints-and-debug`                                                                                                                                                                                     |
+| system and privileged operations       | control/debug registers, msrs, cpuid, system transfers, i/o, clocks and processor controls. reported capabilities must match instruction, memory, event and numeric behavior.                                                            | `system-state-and-identity`, `hardware-breakpoints-and-debug`, `long-mode-paging-and-permissions`                                                                                                                                                 |
 
 ## dependencies
 
@@ -67,6 +68,8 @@ descriptor table and segment operations use imported CPL, visible selectors and 
 ordinary-code far CALL/JMP and RETF load CS through descriptor protection. CS.D/L selects the next code context within its active execution family. outer RETF restores SS:SP from the current frame and updates CPL; call gates, task switching and event returns add their own state and frame rules.
 
 instruction breakpoints and operand-data watchpoints add DR state, execute/GD fault provenance, TF/data cause aggregation and SS-deferred debug checkpoints. their bounded observation profile includes control-stack operands, strings and selected numeric fields, while implicit descriptor/TSS/event-entry traffic, task debug, I/O and tracing remain separate coverage. debug activity participates in existing artifact admission without a separate cache or inactive per-instruction observer.
+
+four-level IA32e paging adds an explicit physical-backed execution model alongside the existing private-linear model. its controls, permissions, A/D effects, #PF/CR2, implicit system accesses and executable translation dependencies form one contract. speculative discovery remains observational; reached instruction and prepared operand/frame access publish their own effects. legacy paging, reset/mode transitions and advanced translation facilities remain separate.
 
 rep, enter, state images, event frames and vector operations have instruction-specific partial-progress rules. instruction retirement, completed suboperations and yield/poll work are separate quantities. resumption must preserve completed effects without replaying them.
 
