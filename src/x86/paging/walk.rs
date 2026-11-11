@@ -139,7 +139,7 @@ fn actual_walk<const FETCH: bool>(
 fn walk_with<const EFFECTS: bool, const FETCH: bool>(
     state: &State,
     request: Request,
-    mut entry_access: impl FnMut(u64, u32, bool) -> Result<Option<u64>, Fault>,
+    entry_access: impl FnMut(u64, u32, bool) -> Result<Option<u64>, Fault>,
 ) -> Result<Option<Translation>, Failure> {
     if state.cr0 & (1 << 31) == 0 {
         if request.linear >= 1u64 << 32 {
@@ -164,22 +164,35 @@ fn walk_with<const EFFECTS: bool, const FETCH: bool>(
             count: 0,
         }));
     }
-    let ia32e = state.efer & (1 << 10) != 0;
-    let pae = state.cr4 & (1 << 5) != 0;
-    let entry_width = if ia32e || pae { 8 } else { 4 };
-    let shifts: &[u32] = if ia32e {
+    if state.efer & (1 << 10) != 0 {
+        walk_paged_with::<EFFECTS, FETCH, true, true>(state, request, entry_access)
+    } else if state.cr4 & (1 << 5) != 0 {
+        walk_paged_with::<EFFECTS, FETCH, false, true>(state, request, entry_access)
+    } else {
+        walk_paged_with::<EFFECTS, FETCH, false, false>(state, request, entry_access)
+    }
+}
+
+// Keep one set of walk/effect rules while specializing geometry and entry width.
+fn walk_paged_with<const EFFECTS: bool, const FETCH: bool, const IA32E: bool, const PAE: bool>(
+    state: &State,
+    request: Request,
+    mut entry_access: impl FnMut(u64, u32, bool) -> Result<Option<u64>, Fault>,
+) -> Result<Option<Translation>, Failure> {
+    let entry_width = if IA32E || PAE { 8 } else { 4 };
+    let shifts: &[u32] = if IA32E {
         &[39, 30, 21, 12]
-    } else if pae {
+    } else if PAE {
         &[21, 12]
     } else {
         &[22, 12]
     };
-    let mut table = if ia32e {
+    let mut table = if IA32E {
         state.cr3 & ADDRESS
     } else {
         state.cr3 & 0xfffff000
     };
-    if !ia32e && pae {
+    if !IA32E && PAE {
         let root =
             state.pdpte.expect("validated legacy PAE quartet")[(request.linear >> 30 & 3) as usize];
         if root & 1 == 0 {
@@ -216,9 +229,9 @@ fn walk_with<const EFFECTS: bool, const FETCH: bool>(
             } else {
                 entry & (((1u64 << shift) - 1) & !0x1fff) != 0
             };
-        if ia32e && index == 0 && large
+        if IA32E && index == 0 && large
             || reserved_address
-            || !ia32e && pae && entry & 0x7ff0000000000000 != 0
+            || !IA32E && PAE && entry & 0x7ff0000000000000 != 0
             || state.efer & (1 << 11) == 0 && entry & (1 << 63) != 0
         {
             return Err(request.page_fault(state, true, true));
@@ -447,6 +460,214 @@ mod tests {
                 }))
             );
             image.physical_write(entry, 8, old).unwrap();
+        }
+    }
+
+    #[test]
+    fn family_specialization_preserves_literal_entry_access_traces_and_geometry() {
+        fn trace<const EFFECTS: bool, const FETCH: bool>(
+            state: &State,
+            words: &[(u64, u64)],
+            expected: Translation,
+            accesses: &[(u64, bool)],
+        ) {
+            let mut words: std::collections::HashMap<_, _> = words.iter().copied().collect();
+            let mut actual = Vec::new();
+            let translated = walk_with::<EFFECTS, FETCH>(
+                state,
+                Request {
+                    linear: 0x1234,
+                    access: Access::Read,
+                    user: true,
+                },
+                |address, width, accessed| {
+                    actual.push((address, width, accessed));
+                    let word = words.get_mut(&address).expect("unexpected table access");
+                    if accessed {
+                        *word |= 0x20;
+                    }
+                    Ok(Some(*word))
+                },
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(translated, expected);
+            let expected_accesses: Vec<_> = accesses
+                .iter()
+                .map(|&(address, accessed)| (address, expected.entry_width, accessed))
+                .collect();
+            assert_eq!(actual, expected_accesses);
+        }
+        // Trace only the walker's entry-access boundary: an update is one callback,
+        // not a claim that its backing preflight/current-word OR is one memory read.
+        let cases = [
+            (
+                State {
+                    cr3: 0x1000,
+                    ..State::default()
+                },
+                vec![
+                    (0x1000, 0x2007),
+                    (0x2000, 0x3007),
+                    (0x3000, 0x4007),
+                    (0x4008, 0xa007),
+                ],
+                vec![
+                    (0x1000, 0x2027),
+                    (0x2000, 0x3027),
+                    (0x3000, 0x4027),
+                    (0x4008, 0xa027),
+                ],
+                Translation {
+                    physical: 0xa234,
+                    leaf: 0x4008,
+                    dirty: true,
+                    remaining: 0xdcc,
+                    entry_width: 8,
+                    entries: [0x1000, 0x2000, 0x3000, 0x4008],
+                    count: 4,
+                },
+                vec![
+                    (0x1000, false),
+                    (0x2000, false),
+                    (0x3000, false),
+                    (0x4008, false),
+                ],
+                vec![
+                    (0x1000, false),
+                    (0x1000, true),
+                    (0x2000, false),
+                    (0x2000, true),
+                    (0x3000, false),
+                    (0x3000, true),
+                    (0x4008, false),
+                    (0x4008, true),
+                ],
+                vec![
+                    (0x1000, false),
+                    (0x1000, true),
+                    (0x1000, false),
+                    (0x2000, false),
+                    (0x2000, true),
+                    (0x1000, false),
+                    (0x2000, false),
+                    (0x3000, false),
+                    (0x3000, true),
+                    (0x1000, false),
+                    (0x2000, false),
+                    (0x3000, false),
+                    (0x4008, false),
+                    (0x4008, true),
+                    (0x1000, false),
+                    (0x2000, false),
+                    (0x3000, false),
+                    (0x4008, false),
+                ],
+            ),
+            (
+                State {
+                    cr0: 0x80000033,
+                    cr2: 0,
+                    cr3: 0x1020,
+                    cr4: 0x628,
+                    efer: 0,
+                    pdpte: Some([0x3001, 0, 0, 0]),
+                },
+                vec![(0x3000, 0x4007), (0x4008, 0xa007)],
+                vec![(0x3000, 0x4027), (0x4008, 0xa027)],
+                Translation {
+                    physical: 0xa234,
+                    leaf: 0x4008,
+                    dirty: true,
+                    remaining: 0xdcc,
+                    entry_width: 8,
+                    entries: [0x3000, 0x4008, 0, 0],
+                    count: 2,
+                },
+                vec![(0x3000, false), (0x4008, false)],
+                vec![
+                    (0x3000, false),
+                    (0x3000, true),
+                    (0x4008, false),
+                    (0x4008, true),
+                ],
+                vec![
+                    (0x3000, false),
+                    (0x3000, true),
+                    (0x3000, false),
+                    (0x4008, false),
+                    (0x4008, true),
+                    (0x3000, false),
+                    (0x4008, false),
+                ],
+            ),
+            (
+                State {
+                    cr0: 0x80000033,
+                    cr2: 0,
+                    cr3: 0x1000,
+                    cr4: 0x608,
+                    efer: 0,
+                    pdpte: None,
+                },
+                vec![(0x1000, 0x4007), (0x4004, 0xa007)],
+                vec![(0x1000, 0x4027), (0x4004, 0xa027)],
+                Translation {
+                    physical: 0xa234,
+                    leaf: 0x4004,
+                    dirty: true,
+                    remaining: 0xdcc,
+                    entry_width: 4,
+                    entries: [0x1000, 0x4004, 0, 0],
+                    count: 2,
+                },
+                vec![(0x1000, false), (0x4004, false)],
+                vec![
+                    (0x1000, false),
+                    (0x1000, true),
+                    (0x4004, false),
+                    (0x4004, true),
+                ],
+                vec![
+                    (0x1000, false),
+                    (0x1000, true),
+                    (0x1000, false),
+                    (0x4004, false),
+                    (0x4004, true),
+                    (0x1000, false),
+                    (0x4004, false),
+                ],
+            ),
+            (
+                State {
+                    cr3: 0xdead000,
+                    cr4: 0x620,
+                    efer: 0x100,
+                    ..State::reset()
+                },
+                vec![],
+                vec![],
+                Translation {
+                    physical: 0x1234,
+                    leaf: 0,
+                    dirty: false,
+                    remaining: 0xffffedcc,
+                    entry_width: 0,
+                    entries: [0; 4],
+                    count: 0,
+                },
+                vec![],
+                vec![],
+                vec![],
+            ),
+        ];
+        for (state, cold, warm, geometry, reads, updates, coherent) in cases {
+            trace::<false, false>(&state, &cold, geometry, &reads);
+            trace::<true, false>(&state, &cold, geometry, &updates);
+            trace::<true, true>(&state, &cold, geometry, &coherent);
+            trace::<false, false>(&state, &warm, geometry, &reads);
+            trace::<true, false>(&state, &warm, geometry, &reads);
+            trace::<true, true>(&state, &warm, geometry, &reads);
         }
     }
 }
