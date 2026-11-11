@@ -1,5 +1,7 @@
 # fast system transfers
 
+Implementation and bounded correctness/performance evidence: [verification](verification.md).
+
 ## objective and chosen vertical
 
 Implement complete Intel-style IA32e fast system entry and return: SYSCALL/SYSRET, SYSENTER/SYSEXIT, SWAPGS and the selected MSRs that they actually consume. A guest programs its entry state, enters a CPL0 handler from CPL3, obtains its kernel stack through GS, performs protected work, and returns to Long64 or compatibility code. Fault repair, debug/event boundaries, changed translations and suspension must preserve that entire execution story. MSR storage or one successful SYSCALL is insufficient.

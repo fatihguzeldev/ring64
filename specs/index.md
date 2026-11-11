@@ -28,7 +28,7 @@
 
 - [hardware breakpoints and debug](hardware-breakpoints-and-debug/spec.md): DR state and MOV DR, execute/GD faults, operand-data watchpoints, combined TF causes, SS-deferred checkpoints and guest handler recovery in a bounded instruction-access profile.
 - [long-mode paging and permissions](long-mode-paging-and-permissions/spec.md): opt-in four-level IA32e physical memory, page permissions/A-D, coherent control consumers, #PF/CR2, handler repair and executable translation dependencies.
-- [fast system transfers](fast-system-transfers/spec.md): proposed Intel IA32e SYSCALL/SYSRET and SYSENTER/SYSEXIT, selected MSR/FS-GS authority, SWAPGS and complete paged user/kernel round trips.
+- [fast system transfers](fast-system-transfers/spec.md): Intel IA32e SYSCALL/SYSRET and SYSENTER/SYSEXIT, selected MSR/FS-GS authority, SWAPGS and complete paged user/kernel round trips; [verification](fast-system-transfers/verification.md).
 
 ## scope
 
