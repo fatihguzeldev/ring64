@@ -25,6 +25,7 @@ import { externalInterruptScenarios } from './execution/external-interrupts/inde
 import { accessFaultScenarios } from './execution/access-faults/index.js';
 
 import { hardwareDebugScenarios } from './execution/hardware-debug/index.js';
+import { pagingScenarios } from './execution/paging/index.js';
 
 export async function runScenarios(
   compiler: Uint8Array | WebAssembly.Module,
@@ -59,6 +60,7 @@ export async function runScenarios(
     ...externalInterruptScenarios(core),
     ...accessFaultScenarios(core),
     ...hardwareDebugScenarios(core),
+    ...pagingScenarios(core),
   ];
   const passed: string[] = [];
   for (const { name, run } of scenarios) {
