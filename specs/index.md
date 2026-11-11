@@ -28,6 +28,7 @@
 
 - [hardware breakpoints and debug](hardware-breakpoints-and-debug/spec.md): DR state and MOV DR, execute/GD faults, operand-data watchpoints, combined TF causes, SS-deferred checkpoints and guest handler recovery in a bounded instruction-access profile.
 - [long-mode paging and permissions](long-mode-paging-and-permissions/spec.md): opt-in four-level IA32e physical memory, page permissions/A-D, coherent control consumers, #PF/CR2, handler repair and executable translation dependencies.
+- [fast system transfers](fast-system-transfers/spec.md): proposed Intel IA32e SYSCALL/SYSRET and SYSENTER/SYSEXIT, selected MSR/FS-GS authority, SWAPGS and complete paged user/kernel round trips.
 
 ## scope
 
@@ -70,6 +71,8 @@ ordinary-code far CALL/JMP and RETF load CS through descriptor protection. CS.D/
 instruction breakpoints and operand-data watchpoints add DR state, execute/GD fault provenance, TF/data cause aggregation and SS-deferred debug checkpoints. their bounded observation profile includes control-stack operands, strings and selected numeric fields, while implicit descriptor/TSS/event-entry traffic, task debug, I/O and tracing remain separate coverage. debug activity participates in existing artifact admission without a separate cache or inactive per-instruction observer.
 
 four-level IA32e paging adds an explicit physical-backed execution model alongside the existing private-linear model. its controls, permissions, A/D effects, #PF/CR2, implicit system accesses and executable translation dependencies form one contract. speculative discovery remains observational; reached instruction and prepared operand/frame access publish their own effects. legacy paging, reset/mode transitions and advanced translation facilities remain separate.
+
+fast system transfers use that paged IA32e profile, loaded CS/SS/CPL context and existing fault/debug boundaries. EFER.SCE controls SYSCALL/SYSRET; selected entry MSRs, synthetic segment caches and one live FS/GS-base authority support guest-managed stack handover with SWAPGS. compatibility entry uses SYSENTER under the selected Intel rules. transfer completion and a later target-fetch fault are separate boundaries. identity reporting, reset and legacy paging remain separate coverage.
 
 rep, enter, state images, event frames and vector operations have instruction-specific partial-progress rules. instruction retirement, completed suboperations and yield/poll work are separate quantities. resumption must preserve completed effects without replaying them.
 
