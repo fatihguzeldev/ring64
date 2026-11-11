@@ -312,5 +312,51 @@ export function lifecycleScenarios(compiler: WebAssembly.Module): Scenario[] {
         }
       },
     },
+    {
+      name: 'reset retains the captured I/O receiver methods and rejects callbacks without cancelling their effect',
+      async run() {
+        const rom = new Uint8Array(0x10000);
+        rom.set(hex('e480'), 0xfff0);
+        let calls = 0;
+        let cpu: Cpu;
+        const io = {
+          marker: 17,
+          read(this: { marker: number }, port: number, width: number) {
+            equal(this.marker, 17, 'captured receiver');
+            equal(port, 0x80, 'reset IN port');
+            equal(width, 8, 'reset IN width');
+            calls++;
+            rejects(() => cpu.reset(), 'callback busy reset');
+            return 0x5a;
+          },
+          write() {
+            throw new Error('unexpected OUT');
+          },
+        };
+        cpu = await physicalCpu(
+          compiler,
+          new Uint8Array(0x10000),
+          rom,
+          RESET_BANK,
+          resetContext(),
+          { io },
+        );
+        try {
+          io.read = () => {
+            throw new Error('replacement method must not be captured');
+          };
+          for (let i = 0; i < 3; i++) {
+            cpu.reset();
+            equal(calls, i, 'reset has no provider effect');
+            const result = await cpu.run({ budget: 1n });
+            equal(result.retired, 1n, 'IN after reset');
+            equal(result.state.registers[0], 0x5an, 'captured input');
+            equal(calls, i + 1, 'one provider call');
+          }
+        } finally {
+          cpu.dispose();
+        }
+      },
+    },
   ];
 }

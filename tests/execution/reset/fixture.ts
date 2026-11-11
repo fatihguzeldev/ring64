@@ -1,4 +1,11 @@
-import { createCpu, type ExecutionContextSnapshot, type PagingState } from '../../../host/index.js';
+import {
+  createCpu,
+  type ExecutionContextSnapshot,
+  type PagingState,
+  type IoProvider,
+  type Limits,
+  type FastSystemState,
+} from '../../../host/index.js';
 import { LIMITS, hex } from '../../support/fixture.js';
 export { equal, hex, type Scenario } from '../../support/fixture.js';
 export { createCpu } from '../../../host/index.js';
@@ -45,8 +52,10 @@ export async function physicalCpu(
   rom: Uint8Array,
   paging = RESET_BANK,
   context = resetContext(),
+  extra: { io?: IoProvider; limits?: Partial<Limits>; fastSystem?: FastSystemState } = {},
 ) {
   return createCpu({
+    ...extra,
     compiler,
     memoryModel: 'physical',
     context,
@@ -79,7 +88,7 @@ export async function physicalCpu(
       maxMappings: 8,
       maxBackingBytes: ram.length + rom.length + 0x1000,
     },
-    limits: { ...LIMITS, maxTranslationsPerRun: 1000 },
+    limits: { ...LIMITS, maxTranslationsPerRun: 1000, ...extra.limits },
   });
 }
 export function transitionProgram() {
