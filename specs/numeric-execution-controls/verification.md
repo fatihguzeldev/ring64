@@ -24,24 +24,25 @@ suppresses the destination and preserves the existing post-begin RF phase.
 
 ## completed checks
 
-`npm run check` passed on `1e2754c`:
+`npm run check` passed on `1e2754c` and again after the compatibility follow-up:
 
 - 804 native tests, including all32 control combinations, pure decoded-form truth
   tables, CLTS, owner retention/pending ABA at epochs0/MAX-1/MAX, source layout and
   secondary cleanup;
 - 228 Node tests;
-- 839 shared Chrome157.0.8103.79 execution scenarios, with actual generated Wasm.
+- 840 shared Chrome157.0.8103.79 execution scenarios, with actual generated Wasm.
 
-Nine new shared scenarios cover all32 images across x87/WAIT/MMX/SIMD/bridge/FX,
+Ten new shared scenarios cover all32 images across x87/WAIT/MMX/SIMD/bridge/FX,
 101 numeric-control round trips without repeated compilation, cold #NM after an
 already consumed compilation allowance, skipped disabled code, actual asynchronous
 compilation ABA, execute/data DR priority, FX under OSFXSR0, CVTPI2PD-memory pending
 exception exemption, benign #NM entry escalation, postnumeric #UD and a complete
-frozen #NM → guest CLTS → IRET → FLD1 retry. Host tests cover primitive-only source
+frozen #NM → guest CLTS → IRET → FLD1 retry. Compatibility16 and32 execute
+CLTS/x87/direct-XMM in sequence and check OSFXSR-before-TS admission and RF. Host tests cover primitive-only source
 capture, detachment, malformed/incompatible metadata and exact transport bounds.
 
 Browser evidence: `build/verification/browser.json`. Full local gate log:
-`/tmp/ring64-numeric-check.log`.
+`/tmp/ring64-numeric-final-check.log`.
 
 ## bounded falsification
 

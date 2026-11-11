@@ -17,6 +17,47 @@ import { same } from './far-control/fixture.js';
 export function numericControlScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     {
+      name: 'numeric compatibility16 and32 preserve live guards and CLTS completion across direct and helper forms',
+      async run() {
+        for (const default32 of [false, true]) {
+          const context = longSnapshot();
+          context.mode = 'compatibility';
+          context.segments.cs.long = false;
+          context.segments.cs.default32 = default32;
+          await usingPaged(
+            compiler,
+            {
+              code: '0f06d9e8660fefc0',
+              context,
+              bank: { ...BANK, cr0: 0x8000003bn },
+              words: [
+                [0x3000n, 0x4007n],
+                [0x4008n, 0x9007n],
+              ],
+            },
+            async (cpu) => {
+              cpu.setState(initial(0x1000n, {}, 0x10002n));
+              const completed = await cpu.run({ budget: 3n });
+              equal(completed.reason, 'budget', 'CLTS/x87/XMM complete');
+              equal(completed.retired, 3n, 'three completed instructions');
+              equal(completed.state.rip, 0x1008n, 'literal instruction lengths');
+              equal(completed.state.flags, 2n, 'ordinary RF begin');
+              equal(cpu.readPagingState().cr0, 0x80000033n, 'TS only cleared');
+              equal(cpu.readX87State().tagWord, 0x3fff, 'one x87 push');
+              equal(cpu.readXmmState()[0], 0n, 'direct XMM operation');
+              cpu.setPagingState({ ...BANK, cr0: 0x8000003bn, cr4: 0x428n });
+              cpu.setState(initial(0x1004n, {}, 0x10002n));
+              const disabled = await cpu.run({ budget: 1n });
+              equal(disabled.reason, 'invalid-encoding', 'OSFXSR #UD precedes TS #NM');
+              equal(disabled.numericControlFault?.phase, 'admission', 'pre-execution record');
+              equal(disabled.numericControlFault?.cause, 'osfxsr', 'typed disable cause');
+              equal(disabled.state.flags, 0x10002n, 'pre-begin RF retained');
+            },
+          );
+        }
+      },
+    },
+    {
       name: 'numeric reached probe beats exhausted compile quota but untaken disabled forms stay unexecuted',
       async run() {
         await usingPaged(
