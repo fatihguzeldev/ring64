@@ -52,7 +52,9 @@ if (!browserMode) {
       const file = resolve(base, '.' + pathname);
       if (!(
         file.startsWith(resolve(base, 'build') + '/') ||
-        file === resolve(root, 'scripts/five-spec-kernels.mjs')
+        ['scripts/five-spec-kernels.mjs', 'scripts/five-spec-transitions.mjs'].some(
+          (path) => file === resolve(root, path),
+        )
       ))
         throw Error('outside allowed route');
       response.writeHead(200, {
@@ -114,6 +116,9 @@ await writeFile(
     manifest: current,
     knobs,
     kernelSha256: hash(await readFile(resolve(root, 'scripts/five-spec-kernels.mjs'))),
+    transitionFixtureSha256: hash(
+      await readFile(resolve(root, 'scripts/five-spec-transitions.mjs')),
+    ),
     ...results,
   }),
 );

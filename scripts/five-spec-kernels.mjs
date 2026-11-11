@@ -1,3 +1,4 @@
+import { transitionKernel } from './five-spec-transitions.mjs';
 const limits = {
   maxInstructions: 128,
   maxSourceBytes: 2048,
@@ -48,6 +49,17 @@ const x87 = (values) => {
   };
 };
 const special = [
+  ...[
+    ['fprem', 'f8'],
+    ['fprem1', 'f5'],
+  ].map(([name, opcode]) => ({
+    name: `x87-${name}-partial-loop`,
+    body: `db2bd9${opcode}dfe066a9000475f6ddd8`,
+    instructions: 10,
+    values: { 0: 0x3fffc000000000000000n },
+    raw: 0x403f8000000000000002n,
+    partial: true,
+  })),
   {
     name: 'x87-fprem',
     body: 'd9f8',
@@ -100,6 +112,8 @@ export const newSpecNames = [
   'numeric-clts-fnop',
   'numeric-nm-fault-attempt',
   'io-ins-private-fault-attempt',
+  'transition-roundtrip',
+  'transition-budget-one',
   'physical-reset-small',
   'physical-reset-large',
   'physical-reset-resident8',
@@ -194,6 +208,7 @@ async function physical(side, family, code, ramSize = 0x20000, io, compileLimits
 }
 
 async function kernel(side, name, requested) {
+  if (name.startsWith('transition-')) return transitionKernel(side, name, limits);
   const row = special.find((row) => row.name === name);
   if (row) {
     const cpu = await linear(side, loop(row.body));
@@ -215,7 +230,15 @@ async function kernel(side, name, requested) {
       },
       validate() {
         const result = cpu.readX87State();
-        if (row.expected !== undefined)
+        if (row.partial)
+          check(
+            result.tagWord === 0xfffc &&
+              (result.statusWord & 0x3c00) === 0 &&
+              result.registers[0] === 0x3fffc000000000000000n &&
+              result.registers[7] === 0x3ffe8000000000000000n,
+            name + ' exact partial reduction and balanced divisor',
+          );
+        else if (row.expected !== undefined)
           check(result.registers[0] === row.expected, name + ' exact raw result');
         else
           check(
@@ -238,6 +261,7 @@ async function kernel(side, name, requested) {
             [...cpu.readMemory(0x4010n, 10)].join(',') === '2,0,0,0,0,0,0,0,0,0',
             'rounded BCD store',
           );
+        return row.partial ? { completedReductions: n, partialSteps: n, completedSteps: n } : {};
       },
     };
   }
