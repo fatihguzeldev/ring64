@@ -1,5 +1,7 @@
 # context and code reuse
 
+Implementation and bounded correctness/performance evidence: [verification](verification.md).
+
 ## objective and chosen vertical
 
 Retain valid generated code across execution-context changes and reuse it when its assumptions become current again. A guest can enter a kernel, switch GS, deliver/return from an event and return to previously translated user code without recompiling every visited context. The same contract covers imported contexts, segment/table operations and far transfers. Correct source invalidation, asynchronous compilation, checked activation and bounded ownership are part of this vertical; a SYSCALL-specific cache shortcut is insufficient.
