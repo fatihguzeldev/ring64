@@ -234,6 +234,7 @@ type CoreExports = WebAssembly.Exports & {
   core_remove_backing(): number;
   core_set_mappings(): number;
   core_validity(owner: bigint): number;
+  core_publish(owner: bigint): number;
   core_activate(owner: bigint): number;
   core_release(owner: bigint): void;
   core_context_info(): void;
@@ -670,6 +671,7 @@ export class Core {
       'core_set_mappings',
       'core_validity',
       'core_activate',
+      'core_publish',
       'core_release',
       'core_context_info',
       'core_context_version',
@@ -1480,6 +1482,10 @@ export class Core {
 
   activate(owner: bigint): boolean {
     return this.#exports.core_activate(owner) === 1;
+  }
+
+  publish(owner: bigint): boolean {
+    return this.#exports.core_publish(owner) === 1;
   }
 
   release(owner: bigint): void {

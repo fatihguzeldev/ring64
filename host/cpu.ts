@@ -32,7 +32,7 @@ import {
   type PageFault,
   type PhysicalMemoryFault,
 } from './core.js';
-import { Translations, type Artifact } from './translations.js';
+import { Translations, type Artifact, type InstalledEntry } from './translations.js';
 import {
   backingName,
   captureBackings,
@@ -472,6 +472,12 @@ export class Cpu {
     let remaining = budget;
     let remainingRepeatBudget = repeatBudget;
     let remainingDeliveryBudget = deliveryBudget;
+    let admissionRestarts = 0;
+    const restartAdmission = () => {
+      if (admissionRestarts >= this.#limits.maxTranslationsPerRun) return false;
+      admissionRestarts++;
+      return true;
+    };
     const finish = (reason: string): RunResult => {
       this.pruneTranslations();
       const fault = this.#engine.fault(reason);
@@ -528,7 +534,7 @@ export class Cpu {
       // Idle-only intake keeps queues stable except at explicit acceptance boundaries.
       let eventKind = this.#engine.eventKind();
       let queuedInterrupts = this.#engine.hasQueuedInterrupts();
-      for (;;) {
+      execution: for (;;) {
         if (
           eventKind === 'shutdown' &&
           (deliveryBudget === undefined || !this.#engine.shutdownCanWake())
@@ -574,10 +580,31 @@ export class Cpu {
           }
           if (reason !== 'dispatch') return finish(reason);
         }
-        let entry = this.#cache.get(pc, boundaryObserved);
-        if (entry) {
-          resources.cacheHits++;
-        } else {
+        let entry: InstalledEntry | undefined;
+        let cached = false;
+        let executionBegan = 0;
+        let refusedEpoch: bigint | undefined;
+        for (const candidate of this.#cache.candidates(pc, boundaryObserved)) {
+          executionBegan = performance.now();
+          if (this.#engine.activate(candidate.artifact.metadata.owner)) {
+            entry = candidate;
+            cached = true;
+            break;
+          }
+          timings.executionMs += performance.now() - executionBegan;
+          if (!this.#engine.valid(candidate.artifact.metadata.owner))
+            this.#cache.remove(candidate.artifact);
+          const epoch = this.#engine.contextVersion();
+          if (
+            this.#engine.boundaryObserved() !== boundaryObserved ||
+            (refusedEpoch !== undefined && refusedEpoch !== epoch)
+          ) {
+            if (!restartAdmission()) return finish('resource-limit');
+            continue execution;
+          }
+          refusedEpoch = epoch;
+        }
+        if (!entry) {
           const probe = this.#engine.probe(pc);
           if (probe === 'paging-restart') {
             resources.pagingRestarts = (resources.pagingRestarts ?? 0) + 1;
@@ -626,19 +653,27 @@ export class Cpu {
               metadata: output.metadata,
             };
             timings.instantiationMs += performance.now() - at;
+            if (!this.#engine.publish(output.metadata.owner)) continue;
             if (!this.#cache.install(artifact)) return finish('resource-limit');
             installed = true;
-            entry = this.#cache.get(pc, boundaryObserved);
-            if (entry?.artifact !== artifact)
-              throw new Error('installed artifact does not own its requested entry');
+            entry = this.#cache
+              .candidates(pc, output.metadata.boundaryObserved)
+              .find((candidate) => candidate.artifact === artifact);
+            if (!entry) throw new Error('installed artifact does not own its requested entry');
           } finally {
             if (!installed) this.#engine.release(output.metadata.owner);
+          }
+          executionBegan = performance.now();
+          if (!this.#engine.activate(entry.artifact.metadata.owner)) {
+            timings.executionMs += performance.now() - executionBegan;
+            if (!this.#engine.valid(entry.artifact.metadata.owner))
+              this.#cache.remove(entry.artifact);
+            if (!restartAdmission()) return finish('resource-limit');
+            continue;
           }
         }
         const before = remaining;
         const repeatBefore = remainingRepeatBudget;
-        const at = performance.now();
-        this.#engine.activate(entry.artifact.metadata.owner);
         const reason = this.#engine.execute(
           entry.artifact.run,
           entry.index,
@@ -646,7 +681,9 @@ export class Cpu {
           stop,
           remainingRepeatBudget,
         );
-        timings.executionMs += performance.now() - at;
+        timings.executionMs += performance.now() - executionBegan;
+        this.#cache.touch(entry.artifact);
+        if (cached) resources.cacheHits++;
         resources.nativeEntries++;
         const current = this.#engine.current();
         remaining = current.remaining;

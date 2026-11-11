@@ -255,7 +255,8 @@ async function fixture(steps: Step[] = []) {
       instantiatedProfiles.push(boundaryObserved);
       return () => 0;
     },
-    activate() {},
+    publish: () => true,
+    activate: () => true,
     release() {},
     execute(_run: unknown, _index: number, budget: bigint, _stop: unknown, repeatBudget?: bigint) {
       entries.push({ budget, repeatBudget });

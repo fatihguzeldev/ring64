@@ -10,9 +10,11 @@ export interface InstalledEntry {
   readonly index: number;
 }
 
+const EMPTY: readonly InstalledEntry[] = Object.freeze([]);
+
 export class Translations {
-  readonly #entries = new Map<bigint, InstalledEntry>();
-  readonly #observedEntries = new Map<bigint, InstalledEntry>();
+  readonly #entries = new Map<bigint, readonly InstalledEntry[]>();
+  readonly #observedEntries = new Map<bigint, readonly InstalledEntry[]>();
   readonly #artifacts = new Map<Artifact, true>();
   #bytes = 0;
 
@@ -22,14 +24,13 @@ export class Translations {
     readonly release: (artifact: Artifact) => void = () => {},
   ) {}
 
-  get(pc: bigint, boundaryObserved = false): InstalledEntry | undefined {
+  candidates(pc: bigint, boundaryObserved = false): readonly InstalledEntry[] {
     const entries = boundaryObserved ? this.#observedEntries : this.#entries;
-    const entry = entries.get(pc);
-    if (entry) {
-      this.#artifacts.delete(entry.artifact);
-      this.#artifacts.set(entry.artifact, true);
-    }
-    return entry;
+    return entries.get(pc) ?? EMPTY;
+  }
+
+  touch(artifact: Artifact): void {
+    if (this.#artifacts.delete(artifact)) this.#artifacts.set(artifact, true);
   }
 
   canFit(bytes: number): boolean {
@@ -38,6 +39,7 @@ export class Translations {
 
   install(artifact: Artifact): boolean {
     if (!this.canFit(artifact.metadata.byteLength)) return false;
+    if (this.#artifacts.has(artifact)) return true;
     while (
       this.#artifacts.size >= this.maxArtifacts ||
       this.#bytes + artifact.metadata.byteLength > this.maxBytes
@@ -50,7 +52,7 @@ export class Translations {
     this.#bytes += artifact.metadata.byteLength;
     const entries = artifact.metadata.boundaryObserved ? this.#observedEntries : this.#entries;
     artifact.metadata.entries.forEach((pc, index) => {
-      entries.set(pc, Object.freeze({ artifact, index }));
+      entries.set(pc, [Object.freeze({ artifact, index }), ...(entries.get(pc) ?? EMPTY)]);
     });
     return true;
   }
@@ -67,12 +69,14 @@ export class Translations {
     }));
   }
 
-  private remove(artifact: Artifact): void {
-    this.#artifacts.delete(artifact);
+  remove(artifact: Artifact): void {
+    if (!this.#artifacts.delete(artifact)) return;
     this.#bytes -= artifact.metadata.byteLength;
     const entries = artifact.metadata.boundaryObserved ? this.#observedEntries : this.#entries;
     for (const pc of artifact.metadata.entries) {
-      if (entries.get(pc)?.artifact === artifact) entries.delete(pc);
+      const remaining = entries.get(pc)?.filter((entry) => entry.artifact !== artifact);
+      if (remaining?.length) entries.set(pc, remaining);
+      else entries.delete(pc);
     }
     this.release(artifact);
   }
