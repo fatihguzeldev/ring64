@@ -185,7 +185,7 @@ pub extern "C" fn core_paged_debug_begin(pc: u64, flags: u64, shadow: u32) -> i3
         }
         match core.paged_decode(pc) {
             Ok(instruction) if !core.image.active_changed() => {
-                core.instruction_admission(instruction.operation, pc)
+                core.instruction_admission(instruction.operation, pc, true)
             }
             Ok(_) | Err(DecodeError::PagingRestart) => 26,
             Err(DecodeError::Paging(failure)) => core.paging_failure(failure),
@@ -357,7 +357,7 @@ pub extern "C" fn core_paging_control(
                     u64::from(value as u32)
                 };
                 if core.physical_controls {
-                    state.prepare_physical_cr_write(register as u8, value, core.context.mode())
+                    state.prepare_physical_cr_write_in_context(register as u8, value, &core.context)
                 } else {
                     state.prepare_cr_write(register as u8, value, core.context.mode())
                 }

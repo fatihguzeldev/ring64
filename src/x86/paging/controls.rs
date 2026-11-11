@@ -142,6 +142,26 @@ impl State {
         Ok(result)
     }
 
+    pub fn prepare_physical_cr_write_in_context(
+        self,
+        register: u8,
+        value: u64,
+        context: &ExecutionContext,
+    ) -> Result<Self, ControlFailure> {
+        // Loaded-CS/task activation restrictions are architectural invalidity,
+        // so they precede refusal of otherwise-defined deferred facilities.
+        if register == 0
+            && self.efer & 0x400 == 0
+            && self.efer & 0x100 != 0
+            && value & 0x80000000 != 0
+            && (context.attributes(Segment::Cs).long
+                || context.tr().valid && matches!(context.tr().attributes & 15, 1 | 3))
+        {
+            return Err(ControlFailure::GeneralProtection);
+        }
+        self.prepare_physical_cr_write(register, value, context.mode())
+    }
+
     pub fn prepare_physical_cr_write(
         self,
         register: u8,

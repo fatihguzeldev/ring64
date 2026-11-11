@@ -75,3 +75,51 @@ fn old_private_models_reject_reset_without_mutating_any_bank() {
         assert!(c.paging.is_none());
     });
 }
+
+#[test]
+fn cold_probe_does_not_evaluate_ne_pending_but_reached_begin_does() {
+    initialize(0x1000, &[0xd9, 0xd0]);
+    BRIDGE.with_borrow_mut(|b| {
+        let c = b.core.as_mut().unwrap();
+        c.physical_controls = true;
+        c.paging = Some(crate::x86::paging::State {
+            cr0: 0x33 & !0x20,
+            ..crate::x86::paging::State::reset()
+        });
+        unsafe {
+            (*c.state.get()).x87.control_word = 0x37e;
+            (*c.state.get()).x87.status_word = 0x8081;
+        }
+    });
+    assert_eq!(core_probe(0x1000), 0);
+    assert_eq!(
+        super::super::paging::core_paged_debug_begin(0x1000, 0x10002, 0),
+        UNSUPPORTED
+    );
+}
+
+#[test]
+fn loaded_cs_activation_invalidity_precedes_a_deferred_cr0_facility() {
+    initialize(0x1000, &[0x90]);
+    BRIDGE.with_borrow_mut(|b| {
+        let c = b.core.as_mut().unwrap();
+        c.physical_controls = true;
+        c.context
+            .set_mode_and_cpl(crate::x86::context::Mode::Protected, 0);
+        c.paging = Some(crate::x86::paging::State {
+            cr0: 0x33,
+            cr4: 0x628,
+            efer: 0x100,
+            ..crate::x86::paging::State::reset()
+        });
+        let mut attrs = c.context.attributes(Segment::Cs);
+        attrs.long = true;
+        c.context
+            .set_segment(Segment::Cs, 8, c.context.segment(Segment::Cs), attrs);
+    });
+    assert_eq!(
+        super::super::paging::core_paging_control(1, 0, 0x80040033, 0x1000, 2),
+        crate::embedding::layout::PROTECTION
+    );
+    BRIDGE.with_borrow(|b| assert_eq!(b.core.as_ref().unwrap().paging.unwrap().cr0, 0x33));
+}
