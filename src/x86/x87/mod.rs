@@ -5,6 +5,8 @@ mod number;
 #[cfg(test)]
 mod reference_tests;
 #[cfg(test)]
+mod special_tests;
+#[cfg(test)]
 mod tests;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

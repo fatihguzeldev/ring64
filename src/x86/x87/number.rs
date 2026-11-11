@@ -1,4 +1,6 @@
+mod special;
 use super::{Format, Kind};
+pub(super) use special::{extract, remainder, scale};
 use std::cmp::Ordering;
 pub(super) const SIGN: u128 = 1 << 79;
 pub(super) const QUIET: u128 = 1 << 62;
@@ -188,7 +190,11 @@ fn round_num(n: Num, p: u32, target: Format, cw: u16) -> Result {
         if !masked {
             return Result {
                 value: if target == Format::F80 {
-                    pack(n.negative, q, e - 24576, p, target, true)
+                    if e - 24576 > emax {
+                        INFINITY | if n.negative { SIGN } else { 0 }
+                    } else {
+                        pack(n.negative, q, e - 24576, p, target, true)
+                    }
                 } else {
                     0
                 },
@@ -222,7 +228,11 @@ fn round_num(n: Num, p: u32, target: Format, cw: u16) -> Result {
         if cw & 16 == 0 {
             return Result {
                 value: if target == Format::F80 {
-                    pack(n.negative, q, e + 24576, p, target, true)
+                    if e + 24576 < emin {
+                        if n.negative { SIGN } else { 0 }
+                    } else {
+                        pack(n.negative, q, e + 24576, p, target, true)
+                    }
                 } else {
                     0
                 },
@@ -582,6 +592,9 @@ pub(super) fn memory_denormal(value: u128, format: Format) -> bool {
     }
 }
 pub(super) fn load(value: u128, format: Format) -> Result {
+    if format == Format::Bcd {
+        return special::load_bcd(value);
+    }
     let raw = widen(value, format);
     if matches!(format, Format::F32 | Format::F64) {
         let mut r = Result::raw(raw);
@@ -598,6 +611,9 @@ pub(super) fn load(value: u128, format: Format) -> Result {
     }
 }
 pub(super) fn store(raw: u128, format: Format, cw: u16) -> Result {
+    if format == Format::Bcd {
+        return special::store_bcd(raw, cw);
+    }
     if format == Format::F80 || format == Format::Register {
         return Result::raw(raw);
     }

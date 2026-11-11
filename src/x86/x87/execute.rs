@@ -173,6 +173,48 @@ pub(super) fn eval(state: &mut State, op: Op, source: u128, flags: u64) -> Effec
         }
         _ => {}
     }
+    if op.kind == Extract {
+        let empty = state.tag(top) == 3;
+        if empty || state.tag((top + 7) & 7) != 3 {
+            if !stack_fault(state, !empty) {
+                state.put(top, INDEFINITE);
+                push(state, INDEFINITE);
+            }
+            return out;
+        }
+        let (result, exponent) = number::extract(a);
+        status(state, result);
+        if result.pre & !cw & 63 == 0 {
+            state.put(top, exponent);
+            push(state, result.value);
+        }
+        return out;
+    }
+    if matches!(op.kind, Remainder | RemainderNearest | Scale) {
+        let second = state.physical(1);
+        if state.tag(top) == 3 || state.tag(second) == 3 {
+            if !stack_fault(state, false) {
+                state.put(top, INDEFINITE);
+                if op.kind != Scale {
+                    state.status_word &= !0x400;
+                }
+            }
+            return out;
+        }
+        let (result, condition) = if op.kind == Scale {
+            (number::scale(a, state.raw(second), cw), 0)
+        } else {
+            number::remainder(a, state.raw(second), op.kind == RemainderNearest, cw)
+        };
+        status(state, result);
+        if !result.suppress && result.pre & !cw & 63 == 0 {
+            state.put(top, result.value);
+            if op.kind != Scale {
+                state.status_word = (state.status_word & !0x4700) | condition;
+            }
+        }
+        return out;
+    }
     let compares = matches!(
         op.kind,
         Compare | CompareUnordered | CompareFlags | CompareUnorderedFlags | Test
