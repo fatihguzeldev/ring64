@@ -517,9 +517,10 @@ export async function measureFive(
       for (let sample = -1; sample < samples; sample++) {
         await row.prepare();
         const at = performance.now();
-        let result;
+        let result, observation;
         const attempts = [];
-        if (row.attempts)
+        if (row.run) observation = await row.run();
+        else if (row.attempts)
           for (let i = 0; i < row.attempts; i++)
             attempts.push(await row.cpu.run({ budget: 1n, repeatBudget: 0n }));
         else if (row.reset) for (let i = 0; i < row.reset; i++) row.cpu.reset();
@@ -538,7 +539,7 @@ export async function measureFive(
           );
           check(result.state.registers[1] === 0n, name + ' loop count');
         }
-        const observed = row.validate(attempts) ?? {};
+        const observed = row.validate(observation ?? attempts) ?? {};
         measurements.push({
           name,
           phase: sample < 0 ? 'first invocation batch in shared process' : 'warm',
