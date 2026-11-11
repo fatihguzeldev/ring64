@@ -75,7 +75,14 @@ fn mappings(value: &Value, capacity: usize) -> Result<Vec<MappingInput>, MemoryE
 fn initial_image(
     input: &[u8],
     metadata_len: u32,
-) -> Result<(Image, Option<crate::x86::paging::State>), MemoryError> {
+) -> Result<
+    (
+        Image,
+        Option<crate::x86::paging::State>,
+        crate::x86::fast_system::State,
+    ),
+    MemoryError,
+> {
     let metadata_len = metadata_len as usize;
     let config = json(input.get(..metadata_len).ok_or_else(invalid)?)?;
     let caps = &config["memoryLimits"];
@@ -119,12 +126,19 @@ fn initial_image(
             if config.get("paging").is_some() || config.get("fastSystem").is_some() {
                 return Err(invalid());
             }
-            Image::mapped(backings, maps, limits).map(|image| (image, None))
+            Image::mapped(backings, maps, limits).map(|image| (image, None, Default::default()))
         }
         Some(Value::String(model)) if model == "ia32e-paged" => {
             let state =
                 super::paging::parse_bank(&config["paging"]).map_err(MemoryError::Invalid)?;
-            Image::physical_mapped(backings, maps, limits).map(|image| (image, Some(state)))
+            let fast_system = config
+                .get("fastSystem")
+                .map(super::fast_system::parse_bank)
+                .transpose()
+                .map_err(MemoryError::Invalid)?
+                .unwrap_or_default();
+            Image::physical_mapped(backings, maps, limits)
+                .map(|image| (image, Some(state), fast_system))
         }
         _ => Err(invalid()),
     }
@@ -133,19 +147,9 @@ fn initial_image(
 #[unsafe(no_mangle)]
 pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
-        let (image, paging) = match initial_image(&bridge.input, metadata_len) {
+        let (image, paging, fast_system) = match initial_image(&bridge.input, metadata_len) {
             Ok(image) => image,
             Err(error) => return memory_error(bridge, error),
-        };
-        let fast_system = match json(&bridge.input[..metadata_len as usize])
-            .map_err(|_| "invalid fast system constructor input")
-            .and_then(|config| match config.get("fastSystem") {
-                Some(value) if paging.is_some() => super::fast_system::parse_bank(value),
-                Some(_) => Err("fast system state requires a paged CPU"),
-                None => Ok(Default::default()),
-            }) {
-            Ok(bank) => bank,
-            Err(message) => return bridge.error(message),
         };
         bridge.core = Some(Core {
             image,
