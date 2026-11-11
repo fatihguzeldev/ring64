@@ -2,6 +2,9 @@ use super::address::{check_physical_span, check_span};
 use super::image::locate_index;
 use super::{Access, Cause, Fault, Image};
 
+mod prepared;
+pub(crate) use prepared::{PreparedPhysicalUpdate, PreparedPhysicalWrite};
+
 impl Image {
     pub fn physical_fetch(&self, address: u64) -> Result<u8, Fault> {
         let first = self.preflight::<true>(address, 1, Access::Execute, false, false)?;
@@ -350,6 +353,10 @@ impl Image {
         rmw: bool,
         cache_scalar: bool,
     ) -> Result<usize, Fault> {
+        #[cfg(test)]
+        if PHYSICAL {
+            prepared::record_preflight();
+        }
         if PHYSICAL {
             check_physical_span(address, width, access)?;
         } else {

@@ -4,7 +4,7 @@ use super::{
     State,
     walk::{self, PhysicalPhase, Request},
 };
-use crate::memory::{Access, Image, check_span};
+use crate::memory::{Access, Image, PreparedPhysicalUpdate, PreparedPhysicalWrite, check_span};
 use crate::x86::{access::GuestMemory, context::AccessFailure};
 
 #[derive(Debug)]
@@ -13,6 +13,7 @@ struct Fragment {
     length: u32,
     request: Request,
     translation: walk::Translation,
+    write: Option<PreparedPhysicalWrite>,
 }
 
 #[derive(Debug)]
@@ -87,17 +88,26 @@ impl<'a> Memory<'a> {
             let translation =
                 walk::walk(storage.image, self.paging, request).map_err(AccessFailure::Paging)?;
             let length = (width - offset).min(translation.remaining as u32);
-            storage
-                .image
-                .physical_check_access(translation.physical, length, access, rmw)
-                .map_err(|f| {
-                    AccessFailure::Paging(request.physical_failure(f, PhysicalPhase::FinalAccess))
-                })?;
+            let write = if access == Access::Write {
+                storage
+                    .image
+                    .prepare_physical_write(translation.physical, length, rmw)
+                    .map(Some)
+            } else {
+                storage
+                    .image
+                    .physical_check_access(translation.physical, length, access, rmw)
+                    .map(|_| None)
+            }
+            .map_err(|f| {
+                AccessFailure::Paging(request.physical_failure(f, PhysicalPhase::FinalAccess))
+            })?;
             prepared.fragments.push(Fragment {
                 offset,
                 length,
                 request,
                 translation,
+                write,
             });
             offset += length;
         }
@@ -145,13 +155,14 @@ impl<'a> Memory<'a> {
         &self,
         prepared: &Prepared,
         fields: &[(u32, u32)],
-    ) -> Result<(), AccessFailure> {
+    ) -> Result<Vec<PreparedPhysicalUpdate>, AccessFailure> {
         let storage = self.storage.borrow();
+        let mut updates = Vec::new();
         for fragment in &prepared.fragments {
             if fragment.translation.dirty && participates(fragment, fields) {
-                storage
+                let update = storage
                     .image
-                    .physical_check_write(fragment.translation.leaf, 8)
+                    .prepare_physical_update(fragment.translation.leaf)
                     .map_err(|f| {
                         AccessFailure::Paging(
                             fragment
@@ -159,25 +170,16 @@ impl<'a> Memory<'a> {
                                 .physical_failure(f, PhysicalPhase::DirtyWrite),
                         )
                     })?;
+                updates.push(update);
             }
         }
-        Ok(())
+        Ok(updates)
     }
 
-    fn dirty_publish(&self, prepared: &Prepared, fields: &[(u32, u32)]) {
+    fn dirty_publish(&self, updates: &[PreparedPhysicalUpdate]) {
         let mut storage = self.storage.borrow_mut();
-        for fragment in &prepared.fragments {
-            if fragment.translation.dirty && participates(fragment, fields) {
-                let leaf = fragment.translation.leaf;
-                let current = storage
-                    .image
-                    .physical_read(leaf, 8)
-                    .expect("admitted leaf read");
-                storage
-                    .image
-                    .physical_write(leaf, 8, current | walk::DIRTY)
-                    .expect("admitted dirty update");
-            }
+        for update in updates {
+            storage.image.publish_physical_update(update, walk::DIRTY);
         }
     }
 
@@ -203,8 +205,8 @@ impl<'a> Memory<'a> {
             None => self.prepare(address, width, Access::Write, false, user)?,
         };
         if !prepared.published {
-            self.dirty_admission(&prepared, fields)?;
-            self.dirty_publish(&prepared, fields);
+            let updates = self.dirty_admission(&prepared, fields)?;
+            self.dirty_publish(&updates);
         }
         let mut storage = self.storage.borrow_mut();
         for fragment in &prepared.fragments {
@@ -212,12 +214,14 @@ impl<'a> Memory<'a> {
                 let begin = start.max(fragment.offset);
                 let end = (start + length).min(fragment.offset + fragment.length);
                 if begin < end {
-                    let physical =
-                        fragment.translation.physical + u64::from(begin - fragment.offset);
-                    storage
-                        .image
-                        .physical_write_bytes(physical, &bytes[begin as usize..end as usize])
-                        .expect("captured physical payload admission");
+                    storage.image.publish_physical(
+                        fragment
+                            .write
+                            .as_ref()
+                            .expect("captured physical payload admission"),
+                        begin - fragment.offset,
+                        &bytes[begin as usize..end as usize],
+                    );
                 }
             }
         }
@@ -346,12 +350,11 @@ impl GuestMemory for Memory<'_> {
     }
     fn prepare_publication(&mut self) -> Result<(), AccessFailure> {
         let pending = std::mem::take(&mut self.storage.borrow_mut().work.pending);
+        let mut updates = Vec::new();
         for prepared in &pending {
-            self.dirty_admission(prepared, &prepared.fields)?;
+            updates.extend(self.dirty_admission(prepared, &prepared.fields)?);
         }
-        for prepared in &pending {
-            self.dirty_publish(prepared, &prepared.fields);
-        }
+        self.dirty_publish(&updates);
         self.storage.borrow_mut().work.pending = pending
             .into_iter()
             .map(|mut p| {

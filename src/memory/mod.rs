@@ -3,6 +3,7 @@ mod address;
 mod image;
 mod validity;
 
+pub(crate) use access::{PreparedPhysicalUpdate, PreparedPhysicalWrite};
 pub(crate) use address::check_span;
 
 pub use address::{Access, Cause, Fault, PHYSICAL_ADDRESS_END, canonical48};
