@@ -1,5 +1,5 @@
 use super::*;
-use crate::embedding::layout::{GENERAL_PROTECTION, SIMD_EXCEPTION};
+use crate::embedding::layout::GENERAL_PROTECTION;
 use crate::x86::float::{self, Op, Stage};
 
 pub(super) struct SimdException {
@@ -48,6 +48,7 @@ pub extern "C" fn core_import_mxcsr() -> i32 {
         core.segment_fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
@@ -71,6 +72,7 @@ pub extern "C" fn core_float(
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
@@ -87,13 +89,15 @@ pub extern "C" fn core_float(
             state.vector_scratch = outcome.value.to_le_bytes();
         }
         if let Some(stage) = outcome.stage {
-            core.simd_exception = Some(SimdException {
-                stage,
-                raised: outcome.raised,
-                before,
-                after: outcome.mxcsr,
-            });
-            SIMD_EXCEPTION
+            core.simd_failure(
+                SimdException {
+                    stage,
+                    raised: outcome.raised,
+                    before,
+                    after: outcome.mxcsr,
+                },
+                crate::x86::numeric_controls::Family::Simd,
+            )
         } else {
             0
         }
@@ -114,6 +118,7 @@ fn core_load_mxcsr_impl<const OBSERVED: bool, const PAGED: bool>(offset: u64, se
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
@@ -167,6 +172,7 @@ fn core_store_mxcsr_impl<const OBSERVED: bool, const PAGED: bool>(
         let core = bridge.core.as_mut().unwrap();
         let value = unsafe { (*core.state.get()).mxcsr.to_le_bytes() };
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;

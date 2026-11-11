@@ -1,5 +1,12 @@
+import {
+  captureNumericFault,
+  type DeviceNotAvailable,
+  type NumericControlFault,
+} from './numeric-controls.js';
 import { captureDebugSource, type DebugSource } from './debug.js';
 interface ExceptionBoundary {
+  deviceNotAvailable?: DeviceNotAvailable;
+  numericControlFault?: NumericControlFault;
   instructionPc: bigint;
   returnPc: bigint;
   savedFlags: bigint;
@@ -9,7 +16,7 @@ export type ExceptionEvent = ExceptionBoundary &
   (
     | { vector: 14; errorCode: number; pageFaultAddress: bigint; debug?: never }
     | {
-        vector: 0 | 1 | 6 | 8 | 10 | 11 | 12 | 13 | 16 | 19;
+        vector: 0 | 1 | 6 | 7 | 8 | 10 | 11 | 12 | 13 | 16 | 19;
         errorCode?: number;
         debug?: DebugSource;
         pageFaultAddress?: never;
@@ -115,11 +122,30 @@ export function captureEventState(input: EventState): EventState {
   if (typeof source !== 'object' || source === null || Array.isArray(source))
     throw new TypeError('pending event must contain an exception record');
   const vector = word(source.vector, 0xff, 'event vector') as ExceptionEvent['vector'];
-  if (![0, 1, 6, 8, 10, 11, 12, 13, 14, 16, 19].includes(vector))
+  if (![0, 1, 6, 7, 8, 10, 11, 12, 13, 14, 16, 19].includes(vector))
     throw new TypeError('event vector is outside the supported exception set');
+  if ((vector === 6 || vector === 7) && 'errorCode' in source)
+    throw new TypeError('UD/NM sources have no error code');
   const instructionPc = unsigned64(source.instructionPc, 'event instruction PC');
   const returnPc = unsigned64(source.returnPc, 'event return PC');
   const savedFlags = unsigned64(source.savedFlags, 'event saved FLAGS');
+  const hasNm = 'deviceNotAvailable' in source,
+    hasUd = 'numericControlFault' in source;
+  if (hasNm && hasUd) throw new TypeError('exclusive numeric fault records');
+  const numeric = hasNm
+    ? captureNumericFault(source.deviceNotAvailable)
+    : hasUd
+      ? captureNumericFault(source.numericControlFault)
+      : undefined;
+  if (
+    numeric &&
+    (numeric.vector !== vector ||
+      numeric.instructionPc !== instructionPc ||
+      instructionPc !== returnPc ||
+      (hasNm ? vector !== 7 : vector !== 6) ||
+      'debug' in source)
+  )
+    throw new TypeError('numeric source differs from event');
   if (vector === 14) {
     if ('debug' in source) throw new TypeError('page fault cannot contain a debug source');
     const address = pageFaultAddress(source.pageFaultAddress!);
@@ -143,6 +169,8 @@ export function captureEventState(input: EventState): EventState {
   }
   if ('pageFaultAddress' in source) throw new TypeError('page fault address requires vector14');
   const exception: ExceptionEvent = { vector, instructionPc, returnPc, savedFlags };
+  if (numeric?.vector === 7) exception.deviceNotAvailable = numeric;
+  else if (numeric?.vector === 6) exception.numericControlFault = numeric;
   if ('debug' in source) exception.debug = captureDebugSource(source.debug!);
   if ('errorCode' in source)
     exception.errorCode = word(source.errorCode!, 0xffff, 'event error code');

@@ -1,5 +1,13 @@
 import { IoBridge, type IoBinding } from './io.js';
 import {
+  captureNumericFault,
+  readNumericSource,
+  writeNumericSource,
+  validateNumericSourceLayout,
+  type NumericSourceLayout,
+  type NumericFault,
+} from './numeric-controls.js';
+import {
   captureDebugState,
   captureDebugContinuation,
   readDebugSource,
@@ -204,6 +212,7 @@ export interface UnitMetadata {
 
 interface Layout {
   pagingSource?: PagingSourceLayout;
+  numericSource?: NumericSourceLayout;
   debug: DebugLayout;
   size: number;
   scalarSize: number;
@@ -396,6 +405,7 @@ type CoreExports = WebAssembly.Exports & {
   core_info_ptr(): number;
   core_info_len(): number;
   core_dispose(): void;
+  core_numeric_fault_info?(): void;
 };
 
 export type GeneratedRun = (
@@ -656,6 +666,16 @@ export class Core {
       );
     if (isPaged && layout.pagingSource === undefined)
       throw new Error('paged core must describe its paging source transport');
+    if (layout.numericSource !== undefined) {
+      validateNumericSourceLayout(
+        layout.numericSource,
+        layout.size,
+        (layout.pagingSource?.offset ?? layout.debug.offset + layout.debug.layout.bytes) +
+          (layout.pagingSource?.bytes ?? 0),
+      );
+      if (typeof exports.core_numeric_fault_info !== 'function')
+        throw new Error('core omitted numeric source export');
+    }
     this.stateView();
   }
 
@@ -877,6 +897,21 @@ export class Core {
         throw new Error('core returned an incompatible debug source');
       event.exception.debug = source;
     }
+    const numeric = this.#layout.numericSource
+      ? readNumericSource(view, this.#layout.numericSource)
+      : undefined;
+    if (numeric) {
+      if (
+        event.kind !== 'pending' ||
+        event.exception.vector !== numeric.vector ||
+        event.exception.instructionPc !== numeric.instructionPc ||
+        event.exception.returnPc !== numeric.instructionPc ||
+        source
+      )
+        throw new Error('core returned incompatible numeric source');
+      if (numeric.vector === 7) event.exception.deviceNotAvailable = numeric;
+      else event.exception.numericControlFault = numeric;
+    }
     const debugContinuation = readDebugContinuation(
       view,
       raw.continuation,
@@ -907,7 +942,13 @@ export class Core {
     const debug = this.#layout.debug.layout;
     const oldSize = baseSize + debug.source.bytes + debug.continuation.bytes;
     const pagingSource = this.#layout.pagingSource;
-    const size = oldSize + (pagingSource?.bytes ?? 0);
+    const numericSource = this.#layout.numericSource;
+    const size = oldSize + (pagingSource?.bytes ?? 0) + (numericSource?.bytes ?? 0);
+    const numeric =
+      input.event.kind === 'pending'
+        ? (input.event.exception.deviceNotAvailable ?? input.event.exception.numericControlFault)
+        : undefined;
+    if (numeric && !numericSource) throw new TypeError('core does not support numeric source');
     const pointer = this.#exports.core_input(size) >>> 0;
     const view = new DataView(this.#exports.memory.buffer, pointer, size);
     for (let index = 0; index < 16; index++) {
@@ -959,6 +1000,16 @@ export class Core {
         input.event.kind === 'pending' && input.event.exception.vector === 14
           ? input.event.exception.pageFaultAddress
           : undefined,
+      );
+    if (numericSource)
+      writeNumericSource(
+        new DataView(
+          view.buffer,
+          view.byteOffset + oldSize + (pagingSource?.bytes ?? 0),
+          numericSource.bytes,
+        ),
+        numericSource,
+        numeric,
       );
     if (this.#exports.core_import_state() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
@@ -1452,6 +1503,21 @@ export class Core {
       physicalAddress: BigInt(raw.physicalAddress),
       failingPhysicalAddress: BigInt(raw.failingPhysicalAddress),
     };
+  }
+
+  numericFault(reason: string): NumericFault | undefined {
+    if (
+      !['invalid-encoding', 'device-not-available'].includes(reason) ||
+      !this.#exports.core_numeric_fault_info
+    )
+      return undefined;
+    this.#exports.core_numeric_fault_info();
+    const raw = this.info<(Record<string, unknown> & { instructionPc: string }) | null>();
+    if (!raw) return undefined;
+    const fault = captureNumericFault({ ...raw, instructionPc: BigInt(raw.instructionPc) });
+    if ((fault.vector === 7) !== (reason === 'device-not-available'))
+      throw new Error('numeric reason differs');
+    return fault;
   }
 
   x87Exception(reason: string): X87Exception | undefined {

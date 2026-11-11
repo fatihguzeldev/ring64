@@ -1,5 +1,5 @@
 use super::*;
-use crate::embedding::layout::{ALIGNMENT, SIMD_EXCEPTION, X87_EXCEPTION};
+use crate::embedding::layout::{ALIGNMENT, X87_EXCEPTION};
 use crate::x86::context::Mode;
 use crate::x86::mmx::{self, Op};
 
@@ -30,6 +30,7 @@ fn core_mmx_impl<const OBSERVED: bool, const PAGED: bool>(
         core.segment_fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
@@ -93,13 +94,15 @@ fn core_mmx_impl<const OBSERVED: bool, const PAGED: bool>(
             unsafe {
                 (*core.state.get()).mxcsr = outcome.mxcsr;
             }
-            core.simd_exception = Some(numeric::SimdException {
-                stage,
-                raised: outcome.raised,
-                before: mxcsr,
-                after: outcome.mxcsr,
-            });
-            return SIMD_EXCEPTION;
+            return core.simd_failure(
+                numeric::SimdException {
+                    stage,
+                    raised: outcome.raised,
+                    before: mxcsr,
+                    after: outcome.mxcsr,
+                },
+                crate::x86::numeric_controls::Family::Bridge,
+            );
         }
         if operation.is_store()
             && let Err(fault) = guest_access!(

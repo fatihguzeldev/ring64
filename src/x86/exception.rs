@@ -4,6 +4,7 @@ use super::protection::{ProtectionFault, ProtectionPhase};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExceptionEvent {
+    pub numeric: Option<super::numeric_controls::Fault>,
     pub debug: Option<super::debug::Source>,
     pub vector: u8,
     pub instruction_pc: u64,
@@ -116,6 +117,7 @@ impl InterruptEvent {
 
     fn secondary(self, vector: u8, error_code: u16, page_fault_address: Option<u64>) -> EventState {
         EventState::Pending(ExceptionEvent {
+            numeric: None,
             debug: None,
             vector,
             instruction_pc: self.return_pc,
@@ -134,8 +136,19 @@ impl ExceptionEvent {
         live_flags: u64,
         context: &ExecutionContext,
     ) -> Result<(), &'static str> {
+        if let Some(source) = self.numeric {
+            source.validate()?;
+            if source.vector() != self.vector
+                || source.instruction_pc != self.instruction_pc
+                || self.instruction_pc != self.return_pc
+                || self.debug.is_some()
+                || self.page_fault_address.is_some()
+            {
+                return Err("numeric source differs from pending fault");
+            }
+        }
         let valid_code = match self.vector {
-            0 | 1 | 6 | 16 | 19 => self.error_code.is_none(),
+            0 | 1 | 6 | 7 | 16 | 19 => self.error_code.is_none(),
             8 => self.error_code == Some(0),
             10..=13 => self.error_code.is_some(),
             14 => self.error_code.is_some_and(|code| {
@@ -189,6 +202,7 @@ impl ExceptionEvent {
         error_code: Option<u16>,
     ) -> Self {
         Self {
+            numeric: None,
             debug: None,
             vector,
             instruction_pc: pc,
@@ -227,6 +241,7 @@ impl ExceptionEvent {
         }
         let double_fault = self.vector == 14 || vector != 14 && matches!(self.vector, 0 | 10..=13);
         EventState::Pending(Self {
+            numeric: None,
             debug: None,
             vector: if double_fault { 8 } else { vector },
             error_code: Some(if double_fault { 0 } else { error_code }),
@@ -559,6 +574,7 @@ mod tests {
         let context = ExecutionContext::default();
         for vector in [1, 6, 16, 19, 0, 10, 11, 12, 13, 8] {
             let event = ExceptionEvent {
+                numeric: None,
                 page_fault_address: None,
                 debug: None,
                 vector,
@@ -682,6 +698,7 @@ mod tests {
             assert_eq!(
                 event.escalate(11, 0x6b),
                 EventState::Pending(ExceptionEvent {
+                    numeric: None,
                     page_fault_address: None,
                     debug: None,
                     vector: 11,

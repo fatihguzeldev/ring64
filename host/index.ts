@@ -45,3 +45,9 @@ export type { PagingState } from './paging.js';
 export type { FastSystemState } from './fast-system.js';
 
 export type { IoProvider, IoWidth } from './io.js';
+export type {
+  DeviceNotAvailable,
+  NumericControlFault,
+  NumericControls,
+  NumericFamily,
+} from './numeric-controls.js';

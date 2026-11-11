@@ -421,3 +421,35 @@ fn context_proof_does_not_override_image_alias_death_release_or_paging_fences() 
         "same CR3 destructive fence clears primed record"
     );
 }
+
+#[test]
+fn numeric_publication_retains_live_guards_but_cancels_pending_aba_at_epoch_max() {
+    use super::super::paging::core_paging_control;
+    for epoch in [0, u64::MAX - 1, u64::MAX] {
+        paged_fixture();
+        BRIDGE.with_borrow_mut(|b| b.core.as_mut().unwrap().context_version = epoch);
+        let installed = paged_owner();
+        assert_eq!(mapped::core_activate(installed), 1);
+        assert_eq!(core_compile(0x400000, 8, 128, 65536), 0);
+        let pending = BRIDGE.with_borrow(|b| {
+            let info: serde_json::Value = serde_json::from_slice(&b.info).unwrap();
+            u64::from_str_radix(info["owner"].as_str().unwrap().trim_start_matches("0x"), 16)
+                .unwrap()
+        });
+        assert_eq!(core_paging_control(1, 0, 0x8000003b, 0x400000, 2), 0);
+        assert_eq!(mapped::core_validity(installed), 1);
+        assert_eq!(
+            mapped::core_activate(installed),
+            1,
+            "unspecialized unit retains live admission"
+        );
+        assert_eq!(mapped::core_validity(pending), 0);
+        assert_eq!(core_paging_control(5, 0, 0, 0x400000, 2), 0);
+        assert_eq!(
+            mapped::core_publish(pending),
+            0,
+            "ABA cannot publish stale capture"
+        );
+        assert_eq!(mapped::core_activate(installed), 1);
+    }
+}

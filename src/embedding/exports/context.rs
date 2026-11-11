@@ -87,6 +87,7 @@ pub extern "C" fn core_set_context() -> i32 {
         core.fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;

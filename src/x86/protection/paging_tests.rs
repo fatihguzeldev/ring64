@@ -133,6 +133,7 @@ fn frame_dirty_refusal_precedes_every_frame_payload_and_context_publication() {
     let mut work = AccessState::default();
     let mut memory = Memory::new(&mut image, &state, 0, &mut work);
     let source = crate::x86::exception::ExceptionEvent {
+        numeric: None,
         vector: 6,
         instruction_pc: 0x1000,
         return_pc: 0x1000,
@@ -256,6 +257,7 @@ fn event_frame_privilege_uses_prepared_target_not_source_cpl() {
         let mut work = AccessState::default();
         let mut memory = Memory::new(&mut image, &state, 3, &mut work);
         let event = crate::x86::exception::ExceptionEvent {
+            numeric: None,
             vector: 6,
             instruction_pc: 0x1000,
             return_pc: 0x1000,
@@ -316,6 +318,7 @@ fn frame_payload_alias_can_clear_a_captured_d1_pte_without_late_rewalk_or_repair
     let mut work = AccessState::default();
     let mut memory = Memory::new(&mut image, &state, 0, &mut work);
     let event = crate::x86::exception::ExceptionEvent {
+        numeric: None,
         vector: 6,
         instruction_pc: 0x1000,
         return_pc: 0x1000,

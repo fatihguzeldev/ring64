@@ -147,7 +147,7 @@ export function pagingControlScenarios(compiler: WebAssembly.Module): Scenario[]
           ['0f22c0', 0x180000033n, 'protection-fault'],
           ['0f22c0', 0x80000032n, 'protection-fault'],
           ['0f22c0', 0xa0000033n, 'protection-fault'],
-          ['0f22c0', 0x80000037n, 'unsupported'],
+          ['0f22c0', 0x80040033n, 'unsupported'],
           ['0f22d8', 0x8000000000000000n, 'protection-fault'],
           ['0f22d8', 0x2000000000000000n, 'unsupported'],
           ['0f22e0', 0x608n, 'protection-fault'],

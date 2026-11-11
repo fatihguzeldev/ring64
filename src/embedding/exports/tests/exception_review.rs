@@ -40,6 +40,7 @@ fn ud2_staging_preserves_private_prefix_fetch_and_report_frontiers() {
         assert_eq!(
             event(),
             EventState::Pending(ExceptionEvent {
+                numeric: None,
                 page_fault_address: None,
                 debug: None,
                 vector: 6,
@@ -135,6 +136,7 @@ fn staged_completed_trap_survives_transient_clear_and_private_entry_failure_befo
     assert_eq!(
         event(),
         EventState::Pending(ExceptionEvent {
+            numeric: None,
             page_fault_address: None,
             debug: None,
             vector: 13,
@@ -150,6 +152,7 @@ fn staged_completed_trap_survives_transient_clear_and_private_entry_failure_befo
     assert_eq!(
         event(),
         EventState::Pending(ExceptionEvent {
+            numeric: None,
             page_fault_address: None,
             debug: None,
             vector: 8,

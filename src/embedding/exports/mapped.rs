@@ -173,6 +173,8 @@ pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
             segment_fault: None,
             alignment_fault: None,
             simd_exception: None,
+            numeric_fault: None,
+            numeric_form: None,
             general_protection: None,
             protection_fault: None,
             system_memory_fault: None,

@@ -46,6 +46,7 @@ mod io;
 mod mapped;
 mod mmx;
 mod numeric;
+mod numeric_controls;
 mod numeric_image;
 mod paging;
 mod protection;
@@ -76,6 +77,8 @@ struct Core {
     segment_fault: Option<SegmentFault>,
     alignment_fault: Option<vector::AlignmentFault>,
     simd_exception: Option<numeric::SimdException>,
+    numeric_fault: Option<crate::x86::numeric_controls::Fault>,
+    numeric_form: Option<(crate::x86::numeric_controls::Family, u64)>,
     general_protection: Option<numeric::GeneralProtectionFault>,
     protection_fault: Option<crate::x86::protection::ProtectionFault>,
     system_memory_fault: Option<crate::x86::protection::SystemMemoryFault>,
@@ -159,6 +162,8 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             segment_fault: None,
             alignment_fault: None,
             simd_exception: None,
+            numeric_fault: None,
+            numeric_form: None,
             general_protection: None,
             protection_fault: None,
             system_memory_fault: None,
@@ -184,11 +189,13 @@ pub extern "C" fn core_import_state() -> i32 {
         let source_end = old_end + size_of::<super::layout::debug::DebugSource>();
         let new_end = source_end + size_of::<super::layout::debug::Continuation>();
         let paging_end = new_end + size_of::<super::layout::paging::RawPagingSource>();
+        let numeric_end = paging_end + size_of::<super::layout::numeric::RawNumericSource>();
         if bridge.input.len() != SCALAR_STATE_SIZE
             && bridge.input.len() != event_end
             && bridge.input.len() != old_end
             && bridge.input.len() != new_end
             && bridge.input.len() != paging_end
+            && bridge.input.len() != numeric_end
         {
             return bridge.error("state input length differs");
         }
@@ -259,7 +266,7 @@ pub extern "C" fn core_import_state() -> i32 {
         } else if source != super::layout::debug::DebugSource::default() {
             return bridge.error("debug source requires pending exception");
         }
-        let paging_source = if bridge.input.len() == paging_end {
+        let paging_source = if bridge.input.len() >= paging_end {
             match super::layout::paging::RawPagingSource::from_bytes(
                 &bridge.input[new_end..paging_end],
             ) {
@@ -269,6 +276,19 @@ pub extern "C" fn core_import_state() -> i32 {
         } else {
             super::layout::paging::RawPagingSource::default()
         };
+        let numeric_source = if bridge.input.len() == numeric_end {
+            match super::layout::numeric::RawNumericSource::from_bytes(
+                &bridge.input[paging_end..numeric_end],
+            ) {
+                Ok(source) => source,
+                Err(message) => return bridge.error(message),
+            }
+        } else {
+            Default::default()
+        };
+        if let Err(message) = numeric_source.attach(&mut decoded) {
+            return bridge.error(message);
+        }
         if let Err(message) = paging_source.attach(&mut decoded) {
             return bridge.error(message);
         }
@@ -306,6 +326,7 @@ pub extern "C" fn core_import_state() -> i32 {
         core.fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
@@ -327,6 +348,7 @@ pub extern "C" fn core_clear_fault() -> i32 {
         core.fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
@@ -349,6 +371,7 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
         core.fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
@@ -385,7 +408,7 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
         match decoded {
             Err(DecodeError::PagingRestart) => 26,
             Err(DecodeError::Paging(failure)) => core.paging_failure(failure),
-            Ok(_) => 0,
+            Ok(instruction) => core.numeric_admission(instruction.operation, pc),
             Err(DecodeError::Segment(fault)) => {
                 core.segment_fault = Some(fault);
                 SEGMENT

@@ -1,7 +1,7 @@
 use super::*;
 use crate::embedding::layout::{
-    ALIGNMENT, DEBUG_EXCEPTION, DISPATCH, DIVIDE_ERROR, GENERAL_PROTECTION, INVALID, PAGE_FAULT,
-    PROTECTION, SHUTDOWN, SIMD_EXCEPTION, SYSTEM_MEMORY, X87_EXCEPTION,
+    ALIGNMENT, DEBUG_EXCEPTION, DEVICE_NOT_AVAILABLE, DISPATCH, DIVIDE_ERROR, GENERAL_PROTECTION,
+    INVALID, PAGE_FAULT, PROTECTION, SHUTDOWN, SIMD_EXCEPTION, SYSTEM_MEMORY, X87_EXCEPTION,
 };
 use crate::x86::exception::{EventState, ExceptionEvent};
 use crate::x86::flags;
@@ -71,12 +71,20 @@ pub extern "C" fn core_stage_exception(reason: i32) -> i32 {
                     fault.address,
                 )
             }
+            DEVICE_NOT_AVAILABLE | INVALID if core.numeric_fault.is_some() => {
+                let source = core.numeric_fault.unwrap();
+                ExceptionEvent {
+                    numeric: Some(source),
+                    ..ExceptionEvent::fault(source.vector(), pc, state.flags, &core.context, None)
+                }
+            }
             DIVIDE_ERROR => ExceptionEvent::fault(0, pc, state.flags, &core.context, None),
             DEBUG_EXCEPTION => {
                 let Some(debug) = core.debug_exception.as_ref() else {
                     return -1;
                 };
                 ExceptionEvent {
+                    numeric: None,
                     page_fault_address: None,
                     debug: debug.source,
                     vector: 1,
@@ -197,6 +205,7 @@ pub extern "C" fn core_deliver_exception() -> i32 {
         core.segment_fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;

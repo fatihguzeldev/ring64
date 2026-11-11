@@ -1,4 +1,5 @@
 import { ioScenarios } from './execution/io/index.js';
+import { numericControlScenarios } from './execution/numeric-controls.js';
 import { integerScenarios } from './execution/integer/index.js';
 import { stackScenarios } from './execution/stack/index.js';
 import { addressingScenarios } from './execution/addressing/index.js';
@@ -67,6 +68,7 @@ export async function runScenarios(
     ...pagingScenarios(core),
     ...fastSystemScenarios(core),
     ...contextReuseScenarios(core),
+    ...numericControlScenarios(core),
   ];
   const passed: string[] = [];
   for (const { name, run } of scenarios) {

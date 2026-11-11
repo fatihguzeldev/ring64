@@ -162,6 +162,8 @@ pub extern "C" fn core_paged_debug_begin(pc: u64, flags: u64, shadow: u32) -> i3
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.paging_work.clear();
+        core.numeric_fault = None;
+        core.numeric_form = None;
         core.paging_failure = None;
         core.paging_system = None;
         core.debug_candidate = 0;
@@ -173,7 +175,9 @@ pub extern "C" fn core_paged_debug_begin(pc: u64, flags: u64, shadow: u32) -> i3
             return debug;
         }
         match core.paged_decode(pc) {
-            Ok(_) if !core.image.active_changed() => 0,
+            Ok(instruction) if !core.image.active_changed() => {
+                core.numeric_admission(instruction.operation, pc)
+            }
             Ok(_) | Err(DecodeError::PagingRestart) => 26,
             Err(DecodeError::Paging(failure)) => core.paging_failure(failure),
             Err(DecodeError::Fetch(fault)) => {

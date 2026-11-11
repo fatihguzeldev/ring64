@@ -43,6 +43,7 @@ fn core_masked_store_impl<const OBSERVED: bool, const PAGED: bool>(
         core.segment_fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
@@ -124,6 +125,7 @@ fn core_clflush_impl<const PAGED: bool>(offset: u64, segment: u32) -> i32 {
         core.segment_fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
+        core.numeric_fault = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;

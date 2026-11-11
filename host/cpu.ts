@@ -1,4 +1,5 @@
 import { captureIo, type IoProvider } from './io.js';
+import type { DeviceNotAvailable, NumericControlFault } from './numeric-controls.js';
 import { captureDebugState, type DebugState } from './debug.js';
 import { capturePagingState, type PagingState } from './paging.js';
 import {
@@ -78,6 +79,8 @@ export interface RunResult {
   simdException?: SimdException;
   generalProtectionFault?: GeneralProtectionFault;
   x87Exception?: X87Exception;
+  deviceNotAvailable?: DeviceNotAvailable;
+  numericControlFault?: NumericControlFault;
   protectionFault?: ProtectionFault;
   systemMemoryFault?: SystemMemoryFault;
   debugException?: DebugException;
@@ -483,6 +486,7 @@ export class Cpu {
     };
     const finish = (reason: string): RunResult => {
       this.pruneTranslations();
+      const numeric = this.#engine.numericFault?.(reason);
       const fault = this.#engine.fault(reason);
       const segmentFault = this.#engine.segmentFault(reason);
       const alignmentFault = this.#engine.alignmentFault(reason);
@@ -514,6 +518,11 @@ export class Cpu {
               remainingDeliveryBudget: remainingDeliveryBudget!,
             }),
         state: this.#engine.snapshot(),
+        ...(numeric?.vector === 7
+          ? { deviceNotAvailable: numeric }
+          : numeric?.vector === 6
+            ? { numericControlFault: numeric }
+            : {}),
         ...(fault ? { fault } : {}),
         ...(segmentFault ? { segmentFault } : {}),
         ...(alignmentFault ? { alignmentFault } : {}),
