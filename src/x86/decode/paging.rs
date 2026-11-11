@@ -9,6 +9,15 @@ pub(super) fn two_byte<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if prefixes.paged && opcode == 0x06 {
+        return Some(if prefixes.repeat.is_some() {
+            Err(DecodeError::Unsupported)
+        } else if prefixes.lock {
+            Err(DecodeError::UndefinedEncoding)
+        } else {
+            Ok(Operation::Paging(PagingInstruction::ClearTaskSwitched))
+        });
+    }
     if prefixes.paged && matches!(opcode, 0x05 | 0x07 | 0x34 | 0x35) {
         use crate::x86::fast_system::Instruction;
         return Some(

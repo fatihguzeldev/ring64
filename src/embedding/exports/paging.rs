@@ -275,6 +275,9 @@ pub extern "C" fn core_import_paging() -> i32 {
         if previous.translation_changed(candidate) {
             core.retire_translations();
         }
+        if previous.numeric_controls() != candidate.numeric_controls() {
+            core.context_changed();
+        }
         core.paging = Some(candidate);
         core.paging_work.clear();
         0
@@ -363,12 +366,22 @@ pub extern "C" fn core_paging_control(
                 }
                 Ok((state, None))
             }
+            5 => Ok((
+                paging::State {
+                    cr0: state.cr0 & !8,
+                    ..state
+                },
+                None,
+            )),
             _ => return -1,
         };
         match operation {
             Ok((candidate, result)) => {
                 if kind == 4 || kind == 1 && register == 3 || state.translation_changed(candidate) {
                     core.retire_translations();
+                }
+                if state.numeric_controls() != candidate.numeric_controls() {
+                    core.context_changed();
                 }
                 core.paging = Some(candidate);
                 if let Some(value) = result {

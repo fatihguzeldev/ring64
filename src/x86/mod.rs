@@ -9,6 +9,7 @@ pub mod float;
 pub mod instruction;
 pub mod masked;
 pub mod mmx;
+pub mod numeric_controls;
 pub mod numeric_images;
 pub mod paging;
 pub mod protection;

@@ -130,3 +130,28 @@ fn paged_msr_and_invlpg_operands_are_literal_instruction_records() {
         );
     }
 }
+
+#[test]
+fn clts_is_an_operand_free_paged_control_with_lock_and_repeat_frontiers() {
+    let context = ExecutionContext::default();
+    for bytes in [&[0x0f, 0x06][..], &[0x66, 0x67, 0x49, 0x0f, 0x06]] {
+        let instruction = decoded(bytes, true, &context).unwrap();
+        assert_eq!(
+            instruction.operation,
+            Operation::Paging(Paging::ClearTaskSwitched)
+        );
+        assert_eq!(instruction.next_pc, 0x1000 + bytes.len() as u64);
+    }
+    assert_eq!(
+        decoded(&[0x0f, 0x06], false, &context),
+        Err(DecodeError::Unsupported)
+    );
+    assert_eq!(
+        decoded(&[0xf0, 0x0f, 0x06], true, &context),
+        Err(DecodeError::UndefinedEncoding)
+    );
+    assert_eq!(
+        decoded(&[0xf3, 0x0f, 0x06], true, &context),
+        Err(DecodeError::Unsupported)
+    );
+}

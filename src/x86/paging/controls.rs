@@ -3,6 +3,8 @@ use crate::x86::context::Mode;
 pub const EFER_MSR: u32 = 0xc0000080;
 const CR0_FIXED: u64 = 0x80000033;
 const CR0_WP: u64 = 1 << 16;
+const CR0_NUMERIC: u64 = 0xe;
+const CR4_NUMERIC: u64 = 0x600;
 const CR3_ALLOWED: u64 = 0x000ffffffffff018;
 const CR4_FIXED: u64 = 0x628;
 const EFER_FIXED: u64 = 0x500;
@@ -40,9 +42,9 @@ pub enum ControlFailure {
 
 impl State {
     pub fn validate(self) -> Result<(), &'static str> {
-        if self.cr0 & !CR0_WP != CR0_FIXED
+        if self.cr0 & !(CR0_WP | CR0_NUMERIC) != CR0_FIXED & !CR0_NUMERIC
             || self.cr3 & !CR3_ALLOWED != 0
-            || self.cr4 != CR4_FIXED
+            || self.cr4 & !CR4_NUMERIC != CR4_FIXED & !CR4_NUMERIC
             || self.efer & !(EFER_NXE | EFER_SCE) != EFER_FIXED
         {
             Err("paging controls do not match the normalized IA32e profile")
@@ -82,7 +84,7 @@ impl State {
                 {
                     return Err(GeneralProtection);
                 }
-                if value & !CR0_WP != CR0_FIXED {
+                if value & !(CR0_WP | CR0_NUMERIC) != CR0_FIXED & !CR0_NUMERIC {
                     return Err(Unsupported);
                 }
                 candidate.cr0 = value;
@@ -107,7 +109,7 @@ impl State {
                 {
                     return Err(GeneralProtection);
                 }
-                if value != CR4_FIXED {
+                if value & !CR4_NUMERIC != CR4_FIXED & !CR4_NUMERIC {
                     return Err(Unsupported);
                 }
                 candidate.cr4 = value;
@@ -150,9 +152,22 @@ impl State {
         }
     }
 
+    pub fn numeric_controls(self) -> u8 {
+        ((self.cr0 >> 1) & 7) as u8 | (((self.cr4 >> 9) & 3) as u8) << 3
+    }
+
     pub fn translation_changed(self, other: Self) -> bool {
-        (self.cr0, self.cr3, self.cr4, self.efer & EFER_NXE)
-            != (other.cr0, other.cr3, other.cr4, other.efer & EFER_NXE)
+        (
+            self.cr0 & !CR0_NUMERIC,
+            self.cr3,
+            self.cr4 & !CR4_NUMERIC,
+            self.efer & EFER_NXE,
+        ) != (
+            other.cr0 & !CR0_NUMERIC,
+            other.cr3,
+            other.cr4 & !CR4_NUMERIC,
+            other.efer & EFER_NXE,
+        )
     }
 }
 
@@ -168,6 +183,33 @@ mod tests {
             cr3: 0x0008000000003018,
             cr4: 0x628,
             efer: 0x500,
+        }
+    }
+
+    #[test]
+    fn all_numeric_enable_images_are_valid_and_do_not_change_translation() {
+        for bits in 0u64..32 {
+            let state = State {
+                cr0: 0x80000031 | (bits & 7) << 1,
+                cr4: 0x28 | (bits >> 3) << 9,
+                ..bank()
+            };
+            assert_eq!(state.validate(), Ok(()), "{bits}");
+            assert!(!bank().translation_changed(state), "{bits}");
+            assert_eq!(
+                bank()
+                    .prepare_cr_write(0, state.cr0, Mode::Long64)
+                    .unwrap()
+                    .cr0,
+                state.cr0
+            );
+            assert_eq!(
+                bank()
+                    .prepare_cr_write(4, state.cr4, Mode::Long64)
+                    .unwrap()
+                    .cr4,
+                state.cr4
+            );
         }
     }
 
@@ -272,9 +314,7 @@ mod tests {
             state.prepare_cr_write(8, 16, Mode::Long64),
             Err(GeneralProtection)
         );
-        for value in [
-            0x80000031, 0x80000037, 0x8000003b, 0x80000013, 0x80040033, 0xe0000033,
-        ] {
+        for value in [0x80000013, 0x80040033, 0xe0000033] {
             assert_eq!(
                 state.prepare_cr_write(0, value, Mode::Long64),
                 Err(Unsupported),

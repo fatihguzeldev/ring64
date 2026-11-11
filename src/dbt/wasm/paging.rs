@@ -6,6 +6,11 @@ use wasm_encoder::{Instruction as Op, MemArg};
 impl Emitter {
     pub(super) fn paging_control(&mut self, operation: PagingInstruction, next: u64, depth: u32) {
         match operation {
+            PagingInstruction::ClearTaskSwitched => {
+                self.op(Op::I32Const(5))
+                    .op(Op::I32Const(0))
+                    .op(Op::I64Const(0));
+            }
             PagingInstruction::ControlRegister {
                 register,
                 gpr,
@@ -71,7 +76,9 @@ impl Emitter {
                         .op(Op::I64ShrU)
                         .op(Op::LocalSet(GPR + 2));
                 }
-                PagingInstruction::InvalidatePage(_) => unreachable!(),
+                PagingInstruction::InvalidatePage(_) | PagingInstruction::ClearTaskSwitched => {
+                    unreachable!()
+                }
             }
         }
         self.commit(next);
