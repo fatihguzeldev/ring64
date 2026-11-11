@@ -1,3 +1,4 @@
+import { ioPermissionReviewScenarios } from './review-permissions.js';
 import { ioScalarReviewScenarios } from './review-scalar.js';
 import { ioRepairReviewScenarios } from './review-repair.js';
 import { ioSourcePteScenarios } from './source-pte.js';
@@ -11,6 +12,7 @@ export function ioScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     ...ioRepairReviewScenarios(compiler),
     ...ioScalarReviewScenarios(compiler),
+    ...ioPermissionReviewScenarios(compiler),
     ...stringIoScenarios(compiler),
     ...pagedIoScenarios(compiler),
     ...ioSourcePteScenarios(compiler),
