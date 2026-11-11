@@ -1,3 +1,4 @@
+import { IoBridge, type IoBinding } from './io.js';
 import {
   captureDebugState,
   captureDebugContinuation,
@@ -262,6 +263,17 @@ type CoreExports = WebAssembly.Exports & {
     pc: bigint,
     flags: bigint,
   ): number;
+  core_io(
+    descriptor: number,
+    port: number,
+    offset: bigint,
+    value: bigint,
+    segment: number,
+    flags: bigint,
+  ): number;
+  core_io_observed: CoreExports['core_io'];
+  core_io_configure(present: number): number;
+  core_io_effect_active(): number;
   core_segmented_load(offset: bigint, width: number, segment: number): bigint;
   core_segmented_load_for_write(offset: bigint, width: number, segment: number): bigint;
   core_segmented_store(offset: bigint, width: number, value: bigint, segment: number): number;
@@ -569,6 +581,7 @@ export class Core {
   private constructor(
     exports: CoreExports,
     readonly isPaged = false,
+    private readonly io?: IoBridge,
   ) {
     this.#exports = exports;
     this.#layout = this.info<Layout>();
@@ -650,6 +663,7 @@ export class Core {
     compiler: Uint8Array | WebAssembly.Module,
     memory: InitialMemory,
     context?: ExecutionContext,
+    ioBinding?: IoBinding,
   ): Promise<Core> {
     const isPaged = memory.memoryModel === 'ia32e-paged';
     const paging = isPaged ? capturePagingState(memory.paging!) : undefined;
@@ -660,146 +674,160 @@ export class Core {
       compiler instanceof WebAssembly.Module
         ? compiler
         : await WebAssembly.compile(new Uint8Array(compiler));
-    const instance = await WebAssembly.instantiate(module, {});
-    const exports = instance.exports as CoreExports;
-    if (!(exports.memory instanceof WebAssembly.Memory)) throw new Error('core must export memory');
-    for (const name of [
-      'core_input',
-      'core_init_mapped',
-      'core_add_backing',
-      'core_remove_backing',
-      'core_set_mappings',
-      'core_validity',
-      'core_activate',
-      'core_publish',
-      'core_release',
-      'core_context_info',
-      'core_context_version',
-      'core_boundary_observed',
-      'core_set_context',
-      'core_segmented_load',
-      'core_segmented_load_for_write',
-      'core_segmented_store',
-      'core_segmented_access_failed',
-      'core_access_reason',
-      'core_target_check',
-      'core_state_ptr',
-      'core_import_state',
-      'core_load_observed',
-      'core_load_for_write_observed',
-      'core_store_observed',
-      'core_segmented_load_observed',
-      'core_segmented_load_for_write_observed',
-      'core_segmented_store_observed',
-      'core_vector_load_observed',
-      'core_vector_store_observed',
-      'core_load_mxcsr_observed',
-      'core_store_mxcsr_observed',
-      'core_x87_observed',
-      'core_mmx_observed',
-      'core_numeric_image_observed',
-      'core_masked_store_observed',
-      'core_protection_observed',
-      'core_far_control_observed',
-      'core_software_event_observed',
-      'core_debug_finish',
-      'core_debug_begin',
-      'core_debug_register',
-      'core_import_debug',
-      'core_import_xmm',
-      'core_import_mxcsr',
-      'core_import_x87',
-      'core_x87',
-      'core_mmx',
-      'core_numeric_image',
-      'core_masked_store',
-      'core_clflush',
-      'core_protection',
-      'core_far_control',
-      'core_software_event',
-      'core_flags',
-      'core_debug_step',
-      'core_configure_delivery',
-      'core_stage_exception',
-      'core_deliver_exception',
-      'core_request_interrupt',
-      'core_request_nmi',
-      'core_external_boundary',
-      'core_shutdown_can_wake',
-      'core_external_step',
-      'core_halt',
-      'core_float',
-      'core_load_mxcsr',
-      'core_store_mxcsr',
-      'core_vector_load',
-      'core_vector_store',
-      'core_clear_fault',
-      'core_probe',
-      'core_compile',
-      'core_load',
-      'core_load_for_write',
-      'core_store',
-      'core_access_failed',
-      'core_multiply_high',
-      'core_divide',
-      'core_divide_failed',
-      'core_fault_info',
-      'core_read_memory',
-      'core_write_memory',
-      'core_output_ptr',
-      'core_output_len',
-      'core_info_ptr',
-      'core_info_len',
-      'core_dispose',
-    ]) {
-      if (typeof exports[name] !== 'function') throw new Error(`core must export ${name}`);
-    }
-    if (isPaged)
-      for (const name of [
-        'core_paging_state',
-        'core_import_paging',
-        'core_paging_control',
-        'core_fast_system_state',
-        'core_import_fast_system',
-        'core_fast_system',
-        ...Object.values(PAGED_HELPERS),
-        ...Object.values(PAGED_OBSERVED_HELPERS),
-      ])
-        if (typeof exports[name] !== 'function') throw new Error(`core must export ${name}`);
-    const metadataLength = writeInput(
-      exports,
-      {
-        ...(isPaged ? { memoryModel: 'ia32e-paged', paging, fastSystem } : {}),
-        memoryLimits: memory.memoryLimits,
-        backings: memory.backings.map(({ id, bytes }) => ({
-          id: backingKey(id),
-          length: bytes.length,
-        })),
-        mappings: mappingInput(memory.mappings),
-      },
-      memory.backings.map(({ bytes }) => bytes),
-    );
-    const status = exports.core_init_mapped(memory.entry, metadataLength);
-    if (status !== 0) {
-      const text = new TextDecoder().decode(
-        new Uint8Array(
-          exports.memory.buffer,
-          exports.core_info_ptr() >>> 0,
-          exports.core_info_len() >>> 0,
-        ),
-      );
-      exports.core_dispose();
-      const error = (JSON.parse(text) as { error: string }).error;
-      if (status === 1) throw new TypeError(error);
-      if (status === 2) throw new RangeError(error);
-      throw new Error('mapped initialization returned an invalid status');
-    }
+    const io = new IoBridge(ioBinding);
     try {
-      const core = new Core(exports, isPaged);
-      if (context !== undefined) core.setContext(context);
-      return core;
+      const instance = await WebAssembly.instantiate(module, { io: io.imports });
+      const exports = instance.exports as CoreExports;
+      if (!(exports.memory instanceof WebAssembly.Memory))
+        throw new Error('core must export memory');
+      for (const name of [
+        'core_io',
+        'core_io_observed',
+        'core_io_configure',
+        'core_io_effect_active',
+        'core_input',
+        'core_init_mapped',
+        'core_add_backing',
+        'core_remove_backing',
+        'core_set_mappings',
+        'core_validity',
+        'core_activate',
+        'core_publish',
+        'core_release',
+        'core_context_info',
+        'core_context_version',
+        'core_boundary_observed',
+        'core_set_context',
+        'core_segmented_load',
+        'core_segmented_load_for_write',
+        'core_segmented_store',
+        'core_segmented_access_failed',
+        'core_access_reason',
+        'core_target_check',
+        'core_state_ptr',
+        'core_import_state',
+        'core_load_observed',
+        'core_load_for_write_observed',
+        'core_store_observed',
+        'core_segmented_load_observed',
+        'core_segmented_load_for_write_observed',
+        'core_segmented_store_observed',
+        'core_vector_load_observed',
+        'core_vector_store_observed',
+        'core_load_mxcsr_observed',
+        'core_store_mxcsr_observed',
+        'core_x87_observed',
+        'core_mmx_observed',
+        'core_numeric_image_observed',
+        'core_masked_store_observed',
+        'core_protection_observed',
+        'core_far_control_observed',
+        'core_software_event_observed',
+        'core_debug_finish',
+        'core_debug_begin',
+        'core_debug_register',
+        'core_import_debug',
+        'core_import_xmm',
+        'core_import_mxcsr',
+        'core_import_x87',
+        'core_x87',
+        'core_mmx',
+        'core_numeric_image',
+        'core_masked_store',
+        'core_clflush',
+        'core_protection',
+        'core_far_control',
+        'core_software_event',
+        'core_flags',
+        'core_debug_step',
+        'core_configure_delivery',
+        'core_stage_exception',
+        'core_deliver_exception',
+        'core_request_interrupt',
+        'core_request_nmi',
+        'core_external_boundary',
+        'core_shutdown_can_wake',
+        'core_external_step',
+        'core_halt',
+        'core_float',
+        'core_load_mxcsr',
+        'core_store_mxcsr',
+        'core_vector_load',
+        'core_vector_store',
+        'core_clear_fault',
+        'core_probe',
+        'core_compile',
+        'core_load',
+        'core_load_for_write',
+        'core_store',
+        'core_access_failed',
+        'core_multiply_high',
+        'core_divide',
+        'core_divide_failed',
+        'core_fault_info',
+        'core_read_memory',
+        'core_write_memory',
+        'core_output_ptr',
+        'core_output_len',
+        'core_info_ptr',
+        'core_info_len',
+        'core_dispose',
+      ]) {
+        if (typeof exports[name] !== 'function') throw new Error(`core must export ${name}`);
+      }
+      if (isPaged)
+        for (const name of [
+          'core_paging_state',
+          'core_import_paging',
+          'core_paging_control',
+          'core_fast_system_state',
+          'core_import_fast_system',
+          'core_fast_system',
+          ...Object.values(PAGED_HELPERS),
+          ...Object.values(PAGED_OBSERVED_HELPERS),
+        ])
+          if (typeof exports[name] !== 'function') throw new Error(`core must export ${name}`);
+      const metadataLength = writeInput(
+        exports,
+        {
+          ...(isPaged ? { memoryModel: 'ia32e-paged', paging, fastSystem } : {}),
+          memoryLimits: memory.memoryLimits,
+          backings: memory.backings.map(({ id, bytes }) => ({
+            id: backingKey(id),
+            length: bytes.length,
+          })),
+          mappings: mappingInput(memory.mappings),
+        },
+        memory.backings.map(({ bytes }) => bytes),
+      );
+      const status = exports.core_init_mapped(memory.entry, metadataLength);
+      if (status !== 0) {
+        const text = new TextDecoder().decode(
+          new Uint8Array(
+            exports.memory.buffer,
+            exports.core_info_ptr() >>> 0,
+            exports.core_info_len() >>> 0,
+          ),
+        );
+        exports.core_dispose();
+        const error = (JSON.parse(text) as { error: string }).error;
+        if (status === 1) throw new TypeError(error);
+        if (status === 2) throw new RangeError(error);
+        throw new Error('mapped initialization returned an invalid status');
+      }
+      try {
+        if (exports.core_io_configure(Number(io.present)) !== 0)
+          throw new Error('core refused I/O configuration');
+        io.effectActive = exports.core_io_effect_active;
+        const core = new Core(exports, isPaged, io);
+        if (context !== undefined) core.setContext(context);
+        return core;
+      } catch (error) {
+        exports.core_dispose();
+        throw error;
+      }
     } catch (error) {
-      exports.core_dispose();
+      io.release();
       throw error;
     }
   }
@@ -1167,6 +1195,7 @@ export class Core {
   instantiate(module: WebAssembly.Module, observed = false): GeneratedRun {
     const operands = observed
       ? {
+          core_io: this.#exports.core_io_observed,
           core_load: this.#exports.core_load_observed,
           core_load_for_write: this.#exports.core_load_for_write_observed,
           core_store: this.#exports.core_store_observed,
@@ -1188,6 +1217,7 @@ export class Core {
       : this.#exports;
     const env: Record<string, WebAssembly.ImportValue> = {
       memory: this.#exports.memory,
+      io: operands.core_io,
       load: operands.core_load,
       load_for_write: operands.core_load_for_write,
       store: operands.core_store,
@@ -1245,9 +1275,14 @@ export class Core {
     repeatBudget: bigint,
   ): string {
     this.stateView().setBigUint64(this.#layout.repeatRemaining, repeatBudget, true);
-    return this.reason(
-      run(this.#statePointer, budget, stop ?? 0n, stop === undefined ? 0 : 1, entryIndex),
-    );
+    if (this.io) this.io.executing = true;
+    try {
+      return this.reason(
+        run(this.#statePointer, budget, stop ?? 0n, stop === undefined ? 0 : 1, entryIndex),
+      );
+    } finally {
+      if (this.io) this.io.executing = false;
+    }
   }
 
   fault(reason: string): Fault | undefined {
@@ -1492,7 +1527,12 @@ export class Core {
     this.#exports.core_release(owner);
   }
 
+  releaseIo(): void {
+    this.io?.release();
+  }
+
   dispose(): void {
+    this.releaseIo();
     this.#exports.core_dispose();
   }
 }

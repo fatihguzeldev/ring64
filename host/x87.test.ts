@@ -299,6 +299,7 @@ async function publicFixture() {
     clearFault() {},
     prepareEntry: () => false,
     boundaryObserved: () => false,
+    releaseIo() {},
     dispose() {},
     release() {},
     valid: () => true,

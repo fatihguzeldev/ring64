@@ -204,6 +204,7 @@ async function cpuFixture() {
         byteLength: 8,
       },
     }),
+    releaseIo() {},
     dispose() {},
     valid: () => true,
     release() {},

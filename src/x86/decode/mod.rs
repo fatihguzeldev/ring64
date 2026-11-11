@@ -6,6 +6,7 @@ use super::instruction::Instruction;
 mod cursor;
 mod far;
 mod float;
+mod io;
 mod mmx;
 mod numeric_image;
 mod opcode;

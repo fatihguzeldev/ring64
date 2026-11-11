@@ -225,8 +225,8 @@ fn string_prefix_failures_distinguish_invalid_unsupported_fetch_and_length() {
         &[0xf3, 0xfc][..],
         &[0xf2, 0xfd][..],
         &[0xf3, 0x8b][..],
-        &[0xf3, 0x6c][..],
-        &[0xf3, 0x6f][..],
+        &[0xf2, 0x6c][..],
+        &[0xf2, 0x6f][..],
     ] {
         assert_eq!(at(0x1000, bytes), Err(DecodeError::Unsupported));
     }

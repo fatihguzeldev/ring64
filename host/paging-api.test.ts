@@ -68,6 +68,7 @@ async function fixture(
     alignmentFault: () => undefined,
     valid: () => true,
     release() {},
+    releaseIo() {},
     dispose() {},
   };
   const original = Core.create;

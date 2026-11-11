@@ -1,3 +1,4 @@
+import { ioScenarios } from './execution/io/index.js';
 import { integerScenarios } from './execution/integer/index.js';
 import { stackScenarios } from './execution/stack/index.js';
 import { addressingScenarios } from './execution/addressing/index.js';
@@ -47,6 +48,7 @@ export async function runScenarios(
     ...embeddingScenarios(core),
     ...modeScenarios(core),
     ...stringScenarios(core),
+    ...ioScenarios(core),
     ...nearControlScenarios(core),
     ...exchangeScenarios(core),
     ...simdScenarios(core),

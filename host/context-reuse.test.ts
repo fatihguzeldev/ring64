@@ -141,6 +141,7 @@ async function fixture(translations = 8) {
       calls.releases.push(id);
       records.delete(id);
     },
+    releaseIo() {},
     dispose() {},
   };
   const create = Core.create;

@@ -82,6 +82,7 @@ async function fixture(
     }),
     valid: () => true,
     release() {},
+    releaseIo() {},
     dispose() {},
   };
   const original = Core.create;

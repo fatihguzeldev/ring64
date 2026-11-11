@@ -68,7 +68,7 @@ pub fn admit(
 ) -> Result<(), Failure> {
     assert!(matches!(width, Width::W8 | Width::W16 | Width::W32));
     if context.mode() == Mode::Real
-        || context.mode() != Mode::Virtual8086 && u64::from(context.cpl()) <= (flags >> 12) & 3
+        || context.mode() != Mode::Virtual8086 && u64::from(context.cpl()) <= ((flags >> 12) & 3)
     {
         return Ok(());
     }

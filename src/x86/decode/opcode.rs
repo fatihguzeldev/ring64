@@ -71,6 +71,9 @@ fn refine_inner<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if let Some(result) = super::io::refine(opcode, prefixes, cursor) {
+        return result;
+    }
     if let Some(result) = super::software_events::one_byte(opcode, prefixes, cursor) {
         return result;
     }

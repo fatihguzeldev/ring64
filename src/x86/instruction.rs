@@ -155,6 +155,8 @@ pub enum Carry {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StringKind {
+    Ins,
+    Outs,
     Movs,
     Stos,
     Lods,
@@ -843,6 +845,11 @@ pub enum Operation {
     },
     Direction {
         set: bool,
+    },
+    Io {
+        input: bool,
+        port: Option<u8>,
+        width: Width,
     },
     String {
         kind: StringKind,

@@ -11,6 +11,7 @@ mod fast_system;
 mod float;
 mod integer;
 mod integer_memory;
+mod io;
 mod memory;
 mod mmx;
 mod multiply_divide;
@@ -83,6 +84,7 @@ struct Emitter {
     load_mxcsr: Option<u32>,
     store_mxcsr: Option<u32>,
     x87: Option<u32>,
+    io: Option<u32>,
     mmx: Option<u32>,
     numeric_image: Option<u32>,
     masked_store: Option<u32>,
@@ -504,6 +506,36 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
         next_type += 1;
         index
     });
+    let io_type = unit
+        .instructions
+        .iter()
+        .any(|i| {
+            matches!(
+                i.operation,
+                Operation::Io { .. }
+                    | Operation::String {
+                        kind: crate::x86::instruction::StringKind::Ins
+                            | crate::x86::instruction::StringKind::Outs,
+                        ..
+                    }
+            )
+        })
+        .then(|| {
+            let index = next_type;
+            types.ty().function(
+                [
+                    ValType::I32,
+                    ValType::I32,
+                    ValType::I64,
+                    ValType::I64,
+                    ValType::I32,
+                    ValType::I64,
+                ],
+                [ValType::I32],
+            );
+            next_type += 1;
+            index
+        });
     let numeric_state_type = (has_mmx || has_numeric_image).then(|| {
         let index = next_type;
         types
@@ -651,6 +683,12 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
             "store_mxcsr",
             EntityType::Function(mxcsr_type.unwrap()),
         );
+        let function = run_index;
+        run_index += 1;
+        function
+    });
+    let io = io_type.map(|index| {
+        imports.import("env", "io", EntityType::Function(index));
         let function = run_index;
         run_index += 1;
         function
@@ -829,6 +867,7 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
         load_mxcsr,
         store_mxcsr,
         x87,
+        io,
         mmx,
         numeric_image,
         masked_store,
@@ -951,6 +990,7 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
             Operation::Clflush { address } => {
                 emitter.clflush(address, instruction.next_pc, exit_depth)
             }
+            Operation::Io { input, port, width } => emitter.io(input, port, width, exit_depth),
             Operation::Nop => {}
             Operation::Mmx { op, address } => {
                 emitter.mmx(op, address, instruction.next_pc, exit_depth)

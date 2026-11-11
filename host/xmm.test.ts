@@ -449,6 +449,7 @@ async function cpuFixture() {
     setState: (next: typeof state) => {
       state = structuredClone(next);
     },
+    releaseIo() {},
     dispose() {},
   };
   const create = Core.create;

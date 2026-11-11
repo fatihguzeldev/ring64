@@ -266,6 +266,7 @@ async function fixture(steps: Step[] = []) {
       current = { ...current, ...step };
       return step.reason;
     },
+    releaseIo() {},
     dispose() {},
   };
   const create = Core.create;

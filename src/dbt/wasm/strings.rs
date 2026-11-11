@@ -104,6 +104,17 @@ impl Emitter {
         exit_depth: u32,
     ) {
         use StringKind::*;
+        if matches!(kind, Ins | Outs) {
+            let (index, segment, operation) = if kind == Ins {
+                (7, Segment::Es, 2)
+            } else {
+                (6, source_segment, 3)
+            };
+            self.string_address(index, address_width, segment);
+            self.io_effect(operation, None, width, Some(segment), exit_depth);
+            self.string_index(index, width, address_width);
+            return;
+        }
         if matches!(kind, Movs | Lods | Cmps) {
             self.string_address(6, address_width, source_segment);
             self.load_address_value(width, false, exit_depth);

@@ -1,3 +1,4 @@
+import { captureIo, type IoProvider } from './io.js';
 import { captureDebugState, type DebugState } from './debug.js';
 import { capturePagingState, type PagingState } from './paging.js';
 import {
@@ -54,6 +55,7 @@ export interface Limits extends CompileLimits {
 }
 
 interface CommonOptions {
+  io?: IoProvider;
   compiler: Uint8Array | WebAssembly.Module;
   limits: Limits;
   context?: ExecutionContext;
@@ -156,6 +158,7 @@ export async function createCpu(options: Options): Promise<Cpu> {
   const began = performance.now();
   if (!WebAssembly.validate(SIMD_PROBE)) throw new TypeError('WebAssembly SIMD is required');
   const limits = checkedLimits(options.limits);
+  const io = captureIo(options);
   const memory = captureInitialMemory(options);
   if (memory.memoryModel === 'ia32e-paged') {
     memory.paging = capturePagingState(options.paging!);
@@ -171,7 +174,7 @@ export async function createCpu(options: Options): Promise<Cpu> {
     context.mode !== 'compatibility'
   )
     throw new TypeError('paged memory requires a Long64 or compatibility context');
-  const core = await Core.create(options.compiler, memory, context);
+  const core = await Core.create(options.compiler, memory, context, io);
   return new Cpu(
     CONSTRUCTION,
     core,
@@ -759,6 +762,7 @@ export class Cpu {
     this.#lifecycle = 'disposed';
     this.#core = undefined;
     this.#cache.clear();
+    core?.releaseIo();
     if (!failed) core?.dispose();
   }
 }

@@ -152,6 +152,9 @@ pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
             Err(error) => return memory_error(bridge, error),
         };
         bridge.core = Some(Core {
+            io_present: false,
+            io_configured: false,
+            io_effect: false,
             image,
             fast_system,
             paging,

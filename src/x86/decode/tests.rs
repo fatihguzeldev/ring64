@@ -14,6 +14,7 @@ mod far;
 mod fast_system;
 mod float;
 mod integer_memory;
+mod io;
 mod logical;
 mod modes;
 mod multiply_divide;

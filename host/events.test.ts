@@ -239,7 +239,11 @@ test('disposal during event capture prevents scalar publication and later captur
   const imports: State[] = [];
   const original = Core.create;
   Core.create = async () =>
-    ({ setState: (input: State) => imports.push(input), dispose() {} }) as unknown as Core;
+    ({
+      setState: (input: State) => imports.push(input),
+      releaseIo() {},
+      dispose() {},
+    }) as unknown as Core;
   let cpu;
   try {
     cpu = await createCpu({

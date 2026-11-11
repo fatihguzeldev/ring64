@@ -43,3 +43,5 @@ export type {
 export type { DebugState, DebugContinuation, DebugSource } from './debug.js';
 export type { PagingState } from './paging.js';
 export type { FastSystemState } from './fast-system.js';
+
+export type { IoProvider, IoWidth } from './io.js';
