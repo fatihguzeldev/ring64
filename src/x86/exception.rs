@@ -10,6 +10,7 @@ pub struct ExceptionEvent {
     pub return_pc: u64,
     pub saved_flags: u64,
     pub error_code: Option<u16>,
+    pub page_fault_address: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -106,6 +107,14 @@ impl InterruptEvent {
 
     pub fn escalate(self, vector: u8, error_code: u16) -> EventState {
         assert!(matches!(vector, 10..=13), "selected entry protection fault");
+        self.secondary(vector, error_code, None)
+    }
+
+    pub fn escalate_page_fault(self, error_code: u16, address: u64) -> EventState {
+        self.secondary(14, error_code, Some(address))
+    }
+
+    fn secondary(self, vector: u8, error_code: u16, page_fault_address: Option<u64>) -> EventState {
         EventState::Pending(ExceptionEvent {
             debug: None,
             vector,
@@ -113,6 +122,7 @@ impl InterruptEvent {
             return_pc: self.return_pc,
             saved_flags: self.saved_flags | flags::RF,
             error_code: Some(error_code),
+            page_fault_address,
         })
     }
 }
@@ -128,10 +138,22 @@ impl ExceptionEvent {
             0 | 1 | 6 | 16 | 19 => self.error_code.is_none(),
             8 => self.error_code == Some(0),
             10..=13 => self.error_code.is_some(),
+            14 => self.error_code.is_some_and(|code| {
+                code <= 31 && (code & 8 == 0 || code & 1 != 0) && code & 0x12 != 0x12
+            }),
             _ => false,
         };
         if !valid_code {
             return Err("invalid exception vector or error code");
+        }
+        let valid_address = if self.vector == 14 {
+            self.page_fault_address
+                .is_some_and(crate::memory::canonical48)
+        } else {
+            self.page_fault_address.is_none()
+        };
+        if !valid_address {
+            return Err("invalid page fault address source");
         }
         if self.return_pc != rip {
             return Err("pending exception return pc differs from rip");
@@ -173,19 +195,46 @@ impl ExceptionEvent {
             return_pc: pc,
             saved_flags: flags::architectural(live_flags, context) | flags::RF,
             error_code,
+            page_fault_address: None,
+        }
+    }
+
+    pub fn page_fault(
+        pc: u64,
+        live_flags: u64,
+        context: &ExecutionContext,
+        error_code: u16,
+        address: u64,
+    ) -> Self {
+        Self {
+            page_fault_address: Some(address),
+            ..Self::fault(14, pc, live_flags, context, Some(error_code))
         }
     }
 
     pub fn escalate(self, vector: u8, error_code: u16) -> EventState {
         assert!(matches!(vector, 10..=13), "selected entry protection fault");
+        self.secondary(vector, error_code, None)
+    }
+
+    pub fn escalate_page_fault(self, error_code: u16, address: u64) -> EventState {
+        self.secondary(14, error_code, Some(address))
+    }
+
+    fn secondary(self, vector: u8, error_code: u16, page_fault_address: Option<u64>) -> EventState {
         if self.vector == 8 {
             return EventState::Shutdown;
         }
-        let double_fault = matches!(self.vector, 0 | 10..=13);
+        let double_fault = self.vector == 14 || vector != 14 && matches!(self.vector, 0 | 10..=13);
         EventState::Pending(Self {
             debug: None,
             vector: if double_fault { 8 } else { vector },
             error_code: Some(if double_fault { 0 } else { error_code }),
+            page_fault_address: if double_fault {
+                None
+            } else {
+                page_fault_address
+            },
             saved_flags: self.saved_flags | flags::RF,
             ..self
         })
@@ -248,6 +297,152 @@ mod tests {
     use super::*;
     use crate::x86::context::ExecutionContext;
     use crate::x86::flags;
+
+    #[test]
+    fn page_fault_checkpoint_requires_its_frozen_canonical_address_and_exact_error_class() {
+        let context = ExecutionContext::default();
+        let event = ExceptionEvent::page_fault(0x1000, 0x202, &context, 6, 0x501000);
+        assert_eq!(event.page_fault_address, Some(0x501000));
+        assert_eq!(event.saved_flags, 0x10202);
+        let valid_codes = [
+            0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 13, 15, 16, 17, 20, 21, 25, 29,
+        ];
+        for code in 0..=63 {
+            let changed = ExceptionEvent {
+                error_code: Some(code),
+                ..event
+            };
+            assert_eq!(
+                changed.validate(0x1000, 0x202, &context).is_ok(),
+                valid_codes.contains(&code),
+                "code{code}"
+            );
+        }
+        for address in [0, 0x501000, 0xffff_8000_0000_0000, u64::MAX] {
+            assert!(
+                ExceptionEvent {
+                    page_fault_address: Some(address),
+                    ..event
+                }
+                .validate(0x1000, 0x202, &context)
+                .is_ok()
+            );
+        }
+        for address in [
+            None,
+            Some(0x0000_8000_0000_0000),
+            Some(0x000f_ffff_ffff_ffff),
+        ] {
+            assert!(
+                ExceptionEvent {
+                    page_fault_address: address,
+                    ..event
+                }
+                .validate(0x1000, 0x202, &context)
+                .is_err()
+            );
+        }
+        assert!(
+            ExceptionEvent {
+                error_code: None,
+                ..event
+            }
+            .validate(0x1000, 0x202, &context)
+            .is_err()
+        );
+        for vector in [0, 1, 6, 8, 10, 11, 12, 13, 16, 19] {
+            let changed = ExceptionEvent {
+                vector,
+                error_code: matches!(vector, 8 | 10..=13).then_some(0),
+                ..event
+            };
+            assert!(
+                changed.validate(0x1000, 0x202, &context).is_err(),
+                "vector{vector}"
+            );
+        }
+        let historical = ExceptionEvent {
+            instruction_pc: 0xff0,
+            ..event
+        };
+        assert!(historical.validate(0x1000, 0x202, &context).is_ok());
+    }
+
+    #[test]
+    fn page_fault_escalation_is_asymmetric_and_replaces_obsolete_source_metadata() {
+        let context = ExecutionContext::default();
+        for original in [1, 6, 0, 10, 11, 12, 13, 14, 8] {
+            let error_code = matches!(original, 8 | 10..=14).then_some(0);
+            let mut event = ExceptionEvent::fault(original, 0x1000, 0x202, &context, error_code);
+            event.page_fault_address = (original == 14).then_some(0x500000);
+            event.return_pc = 0x1010;
+            assert!(event.validate(0x1010, 0x202, &context).is_ok());
+            let result = event.escalate_page_fault(2, 0x600000);
+            if original == 8 {
+                assert_eq!(result, EventState::Shutdown);
+                continue;
+            }
+            let EventState::Pending(next) = result else {
+                panic!("{original}")
+            };
+            assert_eq!(
+                (next.vector, next.error_code, next.page_fault_address),
+                if original == 14 {
+                    (8, Some(0), None)
+                } else {
+                    (14, Some(2), Some(0x600000))
+                }
+            );
+            assert_eq!(
+                (
+                    next.instruction_pc,
+                    next.return_pc,
+                    next.saved_flags,
+                    next.debug
+                ),
+                (0x1000, 0x1010, 0x10202, None)
+            );
+            assert!(next.validate(0x1010, 0x202, &context).is_ok());
+        }
+        let pf = ExceptionEvent::page_fault(0x1000, 0x202, &context, 6, 0x501000);
+        for vector in 10..=13 {
+            let EventState::Pending(df) = pf.escalate(vector, 0x2b) else {
+                panic!("{vector}")
+            };
+            assert_eq!(
+                (df.vector, df.error_code, df.page_fault_address),
+                (8, Some(0), None)
+            );
+        }
+        let debug = ExceptionEvent {
+            debug: Some(super::super::debug::Source::Execute(1)),
+            saved_flags: 2,
+            ..ExceptionEvent::fault(1, 0x1000, 2, &context, None)
+        };
+        assert!(debug.validate(0x1000, 2, &context).is_ok());
+        let EventState::Pending(next) = debug.escalate_page_fault(0, 0x700000) else {
+            panic!()
+        };
+        assert_eq!(
+            (next.vector, next.debug, next.page_fault_address),
+            (14, None, Some(0x700000))
+        );
+        for source in [InterruptSource::Nmi, InterruptSource::Irq(14)] {
+            let event = InterruptEvent {
+                source,
+                return_pc: 0x2000,
+                saved_flags: 0x202,
+            };
+            let EventState::Pending(next) = event.escalate_page_fault(0, 0x800000) else {
+                panic!()
+            };
+            assert_eq!(
+                (next.vector, next.page_fault_address, next.saved_flags),
+                (14, Some(0x800000), 0x10202)
+            );
+            assert!(next.validate(0x2000, 0x202, &context).is_ok());
+        }
+    }
 
     #[test]
     fn exception_checkpoint_validates_boundary_flags_vm_and_error_code_together() {
@@ -364,6 +559,7 @@ mod tests {
         let context = ExecutionContext::default();
         for vector in [1, 6, 16, 19, 0, 10, 11, 12, 13, 8] {
             let event = ExceptionEvent {
+                page_fault_address: None,
                 debug: None,
                 vector,
                 instruction_pc: 0x1000,
@@ -486,6 +682,7 @@ mod tests {
             assert_eq!(
                 event.escalate(11, 0x6b),
                 EventState::Pending(ExceptionEvent {
+                    page_fault_address: None,
                     debug: None,
                     vector: 11,
                     instruction_pc: 0x1234,

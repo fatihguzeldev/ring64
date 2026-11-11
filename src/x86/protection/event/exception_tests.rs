@@ -315,6 +315,7 @@ fn malformed_processor_image_is_rejected_before_gate_or_stack_access() {
 fn trap_frame_keeps_captured_rf_while_handler_uses_live_flags_and_has_no_error_slot() {
     let (mut context, mut image) = setup("protected", 0, 1, 0x0000_8f00_0008_2000);
     let event = ExceptionEvent {
+        page_fault_address: None,
         debug: None,
         vector: 1,
         instruction_pc: 0x1000,
