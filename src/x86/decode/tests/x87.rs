@@ -130,7 +130,7 @@ fn every_esc_selector_admits_exactly_the_documented_selection_and_rejects_lock()
             let selected = match opcode {
                 0xd8 => true,
                 0xd9 => {
-                    matches!(modrm, 0xc0..=0xd0 | 0xe0 | 0xe1 | 0xe4 | 0xe5 | 0xe8..=0xee | 0xf6 | 0xf7 | 0xfa | 0xfc)
+                    matches!(modrm, 0xc0..=0xd0 | 0xe0 | 0xe1 | 0xe4 | 0xe5 | 0xe8..=0xee | 0xf4..=0xf8 | 0xfa | 0xfc | 0xfd)
                 }
                 0xda => matches!(modrm, 0xc0..=0xdf | 0xe9),
                 0xdb => matches!(modrm, 0xc0..=0xdf | 0xe2 | 0xe3 | 0xe8..=0xf7),
@@ -161,7 +161,8 @@ fn every_esc_selector_admits_exactly_the_documented_selection_and_rejects_lock()
                 0xd8 | 0xda | 0xdc | 0xde => true,
                 0xd9 => matches!(selector, 0 | 2..=7),
                 0xdd => matches!(selector, 0 | 2..=4 | 6 | 7),
-                0xdb | 0xdf => matches!(selector, 0 | 2 | 3 | 5 | 7),
+                0xdb => matches!(selector, 0 | 2 | 3 | 5 | 7),
+                0xdf => matches!(selector, 0 | 2..=7),
                 _ => unreachable!(),
             };
             let modrm = (selector << 3) | 3;
@@ -182,7 +183,7 @@ fn every_esc_selector_admits_exactly_the_documented_selection_and_rejects_lock()
             }
         }
     }
-    assert_eq!((registers, memory), (333, 55));
+    assert_eq!((registers, memory), (337, 57));
 }
 
 #[test]
@@ -209,6 +210,10 @@ fn conditional_moves_fixed_controls_and_constants_retain_their_distinct_operatio
         (0xd9, 0xe1, Kind::Abs, Format::None),
         (0xd9, 0xe4, Kind::Test, Format::None),
         (0xd9, 0xe5, Kind::Examine, Format::None),
+        (0xd9, 0xf4, Kind::Extract, Format::None),
+        (0xd9, 0xf5, Kind::RemainderNearest, Format::None),
+        (0xd9, 0xf8, Kind::Remainder, Format::None),
+        (0xd9, 0xfd, Kind::Scale, Format::None),
         (0xd9, 0xf6, Kind::DecTop, Format::None),
         (0xd9, 0xf7, Kind::IncTop, Format::None),
         (0xd9, 0xfa, Kind::Sqrt, Format::None),
@@ -273,6 +278,8 @@ fn memory_forms_have_opcode_defined_formats_and_complete_original_fop() {
         (0xdf, 0, Load, I16, 0),
         (0xdb, 0, Load, I32, 0),
         (0xdf, 5, Load, I64, 0),
+        (0xdf, 4, Load, Bcd, 0),
+        (0xdf, 6, Store, Bcd, 1),
         (0xd9, 2, Store, F32, 0),
         (0xdd, 2, Store, F64, 0),
         (0xd9, 3, Store, F32, 1),
@@ -322,6 +329,8 @@ fn required_x87_address_tails_precede_lock_rejection_but_unselected_forms_stop_a
         &[0xd9, 0x84, 0x24, 1, 2, 3, 4][..],
         &[0xf0, 0xd9, 0x84, 0x24, 1, 2, 3, 4],
         &[0xf0, 0xdb, 0xbc, 0x24, 1, 2, 3, 4],
+        &[0xf0, 0xdf, 0xa4, 0x24, 1, 2, 3, 4],
+        &[0xf0, 0xdf, 0xb4, 0x24, 1, 2, 3, 4],
     ] {
         for length in 1..full.len() {
             assert_eq!(
@@ -340,8 +349,6 @@ fn required_x87_address_tails_precede_lock_rejection_but_unselected_forms_stop_a
         assert_eq!(at(0x1000, prefix), Err(DecodeError::Unsupported));
     }
     for code in [
-        [0xdf, 0x24],
-        [0xdf, 0x34],
         [0xdd, 0x0c],
         [0xdb, 0x0c],
         [0xdf, 0x0c],
@@ -358,12 +365,8 @@ fn required_x87_address_tails_precede_lock_rejection_but_unselected_forms_stop_a
         [0xd9, 0xf1],
         [0xd9, 0xf2],
         [0xd9, 0xf3],
-        [0xd9, 0xf4],
-        [0xd9, 0xf5],
-        [0xd9, 0xf8],
         [0xd9, 0xf9],
         [0xd9, 0xfb],
-        [0xd9, 0xfd],
         [0xd9, 0xfe],
         [0xd9, 0xff],
     ] {

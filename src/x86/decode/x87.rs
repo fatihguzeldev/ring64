@@ -73,6 +73,8 @@ fn memory(opcode: u8, selector: u8) -> Result<Op, DecodeError> {
         (0xdf, 0) => (Load, I16, 0),
         (0xdb, 0) => (Load, I32, 0),
         (0xdf, 5) => (Load, I64, 0),
+        (0xdf, 4) => (Load, Bcd, 0),
+        (0xdf, 6) => (Store, Bcd, 1),
         (0xd9, 2 | 3) => (Store, F32, selector - 2),
         (0xdd, 2 | 3) => (Store, F64, selector - 2),
         (0xdb, 7) => (Store, F80, 1),
@@ -160,6 +162,10 @@ fn register(opcode: u8, modrm: u8) -> Result<Op, DecodeError> {
                     op.index = modrm - 0xe8;
                     Constant
                 }
+                0xf4 => Extract,
+                0xf5 => RemainderNearest,
+                0xf8 => Remainder,
+                0xfd => Scale,
                 0xf6 => DecTop,
                 0xf7 => IncTop,
                 0xfa => Sqrt,
