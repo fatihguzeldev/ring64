@@ -320,8 +320,28 @@ pub extern "C" fn core_paging_control(
                     core.context.mode(),
                 )
                 .map(|s| (s, None)),
-            2 => state.read_msr(register).map(|v| (state, Some(v))),
-            3 => state.prepare_msr_write(register, value).map(|s| (s, None)),
+            2 => if register == paging::EFER_MSR {
+                state.read_msr(register)
+            } else {
+                core.fast_system.read_msr(register, &core.context)
+            }
+            .map(|v| (state, Some(v))),
+            3 if register == paging::EFER_MSR => {
+                state.prepare_msr_write(register, value).map(|s| (s, None))
+            }
+            3 => core
+                .fast_system
+                .prepare_msr_write(register, value, &core.context)
+                .map(|(bank, context)| {
+                    if core.context != context {
+                        core.image.retire_sources();
+                        core.observed_owners.clear();
+                        core.context_version = core.context_version.wrapping_add(1);
+                    }
+                    core.context = context;
+                    core.fast_system = bank;
+                    (state, None)
+                }),
             4 => {
                 let Some(segment) = Segment::ALL.get(register as usize).copied() else {
                     return -1;

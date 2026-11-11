@@ -21,6 +21,12 @@ import {
 import type { InitialMemory, MemoryBackingInput, MemoryMapping } from './memory.js';
 import { capturePagingState, pagingStateFromJson, type PagingState } from './paging.js';
 import {
+  captureFastSystemState,
+  fastSystemStateFromJson,
+  zeroFastSystemState,
+  type FastSystemState,
+} from './fast-system.js';
+import {
   captureEventState,
   captureInterruptState,
   eventKind,
@@ -236,6 +242,18 @@ type CoreExports = WebAssembly.Exports & {
   core_set_context(): number;
   core_paging_state(): number;
   core_import_paging(): number;
+  core_fast_system_state(): number;
+  core_import_fast_system(): number;
+  core_fast_system(
+    kind: number,
+    wide: number,
+    next: bigint,
+    sp: bigint,
+    rcx: bigint,
+    rdx: bigint,
+    r11: bigint,
+    flags: bigint,
+  ): number;
   core_paging_control(
     kind: number,
     register: number,
@@ -634,6 +652,9 @@ export class Core {
   ): Promise<Core> {
     const isPaged = memory.memoryModel === 'ia32e-paged';
     const paging = isPaged ? capturePagingState(memory.paging!) : undefined;
+    const fastSystem = isPaged
+      ? captureFastSystemState(memory.fastSystem ?? zeroFastSystemState())
+      : undefined;
     const module =
       compiler instanceof WebAssembly.Module
         ? compiler
@@ -736,6 +757,9 @@ export class Core {
         'core_paging_state',
         'core_import_paging',
         'core_paging_control',
+        'core_fast_system_state',
+        'core_import_fast_system',
+        'core_fast_system',
         ...Object.values(PAGED_HELPERS),
         ...Object.values(PAGED_OBSERVED_HELPERS),
       ])
@@ -743,7 +767,7 @@ export class Core {
     const metadataLength = writeInput(
       exports,
       {
-        ...(isPaged ? { memoryModel: 'ia32e-paged', paging } : {}),
+        ...(isPaged ? { memoryModel: 'ia32e-paged', paging, fastSystem } : {}),
         memoryLimits: memory.memoryLimits,
         backings: memory.backings.map(({ id, bytes }) => ({
           id: backingKey(id),
@@ -943,6 +967,18 @@ export class Core {
     if (!this.isPaged) throw new TypeError('method requires ia32e-paged memory');
     writeInput(this.#exports, capturePagingState(state));
     if (this.#exports.core_import_paging() !== 0)
+      throw new TypeError(this.info<{ error: string }>().error);
+  }
+  readFastSystemState(): FastSystemState {
+    if (!this.isPaged) throw new TypeError('method requires ia32e-paged memory');
+    if (this.#exports.core_fast_system_state() !== 0)
+      throw new TypeError(this.info<{ error: string }>().error);
+    return fastSystemStateFromJson(this.info<unknown>());
+  }
+  setFastSystemState(state: FastSystemState): void {
+    if (!this.isPaged) throw new TypeError('method requires ia32e-paged memory');
+    writeInput(this.#exports, captureFastSystemState(state));
+    if (this.#exports.core_import_fast_system() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
   }
   readXmmState(): bigint[] {
@@ -1185,12 +1221,14 @@ export class Core {
       divide: this.#exports.core_divide,
       divide_failed: this.#exports.core_divide_failed,
     };
-    if (this.isPaged)
+    if (this.isPaged) {
+      env.fast_system = this.#exports.core_fast_system;
       for (const [name, key] of Object.entries({
         ...PAGED_HELPERS,
         ...(observed ? PAGED_OBSERVED_HELPERS : {}),
       }))
         env[name] = this.#exports[key]!;
+    }
     const instance = new WebAssembly.Instance(module, { env });
     if (typeof instance.exports.run !== 'function')
       throw new Error('generated module must export run');

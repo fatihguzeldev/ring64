@@ -1,6 +1,11 @@
 import { captureDebugState, type DebugState } from './debug.js';
 import { capturePagingState, type PagingState } from './paging.js';
 import {
+  captureFastSystemState,
+  zeroFastSystemState,
+  type FastSystemState,
+} from './fast-system.js';
+import {
   captureContext,
   type ExecutionContext,
   type ExecutionContextSnapshot,
@@ -152,7 +157,11 @@ export async function createCpu(options: Options): Promise<Cpu> {
   if (!WebAssembly.validate(SIMD_PROBE)) throw new TypeError('WebAssembly SIMD is required');
   const limits = checkedLimits(options.limits);
   const memory = captureInitialMemory(options);
-  if (memory.memoryModel === 'ia32e-paged') memory.paging = capturePagingState(options.paging!);
+  if (memory.memoryModel === 'ia32e-paged') {
+    memory.paging = capturePagingState(options.paging!);
+    memory.fastSystem =
+      'fastSystem' in options ? captureFastSystemState(options.fastSystem!) : zeroFastSystemState();
+  }
   const contextInput = options.context;
   const context = contextInput === undefined ? undefined : captureContext(contextInput);
   if (
@@ -333,6 +342,19 @@ export class Cpu {
     const input = capturePagingState(state);
     this.requireIdle(generation);
     this.engineCall(() => this.#engine.setPagingState(input));
+    this.pruneTranslations();
+  }
+  readFastSystemState(): FastSystemState {
+    this.requireIdle();
+    this.requireMemoryModel('ia32e-paged');
+    return this.engineCall(() => this.#engine.readFastSystemState());
+  }
+  setFastSystemState(state: FastSystemState): void {
+    const generation = this.requireIdle();
+    this.requireMemoryModel('ia32e-paged');
+    const input = captureFastSystemState(state);
+    this.requireIdle(generation);
+    this.engineCall(() => this.#engine.setFastSystemState(input));
     this.pruneTranslations();
   }
   readXmmState(): bigint[] {

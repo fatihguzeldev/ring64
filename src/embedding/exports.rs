@@ -42,6 +42,7 @@ mod debug;
 mod exception_delivery;
 mod external_interrupts;
 mod far_control;
+mod fast_system;
 mod mapped;
 mod mmx;
 mod numeric;
@@ -57,6 +58,7 @@ mod x87_state;
 
 struct Core {
     image: Image,
+    fast_system: crate::x86::fast_system::State,
     paging: Option<crate::x86::paging::State>,
     paging_work: crate::x86::paging::access::AccessState,
     paging_failure: Option<crate::x86::paging::walk::Failure>,
@@ -136,6 +138,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
         }));
         bridge.core = Some(Core {
             image,
+            fast_system: Default::default(),
             paging: None,
             paging_work: Default::default(),
             paging_failure: None,

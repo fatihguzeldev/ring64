@@ -1,5 +1,6 @@
 import { byteLength, unsigned64, type Span } from './core.js';
 import type { PagingState } from './paging.js';
+import type { FastSystemState } from './fast-system.js';
 
 export type MemoryModel = 'linear' | 'ia32e-paged';
 
@@ -31,6 +32,7 @@ export interface MemoryLimits {
 export interface InitialMemory {
   memoryModel?: MemoryModel;
   paging?: PagingState;
+  fastSystem?: FastSystemState;
   backings: MemoryBackingInput[];
   mappings: MemoryMapping[];
   memoryLimits: MemoryLimits;
@@ -186,6 +188,7 @@ export type MemoryOptions =
   | {
       memoryModel?: 'linear';
       paging?: never;
+      fastSystem?: never;
       code: Span;
       ram: Span;
       memoryLimits?: MemoryLimits;
@@ -195,6 +198,7 @@ export type MemoryOptions =
   | {
       memoryModel?: 'linear';
       paging?: never;
+      fastSystem?: never;
       memory: { backings: MemoryBackingInput[]; mappings: MemoryMapping[] };
       entry: bigint;
       memoryLimits: MemoryLimits;
@@ -204,6 +208,7 @@ export type MemoryOptions =
   | {
       memoryModel: 'ia32e-paged';
       paging: PagingState;
+      fastSystem?: FastSystemState;
       memory: { backings: MemoryBackingInput[]; mappings: MemoryMapping[] };
       entry: bigint;
       memoryLimits: MemoryLimits;
@@ -217,6 +222,8 @@ export function captureInitialMemory(options: MemoryOptions): InitialMemory {
     throw new TypeError('memoryModel must be linear or ia32e-paged');
   if (memoryModel === 'linear' && 'paging' in options)
     throw new TypeError('linear memory cannot carry a paging state');
+  if (memoryModel === 'linear' && 'fastSystem' in options)
+    throw new TypeError('linear memory cannot carry a fast-system state');
   if (
     memoryModel === 'ia32e-paged' &&
     (!('memory' in options) ||

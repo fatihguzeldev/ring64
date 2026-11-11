@@ -116,7 +116,7 @@ fn initial_image(
         None | Some(Value::String(_))
             if config.get("memoryModel").is_none_or(|v| v == "linear") =>
         {
-            if config.get("paging").is_some() {
+            if config.get("paging").is_some() || config.get("fastSystem").is_some() {
                 return Err(invalid());
             }
             Image::mapped(backings, maps, limits).map(|image| (image, None))
@@ -137,8 +137,19 @@ pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
             Ok(image) => image,
             Err(error) => return memory_error(bridge, error),
         };
+        let fast_system = match json(&bridge.input[..metadata_len as usize])
+            .map_err(|_| "invalid fast system constructor input")
+            .and_then(|config| match config.get("fastSystem") {
+                Some(value) if paging.is_some() => super::fast_system::parse_bank(value),
+                Some(_) => Err("fast system state requires a paged CPU"),
+                None => Ok(Default::default()),
+            }) {
+            Ok(bank) => bank,
+            Err(message) => return bridge.error(message),
+        };
         bridge.core = Some(Core {
             image,
+            fast_system,
             paging,
             paging_work: Default::default(),
             paging_failure: None,
