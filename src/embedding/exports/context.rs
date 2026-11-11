@@ -60,9 +60,10 @@ pub extern "C" fn core_context_version() -> u64 {
 #[unsafe(no_mangle)]
 pub extern "C" fn core_set_context() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
+        let physical = bridge.core.as_ref().unwrap().physical_controls;
         let result = serde_json::from_slice(&bridge.input)
             .map_err(|_| "invalid execution context")
-            .and_then(|value| ExecutionContext::from_json(&value));
+            .and_then(|value| ExecutionContext::from_json_profile(&value, physical));
         let context = match result {
             Ok(context) => context,
             Err(message) => return bridge.error(message),
@@ -72,7 +73,7 @@ pub extern "C" fn core_set_context() -> i32 {
             if let Err(message) = core
                 .paging
                 .expect("physical controls")
-                .validate_physical(context.mode())
+                .validate_physical_context(&context)
             {
                 return bridge.error(message);
             }

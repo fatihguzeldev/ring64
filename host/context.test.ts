@@ -324,3 +324,26 @@ test('context capture rejects malformed fields and exact address domains', () =>
     assert.throws(() => captureContext(value), TypeError);
   }
 });
+
+test('physical full context owns retained transitional CS wide roots and unusable SS without relaxing old inputs', () => {
+  const source = protectedSnapshot();
+  source.segments.cs.type = 'read-write';
+  source.segments.cs.base = 0xffff0000n;
+  source.segments.cs.default32 = false;
+  source.segments.ss.usable = false;
+  source.segments.ss.selector = 0;
+  source.segments.fs.base = 0xffffffffffffffffn;
+  source.gdtr.base = 0x100000000n;
+  source.tr.base = 0xffffffffffffffffn;
+  assert.throws(() => captureContext(source), TypeError);
+  assert.deepEqual(captureContext(source, true), source);
+  const json = JSON.parse(
+    JSON.stringify(source, (_, value: unknown) =>
+      typeof value === 'bigint' ? `0x${value.toString(16)}` : value,
+    ),
+  ) as ContextInfo;
+  assert.deepEqual(contextFromJson(json, true), source);
+  const user = structuredClone(source);
+  user.cpl = 3;
+  assert.throws(() => captureContext(user, true), TypeError);
+});

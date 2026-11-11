@@ -154,12 +154,12 @@ fn initial_image(input: &[u8], metadata_len: u32) -> Result<InitialImage, Memory
             if config.get("fastSystem").is_some() {
                 return Err(invalid());
             }
-            let context =
-                ExecutionContext::from_json(&config["context"]).map_err(MemoryError::Invalid)?;
+            let context = ExecutionContext::from_json_profile(&config["context"], true)
+                .map_err(MemoryError::Invalid)?;
             let state =
                 super::paging::parse_bank(&config["paging"]).map_err(MemoryError::Invalid)?;
             state
-                .validate_physical(context.mode())
+                .validate_physical_context(&context)
                 .map_err(MemoryError::Invalid)?;
             Image::physical_mapped(backings, maps, limits).map(|image| InitialImage {
                 image,

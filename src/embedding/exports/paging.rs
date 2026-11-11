@@ -305,7 +305,7 @@ pub extern "C" fn core_import_paging() -> i32 {
             return bridge.error("paging state requires a paged CPU");
         };
         let validation = if core.physical_controls {
-            candidate.validate_physical(core.context.mode())
+            candidate.validate_physical_context(&core.context)
         } else {
             candidate.validate()
         };
@@ -422,6 +422,22 @@ pub extern "C" fn core_paging_control(
         };
         match operation {
             Ok((mut candidate, result)) => {
+                let context = if core.physical_controls {
+                    match state.transition_context(candidate, &core.context) {
+                        Ok(context) => context,
+                        Err(_) => {
+                            core.protection_fault = Some(ProtectionFault {
+                                vector: 13,
+                                error_code: 0,
+                                phase: ProtectionPhase::Target,
+                                selector: None,
+                            });
+                            return super::super::layout::PROTECTION;
+                        }
+                    }
+                } else {
+                    core.context.clone()
+                };
                 if core.physical_controls
                     && kind == 1
                     && state.needs_pdpte_reload(candidate, register as u8)
@@ -443,10 +459,13 @@ pub extern "C" fn core_paging_control(
                         }
                     }
                 }
+                let context_changed = core.context != context;
+                core.context = context;
                 if kind == 4 || kind == 1 && register == 3 || state.translation_changed(candidate) {
                     core.retire_translations();
-                }
-                if state.numeric_controls() != candidate.numeric_controls() {
+                } else if context_changed
+                    || state.numeric_controls() != candidate.numeric_controls()
+                {
                     core.context_changed();
                 }
                 core.paging = Some(candidate);

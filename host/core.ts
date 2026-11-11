@@ -1392,7 +1392,7 @@ export class Core {
 
   readContext(): ExecutionContextSnapshot {
     this.#exports.core_context_info();
-    return contextFromJson(this.info<ContextInfo>());
+    return contextFromJson(this.info<ContextInfo>(), this.physicalControls);
   }
 
   setContext(context: ExecutionContext): void {

@@ -141,6 +141,29 @@ fn walk_with<const EFFECTS: bool, const FETCH: bool>(
     request: Request,
     mut entry_access: impl FnMut(u64, u32, bool) -> Result<Option<u64>, Fault>,
 ) -> Result<Option<Translation>, Failure> {
+    if state.cr0 & (1 << 31) == 0 {
+        if request.linear >= 1u64 << 32 {
+            return Err(request.physical_failure(
+                Fault {
+                    address: request.linear,
+                    width: 1,
+                    access: request.access,
+                    cause: crate::memory::Cause::AddressRange,
+                    failing: 1u128 << 32,
+                },
+                PhysicalPhase::FinalAccess,
+            ));
+        }
+        return Ok(Some(Translation {
+            physical: request.linear,
+            leaf: 0,
+            dirty: false,
+            remaining: (1u64 << 32) - request.linear,
+            entry_width: 0,
+            entries: [0; 4],
+            count: 0,
+        }));
+    }
     let ia32e = state.efer & (1 << 10) != 0;
     let pae = state.cr4 & (1 << 5) != 0;
     let entry_width = if ia32e || pae { 8 } else { 4 };

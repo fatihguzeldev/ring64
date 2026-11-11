@@ -1,3 +1,4 @@
+import { resetScenarios } from './execution/reset/index.js';
 import { ioScenarios } from './execution/io/index.js';
 import { numericControlScenarios } from './execution/numeric-controls.js';
 import { integerScenarios } from './execution/integer/index.js';
@@ -41,6 +42,7 @@ export async function runScenarios(
       : await WebAssembly.compile(new Uint8Array(compiler));
   const scenarios = [
     ...integerScenarios(core),
+    ...resetScenarios(core),
     ...stackScenarios(core),
     ...addressingScenarios(core),
     ...memoryScenarios(core),

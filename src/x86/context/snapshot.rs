@@ -29,9 +29,9 @@ fn address(value: &Value) -> Result<u64, &'static str> {
         .ok_or(INVALID)
 }
 
-fn system_base(value: &Value, mode: Mode) -> Result<u64, &'static str> {
+fn system_base(value: &Value, mode: Mode, raw: bool) -> Result<u64, &'static str> {
     let base = address(value)?;
-    if !matches!(mode, Mode::Compatibility | Mode::Long64) && base > u64::from(u32::MAX) {
+    if !raw && !matches!(mode, Mode::Compatibility | Mode::Long64) && base > u64::from(u32::MAX) {
         return Err(INVALID);
     }
     Ok(base)
@@ -42,6 +42,7 @@ fn cache(
     mode: Mode,
     segment: Segment,
     full: bool,
+    raw: bool,
 ) -> Result<LoadedSegment, &'static str> {
     let kind = match value["type"].as_str() {
         Some("code") => SegmentType::Code,
@@ -53,8 +54,9 @@ fn cache(
         _ => return Err(INVALID),
     };
     let base = address(&value["base"])?;
-    let wide =
-        mode == Mode::Long64 || full && mode == Mode::Compatibility && segment != Segment::Cs;
+    let wide = raw
+        || mode == Mode::Long64
+        || full && mode == Mode::Compatibility && segment != Segment::Cs;
     if !wide && base > u64::from(u32::MAX)
         || matches!(mode, Mode::Long64 | Mode::Compatibility)
             && matches!(segment, Segment::Fs | Segment::Gs)
@@ -83,15 +85,19 @@ fn attributes(value: &Value) -> Result<SegmentAttributes, &'static str> {
     })
 }
 
-fn table(value: &Value, mode: Mode) -> Result<TableRegister, &'static str> {
+fn table(value: &Value, mode: Mode, raw: bool) -> Result<TableRegister, &'static str> {
     Ok(TableRegister {
-        base: system_base(&value["base"], mode)?,
+        base: system_base(&value["base"], mode, raw)?,
         limit: number(&value["limit"], u64::from(u16::MAX))? as u16,
     })
 }
 
 impl ExecutionContext {
     pub fn from_json(value: &Value) -> Result<Self, &'static str> {
+        Self::from_json_profile(value, false)
+    }
+
+    pub fn from_json_profile(value: &Value, physical: bool) -> Result<Self, &'static str> {
         let mode = match value["mode"].as_str() {
             Some("long64") => Mode::Long64,
             Some("real") => Mode::Real,
@@ -109,6 +115,7 @@ impl ExecutionContext {
                     .iter()
                     .any(|key| value["segments"][segment.name()].get(*key).is_some())
             });
+        let raw = physical && full;
         let mut context = Self {
             mode,
             ..Self::default()
@@ -124,13 +131,13 @@ impl ExecutionContext {
             {
                 return Err(INVALID);
             }
-            context.gdtr = table(&value["gdtr"], mode)?;
-            context.idtr = table(&value["idtr"], mode)?;
+            context.gdtr = table(&value["gdtr"], mode, raw)?;
+            context.idtr = table(&value["idtr"], mode, raw)?;
             let ldtr = &value["ldtr"];
             context.ldtr = LdtRegister {
                 selector: number(&ldtr["selector"], u64::from(u16::MAX))? as u16,
                 valid: boolean(&ldtr["valid"])?,
-                base: system_base(&ldtr["base"], mode)?,
+                base: system_base(&ldtr["base"], mode, raw)?,
                 limit: number(&ldtr["limit"], u64::from(u32::MAX))? as u32,
                 attributes: number(&ldtr["attributes"], 0xfff)? as u16,
             };
@@ -138,7 +145,7 @@ impl ExecutionContext {
                 context.tr = TaskRegister {
                     selector: number(&tr["selector"], u64::from(u16::MAX))? as u16,
                     valid: boolean(&tr["valid"])?,
-                    base: system_base(&tr["base"], mode)?,
+                    base: system_base(&tr["base"], mode, raw)?,
                     limit: number(&tr["limit"], u64::from(u32::MAX))? as u32,
                     attributes: number(&tr["attributes"], 0xfff)? as u16,
                 };
@@ -155,7 +162,7 @@ impl ExecutionContext {
         }
         for segment in Segment::ALL {
             let input = &value["segments"][segment.name()];
-            let loaded = cache(input, mode, segment, full)?;
+            let loaded = cache(input, mode, segment, full, raw)?;
             let index = segment as usize;
             context.segments[index] = loaded;
             if full {
@@ -194,8 +201,14 @@ impl ExecutionContext {
             }
         } else if mode != Mode::Long64
             && (!cs.usable
-                || !(cs.kind.is_code() || mode == Mode::Real && cs.kind == SegmentType::ReadWrite)
-                || !(full && mode == Mode::Compatibility) && (!ss.usable || !ss.kind.writable()))
+                || !(cs.kind.is_code()
+                    || mode == Mode::Real && cs.kind == SegmentType::ReadWrite
+                    || raw
+                        && context.cpl == 0
+                        && matches!(mode, Mode::Protected | Mode::Compatibility)
+                        && cs.kind == SegmentType::ReadWrite)
+                || !(raw || full && mode == Mode::Compatibility)
+                    && (!ss.usable || !ss.kind.writable()))
         {
             return Err(INVALID);
         }

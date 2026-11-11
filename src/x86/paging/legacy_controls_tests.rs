@@ -61,8 +61,11 @@ fn guest_legacy_control_writes_normalize_root_without_host_normalization() {
         );
     }
     assert_eq!(
-        legacy(false).prepare_physical_cr_write(4, 0x628, Mode::Protected),
-        Err(ControlFailure::Unsupported)
+        legacy(false)
+            .prepare_physical_cr_write(4, 0x628, Mode::Protected)
+            .unwrap()
+            .cr4,
+        0x628
     );
     assert_eq!(
         legacy(false).prepare_physical_cr_write(0, 0x80000032, Mode::Protected),

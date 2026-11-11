@@ -1,4 +1,4 @@
-use crate::x86::context::Mode;
+use crate::x86::context::{ExecutionContext, Mode, Segment};
 
 pub const EFER_MSR: u32 = 0xc0000080;
 const CR0_FIXED: u64 = 0x80000033;
@@ -57,13 +57,26 @@ impl State {
     }
 
     pub fn validate_physical(self, mode: Mode) -> Result<(), &'static str> {
-        if !matches!(mode, Mode::Protected | Mode::Virtual8086)
-            || self.cr0 & !(CR0_WP | CR0_NUMERIC) != CR0_FIXED & !CR0_NUMERIC
+        let pg = self.cr0 & 0x80000000 != 0;
+        let pe = self.cr0 & 1 != 0;
+        let lma = pg && self.efer & 0x100 != 0;
+        let coherent_mode = match mode {
+            Mode::Real => !pe && !pg,
+            Mode::Protected | Mode::Virtual8086 => pe && !lma,
+            Mode::Long64 | Mode::Compatibility => pe && lma,
+        };
+        if !coherent_mode
+            || self.cr0 & !0xe001003f != 0
+            || self.cr0 & 0x10 == 0
+            || pg && !pe
+            || self.cr0 & 0x60000000 == 0x20000000
             || self.cr3 & !0x000f_ffff_ffff_fff8 != 0
-            || self.cr4 & !(0x30 | CR4_NUMERIC) != 8
-            || self.efer & !(EFER_NXE | EFER_SCE) != 0
+            || self.cr4 & !0x638 != 0
+            || self.efer & !0xd01 != 0
+            || (self.efer & 0x400 != 0) != lma
+            || lma && self.cr4 & 0x20 == 0
         {
-            return Err("physical controls require a consistent legacy paged context");
+            return Err("physical controls require a consistent execution family");
         }
         if self.legacy_pae() != self.pdpte.is_some() {
             return Err("captured PDPTE quartet requires active legacy PAE");
@@ -75,6 +88,48 @@ impl State {
             return Err("reserved present captured PDPTE");
         }
         Ok(())
+    }
+
+    pub fn validate_physical_context(self, context: &ExecutionContext) -> Result<(), &'static str> {
+        self.validate_physical(context.mode())?;
+        if self.efer & 0x400 != 0
+            && ((context.mode() == Mode::Long64) != context.attributes(Segment::Cs).long
+                || context.mode() == Mode::Long64 && context.segment(Segment::Cs).default32
+                || context.tr().valid && matches!(context.tr().attributes & 15, 1 | 3))
+        {
+            return Err("physical IA32e context has inconsistent loaded CS or task cache");
+        }
+        Ok(())
+    }
+
+    pub fn transition_context(
+        self,
+        candidate: Self,
+        context: &ExecutionContext,
+    ) -> Result<ExecutionContext, ControlFailure> {
+        if self.efer & 0x400 == 0
+            && candidate.efer & 0x400 != 0
+            && (context.attributes(Segment::Cs).long
+                || context.tr().valid && matches!(context.tr().attributes & 15, 1 | 3))
+        {
+            return Err(ControlFailure::GeneralProtection);
+        }
+        let mode = if candidate.cr0 & 1 == 0 {
+            Mode::Real
+        } else if candidate.efer & 0x400 != 0 {
+            if context.attributes(Segment::Cs).long {
+                Mode::Long64
+            } else {
+                Mode::Compatibility
+            }
+        } else if context.mode() == Mode::Virtual8086 {
+            Mode::Virtual8086
+        } else {
+            Mode::Protected
+        };
+        let mut result = context.clone();
+        result.set_mode_and_cpl(mode, if mode == Mode::Real { 0 } else { context.cpl() });
+        Ok(result)
     }
 
     pub fn prepare_physical_cr_write(
@@ -91,50 +146,71 @@ impl State {
                     return Err(GeneralProtection);
                 }
                 let value = (value & 0xe005003f) | 0x10;
-                if value & 0x80000001 == 0x80000000 || value & 0x60000000 == 0x20000000 {
+                if value & 0x80000001 == 0x80000000
+                    || value & 0x60000000 == 0x20000000
+                    || mode == Mode::Long64 && value & 0x80000000 == 0
+                    || value & 0x80000000 != 0 && self.efer & 0x100 != 0 && self.cr4 & 0x20 == 0
+                {
                     return Err(GeneralProtection);
                 }
-                if value & !(CR0_WP | CR0_NUMERIC) != CR0_FIXED & !CR0_NUMERIC {
+                if value & !0xe001003f != 0 {
                     return Err(Unsupported);
                 }
                 candidate.cr0 = value;
-            }
-            2 => candidate.cr2 = u64::from(value as u32),
-            3 => {
-                candidate.cr3 = value
-                    & if self.cr4 & 0x20 != 0 {
-                        0xffffffe0
+                candidate.efer = (self.efer & !0x400)
+                    | if value & 0x80000000 != 0 && self.efer & 0x100 != 0 {
+                        0x400
                     } else {
-                        0xfffff018
-                    }
+                        0
+                    };
+            }
+            2 => candidate.cr2 = value,
+            3 => {
+                if self.efer & 0x400 != 0 {
+                    candidate = self.prepare_cr_write(register, value, mode)?;
+                } else {
+                    candidate.cr3 = u64::from(value as u32)
+                        & if self.cr4 & 0x20 != 0 {
+                            0xffffffe0
+                        } else {
+                            0xfffff018
+                        };
+                }
             }
             4 => {
                 let defined = 0x7fff | (0x3ff << 16) | (3 << 27) | (1 << 32);
                 if value & !defined != 0
-                    || value & (1 << 12) != 0
-                    || value & (1 << 17) != 0
+                    || self.efer & 0x400 != 0
+                        && (value & 0x20 == 0 || (self.cr4 ^ value) & 0x1000 != 0)
+                    || value & (1 << 17) != 0 && (self.efer & 0x400 == 0 || self.cr3 & 0xfff != 0)
                     || value & (1 << 23) != 0 && self.cr0 & CR0_WP == 0
                 {
                     return Err(GeneralProtection);
                 }
-                if value & !(0x30 | CR4_NUMERIC) != 8 || (self.cr4 ^ value) & 0x20 != 0 {
+                if value & !0x638 != 0 {
                     return Err(Unsupported);
                 }
                 candidate.cr4 = value;
             }
             _ => return self.prepare_cr_write(register, value, mode),
         }
+        if !candidate.legacy_pae() {
+            candidate.pdpte = None;
+        }
         Ok(candidate)
     }
 
     pub fn prepare_physical_efer_write(self, value: u64) -> Result<Self, ControlFailure> {
-        if value & !0xd01 != 0 || (self.efer ^ value) & (1 << 8) != 0 {
+        if value & !0xd01 != 0 || self.cr0 & 0x80000000 != 0 && (self.efer ^ value) & 0x100 != 0 {
             return Err(ControlFailure::GeneralProtection);
         }
-        Ok(Self {
-            efer: value & (EFER_NXE | EFER_SCE),
-            ..self
-        })
+        let efer = (value & !0x400)
+            | if self.cr0 & 0x80000000 != 0 && value & 0x100 != 0 {
+                0x400
+            } else {
+                0
+            };
+        Ok(Self { efer, ..self })
     }
 
     pub fn needs_pdpte_reload(self, candidate: Self, register: u8) -> bool {

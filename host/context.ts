@@ -116,9 +116,9 @@ function boolean(value: unknown): boolean {
 function canonical(base: bigint): boolean {
   return base <= 0x7fffffffffffn || base >= 0xffff800000000000n;
 }
-function systemBase(value: unknown, mode: ExecutionMode): bigint {
+function systemBase(value: unknown, mode: ExecutionMode, raw = false): bigint {
   unsigned64(value, 'system base');
-  if (mode !== 'long64' && mode !== 'compatibility' && value > 0xffffffffn)
+  if (!raw && mode !== 'long64' && mode !== 'compatibility' && value > 0xffffffffn)
     throw new TypeError('legacy system base must fit u32');
   return value;
 }
@@ -127,6 +127,7 @@ function captureSegment(
   mode: ExecutionMode,
   name: SegmentName,
   full: boolean,
+  raw: boolean,
 ): LoadedSegment {
   const base = source.base;
   const limit = source.limit;
@@ -134,7 +135,7 @@ function captureSegment(
   const usable = source.usable;
   const type = source.type;
   unsigned64(base, 'segment base');
-  const wide = mode === 'long64' || (full && mode === 'compatibility' && name !== 'cs');
+  const wide = raw || mode === 'long64' || (full && mode === 'compatibility' && name !== 'cs');
   if (!wide && base > 0xffffffffn) throw new TypeError('segment base must fit u32');
   if (
     (mode === 'long64' || mode === 'compatibility') &&
@@ -153,13 +154,17 @@ function captureSegment(
     type: type as SegmentType,
   };
 }
-function captureTable(value: unknown, mode: ExecutionMode): TableRegister {
+function captureTable(value: unknown, mode: ExecutionMode, raw: boolean): TableRegister {
   const source = record(value);
   const base = source.base;
   const limit = source.limit;
-  return { base: systemBase(base, mode), limit: integer(limit, 0xffff) };
+  return { base: systemBase(base, mode, raw), limit: integer(limit, 0xffff) };
 }
-function captureSystemCache(value: unknown, mode: ExecutionMode): LdtRegister | TaskRegister {
+function captureSystemCache(
+  value: unknown,
+  mode: ExecutionMode,
+  raw: boolean,
+): LdtRegister | TaskRegister {
   const source = record(value);
   const selector = source.selector;
   const valid = source.valid;
@@ -169,7 +174,7 @@ function captureSystemCache(value: unknown, mode: ExecutionMode): LdtRegister | 
   return {
     selector: integer(selector, 0xffff),
     valid: boolean(valid),
-    base: systemBase(base, mode),
+    base: systemBase(base, mode, raw),
     limit: integer(limit, 0xffffffff),
     attributes: integer(attributes, 0xfff),
   };
@@ -188,7 +193,10 @@ function defaults(cache: LoadedSegment, selector: number, cpl: number): SegmentS
   };
 }
 
-export function captureContext(context: ExecutionContext): ExecutionContextSnapshot {
+export function captureContext(
+  context: ExecutionContext,
+  physical = false,
+): ExecutionContextSnapshot {
   const source = record(context);
   const modeValue = source.mode;
   if (typeof modeValue !== 'string' || !MODES.includes(modeValue as ExecutionMode))
@@ -206,6 +214,7 @@ export function captureContext(context: ExecutionContext): ExecutionContextSnaps
     hasTr ||
     (mode === 'long64' && hasSegments) ||
     SEGMENTS.some((name) => inputs[name] && EXTRA.some((key) => key in inputs[name]));
+  const raw = physical && full;
   if (full && ('fsBase' in source || 'gsBase' in source))
     throw new TypeError('full snapshots cannot contain legacy FS/GS base aliases');
   const cpl = full ? integer(source.cpl, 3) : mode === 'virtual8086' ? 3 : 0;
@@ -236,7 +245,7 @@ export function captureContext(context: ExecutionContext): ExecutionContextSnaps
   } else {
     for (const name of SEGMENTS) {
       const input = inputs[name];
-      const cache = captureSegment(record(input), mode, name, full);
+      const cache = captureSegment(record(input), mode, name, full, raw);
       if (full) {
         segments[name] = {
           ...cache,
@@ -285,9 +294,13 @@ export function captureContext(context: ExecutionContext): ExecutionContextSnaps
       !cs.usable ||
       !(
         ['code', 'readable-code'].includes(cs.type) ||
-        (mode === 'real' && cs.type === 'read-write')
+        (mode === 'real' && cs.type === 'read-write') ||
+        (raw &&
+          cpl === 0 &&
+          (mode === 'protected' || mode === 'compatibility') &&
+          cs.type === 'read-write')
       ) ||
-      (!(full && mode === 'compatibility') &&
+      (!(raw || (full && mode === 'compatibility')) &&
         (!ss.usable || !['read-write', 'expand-down-read-write'].includes(ss.type)))
     )
       throw new TypeError('invalid loaded CS/SS');
@@ -296,13 +309,13 @@ export function captureContext(context: ExecutionContext): ExecutionContextSnaps
     mode,
     cpl,
     segments,
-    gdtr: full ? captureTable(source.gdtr, mode) : { base: 0n, limit: 0 },
-    idtr: full ? captureTable(source.idtr, mode) : { base: 0n, limit: 0 },
+    gdtr: full ? captureTable(source.gdtr, mode, raw) : { base: 0n, limit: 0 },
+    idtr: full ? captureTable(source.idtr, mode, raw) : { base: 0n, limit: 0 },
     ldtr: full
-      ? captureSystemCache(source.ldtr, mode)
+      ? captureSystemCache(source.ldtr, mode, raw)
       : { selector: 0, valid: false, base: 0n, limit: 0, attributes: 0 },
     tr: hasTr
-      ? captureSystemCache(source.tr, mode)
+      ? captureSystemCache(source.tr, mode, raw)
       : { selector: 0, valid: false, base: 0n, limit: 0, attributes: 0 },
   };
 }
@@ -319,16 +332,19 @@ export type ContextInfo = Omit<
 };
 
 // Rust publishes normalized owned JSON; convert only its address representation.
-export function contextFromJson(value: ContextInfo): ExecutionContextSnapshot {
+export function contextFromJson(value: ContextInfo, physical = false): ExecutionContextSnapshot {
   const segments = {} as Record<SegmentName, SegmentSnapshot>;
   for (const name of SEGMENTS)
     segments[name] = { ...value.segments[name], base: BigInt(value.segments[name].base) };
-  return captureContext({
-    ...value,
-    segments,
-    gdtr: { ...value.gdtr, base: BigInt(value.gdtr.base) },
-    idtr: { ...value.idtr, base: BigInt(value.idtr.base) },
-    ldtr: { ...value.ldtr, base: BigInt(value.ldtr.base) },
-    tr: { ...value.tr, base: BigInt(value.tr.base) },
-  });
+  return captureContext(
+    {
+      ...value,
+      segments,
+      gdtr: { ...value.gdtr, base: BigInt(value.gdtr.base) },
+      idtr: { ...value.idtr, base: BigInt(value.idtr.base) },
+      ldtr: { ...value.ldtr, base: BigInt(value.ldtr.base) },
+      tr: { ...value.tr, base: BigInt(value.tr.base) },
+    },
+    physical,
+  );
 }

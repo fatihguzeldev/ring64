@@ -172,7 +172,10 @@ export async function createCpu(options: Options): Promise<Cpu> {
           : zeroFastSystemState();
   }
   const contextInput = options.context;
-  const context = contextInput === undefined ? undefined : captureContext(contextInput);
+  const context =
+    contextInput === undefined
+      ? undefined
+      : captureContext(contextInput, memory.memoryModel === 'physical');
   if (memory.memoryModel === 'physical' && context === undefined)
     throw new TypeError('physical memory requires a non-undefined context');
   if (
@@ -296,7 +299,7 @@ export class Cpu {
 
   setContext(context: ExecutionContext): void {
     this.requireIdle();
-    const input = captureContext(context);
+    const input = captureContext(context, this.#memoryModel === 'physical');
     this.requireIdle();
     if (
       this.#memoryModel === 'ia32e-paged' &&

@@ -87,7 +87,7 @@ impl<'a> Memory<'a> {
             };
             let translation =
                 walk::walk(storage.image, self.paging, request).map_err(AccessFailure::Paging)?;
-            let length = (width - offset).min(translation.remaining as u32);
+            let length = u64::from(width - offset).min(translation.remaining) as u32;
             let write = if access == Access::Write {
                 storage
                     .image

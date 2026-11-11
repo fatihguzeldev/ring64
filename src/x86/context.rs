@@ -189,6 +189,44 @@ pub enum AccessFailure {
 }
 
 impl ExecutionContext {
+    pub fn reset() -> Self {
+        let mut context = Self {
+            mode: Mode::Real,
+            cpl: 0,
+            selectors: [0; 6],
+            segments: [LoadedSegment {
+                base: 0,
+                limit: 0xffff,
+                default32: false,
+                usable: true,
+                kind: SegmentType::ReadWrite,
+            }; 6],
+            attributes: [SegmentAttributes {
+                present: true,
+                accessed: true,
+                ..SegmentAttributes::default()
+            }; 6],
+            gdtr: TableRegister {
+                base: 0,
+                limit: 0xffff,
+            },
+            idtr: TableRegister {
+                base: 0,
+                limit: 0xffff,
+            },
+            ldtr: LdtRegister {
+                limit: 0xffff,
+                ..LdtRegister::default()
+            },
+            tr: TaskRegister {
+                limit: 0xffff,
+                ..TaskRegister::default()
+            },
+        };
+        context.selectors[Segment::Cs as usize] = 0xf000;
+        context.segments[Segment::Cs as usize].base = 0xffff0000;
+        context
+    }
     pub fn is_long64(&self) -> bool {
         self.mode == Mode::Long64
     }
