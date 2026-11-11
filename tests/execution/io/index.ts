@@ -1,3 +1,4 @@
+import { ioLifecycleReviewScenarios } from './review-lifecycle.js';
 import { ioDebugReviewScenarios } from './review-debug.js';
 import { ioOperandReviewScenarios } from './review-operands.js';
 import { ioPermissionReviewScenarios } from './review-permissions.js';
@@ -17,6 +18,7 @@ export function ioScenarios(compiler: WebAssembly.Module): Scenario[] {
     ...ioPermissionReviewScenarios(compiler),
     ...ioOperandReviewScenarios(compiler),
     ...ioDebugReviewScenarios(compiler),
+    ...ioLifecycleReviewScenarios(compiler),
     ...stringIoScenarios(compiler),
     ...pagedIoScenarios(compiler),
     ...ioSourcePteScenarios(compiler),
