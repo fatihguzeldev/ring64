@@ -1,0 +1,342 @@
+use super::State;
+use crate::memory::{Access, Fault, Image};
+
+const ADDRESS: u64 = 0x000f_ffff_ffff_f000;
+const ACCESSED: u64 = 1 << 5;
+pub const DIRTY: u64 = 1 << 6;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Request {
+    pub linear: u64,
+    pub access: Access,
+    pub user: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PageFault {
+    pub address: u64,
+    pub access: Access,
+    pub error_code: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PhysicalPhase {
+    WalkRead,
+    AccessedWrite,
+    DirtyWrite,
+    FinalAccess,
+}
+
+impl PhysicalPhase {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::WalkRead => "walk-read",
+            Self::AccessedWrite => "accessed-write",
+            Self::DirtyWrite => "dirty-write",
+            Self::FinalAccess => "final-access",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PhysicalFault {
+    pub linear: u64,
+    pub access: Access,
+    pub physical: Fault,
+    pub phase: PhysicalPhase,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Failure {
+    Page(PageFault),
+    Physical(PhysicalFault),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Translation {
+    pub physical: u64,
+    pub leaf: u64,
+    pub dirty: bool,
+    pub remaining: u64,
+    entries: [u64; 4],
+    count: usize,
+}
+
+impl Translation {
+    pub fn entries(&self) -> &[u64] {
+        &self.entries[..self.count]
+    }
+}
+
+impl Request {
+    fn page_fault(self, state: &State, present: bool, reserved: bool) -> Failure {
+        Failure::Page(PageFault {
+            address: self.linear,
+            access: self.access,
+            error_code: u32::from(present)
+                | (u32::from(self.access == Access::Write) << 1)
+                | (u32::from(self.user) << 2)
+                | (u32::from(reserved) << 3)
+                | (u32::from(self.access == Access::Execute && state.efer & (1 << 11) != 0) << 4),
+        })
+    }
+
+    pub fn physical_failure(self, physical: Fault, phase: PhysicalPhase) -> Failure {
+        Failure::Physical(PhysicalFault {
+            linear: self.linear,
+            access: self.access,
+            physical,
+            phase,
+        })
+    }
+}
+
+pub fn peek(image: &Image, state: &State, request: Request) -> Result<Translation, Failure> {
+    walk_with::<false>(state, request, |address, _| image.physical_read(address, 8))
+}
+
+pub fn walk(image: &mut Image, state: &State, request: Request) -> Result<Translation, Failure> {
+    walk_with::<true>(state, request, |address, accessed| {
+        if accessed {
+            image.physical_check_write(address, 8)?;
+            let current = image.physical_read(address, 8)?;
+            image.physical_write(address, 8, current | ACCESSED)?;
+            Ok(current | ACCESSED)
+        } else {
+            image.physical_read(address, 8)
+        }
+    })
+}
+
+fn walk_with<const EFFECTS: bool>(
+    state: &State,
+    request: Request,
+    mut entry_access: impl FnMut(u64, bool) -> Result<u64, Fault>,
+) -> Result<Translation, Failure> {
+    let mut table = state.cr3 & ADDRESS;
+    let mut user = true;
+    let mut writable = true;
+    let mut executable = true;
+    let mut entries = [0; 4];
+    for (index, shift) in [39, 30, 21, 12].into_iter().enumerate() {
+        let address = table + ((request.linear >> shift) & 511) * 8;
+        entries[index] = address;
+        let entry = entry_access(address, false)
+            .map_err(|f| request.physical_failure(f, PhysicalPhase::WalkRead))?;
+        if entry & 1 == 0 {
+            return Err(request.page_fault(state, false, false));
+        }
+        let large = index < 3 && entry & (1 << 7) != 0;
+        let leaf = index == 3 || large;
+        let reserved_address = large && entry & (((1u64 << shift) - 1) & !0x1fff) != 0;
+        if index == 0 && large
+            || reserved_address
+            || state.efer & (1 << 11) == 0 && entry & (1 << 63) != 0
+        {
+            return Err(request.page_fault(state, true, true));
+        }
+        if EFFECTS && entry & ACCESSED == 0 {
+            entry_access(address, true)
+                .map_err(|f| request.physical_failure(f, PhysicalPhase::AccessedWrite))?;
+        }
+        user &= entry & 4 != 0;
+        writable &= entry & 2 != 0;
+        executable &= entry & (1 << 63) == 0;
+        if leaf {
+            if request.user && !user
+                || request.access == Access::Write
+                    && !writable
+                    && (request.user || state.cr0 & (1 << 16) != 0)
+                || request.access == Access::Execute && !executable
+            {
+                return Err(request.page_fault(state, true, false));
+            }
+            let offset_mask = (1u64 << shift) - 1;
+            return Ok(Translation {
+                physical: (entry & ADDRESS & !offset_mask) | (request.linear & offset_mask),
+                leaf: address,
+                dirty: entry & DIRTY == 0,
+                remaining: (1u64 << shift) - (request.linear & offset_mask),
+                entries,
+                count: index + 1,
+            });
+        }
+        table = entry & ADDRESS;
+    }
+    unreachable!("four-level walk always reaches a PTE")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::memory::{MappingInput, MemoryLimits, Permissions};
+
+    fn fixture() -> (Image, State) {
+        let mut bytes = vec![0; 0x5000];
+        for (offset, word) in [
+            (0x1000, 0x2007u64),
+            (0x2000, 0x3007),
+            (0x3000, 0x4007),
+            (0x4008, 0xa007),
+        ] {
+            bytes[offset..offset + 8].copy_from_slice(&word.to_le_bytes());
+        }
+        let image = Image::physical_mapped(
+            vec![("tables".into(), bytes)],
+            vec![MappingInput {
+                base: 0,
+                backing: "tables".into(),
+                offset: 0,
+                length: 0x5000,
+                permissions: Permissions {
+                    read: true,
+                    write: true,
+                    execute: false,
+                },
+            }],
+            MemoryLimits {
+                max_backing_bytes: 0x5000,
+                max_backings: 1,
+                max_mappings: 1,
+            },
+        )
+        .unwrap();
+        (
+            image,
+            State {
+                cr3: 0x1000,
+                ..State::default()
+            },
+        )
+    }
+
+    #[test]
+    fn literal_nonidentity_walk_peeks_without_accessed_effects() {
+        let (image, state) = fixture();
+        let request = Request {
+            linear: 0x1234,
+            access: Access::Read,
+            user: true,
+        };
+        let result = peek(&image, &state, request).unwrap();
+        assert_eq!(
+            (result.physical, result.leaf, result.dirty),
+            (0xa234, 0x4008, true)
+        );
+        assert_eq!(result.entries(), &[0x1000, 0x2000, 0x3000, 0x4008]);
+        assert_eq!(image.physical_read(0x1000, 8).unwrap(), 0x2007);
+    }
+
+    #[test]
+    fn actual_walk_sets_only_visited_valid_accessed_bits_before_nonpresent() {
+        let (mut image, state) = fixture();
+        let failure = walk(
+            &mut image,
+            &state,
+            Request {
+                linear: 0x2000,
+                access: Access::Write,
+                user: true,
+            },
+        )
+        .unwrap_err();
+        assert_eq!(
+            failure,
+            Failure::Page(PageFault {
+                address: 0x2000,
+                access: Access::Write,
+                error_code: 6
+            })
+        );
+        for (address, word) in [(0x1000, 0x2027), (0x2000, 0x3027), (0x3000, 0x4027)] {
+            assert_eq!(image.physical_read(address, 8).unwrap(), word);
+        }
+        assert_eq!(image.physical_read(0x4010, 8).unwrap(), 0);
+    }
+
+    #[test]
+    fn leaf_permission_and_nx_error_codes_use_literal_access_provenance() {
+        for (user, access, wp, nxe, leaf, expected) in [
+            (true, Access::Write, true, false, 0xa005, 7),
+            (false, Access::Write, true, false, 0xa005, 3),
+            (true, Access::Execute, false, true, 0x800000000000a007, 21),
+            (true, Access::Read, false, false, 0x800000000000a007, 13),
+            (true, Access::Execute, false, true, 0, 20),
+            (true, Access::Execute, false, false, 0, 4),
+        ] {
+            let (mut image, mut state) = fixture();
+            state.cr0 |= u64::from(wp) << 16;
+            state.efer |= u64::from(nxe) << 11;
+            image.physical_write(0x4008, 8, leaf).unwrap();
+            assert_eq!(
+                walk(
+                    &mut image,
+                    &state,
+                    Request {
+                        linear: 0x1234,
+                        access,
+                        user
+                    }
+                ),
+                Err(Failure::Page(PageFault {
+                    address: 0x1234,
+                    access,
+                    error_code: expected
+                }))
+            );
+            assert_eq!(image.physical_read(0x4008, 8).unwrap() & 64, 0);
+        }
+    }
+
+    #[test]
+    fn lower_absence_precedes_upper_permission_and_nonpresent_garbage_is_not_reserved() {
+        let (mut image, state) = fixture();
+        image.physical_write(0x1000, 8, 0x2001).unwrap();
+        image.physical_write(0x4008, 8, 0xfffffffffffffffE).unwrap();
+        assert_eq!(
+            walk(
+                &mut image,
+                &state,
+                Request {
+                    linear: 0x1234,
+                    access: Access::Read,
+                    user: true
+                }
+            ),
+            Err(Failure::Page(PageFault {
+                address: 0x1234,
+                access: Access::Read,
+                error_code: 4
+            }))
+        );
+        assert_eq!(image.physical_read(0x4008, 8).unwrap(), 0xfffffffffffffffE);
+    }
+
+    #[test]
+    fn huge_leaves_accept_pat_and_ignored_high_bits_but_reject_reserved_address_bits() {
+        let (mut image, state) = fixture();
+        let request = Request {
+            linear: 0x1234,
+            access: Access::Read,
+            user: true,
+        };
+        for (entry, word, expected) in [
+            (0x2000, 0x7ff0000040001087, 0x40001234),
+            (0x3000, 0x7ff0000000201087, 0x201234),
+        ] {
+            let old = image.physical_read(entry, 8).unwrap();
+            image.physical_write(entry, 8, word).unwrap();
+            assert_eq!(peek(&image, &state, request).unwrap().physical, expected);
+            image.physical_write(entry, 8, word | (1 << 13)).unwrap();
+            assert_eq!(
+                peek(&image, &state, request),
+                Err(Failure::Page(PageFault {
+                    address: 0x1234,
+                    access: Access::Read,
+                    error_code: 13
+                }))
+            );
+            image.physical_write(entry, 8, old).unwrap();
+        }
+    }
+}
