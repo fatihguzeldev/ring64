@@ -634,7 +634,10 @@ where
         }
         let byte = cursor.byte()?;
         let register = (byte >> 3) & 7;
-        if prefixes.lock || prefixes.rex.reg_extension() != 0 || matches!(register, 4 | 5) {
+        if prefixes.lock
+            || prefixes.rex.reg_extension() != 0
+            || !prefixes.paged && matches!(register, 4 | 5)
+        {
             return Err(DecodeError::Invalid);
         }
         return Ok(Operation::DebugRegister {

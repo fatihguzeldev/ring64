@@ -101,12 +101,20 @@ pub extern "C" fn core_debug_register(operation: u32, input: u64, pc: u64, flags
         context::Mode,
         protection::{ProtectionFault, ProtectionPhase},
     };
-    let register = (operation & 7) as u8;
-    if operation & !31 != 0 || matches!(register, 4 | 5) {
+    let mut register = (operation & 7) as u8;
+    if operation & !31 != 0 {
         return -1;
     }
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
+        if core.debug_register_admission(register) != 0 {
+            return INVALID;
+        }
+        if register == 4 {
+            register = 6;
+        } else if register == 5 {
+            register = 7;
+        }
         if (operation & 16 != 0) != core.context.is_long64() {
             return -1;
         }
@@ -231,4 +239,17 @@ pub extern "C" fn core_debug_finish(
             .unwrap()
             .finish_debug(pc, resume, completed != 0, flags, decision)
     })
+}
+
+impl Core {
+    pub(super) fn debug_register_admission(&mut self, register: u8) -> i32 {
+        if matches!(register, 4 | 5)
+            && (!self.physical_controls || self.paging.is_none_or(|bank| bank.cr4 & 8 != 0))
+        {
+            self.decode_fault = Some(decode::DecodeFault::UndefinedOpcode);
+            INVALID
+        } else {
+            0
+        }
+    }
 }
