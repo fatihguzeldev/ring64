@@ -1,12 +1,20 @@
 import { captureDebugSource, type DebugSource } from './debug.js';
-export interface ExceptionEvent {
-  debug?: DebugSource;
-  vector: 0 | 1 | 6 | 8 | 10 | 11 | 12 | 13 | 16 | 19;
+interface ExceptionBoundary {
   instructionPc: bigint;
   returnPc: bigint;
   savedFlags: bigint;
-  errorCode?: number;
 }
+
+export type ExceptionEvent = ExceptionBoundary &
+  (
+    | { vector: 14; errorCode: number; pageFaultAddress: bigint; debug?: never }
+    | {
+        vector: 0 | 1 | 6 | 8 | 10 | 11 | 12 | 13 | 16 | 19;
+        errorCode?: number;
+        debug?: DebugSource;
+        pageFaultAddress?: never;
+      }
+  );
 
 export interface InterruptEvent {
   source: { kind: 'irq'; vector: number } | { kind: 'nmi' };
@@ -47,6 +55,14 @@ export interface EventLayout {
   hasErrorCode: number;
 }
 
+export interface PagingSourceLayout {
+  offset: number;
+  bytes: number;
+  address: number;
+  hasAddress: number;
+  reserved: number;
+}
+
 function word(value: number, maximum: number, name: string): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > maximum)
     throw new TypeError(`${name} is outside its unsigned integer range`);
@@ -59,23 +75,30 @@ function unsigned64(value: bigint, name: string): bigint {
   return value;
 }
 
+function pageFaultAddress(value: bigint): bigint {
+  const address = unsigned64(value, 'page fault address');
+  if (address > 0x7fffffffffffn && address < 0xffff800000000000n)
+    throw new TypeError('page fault address must be canonical48');
+  return address;
+}
+
 export function captureEventState(input: EventState): EventState {
   if (typeof input !== 'object' || input === null || Array.isArray(input))
     throw new TypeError('event must be a record');
   const kind = input.kind;
   if (kind === 'ready' || kind === 'halted' || kind === 'shutdown') return { kind };
   if (kind === 'pending-interrupt') {
-    if ('exception' in input || 'errorCode' in input)
+    if ('exception' in input || 'errorCode' in input || 'pageFaultAddress' in input)
       throw new TypeError('an interrupt is not a processor exception');
     const value = input.interrupt;
     if (typeof value !== 'object' || value === null || Array.isArray(value))
       throw new TypeError('pending interrupt must contain an interrupt record');
-    if ('exception' in value || 'errorCode' in value)
+    if ('exception' in value || 'errorCode' in value || 'pageFaultAddress' in value)
       throw new TypeError('an external interrupt has no exception error code');
     const source = value.source;
     if (typeof source !== 'object' || source === null || Array.isArray(source))
       throw new TypeError('pending interrupt requires a source');
-    if ('exception' in source || 'errorCode' in source)
+    if ('exception' in source || 'errorCode' in source || 'pageFaultAddress' in source)
       throw new TypeError('an external source has no exception error code');
     const sourceKind = source.kind;
     let captured: InterruptEvent['source'];
@@ -92,11 +115,33 @@ export function captureEventState(input: EventState): EventState {
   if (typeof source !== 'object' || source === null || Array.isArray(source))
     throw new TypeError('pending event must contain an exception record');
   const vector = word(source.vector, 0xff, 'event vector') as ExceptionEvent['vector'];
-  if (![0, 1, 6, 8, 10, 11, 12, 13, 16, 19].includes(vector))
+  if (![0, 1, 6, 8, 10, 11, 12, 13, 14, 16, 19].includes(vector))
     throw new TypeError('event vector is outside the supported exception set');
   const instructionPc = unsigned64(source.instructionPc, 'event instruction PC');
   const returnPc = unsigned64(source.returnPc, 'event return PC');
   const savedFlags = unsigned64(source.savedFlags, 'event saved FLAGS');
+  if (vector === 14) {
+    if ('debug' in source) throw new TypeError('page fault cannot contain a debug source');
+    const address = pageFaultAddress(source.pageFaultAddress!);
+    const errorCode = word(source.errorCode!, 31, 'page fault error code');
+    if (
+      ((errorCode & 8) !== 0 && (errorCode & 1) === 0) ||
+      ((errorCode & 2) !== 0 && (errorCode & 16) !== 0)
+    )
+      throw new TypeError('incompatible page fault error bits');
+    return {
+      kind,
+      exception: {
+        vector,
+        instructionPc,
+        returnPc,
+        savedFlags,
+        errorCode,
+        pageFaultAddress: address,
+      },
+    };
+  }
+  if ('pageFaultAddress' in source) throw new TypeError('page fault address requires vector14');
   const exception: ExceptionEvent = { vector, instructionPc, returnPc, savedFlags };
   if ('debug' in source) exception.debug = captureDebugSource(source.debug!);
   if ('errorCode' in source)
@@ -193,6 +238,61 @@ export function validateEventLayout(value: EventLayout, size: number, after: num
   if (end !== value.bytes) throw new Error('core returned an invalid event layout extent');
 }
 
+export function validatePagingSourceLayout(
+  value: PagingSourceLayout,
+  size: number,
+  after: number,
+): void {
+  if (typeof value !== 'object' || value === null)
+    throw new Error('core returned an invalid paging source layout');
+  for (const name of ['offset', 'bytes', 'address', 'hasAddress', 'reserved'] as const)
+    if (!Number.isSafeInteger(value[name]) || value[name] < 0 || value[name] > 0xffffffff)
+      throw new Error('core returned an invalid paging source layout');
+  if (value.bytes !== 16 || value.offset < after || value.offset + value.bytes > size)
+    throw new Error('core returned an incompatible paging source layout');
+  let end = 0;
+  for (const [start, width] of [
+    [value.address, 8],
+    [value.hasAddress, 4],
+    [value.reserved, 4],
+  ].sort((a, b) => a[0]! - b[0]!)) {
+    if (start !== end) throw new Error('core returned overlapping paging source fields');
+    end += width!;
+  }
+  if (end !== value.bytes) throw new Error('core returned an invalid paging source extent');
+}
+
+export function readPagingSource(
+  view: DataView,
+  layout: PagingSourceLayout,
+  offset = 0,
+): bigint | undefined {
+  const address = view.getBigUint64(offset + layout.address, true);
+  const hasAddress = view.getUint32(offset + layout.hasAddress, true);
+  const reserved = view.getUint32(offset + layout.reserved, true);
+  if (
+    hasAddress > 1 ||
+    reserved !== 0 ||
+    (!hasAddress && address !== 0n) ||
+    (hasAddress && address > 0x7fffffffffffn && address < 0xffff800000000000n)
+  )
+    throw new Error('core returned an invalid paging source');
+  return hasAddress ? address : undefined;
+}
+
+export function writePagingSource(
+  view: DataView,
+  layout: PagingSourceLayout,
+  input: bigint | undefined,
+): void {
+  const address = input === undefined ? undefined : pageFaultAddress(input);
+  new Uint8Array(view.buffer, view.byteOffset, layout.bytes).fill(0);
+  if (address !== undefined) {
+    view.setBigUint64(layout.address, address, true);
+    view.setUint32(layout.hasAddress, 1, true);
+  }
+}
+
 export function eventKind(value: number): EventState['kind'] {
   switch (value) {
     case 0:
@@ -211,7 +311,12 @@ export function eventKind(value: number): EventState['kind'] {
   }
 }
 
-export function readEvent(view: DataView, layout: EventLayout, offset = 0): EventState {
+export function readEvent(
+  view: DataView,
+  layout: EventLayout,
+  offset = 0,
+  pagingSource?: PagingSourceLayout,
+): EventState {
   const rawKind = view.getUint32(offset + layout.kind, true);
   const kind = eventKind(rawKind);
   if (kind === 'pending-interrupt') {
@@ -234,14 +339,34 @@ export function readEvent(view: DataView, layout: EventLayout, offset = 0): Even
     };
   }
   if (kind !== 'pending') return { kind };
-  const exception: ExceptionEvent = {
-    vector: view.getUint32(offset + layout.vector, true) as ExceptionEvent['vector'],
+  const vector = view.getUint32(offset + layout.vector, true) as ExceptionEvent['vector'];
+  const boundary = {
     instructionPc: view.getBigUint64(offset + layout.instructionPc, true),
     returnPc: view.getBigUint64(offset + layout.returnPc, true),
     savedFlags: view.getBigUint64(offset + layout.savedFlags, true),
   };
   const hasErrorCode = view.getUint32(offset + layout.hasErrorCode, true);
   if (hasErrorCode > 1) throw new Error('core returned an invalid event error-code tag');
+  if (vector === 14) {
+    if (!pagingSource) throw new Error('core omitted a pending page fault source layout');
+    const address = readPagingSource(view, pagingSource, pagingSource.offset);
+    if (address === undefined || hasErrorCode !== 1)
+      throw new Error('core omitted a pending page fault source');
+    try {
+      return captureEventState({
+        kind,
+        exception: {
+          vector,
+          ...boundary,
+          errorCode: view.getUint32(offset + layout.errorCode, true),
+          pageFaultAddress: address,
+        },
+      });
+    } catch (cause) {
+      throw new Error('core returned an invalid pending page fault', { cause });
+    }
+  }
+  const exception: ExceptionEvent = { vector, ...boundary };
   if (hasErrorCode) exception.errorCode = view.getUint32(offset + layout.errorCode, true);
   return { kind, exception };
 }

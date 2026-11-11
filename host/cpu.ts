@@ -1,4 +1,5 @@
 import { captureDebugState, type DebugState } from './debug.js';
+import { capturePagingState, type PagingState } from './paging.js';
 import {
   captureContext,
   type ExecutionContext,
@@ -20,10 +21,11 @@ import {
   type GeneralProtectionFault,
   type ProtectionFault,
   type SystemMemoryFault,
-  type Span,
   type State,
   type StateSnapshot,
   type DebugException,
+  type PageFault,
+  type PhysicalMemoryFault,
 } from './core.js';
 import { Translations, type Artifact } from './translations.js';
 import {
@@ -36,6 +38,8 @@ import {
   type MemoryBackingInput,
   type MemoryLimits,
   type MemoryMapping,
+  type MemoryModel,
+  type MemoryOptions,
 } from './memory.js';
 
 export interface Limits extends CompileLimits {
@@ -50,17 +54,7 @@ interface CommonOptions {
   context?: ExecutionContext;
 }
 
-export type Options = CommonOptions &
-  (
-    | { code: Span; ram: Span; memoryLimits?: MemoryLimits; memory?: never; entry?: never }
-    | {
-        memory: { backings: MemoryBackingInput[]; mappings: MemoryMapping[] };
-        entry: bigint;
-        memoryLimits: MemoryLimits;
-        code?: never;
-        ram?: never;
-      }
-  );
+export type Options = CommonOptions & MemoryOptions;
 
 export interface RunResult {
   reason: string;
@@ -80,7 +74,10 @@ export interface RunResult {
   protectionFault?: ProtectionFault;
   systemMemoryFault?: SystemMemoryFault;
   debugException?: DebugException;
+  pageFault?: PageFault;
+  physicalMemoryFault?: PhysicalMemoryFault;
   resources: {
+    pagingRestarts?: number;
     compilations: number;
     cacheHits: number;
     nativeEntries: number;
@@ -155,8 +152,16 @@ export async function createCpu(options: Options): Promise<Cpu> {
   if (!WebAssembly.validate(SIMD_PROBE)) throw new TypeError('WebAssembly SIMD is required');
   const limits = checkedLimits(options.limits);
   const memory = captureInitialMemory(options);
+  if (memory.memoryModel === 'ia32e-paged') memory.paging = capturePagingState(options.paging!);
   const contextInput = options.context;
   const context = contextInput === undefined ? undefined : captureContext(contextInput);
+  if (
+    memory.memoryModel === 'ia32e-paged' &&
+    context &&
+    context.mode !== 'long64' &&
+    context.mode !== 'compatibility'
+  )
+    throw new TypeError('paged memory requires a Long64 or compatibility context');
   const core = await Core.create(options.compiler, memory, context);
   return new Cpu(
     CONSTRUCTION,
@@ -165,6 +170,7 @@ export async function createCpu(options: Options): Promise<Cpu> {
     performance.now() - began,
     memory.memoryLimits,
     new Map(memory.backings.map(({ id, bytes }) => [id, bytes.length])),
+    memory.memoryModel,
   );
 }
 
@@ -175,6 +181,7 @@ export class Cpu {
   #core: Core | undefined;
   readonly #limits: Limits;
   readonly #memoryLimits: MemoryLimits;
+  readonly #memoryModel: MemoryModel;
   #backings: Map<string, number>;
 
   constructor(
@@ -184,11 +191,13 @@ export class Cpu {
     readonly creationMs: number,
     memoryLimits: MemoryLimits,
     backings: Map<string, number>,
+    memoryModel: MemoryModel = 'linear',
   ) {
     if (token !== CONSTRUCTION) throw new TypeError('use the createCpu factory');
     this.#core = core;
     this.#limits = { ...limits };
     this.#memoryLimits = { ...memoryLimits };
+    this.#memoryModel = memoryModel;
     this.#backings = backings;
     this.#cache = new Translations(limits.maxCachedArtifacts, limits.maxCachedBytes, (artifact) =>
       this.#core?.release(artifact.metadata.owner),
@@ -200,6 +209,10 @@ export class Cpu {
     if (runGeneration !== undefined && runGeneration !== this.#runGeneration)
       throw new Error('cpu run started during input capture');
     return this.#runGeneration;
+  }
+
+  private requireMemoryModel(model: MemoryModel): void {
+    if (this.#memoryModel !== model) throw new TypeError(`method requires ${model} memory`);
   }
 
   get #engine(): Core {
@@ -244,9 +257,9 @@ export class Cpu {
   }
 
   setMappings(mappings: MemoryMapping[]): void {
-    this.requireIdle();
-    const captured = captureMappings(mappings, this.#memoryLimits);
-    this.requireIdle();
+    const generation = this.requireIdle();
+    const captured = captureMappings(mappings, this.#memoryLimits, this.#memoryModel);
+    this.requireIdle(generation);
     validateMappings(captured, this.#backings);
     this.engineCall(() => this.#engine.setMappings(captured));
     this.pruneTranslations();
@@ -258,9 +271,15 @@ export class Cpu {
   }
 
   setContext(context: ExecutionContext): void {
-    this.requireIdle();
+    const generation = this.requireIdle();
     const input = captureContext(context);
-    this.requireIdle();
+    this.requireIdle(generation);
+    if (
+      this.#memoryModel === 'ia32e-paged' &&
+      input.mode !== 'long64' &&
+      input.mode !== 'compatibility'
+    )
+      throw new TypeError('paged memory requires a Long64 or compatibility context');
     this.engineCall(() => this.#engine.setContext(input));
     this.pruneTranslations();
   }
@@ -303,6 +322,19 @@ export class Cpu {
     this.engineCall(() => this.#engine.setDebugState(input));
     this.pruneTranslations();
   }
+  readPagingState(): PagingState {
+    this.requireIdle();
+    this.requireMemoryModel('ia32e-paged');
+    return this.engineCall(() => this.#engine.readPagingState());
+  }
+  setPagingState(state: PagingState): void {
+    const generation = this.requireIdle();
+    this.requireMemoryModel('ia32e-paged');
+    const input = capturePagingState(state);
+    this.requireIdle(generation);
+    this.engineCall(() => this.#engine.setPagingState(input));
+    this.pruneTranslations();
+  }
   readXmmState(): bigint[] {
     this.requireIdle();
     return this.engineCall(() => this.#engine.readXmmState());
@@ -329,13 +361,29 @@ export class Cpu {
   }
   readMemory(address: bigint, length: number): Uint8Array {
     this.requireIdle();
+    this.requireMemoryModel('linear');
     return this.engineCall(() => this.#engine.readMemory(address, length));
   }
   writeMemory(address: bigint, bytes: Uint8Array): void {
     this.requireIdle();
+    this.requireMemoryModel('linear');
     unsigned64(address, 'address');
     const input = copyMemoryInput(bytes);
     this.requireIdle();
+    this.engineCall(() => this.#engine.writeOwnedMemory(address, input));
+    this.pruneTranslations();
+  }
+  readPhysicalMemory(address: bigint, length: number): Uint8Array {
+    this.requireIdle();
+    this.requireMemoryModel('ia32e-paged');
+    return this.engineCall(() => this.#engine.readMemory(address, length));
+  }
+  writePhysicalMemory(address: bigint, bytes: Uint8Array): void {
+    const generation = this.requireIdle();
+    this.requireMemoryModel('ia32e-paged');
+    unsigned64(address, 'address');
+    const input = copyMemoryInput(bytes);
+    this.requireIdle(generation);
     this.engineCall(() => this.#engine.writeOwnedMemory(address, input));
     this.pruneTranslations();
   }
@@ -385,6 +433,7 @@ export class Cpu {
     this.#lifecycle = 'running';
     const began = performance.now();
     const resources = {
+      ...(this.#memoryModel === 'ia32e-paged' ? { pagingRestarts: 0 } : {}),
       compilations: 0,
       cacheHits: 0,
       nativeEntries: 0,
@@ -418,6 +467,9 @@ export class Cpu {
         reason === 'system-memory-fault' ? this.#engine.systemMemoryFault(reason) : undefined;
       const debugException =
         reason === 'debug-exception' ? this.#engine.debugException(reason) : undefined;
+      const pageFault = reason === 'page-fault' ? this.#engine.pageFault(reason) : undefined;
+      const physicalMemoryFault =
+        reason === 'physical-memory-fault' ? this.#engine.physicalMemoryFault(reason) : undefined;
       const result = {
         reason,
         retired: budget - remaining,
@@ -440,6 +492,8 @@ export class Cpu {
         ...(protectionFault ? { protectionFault } : {}),
         ...(systemMemoryFault ? { systemMemoryFault } : {}),
         ...(debugException ? { debugException } : {}),
+        ...(pageFault ? { pageFault } : {}),
+        ...(physicalMemoryFault ? { physicalMemoryFault } : {}),
         resources: { ...resources, ...this.#cache.resources() },
         timings,
       };
@@ -503,6 +557,13 @@ export class Cpu {
           resources.cacheHits++;
         } else {
           const probe = this.#engine.probe(pc);
+          if (probe === 'paging-restart') {
+            resources.pagingRestarts = (resources.pagingRestarts ?? 0) + 1;
+            if (resources.pagingRestarts >= this.#limits.maxTranslationsPerRun)
+              return finish('resource-limit');
+            this.pruneTranslations();
+            continue;
+          }
           if (probe !== 'dispatch') {
             if (
               (deliveryBudget !== undefined || boundaryObserved) &&
@@ -578,6 +639,13 @@ export class Cpu {
           (reason === 'repeat-budget' && (remainingRepeatBudget !== 0n || remaining === 0n))
         ) {
           throw new Error('generated execution violated its progress contract');
+        }
+        if (reason === 'paging-restart') {
+          resources.pagingRestarts = (resources.pagingRestarts ?? 0) + 1;
+          if (resources.pagingRestarts >= this.#limits.maxTranslationsPerRun)
+            return finish('resource-limit');
+          this.pruneTranslations();
+          continue;
         }
         if (reason !== 'dispatch') {
           if (reason === 'pending-interrupt' || reason === 'halted') {

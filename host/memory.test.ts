@@ -17,6 +17,50 @@ const mapping = (base = 0x1000n): MemoryMapping => ({
   length: 2,
   permissions: { read: false, write: true, execute: false },
 });
+
+test('physical mapping capture uses unsigned52 geometry independently of linear canonicality', () => {
+  for (const base of [0x800000000000n, 1n << 51n, (1n << 52n) - 1n])
+    assert.doesNotThrow(() =>
+      captureMappings([{ ...mapping(base), length: 1 }], limits, 'ia32e-paged'),
+    );
+  for (const base of [1n << 52n, 0xffff800000000000n, 0xffffffffffffffffn])
+    assert.throws(
+      () => captureMappings([{ ...mapping(base), length: 1 }], limits, 'ia32e-paged'),
+      TypeError,
+    );
+  assert.throws(
+    () => captureMappings([mapping((1n << 52n) - 1n)], limits, 'ia32e-paged'),
+    TypeError,
+  );
+  assert.throws(() => captureMappings([mapping(0x800000000000n)], limits), TypeError);
+});
+
+test('memory model is primitive, captured once, and rejects wrong constructor variants', () => {
+  const base = {
+    code: { base: 0x1000n, bytes: Uint8Array.of(0x90) },
+    ram: { base: 0x2000n, bytes: Uint8Array.of(0) },
+  };
+  let reads = 0;
+  assert.equal(
+    captureInitialMemory({
+      ...base,
+      get memoryModel() {
+        reads++;
+        return 'linear' as const;
+      },
+    }).memoryModel,
+    'linear',
+  );
+  assert.equal(reads, 1);
+  for (const memoryModel of [undefined, null, false, '', 'physical', Object('linear')])
+    assert.throws(() => captureInitialMemory({ ...base, memoryModel } as never), TypeError);
+  for (const paging of [undefined, null, {}])
+    assert.throws(() => captureInitialMemory({ ...base, paging } as never), TypeError);
+  assert.throws(
+    () => captureInitialMemory({ ...base, memoryModel: 'ia32e-paged' } as never),
+    TypeError,
+  );
+});
 test('backing capacity precedes indexed access and proportional copying', () => {
   const oversized = new Array(3);
   Object.defineProperty(oversized, 0, {

@@ -19,12 +19,15 @@ import {
   type SegmentName,
 } from './context.js';
 import type { InitialMemory, MemoryBackingInput, MemoryMapping } from './memory.js';
+import { capturePagingState, pagingStateFromJson, type PagingState } from './paging.js';
 import {
   captureEventState,
   captureInterruptState,
   eventKind,
   readEvent,
   readInterrupts,
+  writePagingSource,
+  validatePagingSourceLayout,
   validateEventLayout,
   validateInterruptLayout,
   writeEvent,
@@ -33,6 +36,7 @@ import {
   type EventState,
   type InterruptLayout,
   type InterruptState,
+  type PagingSourceLayout,
 } from './events.js';
 import {
   captureX87State,
@@ -142,6 +146,31 @@ type SystemMemoryReference =
   | { table: 'tss'; selector: number; phase: 'tss-read' };
 export type SystemMemoryFault = SystemMemoryAccess & SystemMemoryReference;
 
+export interface PageFault {
+  instructionPc: bigint;
+  vector: 14;
+  address: bigint;
+  access: 'read' | 'write' | 'execute';
+  errorCode: number;
+}
+
+export interface PhysicalMemoryFault {
+  instructionPc: bigint;
+  address: bigint;
+  access: 'read' | 'write' | 'execute';
+  physicalAddress: bigint;
+  width: number;
+  failingPhysicalAddress: bigint;
+  physicalAccess: 'read' | 'write' | 'execute';
+  cause: 'unmapped' | 'permission' | 'address-range';
+  phase: 'walk-read' | 'accessed-write' | 'dirty-write' | 'final-access';
+  segment?: SegmentName;
+  table?: 'gdt' | 'ldt' | 'idt' | 'tss';
+  systemPhase?: string;
+  selector?: number;
+  referenceVector?: number;
+}
+
 export interface Span {
   base: bigint;
   bytes: Uint8Array;
@@ -167,6 +196,7 @@ export interface UnitMetadata {
 }
 
 interface Layout {
+  pagingSource?: PagingSourceLayout;
   debug: DebugLayout;
   size: number;
   scalarSize: number;
@@ -204,6 +234,15 @@ type CoreExports = WebAssembly.Exports & {
   core_context_version(): bigint;
   core_boundary_observed(): number;
   core_set_context(): number;
+  core_paging_state(): number;
+  core_import_paging(): number;
+  core_paging_control(
+    kind: number,
+    register: number,
+    value: bigint,
+    pc: bigint,
+    flags: bigint,
+  ): number;
   core_segmented_load(offset: bigint, width: number, segment: number): bigint;
   core_segmented_load_for_write(offset: bigint, width: number, segment: number): bigint;
   core_segmented_store(offset: bigint, width: number, value: bigint, segment: number): number;
@@ -456,13 +495,62 @@ function writeInput(
   return header.length;
 }
 
+const PAGED_HELPERS = {
+  load: 'core_paged_load',
+  load_for_write: 'core_paged_load_for_write',
+  store: 'core_paged_store',
+  segmented_load: 'core_paged_segmented_load',
+  segmented_load_for_write: 'core_paged_segmented_load_for_write',
+  segmented_store: 'core_paged_segmented_store',
+  vector_load: 'core_paged_vector_load',
+  vector_store: 'core_paged_vector_store',
+  load_mxcsr: 'core_paged_load_mxcsr',
+  store_mxcsr: 'core_paged_store_mxcsr',
+  x87: 'core_paged_x87',
+  mmx: 'core_paged_mmx',
+  numeric_image: 'core_paged_numeric_image',
+  masked_store: 'core_paged_masked_store',
+  clflush: 'core_paged_clflush',
+  protection: 'core_paged_protection',
+  far_control: 'core_paged_far_control',
+  software_event: 'core_paged_software_event',
+  access_failed: 'core_paged_access_failed',
+  segmented_access_failed: 'core_paged_segmented_access_failed',
+  access_reason: 'core_paged_access_reason',
+  debug_begin: 'core_paged_debug_begin',
+  debug_finish: 'core_paged_debug_finish',
+} as const;
+
+const PAGED_OBSERVED_HELPERS = {
+  load: 'core_paged_load_observed',
+  load_for_write: 'core_paged_load_for_write_observed',
+  store: 'core_paged_store_observed',
+  segmented_load: 'core_paged_segmented_load_observed',
+  segmented_load_for_write: 'core_paged_segmented_load_for_write_observed',
+  segmented_store: 'core_paged_segmented_store_observed',
+  vector_load: 'core_paged_vector_load_observed',
+  vector_store: 'core_paged_vector_store_observed',
+  load_mxcsr: 'core_paged_load_mxcsr_observed',
+  store_mxcsr: 'core_paged_store_mxcsr_observed',
+  x87: 'core_paged_x87_observed',
+  mmx: 'core_paged_mmx_observed',
+  numeric_image: 'core_paged_numeric_image_observed',
+  masked_store: 'core_paged_masked_store_observed',
+  protection: 'core_paged_protection_observed',
+  far_control: 'core_paged_far_control_observed',
+  software_event: 'core_paged_software_event_observed',
+} as const;
+
 export class Core {
   readonly #exports: CoreExports;
   readonly #layout: Layout;
   readonly #statePointer: number;
   #stateDataView?: DataView;
 
-  private constructor(exports: CoreExports) {
+  private constructor(
+    exports: CoreExports,
+    readonly isPaged = false,
+  ) {
     this.#exports = exports;
     this.#layout = this.info<Layout>();
     this.#statePointer = exports.core_state_ptr() >>> 0;
@@ -528,6 +616,14 @@ export class Core {
       layout.size,
       layout.interrupts.offset + layout.interrupts.bytes,
     );
+    if (layout.pagingSource !== undefined)
+      validatePagingSourceLayout(
+        layout.pagingSource,
+        layout.size,
+        layout.debug.offset + layout.debug.layout.bytes,
+      );
+    if (isPaged && layout.pagingSource === undefined)
+      throw new Error('paged core must describe its paging source transport');
     this.stateView();
   }
 
@@ -536,6 +632,8 @@ export class Core {
     memory: InitialMemory,
     context?: ExecutionContext,
   ): Promise<Core> {
+    const isPaged = memory.memoryModel === 'ia32e-paged';
+    const paging = isPaged ? capturePagingState(memory.paging!) : undefined;
     const module =
       compiler instanceof WebAssembly.Module
         ? compiler
@@ -633,9 +731,19 @@ export class Core {
     ]) {
       if (typeof exports[name] !== 'function') throw new Error(`core must export ${name}`);
     }
+    if (isPaged)
+      for (const name of [
+        'core_paging_state',
+        'core_import_paging',
+        'core_paging_control',
+        ...Object.values(PAGED_HELPERS),
+        ...Object.values(PAGED_OBSERVED_HELPERS),
+      ])
+        if (typeof exports[name] !== 'function') throw new Error(`core must export ${name}`);
     const metadataLength = writeInput(
       exports,
       {
+        ...(isPaged ? { memoryModel: 'ia32e-paged', paging } : {}),
         memoryLimits: memory.memoryLimits,
         backings: memory.backings.map(({ id, bytes }) => ({
           id: backingKey(id),
@@ -661,7 +769,7 @@ export class Core {
       throw new Error('mapped initialization returned an invalid status');
     }
     try {
-      const core = new Core(exports);
+      const core = new Core(exports, isPaged);
       if (context !== undefined) core.setContext(context);
       return core;
     } catch (error) {
@@ -701,11 +809,20 @@ export class Core {
   snapshot(): StateSnapshot {
     const view = this.stateView();
     const interruptibility = view.getUint32(this.#layout.interruptibility, true);
-    const event = readEvent(view, this.#layout.event, this.#layout.event.offset);
+    const event = readEvent(
+      view,
+      this.#layout.event,
+      this.#layout.event.offset,
+      this.#layout.pagingSource,
+    );
     const d = this.#layout.debug,
       raw = d.layout;
     const source = readDebugSource(view, raw.source, d.offset + raw.sourceOffset);
-    if (source && event.kind === 'pending') event.exception.debug = source;
+    if (source) {
+      if (event.kind !== 'pending' || event.exception.vector !== 1)
+        throw new Error('core returned an incompatible debug source');
+      event.exception.debug = source;
+    }
     const debugContinuation = readDebugContinuation(
       view,
       raw.continuation,
@@ -729,10 +846,14 @@ export class Core {
 
   setState(state: State): void {
     const input = captureState(state);
+    if (input.event.kind === 'pending' && input.event.exception.vector === 14 && !this.isPaged)
+      throw new TypeError('page fault source requires ia32e-paged memory');
     const baseSize =
       this.#layout.scalarSize + this.#layout.event.bytes + this.#layout.interrupts.bytes;
     const debug = this.#layout.debug.layout;
-    const size = baseSize + debug.source.bytes + debug.continuation.bytes;
+    const oldSize = baseSize + debug.source.bytes + debug.continuation.bytes;
+    const pagingSource = this.#layout.pagingSource;
+    const size = oldSize + (pagingSource?.bytes ?? 0);
     const pointer = this.#exports.core_input(size) >>> 0;
     const view = new DataView(this.#exports.memory.buffer, pointer, size);
     for (let index = 0; index < 16; index++) {
@@ -777,6 +898,14 @@ export class Core {
       debug.continuation,
       input.debugContinuation,
     );
+    if (pagingSource)
+      writePagingSource(
+        new DataView(view.buffer, view.byteOffset + oldSize, pagingSource.bytes),
+        pagingSource,
+        input.event.kind === 'pending' && input.event.exception.vector === 14
+          ? input.event.exception.pageFaultAddress
+          : undefined,
+      );
     if (this.#exports.core_import_state() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
   }
@@ -802,6 +931,18 @@ export class Core {
     view.setBigUint64(d.dr6, input.dr6, true);
     view.setBigUint64(d.dr7, input.dr7, true);
     if (this.#exports.core_import_debug() !== 0)
+      throw new TypeError(this.info<{ error: string }>().error);
+  }
+  readPagingState(): PagingState {
+    if (!this.isPaged) throw new TypeError('method requires ia32e-paged memory');
+    if (this.#exports.core_paging_state() !== 0)
+      throw new TypeError(this.info<{ error: string }>().error);
+    return pagingStateFromJson(this.info<unknown>());
+  }
+  setPagingState(state: PagingState): void {
+    if (!this.isPaged) throw new TypeError('method requires ia32e-paged memory');
+    writeInput(this.#exports, capturePagingState(state));
+    if (this.#exports.core_import_paging() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
   }
   readXmmState(): bigint[] {
@@ -1007,44 +1148,50 @@ export class Core {
           core_software_event: this.#exports.core_software_event_observed,
         }
       : this.#exports;
-    const instance = new WebAssembly.Instance(module, {
-      env: {
-        memory: this.#exports.memory,
-        load: operands.core_load,
-        load_for_write: operands.core_load_for_write,
-        store: operands.core_store,
-        access_failed: this.#exports.core_access_failed,
-        segmented_load: operands.core_segmented_load,
-        segmented_load_for_write: operands.core_segmented_load_for_write,
-        segmented_store: operands.core_segmented_store,
-        segmented_access_failed: this.#exports.core_segmented_access_failed,
-        access_reason: this.#exports.core_access_reason,
-        vector_load: operands.core_vector_load,
-        vector_store: operands.core_vector_store,
-        float: this.#exports.core_float,
-        load_mxcsr: operands.core_load_mxcsr,
-        store_mxcsr: operands.core_store_mxcsr,
-        x87: operands.core_x87,
-        mmx: operands.core_mmx,
-        numeric_image: operands.core_numeric_image,
-        masked_store: operands.core_masked_store,
-        clflush: this.#exports.core_clflush,
-        protection: operands.core_protection,
-        far_control: operands.core_far_control,
-        software_event: operands.core_software_event,
-        flags: this.#exports.core_flags,
-        debug_step: this.#exports.core_debug_step,
-        debug_finish: this.#exports.core_debug_finish,
-        debug_register: this.#exports.core_debug_register,
-        debug_begin: this.#exports.core_debug_begin,
-        external_step: this.#exports.core_external_step,
-        halt: this.#exports.core_halt,
-        target_check: this.#exports.core_target_check,
-        multiply_high: this.#exports.core_multiply_high,
-        divide: this.#exports.core_divide,
-        divide_failed: this.#exports.core_divide_failed,
-      },
-    });
+    const env: Record<string, WebAssembly.ImportValue> = {
+      memory: this.#exports.memory,
+      load: operands.core_load,
+      load_for_write: operands.core_load_for_write,
+      store: operands.core_store,
+      access_failed: this.#exports.core_access_failed,
+      segmented_load: operands.core_segmented_load,
+      segmented_load_for_write: operands.core_segmented_load_for_write,
+      segmented_store: operands.core_segmented_store,
+      segmented_access_failed: this.#exports.core_segmented_access_failed,
+      access_reason: this.#exports.core_access_reason,
+      vector_load: operands.core_vector_load,
+      vector_store: operands.core_vector_store,
+      float: this.#exports.core_float,
+      load_mxcsr: operands.core_load_mxcsr,
+      store_mxcsr: operands.core_store_mxcsr,
+      x87: operands.core_x87,
+      mmx: operands.core_mmx,
+      numeric_image: operands.core_numeric_image,
+      masked_store: operands.core_masked_store,
+      clflush: this.#exports.core_clflush,
+      protection: operands.core_protection,
+      far_control: operands.core_far_control,
+      software_event: operands.core_software_event,
+      flags: this.#exports.core_flags,
+      debug_step: this.#exports.core_debug_step,
+      debug_finish: this.#exports.core_debug_finish,
+      debug_register: this.#exports.core_debug_register,
+      paging_control: this.#exports.core_paging_control,
+      debug_begin: this.#exports.core_debug_begin,
+      external_step: this.#exports.core_external_step,
+      halt: this.#exports.core_halt,
+      target_check: this.#exports.core_target_check,
+      multiply_high: this.#exports.core_multiply_high,
+      divide: this.#exports.core_divide,
+      divide_failed: this.#exports.core_divide_failed,
+    };
+    if (this.isPaged)
+      for (const [name, key] of Object.entries({
+        ...PAGED_HELPERS,
+        ...(observed ? PAGED_OBSERVED_HELPERS : {}),
+      }))
+        env[name] = this.#exports[key]!;
+    const instance = new WebAssembly.Instance(module, { env });
     if (typeof instance.exports.run !== 'function')
       throw new Error('generated module must export run');
     return instance.exports.run as GeneratedRun;
@@ -1204,6 +1351,31 @@ export class Core {
       instructionPc: this.diagnosticPc(),
       address: BigInt(raw.address),
       failingAddress: BigInt(raw.failingAddress),
+    };
+  }
+
+  pageFault(reason: string): PageFault | undefined {
+    if (reason !== 'page-fault') return undefined;
+    this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
+    const raw = this.info<Omit<PageFault, 'instructionPc' | 'address'> & { address: string }>();
+    return { ...raw, instructionPc: this.diagnosticPc(), address: BigInt(raw.address) };
+  }
+
+  physicalMemoryFault(reason: string): PhysicalMemoryFault | undefined {
+    if (reason !== 'physical-memory-fault') return undefined;
+    this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
+    const raw = this.info<
+      Omit<
+        PhysicalMemoryFault,
+        'instructionPc' | 'address' | 'physicalAddress' | 'failingPhysicalAddress'
+      > & { address: string; physicalAddress: string; failingPhysicalAddress: string }
+    >();
+    return {
+      ...raw,
+      instructionPc: this.diagnosticPc(),
+      address: BigInt(raw.address),
+      physicalAddress: BigInt(raw.physicalAddress),
+      failingPhysicalAddress: BigInt(raw.failingPhysicalAddress),
     };
   }
 

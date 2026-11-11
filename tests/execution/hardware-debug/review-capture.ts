@@ -78,6 +78,7 @@ export function reviewCaptureScenarios(compiler: WebAssembly.Module): Scenario[]
           same(omitted.state, captured.state, 'frozen source image unchanged');
           check(captured.state.event.kind === 'pending', 'selected processor event');
           const exception = captured.state.event.exception;
+          check(exception.vector === 1, 'selected debug vector');
           throws(
             () =>
               cpu.setState({

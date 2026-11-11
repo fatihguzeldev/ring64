@@ -13,6 +13,8 @@ export type {
   GeneralProtectionFault,
   ProtectionFault,
   SystemMemoryFault,
+  PageFault,
+  PhysicalMemoryFault,
   Span,
   UnitMetadata,
 } from './core.js';
@@ -21,6 +23,7 @@ export type {
   MemoryPermissions,
   MemoryMapping,
   MemoryLimits,
+  MemoryModel,
 } from './memory.js';
 export type {
   ExecutionContext,
@@ -38,3 +41,4 @@ export type {
 } from './context.js';
 
 export type { DebugState, DebugContinuation, DebugSource } from './debug.js';
+export type { PagingState } from './paging.js';

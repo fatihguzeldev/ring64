@@ -1,4 +1,7 @@
 import { byteLength, unsigned64, type Span } from './core.js';
+import type { PagingState } from './paging.js';
+
+export type MemoryModel = 'linear' | 'ia32e-paged';
 
 export interface MemoryBackingInput {
   id: string;
@@ -26,6 +29,8 @@ export interface MemoryLimits {
 }
 
 export interface InitialMemory {
+  memoryModel?: MemoryModel;
+  paging?: PagingState;
   backings: MemoryBackingInput[];
   mappings: MemoryMapping[];
   memoryLimits: MemoryLimits;
@@ -121,7 +126,13 @@ export function captureBackings(
   return result;
 }
 
-export function captureMappings(input: MemoryMapping[], limits: MemoryLimits): MemoryMapping[] {
+export function captureMappings(
+  input: MemoryMapping[],
+  limits: MemoryLimits,
+  memoryModel: MemoryModel = 'linear',
+): MemoryMapping[] {
+  if (memoryModel !== 'linear' && memoryModel !== 'ia32e-paged')
+    throw new TypeError('unsupported memory model');
   if (!Array.isArray(input)) throw new TypeError('mappings must be an array');
   const count = input.length;
   byteLength(count, 'mapping count');
@@ -147,7 +158,9 @@ export function captureMappings(input: MemoryMapping[], limits: MemoryLimits): M
     const end = base + BigInt(length);
     const lowEnd = 0x800000000000n;
     const highStart = 0xffff800000000000n;
-    if (end > 1n << 64n || !(end <= lowEnd || base >= highStart))
+    if (memoryModel === 'ia32e-paged' && end > 1n << 52n)
+      throw new TypeError('physical mapping must have a nonwrapping unsigned52 address range');
+    if (memoryModel === 'linear' && (end > 1n << 64n || !(end <= lowEnd || base >= highStart)))
       throw new TypeError('mapping must have a nonwrapping canonical48 address range');
     result.push({ base, backing, offset, length, permissions: { read, write, execute } });
   }
@@ -169,15 +182,49 @@ export function validateMappings(
   }
 }
 
-type MemoryOptions =
-  | { code: Span; ram: Span; memoryLimits?: MemoryLimits }
+export type MemoryOptions =
   | {
+      memoryModel?: 'linear';
+      paging?: never;
+      code: Span;
+      ram: Span;
+      memoryLimits?: MemoryLimits;
+      memory?: never;
+      entry?: never;
+    }
+  | {
+      memoryModel?: 'linear';
+      paging?: never;
       memory: { backings: MemoryBackingInput[]; mappings: MemoryMapping[] };
       entry: bigint;
       memoryLimits: MemoryLimits;
+      code?: never;
+      ram?: never;
+    }
+  | {
+      memoryModel: 'ia32e-paged';
+      paging: PagingState;
+      memory: { backings: MemoryBackingInput[]; mappings: MemoryMapping[] };
+      entry: bigint;
+      memoryLimits: MemoryLimits;
+      code?: never;
+      ram?: never;
     };
 
 export function captureInitialMemory(options: MemoryOptions): InitialMemory {
+  const memoryModel = 'memoryModel' in options ? options.memoryModel : 'linear';
+  if (memoryModel !== 'linear' && memoryModel !== 'ia32e-paged')
+    throw new TypeError('memoryModel must be linear or ia32e-paged');
+  if (memoryModel === 'linear' && 'paging' in options)
+    throw new TypeError('linear memory cannot carry a paging state');
+  if (
+    memoryModel === 'ia32e-paged' &&
+    (!('memory' in options) ||
+      !('entry' in options) ||
+      !('memoryLimits' in options) ||
+      !('paging' in options))
+  )
+    throw new TypeError('paged memory requires explicit memory, entry, limits and paging state');
   let backings: MemoryBackingInput[];
   let mappings: MemoryMapping[];
   let memoryLimits: MemoryLimits;
@@ -197,7 +244,7 @@ export function captureInitialMemory(options: MemoryOptions): InitialMemory {
     byteLength(mappingCount, 'mapping count');
     if (mappingCount > memoryLimits.maxMappings) throw new RangeError('mapping capacity exceeded');
     backings = captureBackings(backingInput, memoryLimits);
-    mappings = captureMappings(mappingInput, memoryLimits);
+    mappings = captureMappings(mappingInput, memoryLimits, memoryModel);
   } else {
     const code = options.code;
     const ram = options.ram;
@@ -247,5 +294,5 @@ export function captureInitialMemory(options: MemoryOptions): InitialMemory {
     entry = codeBase;
   }
   validateMappings(mappings, validateBackings(backings, new Map(), memoryLimits));
-  return { backings, mappings, memoryLimits, entry };
+  return { backings, mappings, memoryLimits, entry, memoryModel };
 }

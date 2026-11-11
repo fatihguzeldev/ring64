@@ -7,6 +7,9 @@ import {
   readEvent,
   validateEventLayout,
   writeEvent,
+  readPagingSource,
+  writePagingSource,
+  validatePagingSourceLayout,
   type EventState,
 } from './events.js';
 
@@ -31,6 +34,105 @@ const pending = (): Extract<EventState, { kind: 'pending' }> => ({
     savedFlags: 0x10202n,
     errorCode: 0x1234,
   },
+});
+
+test('paging source transport appends a literal address without reusing mutable CR2 or event slots', () => {
+  const sourceLayout = { offset: 712, bytes: 16, address: 0, hasAddress: 8, reserved: 12 };
+  validatePagingSourceLayout(sourceLayout, 728, 712);
+  const event = {
+    kind: 'pending',
+    exception: {
+      instructionPc: 0x1122334455667788n,
+      returnPc: 0x8877665544332211n,
+      savedFlags: 0x10202n,
+      vector: 14,
+      errorCode: 21,
+      pageFaultAddress: 0xffff800000001234n,
+    },
+  } as const;
+  const bytes = new Uint8Array(728);
+  const view = new DataView(bytes.buffer);
+  writeEvent(new DataView(bytes.buffer, layout.offset, layout.bytes), layout, event);
+  writePagingSource(
+    new DataView(bytes.buffer, sourceLayout.offset, sourceLayout.bytes),
+    sourceLayout,
+    event.exception.pageFaultAddress,
+  );
+  assert.deepEqual(
+    bytes.slice(712),
+    Uint8Array.of(0x34, 0x12, 0, 0, 0, 0x80, 0xff, 0xff, 1, 0, 0, 0, 0, 0, 0, 0),
+  );
+  assert.equal(view.getUint32(layout.offset + layout.vector, true), 14);
+  assert.equal(view.getUint32(layout.offset + layout.errorCode, true), 21);
+  assert.deepEqual(readEvent(view, layout, layout.offset, sourceLayout), event);
+  assert.throws(() => readEvent(view, layout, layout.offset), /paging|page fault/);
+  writePagingSource(new DataView(bytes.buffer, 712, 16), sourceLayout, undefined);
+  assert.ok(bytes.slice(712).every((byte) => byte === 0));
+  assert.throws(() => readEvent(view, layout, layout.offset, sourceLayout), /page fault/);
+});
+
+test('paging source descriptor controls member offsets and rejects overlap, malformed tags and noncanonical addresses', () => {
+  const layout = { offset: 712, bytes: 16, address: 8, hasAddress: 0, reserved: 4 };
+  validatePagingSourceLayout(layout, 728, 712);
+  const bytes = new Uint8Array(16).fill(0xa5);
+  const view = new DataView(bytes.buffer);
+  writePagingSource(view, layout, 0x1234n);
+  assert.deepEqual(bytes, Uint8Array.of(1, 0, 0, 0, 0, 0, 0, 0, 0x34, 0x12, 0, 0, 0, 0, 0, 0));
+  assert.equal(readPagingSource(view, layout), 0x1234n);
+  for (const change of [
+    { offset: 704 },
+    { bytes: 15 },
+    { hasAddress: 8 },
+    { address: 4 },
+    { reserved: NaN },
+  ])
+    assert.throws(
+      () => validatePagingSourceLayout({ ...layout, ...change }, 728, 712),
+      /paging source/,
+    );
+  view.setUint32(layout.hasAddress, 2, true);
+  assert.throws(() => readPagingSource(view, layout), /paging source/);
+  writePagingSource(view, layout, 0n);
+  view.setUint32(layout.reserved, 1, true);
+  assert.throws(() => readPagingSource(view, layout), /paging source/);
+  const before = bytes.slice();
+  assert.throws(() => writePagingSource(view, layout, 0x800000000000n), TypeError);
+  assert.deepEqual(bytes, before, 'invalid source cannot partially replace the caller packet');
+});
+
+test('pending page faults capture a canonical frozen address and error shape without live paging state', () => {
+  const source = { ...pending().exception, vector: 14, errorCode: 6, pageFaultAddress: 0x501000n };
+  const reads = new Map<PropertyKey, number>();
+  const exception = new Proxy(source, {
+    get(target, key, receiver) {
+      reads.set(key, (reads.get(key) ?? 0) + 1);
+      return Reflect.get(target, key, receiver) as unknown;
+    },
+  });
+  assert.deepEqual(captureEventState({ kind: 'pending', exception } as never), {
+    kind: 'pending',
+    exception: source,
+  });
+  assert.deepEqual([...reads.values()], Array<number>(6).fill(1));
+  for (const value of [undefined, null, 0, Object(0n), -1n, 1n << 64n, 0x800000000000n])
+    assert.throws(
+      () =>
+        captureEventState({
+          kind: 'pending',
+          exception: { ...source, pageFaultAddress: value },
+        } as never),
+      TypeError,
+    );
+  for (const errorCode of [undefined, 8, 16 | 2, 32, -1, 1.5])
+    assert.throws(
+      () => captureEventState({ kind: 'pending', exception: { ...source, errorCode } } as never),
+      TypeError,
+    );
+  for (const vector of [0, 1, 6, 8, 10, 11, 12, 13, 16, 19])
+    assert.throws(
+      () => captureEventState({ kind: 'pending', exception: { ...source, vector } } as never),
+      TypeError,
+    );
 });
 
 test('event capture owns nested state and reads each selected field once', () => {
