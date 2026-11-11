@@ -30,6 +30,51 @@ function vmContext(): ExecutionContextSnapshot {
 }
 export function legacyModeScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
+    ...[false, true].map((pae) => ({
+      name: `legacy ${pae ? 'PAE' : 'nonPAE'} protected16 word gate uses four word PF slots`,
+      async run() {
+        const options = legacyOptions(compiler, pae, '8907');
+        const context = protectedSnapshot();
+        context.segments.cs.default32 = false;
+        context.segments.ss.default32 = false;
+        context.gdtr = { base: 0x7000n, limit: 0x17 };
+        context.idtr = { base: 0x8000n, limit: 0x77 };
+        options.context = context;
+        options.paging!.cr0 |= 0x10000n;
+        const bytes = options.memory!.backings[0]!.bytes,
+          pt = pae ? 0x4000 : 0x2000,
+          width = pae ? 8 : 4;
+        for (const [index, value] of [
+          [4, 0xc003n],
+          [6, 0xa001n],
+          [7, 0xd003n],
+          [8, 0xe003n],
+        ] as const)
+          bytes.set(little(value, width), pt + index * width);
+        bytes.set(hex('0000000000000000ffff0000009b0000ffff000000930000'), 0xd000);
+        bytes.set(hex('0040080000860000'), 0xe070);
+        const cpu = await createCpu(options);
+        try {
+          cpu.setState(
+            initial(0x1000n, { 0: 0x1122n, 3: 0x6000n, 4: 0x1122334400009000n }, 0x202n),
+          );
+          const result = await cpu.run({
+            budget: 1n,
+            stop: 0x4000n,
+            eventDelivery: { budget: 1n },
+          });
+          equal(result.reason, 'stop', 'word gate handler');
+          equal(result.retired, 0n, 'source fault not retired');
+          equal(result.deliveryAttempts, 1n, 'one word entry');
+          equal(result.state.registers[4], 0x1122334400008ff8n, 'SP16 merge');
+          for (const [i, value] of [3n, 0x1000n, 8n, 0x202n].entries())
+            equal(word(cpu, 0xeff8n + BigInt(i * 2), 2), value, 'word frame slot');
+          equal(cpu.readContext().segments.cs.default32, false, 'handler code16');
+        } finally {
+          cpu.dispose();
+        }
+      },
+    })),
     ...[false, true].flatMap((pae) =>
       [false, true].map((vm) => ({
         name: `legacy ${pae ? 'PAE' : 'nonPAE'} ${vm ? 'VM86' : 'protected16'} operand and address defaults`,

@@ -3,6 +3,32 @@ import { legacyCpu, little, word, equal, check, initial, type Scenario } from '.
 export function legacyControlScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     {
+      name: 'legacy captured quartet A/B/A cannot reuse stale immediate or middle entries',
+      async run() {
+        const cpu = await legacyCpu(compiler, true, '90b801000000');
+        try {
+          cpu.writePhysicalMemory(0x6008n, little(0x9007n));
+          cpu.writePhysicalMemory(0x9000n, Uint8Array.of(0x90, 0xb8, 2, 0, 0, 0));
+          cpu.setState(initial(0x1000n, { 0: 0n }));
+          equal((await cpu.run({ budget: 2n })).state.registers[0], 1n, 'warm A');
+          const a = cpu.readPagingState();
+          const b = { ...a, pdpte: [0x5001n, 0n, 0n, 0n] as [bigint, bigint, bigint, bigint] };
+          cpu.setPagingState(b);
+          cpu.setState(initial(0x1001n, { 0: 0n }));
+          equal(
+            (await cpu.run({ budget: 1n })).state.registers[0],
+            2n,
+            'B middle entry cannot retain A immediate',
+          );
+          cpu.setPagingState(a);
+          cpu.setState(initial(0x1001n, { 0: 0n }));
+          equal((await cpu.run({ budget: 1n })).state.registers[0], 1n, 'A/B/A fresh source');
+        } finally {
+          cpu.dispose();
+        }
+      },
+    },
+    {
       name: 'legacy PAE same-value CR3 reload uses four captured roots and commits once',
       async run() {
         const cpu = await legacyCpu(compiler, true, '8b030f22d98b03');

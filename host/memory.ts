@@ -231,11 +231,11 @@ export type MemoryOptions =
 export function captureInitialMemory(options: MemoryOptions): InitialMemory {
   const memoryModel = 'memoryModel' in options ? options.memoryModel : 'linear';
   if (memoryModel !== 'linear' && memoryModel !== 'ia32e-paged' && memoryModel !== 'physical')
-    throw new TypeError('memoryModel must be linear or ia32e-paged');
+    throw new TypeError('memoryModel must be linear, ia32e-paged or physical');
   if (memoryModel === 'linear' && 'paging' in options)
     throw new TypeError('linear memory cannot carry a paging state');
   if (memoryModel !== 'ia32e-paged' && 'fastSystem' in options)
-    throw new TypeError('linear memory cannot carry a fast-system state');
+    throw new TypeError('fast-system state requires ia32e-paged memory');
   if (
     memoryModel !== 'linear' &&
     (!('memory' in options) ||
