@@ -8,6 +8,7 @@ import { pagingReviewAccessScenarios } from './review-access.js';
 import { pagingBoundaryReviewScenarios } from './review-boundaries.js';
 import { pagingCurrentWalkReviewScenarios } from './review-current-walk.js';
 import { pagingMutationOracleScenarios } from './mutation-oracles.js';
+import { pagingPermissionReviewScenarios } from './review-permissions.js';
 import type { Scenario } from '../../support/fixture.js';
 
 export function pagingScenarios(compiler: WebAssembly.Module): Scenario[] {
@@ -22,5 +23,6 @@ export function pagingScenarios(compiler: WebAssembly.Module): Scenario[] {
     ...pagingBoundaryReviewScenarios(compiler),
     ...pagingCurrentWalkReviewScenarios(compiler),
     ...pagingMutationOracleScenarios(compiler),
+    ...pagingPermissionReviewScenarios(compiler),
   ];
 }
