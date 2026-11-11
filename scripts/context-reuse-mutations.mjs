@@ -110,7 +110,15 @@ const mutants = [
     file: adapter,
     old: 'self.translation_owners.contains(owner) && self.image.owner_valid(owner)',
     replacement:
-      'self.translation_owners.eligible(owner, &self.context, self.boundary_observed()) && self.image.owner_valid(owner)',
+      'self.translation_owners.contains(owner) && (!self.translation_owners.published(owner) || self.translation_owners.eligible(owner, &self.context, self.boundary_observed())) && self.image.owner_valid(owner)',
+    extra: [
+      {
+        file: owners,
+        old: '    pub fn eligible(&self, owner: u64, context: &ExecutionContext, observed: bool) -> bool {',
+        replacement:
+          '    pub fn published(&self, owner: u64) -> bool { self.records.get(&owner).is_some_and(|record| record.published) }\n\n    pub fn eligible(&self, owner: u64, context: &ExecutionContext, observed: bool) -> bool {',
+      },
+    ],
     filter: 'keeps dormant FS variants',
   },
   {
@@ -313,6 +321,19 @@ if(!process.exitCode)console.log(JSON.stringify({selected:selected.length,passed
 `;
 await writeFile(join(work, 'mutation-cases.mjs'), cases);
 await writeFile(join(evidence, 'mutation-cases.mjs'), cases);
+// Preserve AssertionError.cause, which Node's TAP reporter may flatten to ERR_TEST_FAILURE.
+const hostReporter = `const errorInfo = error => error && ({name:error.name,code:error.code,message:error.message,stack:error.stack,actual:error.actual,expected:error.expected,cause:errorInfo(error.cause)});
+export default async function* (source) {
+  let passed=0,failed=0;const failures=[];
+  for await (const event of source) {
+    if(event.type==='test:pass')passed++;
+    if(event.type==='test:fail'){failed++;failures.push({name:event.data.name,file:event.data.file,error:errorInfo(event.data.details.error)});}
+  }
+  yield JSON.stringify({passed,failed,failures},(_,value)=>typeof value==='bigint'?value.toString()+'n':value)+'\\n';
+}
+`;
+await writeFile(join(work, 'mutation-host-reporter.mjs'), hostReporter);
+await writeFile(join(evidence, 'mutation-host-reporter.mjs'), hostReporter);
 function run(command, args, timeout = 240000) {
   const result = spawnSync(command, args, {
     cwd: work,
@@ -381,31 +402,71 @@ async function test(label, kind, filter, testFile) {
     const at = result.output.search(/assertion[^\n]*failed/);
     const binary = result.output.match(/Running unittests src\/lib\.rs \(([^)]+)\)/)?.[1];
     const binarySha256 = binary ? hash(await readFile(resolve(work, binary))) : undefined;
+    const panic = result.output.match(/panicked at (src\/[^:\n]+):(\d+):(\d+):\n([^\n]+)/);
+    let assertionSource;
+    if (panic) {
+      const source = await readFile(join(work, panic[1]), 'utf8');
+      const original = await readFile(join(root, panic[1]), 'utf8');
+      const line = source.split('\n')[Number(panic[2]) - 1];
+      if (source === original && /^\s*assert(?:_eq|_ne)?!\(/.test(line))
+        assertionSource = {
+          file: panic[1],
+          line: Number(panic[2]),
+          source: line.trim(),
+          oracleSha256: hash(source),
+        };
+    }
     detail = {
       passed,
       failed,
       assertionLocation: result.output.match(/panicked at ([^\n]+)/)?.[1],
+      assertionSource,
       binary,
       binarySha256,
-      assertion: at < 0 ? undefined : result.output.slice(at, at + 2500),
+      assertion: at < 0 ? panic?.[4] : result.output.slice(at, at + 2500),
     };
     semantic =
       result.status === 101 &&
       failed > 0 &&
-      at >= 0 &&
+      Boolean(assertionSource) &&
       !result.output.includes('could not compile');
   } else if (kind === 'host-owner') {
     result = await logged(
       label + '-test',
       'node',
-      ['--import', 'tsx', '--test', '--test-reporter=tap', '--test-name-pattern', filter, testFile],
+      [
+        '--import',
+        'tsx',
+        '--test',
+        '--experimental-test-isolation=none',
+        '--test-reporter=./mutation-host-reporter.mjs',
+        '--test-name-pattern',
+        filter,
+        testFile,
+      ],
       120000,
     );
-    const passed = Number(result.output.match(/^# pass (\d+)/m)?.[1] ?? 0);
-    const failed = Number(result.output.match(/^# fail (\d+)/m)?.[1] ?? 0);
-    const at = result.output.indexOf('  error:');
-    detail = { passed, failed, assertion: at < 0 ? undefined : result.output.slice(at, at + 3500) };
-    semantic = result.status === 1 && failed > 0 && result.output.includes("code: 'ERR_ASSERTION'");
+    try {
+      detail = JSON.parse(result.output.trim().split('\n').at(-1));
+    } catch {
+      /* reporter failures are uncounted */
+    }
+    function assertion(error) {
+      if (!error) return undefined;
+      return error.code === 'ERR_ASSERTION' ? error : assertion(error.cause);
+    }
+    const failedAssertion = detail?.failures
+      ?.map((failure) => ({ ...failure, assertion: assertion(failure.error) }))
+      .find(
+        (failure) =>
+          failure.assertion?.stack?.includes('/' + testFile) && failure.name.includes(filter),
+      );
+    if (failedAssertion) {
+      detail.assertion = failedAssertion.assertion.message;
+      detail.assertionError = failedAssertion.assertion;
+      detail.oracleSha256 = hash(await readFile(join(work, testFile)));
+    }
+    semantic = result.status === 1 && detail?.failed > 0 && Boolean(failedAssertion);
   } else {
     result = await logged(
       label + '-test',
