@@ -144,3 +144,31 @@ fn capture_reads_all_four_slots_before_reserved_validation() {
     image.physical_write(0x1000, 8, 0x3001).unwrap();
     assert_eq!(state.load_pdpte(&image), Ok([0x3001, 0, 0, 0x4001]));
 }
+
+#[test]
+fn physical_paging_inherits_all_numeric_controls_without_translation_changes() {
+    for bits in 0u8..32 {
+        for pae in [false, true] {
+            let state = State {
+                cr0: 0x80000031 | u64::from(bits & 7) << 1,
+                cr4: 8 | if pae { 0x20 } else { 0 } | u64::from((bits >> 3) & 3) << 9,
+                efer: 0,
+                pdpte: pae.then_some([0; 4]),
+                ..State::default()
+            };
+            assert_eq!(
+                state.validate_physical(Mode::Protected),
+                Ok(()),
+                "numeric{bits}/PAE{pae}"
+            );
+            let cr0 = state
+                .prepare_physical_cr_write(0, state.cr0 ^ 0xe, Mode::Protected)
+                .unwrap();
+            assert!(!state.translation_changed(cr0));
+            let cr4 = state
+                .prepare_physical_cr_write(4, state.cr4 ^ 0x600, Mode::Protected)
+                .unwrap();
+            assert!(!state.translation_changed(cr4));
+        }
+    }
+}

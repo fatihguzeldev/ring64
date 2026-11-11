@@ -58,9 +58,9 @@ impl State {
 
     pub fn validate_physical(self, mode: Mode) -> Result<(), &'static str> {
         if !matches!(mode, Mode::Protected | Mode::Virtual8086)
-            || self.cr0 & !CR0_WP != CR0_FIXED
+            || self.cr0 & !(CR0_WP | CR0_NUMERIC) != CR0_FIXED & !CR0_NUMERIC
             || self.cr3 & !0x000f_ffff_ffff_fff8 != 0
-            || self.cr4 & !0x30 != 0x608
+            || self.cr4 & !(0x30 | CR4_NUMERIC) != 8
             || self.efer & !(EFER_NXE | EFER_SCE) != 0
         {
             return Err("physical controls require a consistent legacy paged context");
@@ -94,7 +94,7 @@ impl State {
                 if value & 0x80000001 == 0x80000000 || value & 0x60000000 == 0x20000000 {
                     return Err(GeneralProtection);
                 }
-                if value & !CR0_WP != CR0_FIXED {
+                if value & !(CR0_WP | CR0_NUMERIC) != CR0_FIXED & !CR0_NUMERIC {
                     return Err(Unsupported);
                 }
                 candidate.cr0 = value;
@@ -117,7 +117,7 @@ impl State {
                 {
                     return Err(GeneralProtection);
                 }
-                if value & !0x30 != 0x608 || (self.cr4 ^ value) & 0x20 != 0 {
+                if value & !(0x30 | CR4_NUMERIC) != 8 || (self.cr4 ^ value) & 0x20 != 0 {
                     return Err(Unsupported);
                 }
                 candidate.cr4 = value;
