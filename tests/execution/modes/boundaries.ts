@@ -50,7 +50,7 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
       },
     },
     {
-      name: 'repairing a segment fault resumes without rewriting raw state or reviving old owners',
+      name: 'repairing a segment fault resumes with incompatible owners dormant and repaired code reusable',
       async run() {
         const broken = context();
         broken.segments.ds.base = 0x10000n;
@@ -84,16 +84,25 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
             repaired.segments.ds.base = 0x10000n;
             cpu.setContext(repaired);
             state(cpu.readState(), before);
-            equal(cpu.inspectTranslations().length, 0, 'repair retires faulting owner');
+            equal(
+              cpu.inspectTranslations()[0]!.owner,
+              faultOwner,
+              'repair keeps incompatible owner dormant',
+            );
             const resumed = await cpu.run({ budget: 1n });
             const after = changed(before, 0x1002n, { 0: 0x1122334412345678n });
             exit(resumed, 'budget', 1n, 1n, after);
             equal(resumed.fault, undefined, 'repaired linear diagnostic cleared');
             equal(resumed.segmentFault, undefined, 'repaired segment diagnostic cleared');
-            const repairedOwner = cpu.inspectTranslations()[0]!.owner;
+            const repairedOwner = cpu
+              .inspectTranslations()
+              .find((entry) => entry.owner !== faultOwner)!.owner;
             check(repairedOwner !== faultOwner, 'repair uses a fresh owner token');
             cpu.setContext(repaired);
-            equal(cpu.inspectTranslations()[0]!.owner, repairedOwner, 'equal repair retains owner');
+            check(
+              cpu.inspectTranslations().some((entry) => entry.owner === repairedOwner),
+              'equal repair retains owner',
+            );
             cpu.setState(before);
             const reused = await cpu.run({ budget: 1n });
             exit(reused, 'budget', 1n, 1n, after);
@@ -105,16 +114,16 @@ export function boundaryScenarios(compiler: WebAssembly.Module): Scenario[] {
             state(cpu.readState(), after);
             equal(
               cpu.inspectTranslations().length,
-              0,
-              'context round trip cannot revive retired owner',
+              2,
+              'context round trip retains both valid owners',
             );
             cpu.setState(before);
             const rebuilt = await cpu.run({ budget: 1n });
             exit(rebuilt, 'budget', 1n, 1n, after);
-            equal(rebuilt.resources.compilations, 1, 'context round trip recompiles');
+            equal(rebuilt.resources.compilations, 0, 'context round trip reuses repaired code');
             check(
-              cpu.inspectTranslations()[0]!.owner !== repairedOwner,
-              'context round trip uses a fresh token',
+              cpu.inspectTranslations().some((entry) => entry.owner === repairedOwner),
+              'context round trip keeps the installed token',
             );
             memory(cpu, 0x1000n, '8b03');
             memory(cpu, 0x11fffn, 'a578563412a5');

@@ -128,8 +128,8 @@ export function reuseScenarios(compiler: WebAssembly.Module): Scenario[] {
             equal(cpu.readContext().segments.fs.base, 0x6000n, 'new cache published');
             equal(reloaded.resources.dispatches, 1, 'new base invalidation');
             check(
-              !cpu.inspectTranslations().some((unit) => unit.entries.includes(0x1000n)),
-              'old-context unit retired',
+              cpu.inspectTranslations().some((unit) => unit.entries.includes(0x1000n)),
+              'old-context unit remains dormant',
             );
           },
           {

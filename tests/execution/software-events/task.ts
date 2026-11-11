@@ -192,7 +192,11 @@ export function taskScenarios(compiler: WebAssembly.Module): Scenario[] {
                 'outer projection publication follows context contract',
               );
               if (action === 'warm')
-                same(cpu.inspectTranslations(), [], 'changed context retires old owners');
+                equal(
+                  cpu.inspectTranslations().length,
+                  1,
+                  'changed context keeps old owner dormant',
+                );
               numeric();
             } finally {
               await pending;

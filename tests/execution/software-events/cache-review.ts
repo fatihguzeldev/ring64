@@ -56,8 +56,13 @@ export function cacheReviewScenarios(compiler: WebAssembly.Module): Scenario[] {
               equal(result.resources.compilations, 1, 'one admitted source translation');
               equal(result.resources.nativeEntries, 1, 'completed transfer entered once');
               equal(result.resources.dispatches, 1, 'transfer completed before refusal');
-              equal(result.resources.cachedArtifacts, 0, 'changed-context source owner pruned');
             }
+            equal(
+              entered.resources.cachedArtifacts,
+              1,
+              'INT source remains dormant at handler refusal',
+            );
+            equal(returned.resources.cachedArtifacts, 2, 'IRET and source owners remain retained');
             guarded(cpu, STACK, FILL, [[0x6ff8n, frame]]);
             const resumed = await cpu.run({ budget: 1n, repeatBudget: 11n });
             outcome(resumed, 'budget', 1n, 1n, 11n);

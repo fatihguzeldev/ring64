@@ -62,16 +62,17 @@ test('default context and identical imports preserve raw State and warm owners',
   }
 });
 
-test('meaningful context changes retire all entries without changing raw banks flags or RIP', async () => {
+test('meaningful context changes keep entries dormant without changing raw banks flags or RIP', async () => {
   const cpu = await createCpu(options());
   try {
     await cpu.run({ budget: 1n });
+    const owners = cpu.inspectTranslations();
     const state = initial(0x1000n, { 0: 0x1122334455667788n }, 0x8d7n);
     cpu.setState(state);
     const input = context();
     cpu.setContext(input);
     assert.deepEqual(cpu.readState(), state);
-    assert.deepEqual(cpu.inspectTranslations(), []);
+    assert.deepEqual(cpu.inspectTranslations(), owners);
     assert.deepEqual(cpu.readContext(), protectedSnapshot());
     assert.notEqual(input.mode, 'long64');
     if (input.mode === 'long64') assert.fail();
