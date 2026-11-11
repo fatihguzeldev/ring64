@@ -5,12 +5,14 @@ import { memoryScenarios } from './memory.js';
 import { boundaryScenarios } from './boundaries.js';
 import { specialScenarios } from './specials.js';
 import { specialMemoryScenarios } from './special-memory.js';
+import { specialImageScenarios } from './special-images.js';
 
 export function x87Scenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     ...literalScenarios(compiler),
     ...specialScenarios(compiler),
     ...specialMemoryScenarios(compiler),
+    ...specialImageScenarios(compiler),
     ...modeScenarios(compiler),
     ...memoryScenarios(compiler),
     ...boundaryScenarios(compiler),
