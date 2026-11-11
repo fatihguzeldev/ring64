@@ -15,9 +15,11 @@ impl Core {
     }
 
     pub(super) fn activate_owner(&mut self, owner: u64) -> bool {
+        let observed = self.boundary_observed();
         self.translation_owners
-            .eligible(owner, &self.context, self.boundary_observed())
-            && self.image.activate(owner)
+            .admit(owner, &self.context, observed, || {
+                self.image.activate(owner)
+            })
     }
 
     pub(super) fn context_changed(&mut self) {

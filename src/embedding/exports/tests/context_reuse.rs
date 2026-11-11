@@ -253,3 +253,171 @@ fn context_reuse_keeps_exact_paging_fences_and_dynamic_nonfences() {
         assert_eq!(mapped::core_validity(owner), i32::from(!destructive));
     }
 }
+
+#[test]
+fn context_proof_all_seven_publishers_clear_a_primed_proof_even_at_saturation() {
+    use crate::x86::context::Mode;
+    use crate::x86::instruction::{
+        FarDescriptor, FarKind, ProtectionDescriptor, ProtectionKind, SoftwareEventDescriptor,
+        SoftwareEventKind, Width,
+    };
+    for epoch in [0, u64::MAX] {
+        for writer in 0..7 {
+            let owner = if writer >= 5 {
+                paged_fixture();
+                BRIDGE.with_borrow_mut(|bridge| {
+                    bridge.core.as_mut().unwrap().context_version = epoch
+                });
+                paged_owner()
+            } else {
+                initialize(0x1000, &[0x90]);
+                BRIDGE.with_borrow_mut(|bridge| {
+                    let core = bridge.core.as_mut().unwrap();
+                    core.image = Image::new(0x1000, vec![0x90], 0x4000, vec![0; 0x2000]).unwrap();
+                    core.context.set_mode_and_cpl(Mode::Real, 0);
+                    core.context.set_idtr(crate::x86::context::TableRegister {
+                        base: 0x4000,
+                        limit: 0x3ff,
+                    });
+                    core.image.write_bytes(0x400c, &[0, 0x20, 0x20, 0]).unwrap();
+                    core.image.write_bytes(0x4018, &[0, 0x20, 0x20, 0]).unwrap();
+                    core.context_version = epoch;
+                    unsafe {
+                        (*core.state.get()).registers[4] = 0x5000;
+                    }
+                });
+                compile_and_publish()
+            };
+            assert_eq!(
+                mapped::core_activate(owner),
+                1,
+                "prime writer{writer} epoch{epoch}"
+            );
+            match writer {
+                0 => {
+                    let mut context = BRIDGE
+                        .with_borrow(|bridge| bridge.core.as_ref().unwrap().context.to_json());
+                    context["segments"]["fs"]["base"] = serde_json::json!("0x10000");
+                    import_context(context);
+                }
+                1 => assert_eq!(
+                    protection::core_protection(
+                        ProtectionDescriptor {
+                            kind: ProtectionKind::LoadSegment(Segment::Fs),
+                            width: Width::W16,
+                            memory: false
+                        }
+                        .encode(),
+                        0,
+                        0x20,
+                        Segment::Ds as u32
+                    ),
+                    2
+                ),
+                2 => assert_eq!(
+                    far_control::core_far_control(
+                        FarDescriptor {
+                            kind: FarKind::Jump,
+                            width: Width::W16,
+                            memory: false
+                        }
+                        .encode(),
+                        0x2000,
+                        0x20,
+                        0x5000,
+                        0x1001,
+                        Segment::Cs as u32
+                    ),
+                    0
+                ),
+                3 => assert_eq!(
+                    crate::embedding::exports::software_events::core_software_event(
+                        SoftwareEventDescriptor {
+                            kind: SoftwareEventKind::Int3,
+                            width: Width::W16,
+                            vector: 3
+                        }
+                        .encode(),
+                        0x5000,
+                        2,
+                        0x1001
+                    ),
+                    0
+                ),
+                4 => {
+                    BRIDGE.with_borrow_mut(|bridge| {
+                        let core = bridge.core.as_mut().unwrap();
+                        let event = crate::x86::exception::ExceptionEvent::fault(
+                            6,
+                            0x1000,
+                            2,
+                            &core.context,
+                            None,
+                        );
+                        unsafe {
+                            (*core.state.get())
+                                .set_event(crate::x86::exception::EventState::Pending(event));
+                        }
+                    });
+                    assert_eq!(
+                        crate::embedding::exports::exception_delivery::core_deliver_exception(),
+                        0
+                    );
+                }
+                5 => {
+                    BRIDGE.with_borrow_mut(|bridge| {
+                        bridge.core.as_mut().unwrap().fast_system.kernel_gs_base = 0x10000
+                    });
+                    assert_eq!(
+                        fast_system::core_fast_system(4, 0, 0x400001, 0x8000, 0, 0, 0, 2),
+                        0
+                    );
+                }
+                _ => assert_eq!(
+                    paging::core_paging_control(3, 0xc0000100, 0x10000, 0x400000, 2),
+                    0
+                ),
+            }
+            assert_eq!(
+                mapped::core_validity(owner),
+                1,
+                "retain writer{writer} epoch{epoch}"
+            );
+            assert_eq!(
+                mapped::core_activate(owner),
+                0,
+                "context proof invalidated writer{writer} epoch{epoch}"
+            );
+        }
+    }
+}
+
+#[test]
+fn context_proof_does_not_override_image_alias_death_release_or_paging_fences() {
+    let length = mapped_input(
+        mapped_configuration(),
+        &[0x90, 0x82, 0xa5, 0xa5, 0xa5, 0xa5, 0xa5, 0xa5],
+    );
+    assert_eq!(mapped::core_init_mapped(0x1000, length), 0);
+    let owner = compile_and_publish();
+    assert_eq!(mapped::core_activate(owner), 1);
+    assert_eq!(core_store(0x4000, 1, 0x90), 2);
+    assert_eq!(
+        mapped::core_activate(owner),
+        0,
+        "primed proof cannot bypass identity alias write"
+    );
+    let fresh = compile_and_publish();
+    assert_eq!(mapped::core_activate(fresh), 1);
+    mapped::core_release(fresh);
+    assert_eq!(mapped::core_activate(fresh), 0);
+    paged_fixture();
+    let owner = paged_owner();
+    assert_eq!(mapped::core_activate(owner), 1);
+    assert_eq!(paging::core_paging_control(1, 3, 0x1000, 0x400000, 2), 0);
+    assert_eq!(
+        mapped::core_activate(owner),
+        0,
+        "same CR3 destructive fence clears primed record"
+    );
+}

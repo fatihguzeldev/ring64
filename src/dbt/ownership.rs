@@ -8,6 +8,7 @@ struct Assumptions {
     observed: bool,
     epoch: u64,
     published: bool,
+    context_proven: bool,
 }
 
 /// Compiled assumptions share the memory source owner's identity and lifetime.
@@ -34,6 +35,7 @@ impl Owners {
                 observed,
                 epoch,
                 published: false,
+                context_proven: false,
             },
         );
         true
@@ -43,10 +45,36 @@ impl Owners {
         self.records.contains_key(&owner)
     }
 
+    fn matches(record: &Assumptions, context: &ExecutionContext, observed: bool) -> bool {
+        record.published && record.context == *context && record.observed == observed
+    }
+
+    #[cfg(test)]
     pub fn eligible(&self, owner: u64, context: &ExecutionContext, observed: bool) -> bool {
-        self.records.get(&owner).is_some_and(|record| {
-            record.published && record.context == *context && record.observed == observed
-        })
+        self.records
+            .get(&owner)
+            .is_some_and(|record| Self::matches(record, context, observed))
+    }
+
+    pub fn admit(
+        &mut self,
+        owner: u64,
+        context: &ExecutionContext,
+        observed: bool,
+        activate: impl FnOnce() -> bool,
+    ) -> bool {
+        let Some(record) = self.records.get_mut(&owner) else {
+            return false;
+        };
+        if !record.published
+            || record.observed != observed
+            || !record.context_proven && !Self::matches(record, context, observed)
+            || !activate()
+        {
+            return false;
+        }
+        record.context_proven = true;
+        true
     }
 
     pub fn publish(
@@ -72,6 +100,7 @@ impl Owners {
     pub fn cancel_pending(&mut self, mut release: impl FnMut(u64)) {
         self.records.retain(|&owner, record| {
             if record.published {
+                record.context_proven = false;
                 true
             } else {
                 release(owner);
@@ -89,5 +118,7 @@ impl Owners {
     }
 }
 
+#[cfg(test)]
+mod proof_tests;
 #[cfg(test)]
 mod tests;
