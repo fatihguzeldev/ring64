@@ -29,27 +29,21 @@ export function ioScenarios(compiler: WebAssembly.Module): Scenario[] {
       name: 'scalar port transfers preserve widths and publish unsigned dword values',
       async run() {
         const trace: string[] = [];
-        const cpu = await createCpu(
-          Object.assign(
-            {
-              compiler,
-              limits: LIMITS,
-              code: { base: 0x1000n, bytes: hex('66ede5ffefe6fe') },
-              ram: { base: 0x4000n, bytes: new Uint8Array(8) },
+        const cpu = await createCpu({
+          compiler,
+          limits: LIMITS,
+          code: { base: 0x1000n, bytes: hex('66ede5ffefe6fe') },
+          ram: { base: 0x4000n, bytes: new Uint8Array(8) },
+          io: {
+            read(port, width) {
+              trace.push(`in:${port}:${width}`);
+              return width === 16 ? 0xabcd : 0xfedcba98;
             },
-            {
-              io: {
-                read(port: number, width: number) {
-                  trace.push(`in:${port}:${width}`);
-                  return width === 16 ? 0xabcd : 0xfedcba98;
-                },
-                write(port: number, width: number, value: number) {
-                  trace.push(`out:${port}:${width}:${value}`);
-                },
-              },
+            write(port, width, value) {
+              trace.push(`out:${port}:${width}:${value}`);
             },
-          ),
-        );
+          },
+        });
         try {
           cpu.setState(initial(0x1000n, { 0: 0x1122334455667788n, 2: 0x8000000000001234n }));
           const result = await cpu.run({ budget: 4n, repeatBudget: 0n });
