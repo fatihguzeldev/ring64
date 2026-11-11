@@ -1,6 +1,6 @@
 # x87 remainder, exponent and BCD
 
-Status: implementation-ready specification; implementation not started. Source audit baseline: `4df41a0814beaceb0681dc013f5eac094cdc6660`. First of the next five specs.
+Status: implemented; functional verification passed. Integrated paired performance verification is pending; see [verification](verification.md). Source audit baseline: `4df41a0814beaceb0681dc013f5eac094cdc6660`. First of the next five specs.
 
 ## objective and admitted profile
 
