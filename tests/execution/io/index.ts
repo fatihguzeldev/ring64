@@ -1,3 +1,4 @@
+import { ioSourcePteScenarios } from './source-pte.js';
 import { pagedIoScenarios } from './paging.js';
 import { ioBoundaryScenarios } from './boundaries.js';
 import { stringIoScenarios } from './strings.js';
@@ -8,6 +9,7 @@ export function ioScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
     ...stringIoScenarios(compiler),
     ...pagedIoScenarios(compiler),
+    ...ioSourcePteScenarios(compiler),
     ...ioBoundaryScenarios(compiler),
     {
       name: 'scalar port transfers preserve widths and publish unsigned dword values',
