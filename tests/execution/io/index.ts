@@ -1,8 +1,12 @@
+import { ioBoundaryScenarios } from './boundaries.js';
+import { stringIoScenarios } from './strings.js';
 import { createCpu } from '../../../host/index.js';
 import { LIMITS, equal, hex, initial, type Scenario } from '../../support/fixture.js';
 
 export function ioScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
+    ...stringIoScenarios(compiler),
+    ...ioBoundaryScenarios(compiler),
     {
       name: 'scalar port transfers preserve widths and publish unsigned dword values',
       async run() {
