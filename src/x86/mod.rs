@@ -3,6 +3,7 @@ pub mod context;
 pub mod debug;
 pub mod decode;
 pub mod exception;
+pub mod fast_system;
 pub mod flags;
 pub mod float;
 pub mod instruction;

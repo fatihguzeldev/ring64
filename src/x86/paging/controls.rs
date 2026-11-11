@@ -7,6 +7,7 @@ const CR3_ALLOWED: u64 = 0x000ffffffffff018;
 const CR4_FIXED: u64 = 0x628;
 const EFER_FIXED: u64 = 0x500;
 const EFER_NXE: u64 = 1 << 11;
+const EFER_SCE: u64 = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
@@ -42,7 +43,7 @@ impl State {
         if self.cr0 & !CR0_WP != CR0_FIXED
             || self.cr3 & !CR3_ALLOWED != 0
             || self.cr4 != CR4_FIXED
-            || self.efer & !EFER_NXE != EFER_FIXED
+            || self.efer & !(EFER_NXE | EFER_SCE) != EFER_FIXED
         {
             Err("paging controls do not match the normalized IA32e profile")
         } else {
@@ -127,11 +128,8 @@ impl State {
         if value & !0xd01 != 0 || value & (1 << 8) == 0 {
             return Err(ControlFailure::GeneralProtection);
         }
-        if value & 1 != 0 {
-            return Err(ControlFailure::Unsupported);
-        }
         Ok(Self {
-            efer: (value & EFER_NXE) | EFER_FIXED,
+            efer: (value & (EFER_NXE | EFER_SCE)) | EFER_FIXED,
             ..self
         })
     }
@@ -153,7 +151,8 @@ impl State {
     }
 
     pub fn translation_changed(self, other: Self) -> bool {
-        (self.cr0, self.cr3, self.cr4, self.efer) != (other.cr0, other.cr3, other.cr4, other.efer)
+        (self.cr0, self.cr3, self.cr4, self.efer & EFER_NXE)
+            != (other.cr0, other.cr3, other.cr4, other.efer & EFER_NXE)
     }
 }
 
@@ -199,7 +198,7 @@ mod tests {
                 1 => bad.cr0 &= !1,
                 2 => bad.cr3 |= 1,
                 3 => bad.cr4 |= 1 << 7,
-                4 => bad.efer |= 1,
+                4 => bad.efer |= 1 << 1,
                 _ => unreachable!(),
             }
             assert!(bad.validate().is_err(), "field {field}");
@@ -363,8 +362,65 @@ mod tests {
                 "{value:x}"
             );
         }
-        assert_eq!(state.prepare_efer_write(0x501), Err(Unsupported));
+        assert_eq!(
+            state.prepare_efer_write(0x501),
+            Ok(State {
+                efer: 0x501,
+                ..state
+            })
+        );
         assert_eq!(state, bank());
+    }
+
+    #[test]
+    fn efer_sce_is_live_normalized_state_without_changing_other_controls() {
+        for efer in [0x500, 0x501, 0xd00, 0xd01] {
+            let state = State { efer, ..bank() };
+            assert_eq!(state.validate(), Ok(()));
+            assert_eq!(state.read_msr(0xc0000080), Ok(efer));
+            for input in [0x100, 0x101, 0x900, 0x901, 0x500, 0x501, 0xd00, 0xd01] {
+                let next = state.prepare_efer_write(input).unwrap();
+                assert_eq!(
+                    next,
+                    State {
+                        efer: (input & 0x801) | 0x500,
+                        ..state
+                    }
+                );
+                assert_eq!(next.cr2, state.cr2);
+            }
+        }
+    }
+
+    #[test]
+    fn sce_only_updates_do_not_change_paging_authority_but_nxe_and_cr_changes_do() {
+        let state = bank();
+        assert!(!state.translation_changed(State {
+            efer: 0x501,
+            ..state
+        }));
+        let nxe = State {
+            efer: 0xd00,
+            ..state
+        };
+        assert!(!nxe.translation_changed(State { efer: 0xd01, ..nxe }));
+        assert!(state.translation_changed(nxe));
+        assert!(state.translation_changed(State {
+            cr0: 0x80010033,
+            ..state
+        }));
+        assert!(state.translation_changed(State {
+            cr3: 0x5000,
+            ..state
+        }));
+        assert!(state.translation_changed(State {
+            cr4: 0x620,
+            ..state
+        }));
+        assert!(!state.translation_changed(State {
+            cr2: 0x400000,
+            ..state
+        }));
     }
 
     #[test]
