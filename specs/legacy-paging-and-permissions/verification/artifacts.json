@@ -1,0 +1,307 @@
+{
+  "kind": "structural-generated-artifact-comparison",
+  "ceiling": "No timing, guest execution, throughput or native-Core helper latency is measured.",
+  "sides": [
+    {
+      "label": "baseline",
+      "path": "/tmp/ring64-five-baseline",
+      "revision": "e00a41875c54798a554f7c30864e784e569df10d",
+      "coreSha256": "bc0f715fff9bcceac715359804103041deb1fd4038197f3d547fb708fada7be4",
+      "coreBytes": 1116930
+    },
+    {
+      "label": "legacy",
+      "path": "/tmp/ring64-five-legacy",
+      "revision": "c8e11257a9f3ba765f6373683b4b5eface96149e",
+      "coreSha256": "ea98648c12d3fc3fea2f9586c4e4d60e9abdcf8c10978b5b1c81cf8b8914f97f",
+      "coreBytes": 1132644
+    }
+  ],
+  "results": [
+    {
+      "name": "scalar",
+      "sides": [
+        {
+          "label": "baseline",
+          "bytes": 786,
+          "sha256": "5ff0cf21f87bd38d85f0e5b44b523a995d245f5ef06ef119e3b2c649f074b464",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function"
+          ],
+          "instructionCount": 2,
+          "blockCount": 1
+        },
+        {
+          "label": "legacy",
+          "bytes": 786,
+          "sha256": "5ff0cf21f87bd38d85f0e5b44b523a995d245f5ef06ef119e3b2c649f074b464",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function"
+          ],
+          "instructionCount": 2,
+          "blockCount": 1
+        }
+      ],
+      "byteIdentical": true,
+      "sourceBytes": "4883c00175fa"
+    },
+    {
+      "name": "checked-load",
+      "sides": [
+        {
+          "label": "baseline",
+          "bytes": 876,
+          "sha256": "6c7dca133695ca178013fb3be5facb2c5a233b2f9465c4086e3c6cf43ebc8af9",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function"
+          ],
+          "instructionCount": 3,
+          "blockCount": 1
+        },
+        {
+          "label": "legacy",
+          "bytes": 876,
+          "sha256": "6c7dca133695ca178013fb3be5facb2c5a233b2f9465c4086e3c6cf43ebc8af9",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function"
+          ],
+          "instructionCount": 3,
+          "blockCount": 1
+        }
+      ],
+      "byteIdentical": true,
+      "sourceBytes": "488b034883c00175f7"
+    },
+    {
+      "name": "byte-rmw",
+      "sides": [
+        {
+          "label": "baseline",
+          "bytes": 933,
+          "sha256": "1005d5e3125172f0e961686a6a4c1de1e9d9885da6bdfa181390ac98267853df",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function",
+            "env.load_for_write:function"
+          ],
+          "instructionCount": 2,
+          "blockCount": 1
+        },
+        {
+          "label": "legacy",
+          "bytes": 933,
+          "sha256": "1005d5e3125172f0e961686a6a4c1de1e9d9885da6bdfa181390ac98267853df",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function",
+            "env.load_for_write:function"
+          ],
+          "instructionCount": 2,
+          "blockCount": 1
+        }
+      ],
+      "byteIdentical": true,
+      "sourceBytes": "fe0375fc"
+    },
+    {
+      "name": "stack",
+      "sides": [
+        {
+          "label": "baseline",
+          "bytes": 845,
+          "sha256": "d00ffac8fafdbd1c3961b08cbd6c028a94836602bd8ab4ad5449b8ea72eecc3c",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function"
+          ],
+          "instructionCount": 3,
+          "blockCount": 1
+        },
+        {
+          "label": "legacy",
+          "bytes": 845,
+          "sha256": "d00ffac8fafdbd1c3961b08cbd6c028a94836602bd8ab4ad5449b8ea72eecc3c",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function"
+          ],
+          "instructionCount": 3,
+          "blockCount": 1
+        }
+      ],
+      "byteIdentical": true,
+      "sourceBytes": "505890"
+    },
+    {
+      "name": "simd",
+      "sides": [
+        {
+          "label": "baseline",
+          "bytes": 698,
+          "sha256": "7a2c24eaa68a8e2672307542bc0cd0b3c2513115931ca253e4d3cb95fe0b6c10",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function"
+          ],
+          "instructionCount": 2,
+          "blockCount": 1
+        },
+        {
+          "label": "legacy",
+          "bytes": 698,
+          "sha256": "7a2c24eaa68a8e2672307542bc0cd0b3c2513115931ca253e4d3cb95fe0b6c10",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function"
+          ],
+          "instructionCount": 2,
+          "blockCount": 1
+        }
+      ],
+      "byteIdentical": true,
+      "sourceBytes": "660fefc090"
+    },
+    {
+      "name": "x87",
+      "sides": [
+        {
+          "label": "baseline",
+          "bytes": 742,
+          "sha256": "f33ff9fc764fe81f2a460cea1d4c327a1be9e294c22f502eb1f38d3aacdeb33b",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function",
+            "env.x87:function"
+          ],
+          "instructionCount": 2,
+          "blockCount": 1
+        },
+        {
+          "label": "legacy",
+          "bytes": 742,
+          "sha256": "f33ff9fc764fe81f2a460cea1d4c327a1be9e294c22f502eb1f38d3aacdeb33b",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function",
+            "env.x87:function"
+          ],
+          "instructionCount": 2,
+          "blockCount": 1
+        }
+      ],
+      "byteIdentical": true,
+      "sourceBytes": "d9e8d9e0"
+    },
+    {
+      "name": "iret",
+      "sides": [
+        {
+          "label": "baseline",
+          "bytes": 763,
+          "sha256": "93d2d0355143db235af49e1f28349887c44109be2c457b23fa866bfa98de588f",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function",
+            "env.software_event:function",
+            "env.external_step:function"
+          ],
+          "instructionCount": 1,
+          "blockCount": 1
+        },
+        {
+          "label": "legacy",
+          "bytes": 763,
+          "sha256": "93d2d0355143db235af49e1f28349887c44109be2c457b23fa866bfa98de588f",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function",
+            "env.software_event:function",
+            "env.external_step:function"
+          ],
+          "instructionCount": 1,
+          "blockCount": 1
+        }
+      ],
+      "byteIdentical": true,
+      "sourceBytes": "48cf"
+    },
+    {
+      "name": "ia32e-checked-load",
+      "sides": [
+        {
+          "label": "baseline",
+          "bytes": 1667,
+          "sha256": "d4f05d391703be73855e0d0980ef8c9155e566c3ee3e1c8b6b4d1532f7453efd",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function",
+            "env.access_reason:function",
+            "env.debug_begin:function",
+            "env.debug_finish:function",
+            "env.external_step:function"
+          ],
+          "instructionCount": 3,
+          "blockCount": 1
+        },
+        {
+          "label": "legacy",
+          "bytes": 1667,
+          "sha256": "d4f05d391703be73855e0d0980ef8c9155e566c3ee3e1c8b6b4d1532f7453efd",
+          "imports": [
+            "env.memory:memory",
+            "env.load:function",
+            "env.store:function",
+            "env.access_failed:function",
+            "env.access_reason:function",
+            "env.debug_begin:function",
+            "env.debug_finish:function",
+            "env.external_step:function"
+          ],
+          "instructionCount": 3,
+          "blockCount": 1
+        }
+      ],
+      "byteIdentical": true,
+      "sourceBytes": "488b034883c00175f7"
+    }
+  ],
+  "compileLimits": {
+    "maxInstructions": 128,
+    "maxSourceBytes": 2048,
+    "maxArtifactBytes": 262144
+  }
+}

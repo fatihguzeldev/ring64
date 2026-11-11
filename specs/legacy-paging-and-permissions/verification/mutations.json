@@ -1,0 +1,37 @@
+[
+  {
+    "name": "widen-nonpae-entry",
+    "test": "nonpae_literal_walk_uses_exact_dword_entries",
+    "semantic_assertion_failed": true,
+    "restored_control_passed": true,
+    "source_sha256": "3b683566f339e7aef0ece3a9051905b6ea16faa9983df0437a056c8493b5ae26"
+  },
+  {
+    "name": "validate-slot-before-complete-capture",
+    "test": "capture_reads_all_four_slots_before_reserved_validation",
+    "semantic_assertion_failed": true,
+    "restored_control_passed": true,
+    "source_sha256": "991bc57779bf30bfd074ddb4074ff9322cb278f1243ac291d5fcad7fcd0b107d"
+  },
+  {
+    "name": "reread-latched-pdpt",
+    "test": "pae_uses_latched_roots_and_only_two_live_qword_levels",
+    "semantic_assertion_failed": true,
+    "restored_control_passed": true,
+    "source_sha256": "3b683566f339e7aef0ece3a9051905b6ea16faa9983df0437a056c8493b5ae26"
+  },
+  {
+    "name": "widen-dword-dirty-update",
+    "test": "dword_update_uses_only_its_admitted_four_bytes",
+    "semantic_assertion_failed": true,
+    "restored_control_passed": true,
+    "source_sha256": "2e5d47719edb753d78a50cc28aeaae4752133fe4f76120779041a080d455bea9"
+  },
+  {
+    "name": "omit-quartet-owner-fence",
+    "test": "quartet_changes_and_same_cr3_reload",
+    "semantic_assertion_failed": true,
+    "restored_control_passed": true,
+    "source_sha256": "991bc57779bf30bfd074ddb4074ff9322cb278f1243ac291d5fcad7fcd0b107d"
+  }
+]
