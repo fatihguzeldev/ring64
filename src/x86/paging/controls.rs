@@ -42,6 +42,123 @@ pub enum ControlFailure {
     Unsupported,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PdpteFailure {
+    Physical {
+        slot: u8,
+        fault: crate::memory::Fault,
+    },
+    Reserved,
+}
+
+impl State {
+    pub fn legacy_pae(self) -> bool {
+        self.cr0 & (1 << 31) != 0 && self.cr4 & (1 << 5) != 0 && self.efer & (1 << 10) == 0
+    }
+
+    pub fn validate_physical(self, mode: Mode) -> Result<(), &'static str> {
+        if !matches!(mode, Mode::Protected | Mode::Virtual8086)
+            || self.cr0 & !CR0_WP != CR0_FIXED
+            || self.cr3 & !0x000f_ffff_ffff_fff8 != 0
+            || self.cr4 & !0x30 != 0x608
+            || self.efer & !(EFER_NXE | EFER_SCE) != 0
+        {
+            return Err("physical controls require a consistent legacy paged context");
+        }
+        if self.legacy_pae() != self.pdpte.is_some() {
+            return Err("captured PDPTE quartet requires active legacy PAE");
+        }
+        if self
+            .pdpte
+            .is_some_and(|entries| !entries.into_iter().all(valid_pdpte))
+        {
+            return Err("reserved present captured PDPTE");
+        }
+        Ok(())
+    }
+
+    pub fn prepare_physical_cr_write(
+        self,
+        register: u8,
+        value: u64,
+        mode: Mode,
+    ) -> Result<Self, ControlFailure> {
+        use ControlFailure::{GeneralProtection, Unsupported};
+        let mut candidate = self;
+        match register {
+            0 => {
+                if value >> 32 != 0 {
+                    return Err(GeneralProtection);
+                }
+                let value = (value & 0xe005003f) | 0x10;
+                if value & 0x80000001 == 0x80000000 || value & 0x60000000 == 0x20000000 {
+                    return Err(GeneralProtection);
+                }
+                if value & !CR0_WP != CR0_FIXED {
+                    return Err(Unsupported);
+                }
+                candidate.cr0 = value;
+            }
+            2 => candidate.cr2 = u64::from(value as u32),
+            3 => {
+                candidate.cr3 = value
+                    & if self.cr4 & 0x20 != 0 {
+                        0xffffffe0
+                    } else {
+                        0xfffff018
+                    }
+            }
+            4 => {
+                let defined = 0x7fff | (0x3ff << 16) | (3 << 27) | (1 << 32);
+                if value & !defined != 0
+                    || value & (1 << 12) != 0
+                    || value & (1 << 17) != 0
+                    || value & (1 << 23) != 0 && self.cr0 & CR0_WP == 0
+                {
+                    return Err(GeneralProtection);
+                }
+                if value & !0x30 != 0x608 || (self.cr4 ^ value) & 0x20 != 0 {
+                    return Err(Unsupported);
+                }
+                candidate.cr4 = value;
+            }
+            _ => return self.prepare_cr_write(register, value, mode),
+        }
+        Ok(candidate)
+    }
+
+    pub fn prepare_physical_efer_write(self, value: u64) -> Result<Self, ControlFailure> {
+        if value & !0xd01 != 0 || (self.efer ^ value) & (1 << 8) != 0 {
+            return Err(ControlFailure::GeneralProtection);
+        }
+        Ok(Self {
+            efer: value & (EFER_NXE | EFER_SCE),
+            ..self
+        })
+    }
+
+    pub fn load_pdpte(self, image: &crate::memory::Image) -> Result<[u64; 4], PdpteFailure> {
+        let mut entries = [0; 4];
+        let root = self.cr3 & 0xffffffe0;
+        for (slot, entry) in entries.iter_mut().enumerate() {
+            *entry = image
+                .physical_read(root + slot as u64 * 8, 8)
+                .map_err(|fault| PdpteFailure::Physical {
+                    slot: slot as u8,
+                    fault,
+                })?;
+        }
+        if !entries.into_iter().all(valid_pdpte) {
+            return Err(PdpteFailure::Reserved);
+        }
+        Ok(entries)
+    }
+}
+
+fn valid_pdpte(value: u64) -> bool {
+    value & 1 == 0 || value & 0xfff00000000001e6 == 0
+}
+
 impl State {
     pub fn validate(self) -> Result<(), &'static str> {
         if self.pdpte.is_some()
@@ -165,11 +282,13 @@ impl State {
             self.cr3,
             self.cr4 & !CR4_NUMERIC,
             self.efer & EFER_NXE,
+            self.pdpte,
         ) != (
             other.cr0 & !CR0_NUMERIC,
             other.cr3,
             other.cr4 & !CR4_NUMERIC,
             other.efer & EFER_NXE,
+            other.pdpte,
         )
     }
 }
@@ -484,3 +603,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "legacy_controls_tests.rs"]
+mod legacy_tests;
