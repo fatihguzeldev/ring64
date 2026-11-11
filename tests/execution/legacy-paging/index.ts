@@ -1,3 +1,5 @@
+import { legacyAccessScenarios } from './access.js';
+import { legacyBoundaryScenarios } from './boundaries.js';
 import { legacyModeScenarios } from './modes.js';
 import { legacyEventScenarios } from './events.js';
 import { legacyControlScenarios } from './controls.js';
@@ -18,6 +20,8 @@ export function legacyPagingScenarios(compiler: WebAssembly.Module): Scenario[] 
     ...legacyControlScenarios(compiler),
     ...legacyEventScenarios(compiler),
     ...legacyModeScenarios(compiler),
+    ...legacyAccessScenarios(compiler),
+    ...legacyBoundaryScenarios(compiler),
     ...[false, true].map((pae) => ({
       name: `legacy ${pae ? 'PAE' : 'nonPAE'} public generated access and raw bank`,
       async run() {
