@@ -1,3 +1,4 @@
+import { Core } from '../../host/core.js';
 import { captureNumericFault } from '../../host/numeric-controls.js';
 import { longSnapshot } from '../support/context.js';
 import {
@@ -15,6 +16,181 @@ import { same } from './far-control/fixture.js';
 
 export function numericControlScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
+    {
+      name: 'numeric reached probe beats exhausted compile quota but untaken disabled forms stay unexecuted',
+      async run() {
+        await usingPaged(
+          compiler,
+          {
+            code: 'ffe0',
+            bank: { ...BANK, cr0: 0x8000003bn },
+            limits: { maxInstructions: 1, maxTranslationsPerRun: 1 },
+          },
+          async (cpu) => {
+            cpu.writePhysicalMemory(0x9100n, hex('d9e8'));
+            cpu.setState(initial(PC, { 0: PC + 0x100n }));
+            const result = await cpu.run({ budget: 2n });
+            equal(result.reason, 'device-not-available', 'reached cold fault');
+            equal(result.retired, 1n, 'only JMP');
+            equal(result.remaining, 1n, 'numeric consumes none');
+            equal(result.resources.compilations, 1, 'no second compile');
+            equal(result.resources.nativeEntries, 1, 'only JMP enters');
+          },
+        );
+        await usingPaged(
+          compiler,
+          { code: 'eb02d9e890', bank: { ...BANK, cr0: 0x8000003bn } },
+          async (cpu) => {
+            const before = cpu.readX87State();
+            cpu.setState(initial(PC));
+            const result = await cpu.run({ budget: 2n });
+            equal(result.reason, 'budget', 'skipped disabled form');
+            equal(result.state.rip, PC + 5n, 'JMP and NOP');
+            same(cpu.readX87State(), before, 'future form no effect');
+          },
+        );
+      },
+    },
+    {
+      name: 'numeric pending async artifacts are cancelled by control ABA while installed live guards remain reusable',
+      async run() {
+        const create = Core.create,
+          compile = WebAssembly.compile;
+        let core: Core | undefined;
+        Core.create = async (...args) => {
+          core = await create(...args);
+          return core;
+        };
+        try {
+          await usingPaged(
+            compiler,
+            { code: '90d9e8', limits: { maxInstructions: 1 } },
+            async (cpu) => {
+              cpu.setState(initial(PC));
+              await cpu.run({ budget: 1n });
+              const installed = cpu.inspectTranslations()[0]!.owner;
+              let crossed = false;
+              WebAssembly.compile = async (bytes) => {
+                if (!crossed) {
+                  crossed = true;
+                  check(core, 'actual Core');
+                  core.setPagingState({ ...BANK, cr0: 0x8000003bn });
+                  core.setPagingState(BANK);
+                  equal(core.valid(installed), true, 'published owner retained');
+                }
+                return compile(bytes);
+              };
+              cpu.setState(initial(PC + 1n));
+              const result = await cpu.run({ budget: 1n });
+              equal(crossed, true, 'crossed real browser compile');
+              equal(result.resources.compilations, 2, 'cancelled then fresh');
+              equal(result.resources.nativeEntries, 1, 'no stale native entry');
+              equal(result.retired, 1n, 'one numeric execution');
+            },
+          );
+        } finally {
+          Core.create = create;
+          WebAssembly.compile = compile;
+        }
+      },
+    },
+    {
+      name: 'numeric admission precedes data DR and bad operands while execute DB keeps its priority',
+      async run() {
+        await usingPaged(
+          compiler,
+          { code: 'd907', bank: { ...BANK, cr0: 0x8000003bn } },
+          async (cpu) => {
+            cpu.setDebugState({ addresses: [0x500000n, 0n, 0n, 0n], dr6: 0n, dr7: 0x30401n });
+            cpu.setState(initial(PC, { 7: 0x500000n }, 0x10002n));
+            const fault = await cpu.run({ budget: 1n });
+            equal(fault.reason, 'device-not-available', 'NM before data access');
+            equal(cpu.readDebugState().dr6 & 15n, 0n, 'no operand hit');
+            equal(fault.state.flags, 0x10002n, 'RF retained');
+            cpu.setDebugState({ addresses: [PC, 0n, 0n, 0n], dr6: 0n, dr7: 0x401n });
+            cpu.setState(initial(PC, { 7: 0x500000n }));
+            const debug = await cpu.run({ budget: 1n });
+            equal(debug.reason, 'debug-exception', 'execute DB precedes admission');
+            equal(debug.deviceNotAvailable, undefined, 'exclusive diagnostic');
+          },
+        );
+      },
+    },
+    {
+      name: 'numeric FX under OSFXSR0 still saves XMM MXCSR and CVTPI2PD memory alone bypasses pending MF',
+      async run() {
+        await usingPaged(
+          compiler,
+          {
+            code: '0fae00',
+            bank: { ...BANK, cr4: 0x28n },
+            words: [[0x4008n, 0xa007n]],
+            spans: [{ physical: 0xa000n, bytes: new Uint8Array(512).fill(0xa5) }],
+          },
+          async (cpu) => {
+            const xmm = cpu.readXmmState();
+            xmm[0] = 0x112233445566778899aabbccddeeff00n;
+            cpu.setXmmState(xmm);
+            cpu.setMxcsr(0x1f01);
+            cpu.setState(initial(PC, { 0: PC + 0x1000n }));
+            const result = await cpu.run({ budget: 1n });
+            equal(result.retired, 1n, 'FX admitted despite OSFXSR0');
+            const bytes = cpu.readPhysicalMemory(0xa000n, 512);
+            same(
+              bytes.slice(160, 176),
+              little([0x99aabbccddeeff00n, 0x1122334455667788n]),
+              'XMM image',
+            );
+            equal(new DataView(bytes.buffer).getUint32(24, true), 0x1f01, 'MXCSR image');
+          },
+        );
+        await usingPaged(
+          compiler,
+          {
+            code: '660f2a07',
+            words: [[0x4008n, 0xa007n]],
+            spans: [{ physical: 0xa000n, bytes: little([0x200000001n]) }],
+          },
+          async (cpu) => {
+            const before = cpu.readX87State();
+            before.controlWord = 0x37e;
+            before.statusWord = 0x8081;
+            cpu.setX87State(before);
+            cpu.setState(initial(PC, { 7: PC + 0x1000n }));
+            const result = await cpu.run({ budget: 1n });
+            equal(result.retired, 1n, 'memory PI2PD skips MF');
+            equal(cpu.readXmmState()[0], 0x40000000000000003ff0000000000000n, 'two exact doubles');
+            same(cpu.readX87State(), before, 'no alias transition');
+          },
+        );
+      },
+    },
+    {
+      name: 'numeric pending NM is benign on entry GP and subsequent decoder UD cannot inherit numeric metadata',
+      async run() {
+        await usingPaged(
+          compiler,
+          { code: 'd9e80f20c8', bank: { ...BANK, cr0: 0x8000003bn } },
+          async (cpu) => {
+            cpu.setState(initial(PC));
+            const failure = await cpu.run({ budget: 1n, eventDelivery: { budget: 1n } });
+            equal(failure.reason, 'event-budget', 'one failed NM entry attempt');
+            check(failure.state.event.kind === 'pending', 'secondary pending');
+            equal(failure.state.event.exception.vector, 13, 'benign NM yields GP rather than DF');
+            equal(
+              failure.state.event.exception.deviceNotAvailable,
+              undefined,
+              'old source dropped',
+            );
+            cpu.setState(initial(PC + 2n));
+            const invalid = await cpu.run({ budget: 1n });
+            equal(invalid.reason, 'invalid-encoding', 'ordinary decoder UD');
+            equal(invalid.numericControlFault, undefined, 'no stale numeric cause');
+            equal(invalid.deviceNotAvailable, undefined, 'no stale NM cause');
+          },
+        );
+      },
+    },
     {
       name: 'numeric live admission covers all32 control images and direct/helper forms before RF operands and compile quota',
       async run() {

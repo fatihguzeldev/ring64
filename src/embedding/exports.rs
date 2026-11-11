@@ -327,6 +327,7 @@ pub extern "C" fn core_import_state() -> i32 {
         core.alignment_fault = None;
         core.simd_exception = None;
         core.numeric_fault = None;
+        core.numeric_form = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
@@ -349,6 +350,7 @@ pub extern "C" fn core_clear_fault() -> i32 {
         core.alignment_fault = None;
         core.simd_exception = None;
         core.numeric_fault = None;
+        core.numeric_form = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
@@ -368,10 +370,12 @@ pub extern "C" fn core_clear_fault() -> i32 {
 pub extern "C" fn core_probe(pc: u64) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
+        core.debug_candidate = 0;
         core.fault = None;
         core.alignment_fault = None;
         core.simd_exception = None;
         core.numeric_fault = None;
+        core.numeric_form = None;
         core.general_protection = None;
         core.protection_fault = None;
         core.system_memory_fault = None;
