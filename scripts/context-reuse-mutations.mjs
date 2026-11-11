@@ -58,9 +58,9 @@ const mutants = [
     name: 'installed-owner-keyed-by-epoch',
     kind: 'rust-owner',
     file: adapter,
-    old: '        self.translation_owners\n            .eligible(owner, &self.context, self.boundary_observed())',
+    old: '        self.translation_owners\n            .admit(owner, &self.context, observed, || {',
     replacement:
-      '        self.context_version == 0 && self.translation_owners\n            .eligible(owner, &self.context, self.boundary_observed())',
+      '        self.context_version == 0 && self.translation_owners\n            .admit(owner, &self.context, observed, || {',
     filter: 'context_reuse_keeps_a_published_owner_alive_but_refuses_the_wrong_context',
   },
   {
@@ -86,6 +86,13 @@ const mutants = [
     file: owners,
     old: 'record.published && record.context == *context && record.observed == observed',
     replacement: 'record.context == *context && record.observed == observed',
+    extra: [
+      {
+        file: owners,
+        old: '        if !record.published\n            || record.observed != observed',
+        replacement: '        if false\n            || record.observed != observed',
+      },
+    ],
     filter: 'context_reuse_pending_aba_is_cancelled_even_when_epoch_saturates',
   },
   {
@@ -110,13 +117,13 @@ const mutants = [
     file: adapter,
     old: 'self.translation_owners.contains(owner) && self.image.owner_valid(owner)',
     replacement:
-      'self.translation_owners.contains(owner) && (!self.translation_owners.published(owner) || self.translation_owners.eligible(owner, &self.context, self.boundary_observed())) && self.image.owner_valid(owner)',
+      'self.translation_owners.contains(owner) && self.translation_owners.pending_or_eligible(owner, &self.context, self.boundary_observed()) && self.image.owner_valid(owner)',
     extra: [
       {
         file: owners,
-        old: '    pub fn eligible(&self, owner: u64, context: &ExecutionContext, observed: bool) -> bool {',
+        old: '    pub fn admit(',
         replacement:
-          '    pub fn published(&self, owner: u64) -> bool { self.records.get(&owner).is_some_and(|record| record.published) }\n\n    pub fn eligible(&self, owner: u64, context: &ExecutionContext, observed: bool) -> bool {',
+          '    pub fn pending_or_eligible(&self, owner: u64, context: &ExecutionContext, observed: bool) -> bool { self.records.get(&owner).is_some_and(|record| !record.published || Self::matches(record, context, observed)) }\n\n    pub fn admit(',
       },
     ],
     filter: 'keeps dormant FS variants',
@@ -215,6 +222,43 @@ const mutants = [
     old: '.chain(read_ranges.into_iter().map(|range| (range, Access::Read)));',
     replacement: '.chain(read_ranges.into_iter().map(|range| (range, Access::Execute)));',
     filter: 'warm code PTE remap cannot reuse its original physical encoding',
+  },
+  {
+    name: 'fs-msr-context-proof-not-cleared',
+    kind: 'public-cpu',
+    file: 'src/embedding/exports/paging.rs',
+    old: '                        core.context_changed();',
+    replacement: `                        core.translation_owners.cancel_pending_without_proof_clear(|owner| core.image.release(owner));
+                        core.context_version = core.context_version.saturating_add(1);`,
+    extra: [
+      {
+        file: owners,
+        old: '    pub fn cancel_pending(&mut self, mut release: impl FnMut(u64)) {',
+        replacement: `    pub fn cancel_pending_without_proof_clear(&mut self, mut release: impl FnMut(u64)) {
+        self.records.retain(|&owner, record| if record.published { true } else { release(owner); false });
+    }
+
+    pub fn cancel_pending(&mut self, mut release: impl FnMut(u64)) {`,
+      },
+    ],
+    filter: 'guest FS_BASE WRMSR ends the old native path',
+  },
+  {
+    name: 'primed-proof-bypasses-live-profile',
+    kind: 'rust-owner',
+    file: owners,
+    old: '            || record.observed != observed\n            || !record.context_proven',
+    replacement:
+      '            || !record.context_proven && record.observed != observed\n            || !record.context_proven',
+    filter: 'context_proof_requires_full_match_and_successful_source_admission',
+  },
+  {
+    name: 'primed-proof-skips-image-activation',
+    kind: 'rust-owner',
+    file: owners,
+    old: '            || !activate()',
+    replacement: '            || !record.context_proven && !activate()',
+    filter: 'context_proof_does_not_override_image_alias_death_release_or_paging_fences',
   },
 ];
 
@@ -509,6 +553,8 @@ const results = [];
 let before, after, baselineWasm, restoredWasm, fatal;
 try {
   baselineWasm = await buildWasm('baseline-before');
+  if (arg('--expected-wasm') && baselineWasm !== arg('--expected-wasm'))
+    throw Error('unmodified baseline Wasm differs from required shipping artifact');
   await copyFile(join(work, 'build/ring64.wasm'), join(evidence, 'baseline.wasm'));
   before = await baseline('baseline-before');
   for (const mutant of selected.filter((m) => m.kind === 'public-cpu'))
