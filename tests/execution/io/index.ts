@@ -1,3 +1,4 @@
+import { ioResetScenarios } from './reset.js';
 import { ioLifecycleReviewScenarios } from './review-lifecycle.js';
 import { ioDebugReviewScenarios } from './review-debug.js';
 import { ioOperandReviewScenarios } from './review-operands.js';
@@ -13,6 +14,7 @@ import { LIMITS, equal, hex, initial, type Scenario } from '../../support/fixtur
 
 export function ioScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
+    ...ioResetScenarios(compiler),
     ...ioRepairReviewScenarios(compiler),
     ...ioScalarReviewScenarios(compiler),
     ...ioPermissionReviewScenarios(compiler),
