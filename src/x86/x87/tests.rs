@@ -599,3 +599,65 @@ fn pseudo_denormals_use_exponent_one_but_report_denormal_on_arithmetic() {
         (0x00008000000000000000, 0x3800)
     );
 }
+
+#[test]
+fn special_operation_words_have_disjoint_kinds_and_checked_fields() {
+    for kind in [
+        Kind::Remainder,
+        Kind::RemainderNearest,
+        Kind::Scale,
+        Kind::Extract,
+    ] {
+        let operation = Op {
+            kind,
+            encoding: 0x7ff,
+            ..Op::default()
+        };
+        assert_eq!(Op::try_decode(operation.encode()), Some(operation));
+        assert!(Op::try_decode(operation.encode() | (1 << 30)).is_none());
+        assert!(Op::try_decode(operation.encode() | (1 << 10)).is_none());
+    }
+    for (kind, pop) in [(Kind::Load, 0), (Kind::Store, 1)] {
+        let operation = Op {
+            kind,
+            format: Format::Bcd,
+            pop,
+            encoding: 0x733,
+            ..Op::default()
+        };
+        assert_eq!(Op::try_decode(operation.encode()), Some(operation));
+        assert_eq!(operation.memory_bytes(), 10);
+        assert_eq!(operation.is_store(), kind == Kind::Store);
+    }
+}
+
+#[test]
+fn every_admitted_operation_word_roundtrips_without_field_collisions() {
+    for fields in 0..1u32 << 19 {
+        for encoding in [0, 0x7ff] {
+            let word = fields | encoding << 19;
+            if let Some(operation) = Op::try_decode(word) {
+                assert_eq!(operation.encode(), word);
+            }
+        }
+    }
+    for (kind, format, pop) in [
+        (Kind::Store, Format::Bcd, 0),
+        (Kind::Load, Format::Bcd, 1),
+        (Kind::Add, Format::Bcd, 0),
+        (Kind::Extract, Format::Register, 0),
+    ] {
+        assert!(
+            Op::try_decode(
+                Op {
+                    kind,
+                    format,
+                    pop,
+                    ..Op::default()
+                }
+                .encode()
+            )
+            .is_none()
+        );
+    }
+}

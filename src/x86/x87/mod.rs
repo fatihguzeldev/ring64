@@ -124,6 +124,10 @@ pub enum Kind {
     Clear,
     Init,
     Wait,
+    Remainder,
+    RemainderNearest,
+    Scale,
+    Extract,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[repr(u8)]
@@ -138,6 +142,7 @@ pub enum Format {
     I32,
     I64,
     Ax,
+    Bcd,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct Op {
@@ -152,12 +157,12 @@ pub struct Op {
 impl Op {
     pub fn encode(self) -> u32 {
         self.kind as u32
-            | ((self.format as u32) << 5)
-            | (u32::from(self.index) << 9)
-            | ((self.dest_index as u32) << 12)
-            | (u32::from(self.pop) << 13)
-            | (u32::from(self.condition) << 15)
-            | (u32::from(self.encoding) << 18)
+            | ((self.format as u32) << 6)
+            | (u32::from(self.index) << 10)
+            | ((self.dest_index as u32) << 13)
+            | (u32::from(self.pop) << 14)
+            | (u32::from(self.condition) << 16)
+            | (u32::from(self.encoding) << 19)
     }
     pub fn decode(n: u32) -> Self {
         Self::try_decode(n).expect("trusted x87 operation")
@@ -196,6 +201,10 @@ impl Op {
             Clear,
             Init,
             Wait,
+            Remainder,
+            RemainderNearest,
+            Scale,
+            Extract,
         ];
         let formats = [
             Format::None,
@@ -207,18 +216,19 @@ impl Op {
             Format::I32,
             Format::I64,
             Format::Ax,
+            Format::Bcd,
         ];
-        if n >> 29 != 0 || n & 31 == Kind::Constant as u32 && (n >> 9) & 7 == 7 {
+        if n >> 30 != 0 || n & 63 == Kind::Constant as u32 && (n >> 10) & 7 == 7 {
             return None;
         }
         let op = Self {
-            kind: *kinds.get((n & 31) as usize)?,
-            format: *formats.get(((n >> 5) & 15) as usize)?,
-            index: ((n >> 9) & 7) as u8,
-            dest_index: n & (1 << 12) != 0,
-            pop: ((n >> 13) & 3) as u8,
-            condition: ((n >> 15) & 7) as u8,
-            encoding: ((n >> 18) & 0x7ff) as u16,
+            kind: *kinds.get((n & 63) as usize)?,
+            format: *formats.get(((n >> 6) & 15) as usize)?,
+            index: ((n >> 10) & 7) as u8,
+            dest_index: n & (1 << 13) != 0,
+            pop: ((n >> 14) & 3) as u8,
+            condition: ((n >> 16) & 7) as u8,
+            encoding: ((n >> 19) & 0x7ff) as u16,
         };
         op.well_formed().then_some(op)
     }
@@ -237,12 +247,17 @@ impl Op {
         }
         match self.kind {
             Load => {
-                matches!(self.format, Register | F32 | F64 | F80 | I16 | I32 | I64) && self.pop == 0
+                matches!(
+                    self.format,
+                    Register | F32 | F64 | F80 | I16 | I32 | I64 | Bcd
+                ) && self.pop == 0
             }
             Store => {
-                matches!(self.format, Register | F32 | F64 | F80 | I16 | I32 | I64)
-                    && self.pop <= 1
-                    && (!matches!(self.format, F80 | I64) || self.pop == 1)
+                matches!(
+                    self.format,
+                    Register | F32 | F64 | F80 | I16 | I32 | I64 | Bcd
+                ) && self.pop <= 1
+                    && (!matches!(self.format, F80 | I64 | Bcd) || self.pop == 1)
             }
             Add | Mul | Sub | SubReverse | Div | DivReverse => {
                 matches!(self.format, Register | F32 | F64 | I16 | I32)
@@ -278,7 +293,7 @@ impl Op {
             Format::I16 => 2,
             Format::F32 | Format::I32 => 4,
             Format::F64 | Format::I64 => 8,
-            Format::F80 => 10,
+            Format::F80 | Format::Bcd => 10,
             Format::None
                 if matches!(
                     self.kind,

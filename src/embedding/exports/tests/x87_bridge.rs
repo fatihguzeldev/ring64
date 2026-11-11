@@ -36,7 +36,7 @@ fn x87_malformed_private_operations_reject_before_state_or_diagnostic_changes() 
     let before = snapshot();
     assert_eq!(core_load(0x7000, 8), 0);
     let fault = metadata(DATA);
-    for invalid in [31, 15 << 5, 1 << 31] {
+    for invalid in [63, 15 << 6, 1 << 31] {
         assert_eq!(
             x87::core_x87(invalid, 0, Segment::Ds as u32, 0x1000, 0x46, 0),
             -1
