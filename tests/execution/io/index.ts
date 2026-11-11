@@ -1,3 +1,4 @@
+import { ioRepairReviewScenarios } from './review-repair.js';
 import { ioSourcePteScenarios } from './source-pte.js';
 import { pagedIoScenarios } from './paging.js';
 import { ioBoundaryScenarios } from './boundaries.js';
@@ -7,6 +8,7 @@ import { LIMITS, equal, hex, initial, type Scenario } from '../../support/fixtur
 
 export function ioScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
+    ...ioRepairReviewScenarios(compiler),
     ...stringIoScenarios(compiler),
     ...pagedIoScenarios(compiler),
     ...ioSourcePteScenarios(compiler),
