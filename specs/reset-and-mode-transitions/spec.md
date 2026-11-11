@@ -1,6 +1,6 @@
 # reset and mode transitions
 
-Status: implementation-ready specification; implementation not started. Source audit baseline: `4df41a0814beaceb0681dc013f5eac094cdc6660`. Fourth of five, after [numeric controls](../numeric-execution-controls/spec.md) and [legacy paging](../legacy-paging-and-permissions/spec.md).
+Status: implemented; conformance and bounded mutation evidence are in [verification.md](verification.md). Source audit baseline: `4df41a0814beaceb0681dc013f5eac094cdc6660`. Fourth of five, after [numeric controls](../numeric-execution-controls/spec.md) and [legacy paging](../legacy-paging-and-permissions/spec.md).
 
 ## complete objective and inherited boundaries
 
@@ -136,7 +136,7 @@ All addresses/words below are hexadecimal. Seed all banks, event histories, cach
 
 ## complete 69-instruction transition fixture
 
-The following separate positive program is a fully specified fixture plan, not a claim of execution under the unimplemented profile. It uses no destination-state imports, one CPU, no events, initial reset FLAGS2 and static physical bootstrap tables. Spaces below separate instructions, not extra bytes. All addresses and images are hexadecimal; instruction counts/budget69/100/31 are decimal.
+The following separate positive program is a fully specified fixture, executed by the [shared transition tests](../../tests/execution/reset/transitions.ts). It uses no destination-state imports, one CPU, no events, initial reset FLAGS2 and static physical bootstrap tables. Spaces below separate instructions, not extra bytes. All addresses and images are hexadecimal; instruction counts/budget69/100/31 are decimal.
 
 ROM at physicalfffffff0 is `ea00000010`, entering realCS1000/base10000/IP0. At physical10200 place pseudo-descriptor `270000000300` for GDT30000. Its five little-endian descriptor images are `0000000000000000`, `ffff0000009bcf00` (CS8/code32), `ffff00000093cf00` (data10), `ffff0000009baf00` (CS18/code64), `ffff0000009b0000` (CS20/code16).
 
@@ -159,7 +159,7 @@ Check the actual intermediate writers: real PE write logical22→25 retains load
 
 The independent physical witnesses are PA90000=11111111, PA91000=22222222, PA92000=33333333, PA92004=44444444 and identity PA6000=55555555. They prove actual memory consumers for each family. Including the ROM far jump the program retires69 instructions; budget100/stop at final logical403 returns stop with remaining31. Final CR0=32/CR4=608/EFER0/CR3=3b000; CS1000/base10000/D0/limitffff; DS/SS retain data32/unreal cache facts. AX isbeef. This fixture intentionally does not require a16-bit final stack; a separate return packet loads SS16 before PE clear when16-bit stack defaults are wanted.
 
-Split execution after each control/far writer and at budget-one boundaries, then resume the same bytes. Source review independently decoded all fragments with Capstone5.0.7: 45/154/24/51/15/3 bytes and11/37/3/12/4/1 instructions respectively, plus the ROM jump, with the listed writer PCs and69/31 retirement arithmetic. This is a static decoder/arithmetic check, not execution of the transition semantics; a future port to the tests must not generate expected control values through the production family resolver.
+Split execution after each control/far writer and at budget-one boundaries, then resume the same bytes. Source review independently decoded all fragments with Capstone5.0.7: 45/154/24/51/15/3 bytes and11/37/3/12/4/1 instructions respectively, plus the ROM jump, with the listed writer PCs and69/31 retirement arithmetic. That source review is a static decoder/arithmetic check; runtime evidence is recorded separately in verification.md. The executable fixtures retain independent literal control values rather than deriving expected values through the production family resolver.
 
 A separate direct-PG1 PAE-switch fixture deliberately preserves raw CR3=31020: non-PAE effective root31000 has PDE0=32003, with PT32000 dword6=90003 and dword32=20003. The separate32-byte PDPT31020 is `[33001,0,0,0]`; PAE PD33000[0]=34003 and PT34000 qword6=91003/qword32=20003. With PG1/PE1/CR4608/EAX628, code20000=`c7050060000011111111 0f22e0 c7050060000022222222` writes11111111 at PA90000, toggles PAE at2000a→2000d while loading the quartet, then writes22222222 at PA91000; retired3. Returning CR4 to608 reselects the same non-PAE root without a quartet. The raw bank can be established by host constructor or by writing CR3=31020 while PG0/PAE1 before clearing PAE and enabling non-PAE PG. Do not alias the source PDE and PDPTE0 here: the source walk's A write would set reserved PDPTEbit5 and correctly turn the toggle into #GP. That rejected variant is an independent ordering/alias test.
 
@@ -187,4 +187,4 @@ Reset cost is fixed architectural state plus bounded resident owner/cache/watche
 - [Instruction references](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html), MOV CR/DR, CLTS, WRMSR, far JMP and x87 waiting operations; [existing far](../far-control-and-code-segments/spec.md) and [segment reload](../descriptor-tables-and-segment-loads/spec.md) contracts explicitly retain real-mode loaded attributes.
 - [Numeric controls](../numeric-execution-controls/spec.md), [legacy capture](../legacy-paging-and-permissions/spec.md), [debug](../hardware-breakpoints-and-debug/spec.md), [fast-system transfers](../fast-system-transfers/spec.md) and [context/code reuse](../context-and-code-reuse/spec.md) retain their own fault/frame/proof policies.
 
-EDX600, invalid task-cache attributes0, deterministic raw upper-bank/system-root preservation, cacheless CD/NW and the NE0 private frontier are selected-profile choices. The real reload rule preserves the predecessor's explicit profile. This source-reviewed specification does not assert that reset/transition code, future packets, mutations or performance measurements already execute.
+EDX600, invalid task-cache attributes0, deterministic raw upper-bank/system-root preservation, cacheless CD/NW and the NE0 private frontier are selected-profile choices. The real reload rule preserves the predecessor's explicit profile. Runtime, mutation and performance claim ceilings are recorded in verification.md; the admitted profile does not claim hardware parity for selected or undefined fields.
