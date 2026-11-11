@@ -1,3 +1,4 @@
+import { negativeScenarios } from './negative.js';
 import { systemScenarios } from './system.js';
 import { pagingSwitchScenarios } from './paging-switch.js';
 import { boundaryScenarios } from './boundaries.js';
@@ -11,4 +12,5 @@ export const resetScenarios = (compiler: WebAssembly.Module) => [
   ...boundaryScenarios(compiler),
   ...pagingSwitchScenarios(compiler),
   ...systemScenarios(compiler),
+  ...negativeScenarios(compiler),
 ];

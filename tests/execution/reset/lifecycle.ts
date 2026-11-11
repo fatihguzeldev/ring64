@@ -24,6 +24,12 @@ function checkReset(cpu: Cpu) {
   equal(state.rip, 0xfff0n, 'reset logical IP');
   equal(state.flags, 2n, 'reset FLAGS');
   equal(encode(state.interruptibility), encode({ sti: false, ss: false }), 'reset shadows');
+  equal(state.event.kind, 'ready', 'reset event');
+  equal(
+    encode(state.interrupts),
+    encode({ irq: null, nmiPending: false, nmiBlocked: false }),
+    'reset interrupt history',
+  );
   equal(encode(cpu.readPagingState()), encode(RESET_BANK), 'reset controls');
   equal(encode(cpu.readContext()), encode(resetContext()), 'complete literal reset caches');
   equal(encode(cpu.readXmmState()), encode(Array<bigint>(16).fill(0n)), 'reset XMM');

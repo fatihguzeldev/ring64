@@ -436,8 +436,10 @@ export class Cpu {
   reset(): void {
     this.requireIdle();
     this.requireMemoryModel('physical');
-    this.engineCall(() => this.#engine.reset());
-    this.#cache.clear();
+    this.engineCall(() => {
+      this.#engine.reset();
+      this.#cache.clear();
+    });
     this.#captureToken = { reset: {} };
   }
 
