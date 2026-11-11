@@ -1,5 +1,7 @@
 mod discovery;
+#[cfg(any(target_arch = "wasm32", test))]
 mod ownership;
+#[cfg(any(target_arch = "wasm32", test))]
 pub(crate) use ownership::Owners;
 mod unit;
 mod wasm;
