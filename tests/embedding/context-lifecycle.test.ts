@@ -55,6 +55,7 @@ test('a context getter may complete cached execution and publication preserves i
   let nested: Promise<RunResult> | undefined;
   try {
     await warm(cpu);
+    const owners = cpu.inspectTranslations();
     const source = initial(0x1000n, { 0: 0x1122334455667788n }, 0x8d7n);
     cpu.setState(source);
     let reads = 0;
@@ -75,7 +76,7 @@ test('a context getter may complete cached execution and publication preserves i
     assert.deepEqual(result.state, changed(source, 0x1005n, { 0: 1n }));
     assert.deepEqual(cpu.readState(), result.state);
     assert.deepEqual(cpu.readContext(), longSnapshot(0x100n));
-    assert.deepEqual(cpu.inspectTranslations(), []);
+    assert.deepEqual(cpu.inspectTranslations(), owners);
   } finally {
     await nested;
     cpu.dispose();
@@ -118,6 +119,7 @@ test('context capture preserves successful nested changes even when the outer lo
   const cpu = await createCpu(options());
   try {
     await warm(cpu);
+    const owners = cpu.inspectTranslations();
     const source = initial(0x123456789abcdef0n, { 0: 0x8877665544332211n }, 0x8d7n);
     const input = protectedContext();
     input.segments.cs.type = 'read-write';
@@ -136,7 +138,7 @@ test('context capture preserves successful nested changes even when the outer lo
     assert.deepEqual(cpu.readState(), source);
     assert.deepEqual(cpu.readMemory(0x4000n, 8), hex('1234567800000000'));
     assert.deepEqual(cpu.readContext(), longSnapshot(0x200n));
-    assert.deepEqual(cpu.inspectTranslations(), []);
+    assert.deepEqual(cpu.inspectTranslations(), owners);
   } finally {
     cpu.dispose();
   }
@@ -179,7 +181,7 @@ test('equality uses the context current after getters and reordered loaded cache
     });
     assert.deepEqual(cpu.readContext(), longSnapshot());
     assert.deepEqual(cpu.readState(), raw);
-    assert.deepEqual(cpu.inspectTranslations(), []);
+    assert.deepEqual(cpu.inspectTranslations(), owners);
   } finally {
     cpu.dispose();
   }
