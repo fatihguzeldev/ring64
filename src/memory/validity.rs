@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use super::image::{Backing, Mapping, locate};
-use super::{Image, MemoryError};
+use super::{Access, Image, MemoryError};
 
 #[derive(Debug)]
 struct SourceSlice {
@@ -10,6 +10,7 @@ struct SourceSlice {
     length: u32,
     incarnation: Rc<()>,
     offset: u32,
+    access: Access,
 }
 
 #[derive(Debug)]
@@ -118,6 +119,14 @@ impl Validity {
     }
 }
 
+fn permits(mapping: &Mapping, access: Access) -> bool {
+    match access {
+        Access::Read => mapping.permissions.read,
+        Access::Write => mapping.permissions.write,
+        Access::Execute => mapping.permissions.execute,
+    }
+}
+
 fn source_current(source: &SourceSlice, backings: &[Backing], mappings: &[Mapping]) -> bool {
     let mut cursor = u128::from(source.guest);
     let end = cursor + u128::from(source.length);
@@ -126,7 +135,7 @@ fn source_current(source: &SourceSlice, backings: &[Backing], mappings: &[Mappin
             return false;
         };
         let offset = u64::from(mapping.offset) + (cursor as u64 - mapping.base);
-        if !mapping.permissions.execute
+        if !permits(mapping, source.access)
             || !Rc::ptr_eq(&backings[mapping.backing].incarnation, &source.incarnation)
             || offset != u64::from(source.offset) + (cursor - u128::from(source.guest)) as u64
         {
@@ -142,8 +151,20 @@ impl Image {
         &mut self,
         ranges: impl IntoIterator<Item = (u64, u32)>,
     ) -> Result<u64, MemoryError> {
+        self.register_dependencies(ranges, [])
+    }
+
+    pub fn register_dependencies(
+        &mut self,
+        executable_ranges: impl IntoIterator<Item = (u64, u32)>,
+        read_ranges: impl IntoIterator<Item = (u64, u32)>,
+    ) -> Result<u64, MemoryError> {
         let mut sources = Vec::new();
-        for (start, length) in ranges {
+        let ranges = executable_ranges
+            .into_iter()
+            .map(|range| (range, Access::Execute))
+            .chain(read_ranges.into_iter().map(|range| (range, Access::Read)));
+        for ((start, length), access) in ranges {
             if length == 0 || self.mapping_span_failure(start, u64::from(length)) {
                 return Err(MemoryError::Invalid("invalid artifact source range"));
             }
@@ -152,10 +173,12 @@ impl Image {
             while cursor < end {
                 let mapping = self
                     .locate(cursor as u64)
-                    .filter(|mapping| mapping.permissions.execute)
-                    .ok_or(MemoryError::Invalid(
-                        "artifact source is no longer executable",
-                    ))?;
+                    .filter(|mapping| permits(mapping, access))
+                    .ok_or(MemoryError::Invalid(if access == Access::Execute {
+                        "artifact source is no longer executable"
+                    } else {
+                        "artifact dependency is no longer readable"
+                    }))?;
                 let count = (end.min(mapping.end()) - cursor) as u32;
                 sources
                     .try_reserve(1)
@@ -165,6 +188,7 @@ impl Image {
                     length: count,
                     incarnation: self.backings[mapping.backing].incarnation.clone(),
                     offset: mapping.offset + (cursor as u64 - mapping.base) as u32,
+                    access,
                 });
                 cursor += u128::from(count);
             }

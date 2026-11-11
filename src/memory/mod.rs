@@ -18,6 +18,9 @@ mod mapped_tests;
 mod physical_tests;
 
 #[cfg(test)]
+mod dependency_tests;
+
+#[cfg(test)]
 mod vector_tests;
 
 #[cfg(test)]
