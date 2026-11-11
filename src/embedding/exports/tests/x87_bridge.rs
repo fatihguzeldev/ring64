@@ -91,7 +91,18 @@ fn x87_pending_detector_precedes_operand_access_and_diagnostics_do_not_erase_pen
     }
     install(pending);
     let load = operation(Kind::Load, Format::F80, 0x52b);
-    for _ in 0..2 {
+    for load in [
+        load,
+        operation(Kind::Load, Format::Bcd, 0x723),
+        Op {
+            pop: 1,
+            ..operation(Kind::Store, Format::Bcd, 0x733)
+        },
+        operation(Kind::Remainder, Format::None, 0x1f8),
+        operation(Kind::RemainderNearest, Format::None, 0x1f5),
+        operation(Kind::Scale, Format::None, 0x1fd),
+        operation(Kind::Extract, Format::None, 0x1f4),
+    ] {
         assert_eq!(
             invoke(load, 0x800000000000, 0x2000, 0x8d7, 0x12345678),
             X87_EXCEPTION

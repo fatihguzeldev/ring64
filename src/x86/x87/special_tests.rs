@@ -416,3 +416,133 @@ fn extract_and_decimal_stack_publication_cover_every_top_and_mask() {
         }
     }
 }
+
+#[test]
+fn bcd_precision_commits_for_all_masks_precisions_rounding_directions_and_signs() {
+    for masks in 0..64 {
+        for pc in 0..4 {
+            for rc in 0..4 {
+                for negative in [false, true] {
+                    let sign = if negative { 1u128 << 79 } else { 0 };
+                    let mut state = occupied(
+                        &[sign | 0x3fffc000000000000000],
+                        0x40 | masks | pc << 8 | rc << 10,
+                    );
+                    let effect = eval(
+                        &mut state,
+                        Op {
+                            kind: Kind::Store,
+                            format: Format::Bcd,
+                            pop: 1,
+                            ..Op::default()
+                        },
+                        0,
+                        2,
+                    );
+                    let up = rc == 0 || rc == 1 && negative || rc == 2 && !negative;
+                    assert!(effect.store);
+                    assert_eq!(effect.value, sign | if up { 2 } else { 1 });
+                    assert_eq!(
+                        state.status_word,
+                        0x820
+                            | if up { 0x200 } else { 0 }
+                            | if masks & 32 == 0 { 0x8080 } else { 0 }
+                    );
+                    assert_eq!(state.tag_word, 0xffff);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn remainder_normalizes_subnormal_exponents_and_keeps_partial_zero_incomplete() {
+    for kind in [Kind::Remainder, Kind::RemainderNearest] {
+        let mut state = occupied(&[0x00018000000000000001, 1], 0x37f);
+        eval(&mut state, operation(kind), 0, 2);
+        assert_eq!(state.raw(0), 0);
+        assert_eq!(state.status_word, 0x202);
+        let mut state = occupied(&[0x00038000000000000000, 1], 0x37f);
+        eval(&mut state, operation(kind), 0, 2);
+        assert_eq!(state.raw(0), 0);
+        assert_eq!(state.status_word, 0x402);
+        eval(&mut state, operation(kind), 0, 2);
+        assert_eq!(state.status_word, 2);
+    }
+}
+
+#[test]
+fn bcd_push_and_invalid_pop_cover_all_top_occupancies_and_masks() {
+    for top in 0..8 {
+        for masks in 0..64 {
+            for occupied_slot in [false, true] {
+                let mut load = State {
+                    control_word: 0x340 | masks,
+                    status_word: (top as u16) << 11,
+                    ..State::default()
+                };
+                if occupied_slot {
+                    load.put((top + 7) & 7, 0x40008000000000000000);
+                }
+                let before = load;
+                eval(
+                    &mut load,
+                    Op {
+                        kind: Kind::Load,
+                        format: Format::Bcd,
+                        ..Op::default()
+                    },
+                    0x42,
+                    2,
+                );
+                let trapped = occupied_slot && masks & 1 == 0;
+                assert_eq!(load.top(), if trapped { top } else { (top + 7) & 7 });
+                if trapped {
+                    assert_eq!(load.registers, before.registers);
+                    assert_eq!(load.tag_word, before.tag_word);
+                } else {
+                    assert_eq!(
+                        load.raw((top + 7) & 7),
+                        if occupied_slot {
+                            0xffffc000000000000000
+                        } else {
+                            0x4004a800000000000000
+                        }
+                    );
+                }
+                let mut store = State {
+                    control_word: 0x340 | masks,
+                    status_word: (top as u16) << 11,
+                    ..State::default()
+                };
+                if occupied_slot {
+                    store.put(top, 0x7fff8000000000000000);
+                }
+                let effect = eval(
+                    &mut store,
+                    Op {
+                        kind: Kind::Store,
+                        format: Format::Bcd,
+                        pop: 1,
+                        ..Op::default()
+                    },
+                    0,
+                    2,
+                );
+                assert_eq!(effect.store, masks & 1 != 0);
+                assert_eq!(
+                    store.top(),
+                    if masks & 1 != 0 { (top + 1) & 7 } else { top }
+                );
+                if effect.store {
+                    assert_eq!(effect.value, 0xffffc000000000000000);
+                }
+                assert_eq!(
+                    store.status_word & 0x80c1,
+                    1 | if occupied_slot { 0 } else { 0x40 }
+                        | if masks & 1 == 0 { 0x8080 } else { 0 }
+                );
+            }
+        }
+    }
+}
