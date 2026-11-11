@@ -12,15 +12,21 @@ import {
   manifest,
   root,
 } from './fast-system-support.mjs';
+import { checkedContextBaseline, contextBaseline } from './context-reuse-support.mjs';
 
 const args = process.argv.slice(2);
 const browserMode = args.includes('--browser');
+const contextReuse = args.includes('--context-reuse');
+if (contextReuse && !args.includes('--include-fast'))
+  throw Error('--context-reuse observes inherited fast kernels and requires --include-fast');
 const value = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
 const stamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
 const current = args.includes('--snapshot')
   ? await manifest(resolve(value('--snapshot')))
   : await freeze(value('--current', root), `fast-system-observer-build-${stamp}`);
-const old = await checkedBaseline(value('--baseline', baseline));
+const old = await (contextReuse ? checkedContextBaseline : checkedBaseline)(
+  value('--baseline', contextReuse ? contextBaseline : baseline),
+);
 if (args.includes('--baseline-control')) {
   if (resolve(current.path) !== resolve(old.path))
     throw Error('baseline control requires the same exact8a build');
@@ -38,7 +44,10 @@ async function observe({
   kernels,
   pagingKernels,
   fastKernels,
+  reuseKernels,
   includeFast,
+  contextReuse,
+  sameBuildControl,
   iterations,
 }) {
   const canonical = (value) =>
@@ -83,6 +92,7 @@ async function observe({
   let active,
     workload,
     delivery,
+    phase,
     cohort = 'inherited';
   try {
     WebAssembly.compile = async (bytes) => {
@@ -231,6 +241,7 @@ async function observe({
                     ordinaryCalls: {},
                     observedCalls: {},
                     hostCalls: {},
+                    ...(contextReuse ? { phase } : {}),
                   };
                   active = record;
                   try {
@@ -240,6 +251,15 @@ async function observe({
                       retired: result.retired,
                       repeatIterations: result.repeatIterations,
                       resources: result.resources,
+                      ...(contextReuse
+                        ? {
+                            semantic: Object.fromEntries(
+                              Object.entries(result).filter(
+                                ([name]) => !['resources', 'timings'].includes(name),
+                              ),
+                            ),
+                          }
+                        : {}),
                     });
                     evidence.runs.push(record);
                     return result;
@@ -298,11 +318,13 @@ async function observe({
       const { measureFast, fastNames, measureInheritedMsr, inheritedMsrNames } = await import(
         fastKernels
       );
-      cohort = 'fast-current-only';
+      cohort = contextReuse ? 'fast-paired' : 'fast-current-only';
       for (const name of fastNames) {
         workload = name;
-        const result = await measureFast(sides[1], { iterations, samples: 1, workloads: [name] });
-        activeDefinitions.push(...result.definitions);
+        for (const side of contextReuse ? sides : [sides[1]]) {
+          const result = await measureFast(side, { iterations, samples: 1, workloads: [name] });
+          if (side.label === 'current') activeDefinitions.push(...result.definitions);
+        }
       }
       cohort = 'inherited-msr-control';
       for (const name of inheritedMsrNames) {
@@ -310,8 +332,51 @@ async function observe({
         for (const side of sides)
           await measureInheritedMsr(side, { iterations, samples: 1, workloads: [name] });
       }
+      if (contextReuse) {
+        const { measureReuse, reuseNames } = await import(reuseKernels);
+        cohort = 'warm-reuse';
+        for (const name of reuseNames) {
+          workload = name;
+          for (const side of sides)
+            await measureReuse(side, {
+              iterations,
+              samples: 1,
+              workloads: [name],
+              requireReuse: side.label === 'current' && !sameBuildControl,
+              onPhase: (value) => {
+                phase = value;
+              },
+            });
+        }
+        phase = undefined;
+        evidence.warmCharacterizations = reuseNames.map((name) => {
+          const rows = evidence.runs.filter(
+            (row) =>
+              row.cohort === 'warm-reuse' &&
+              row.workload === name &&
+              row.side === 'current' &&
+              row.phase === 'measured',
+          );
+          const compileCalls = rows.reduce((sum, row) => sum + (row.hostCalls.compile ?? 0), 0);
+          const modules = rows.flatMap((row) => row.modules).length;
+          const instances = rows.flatMap((row) => row.runArities).length;
+          if (!sameBuildControl && (compileCalls || modules || instances))
+            evidence.failures.push(name + ':warm-actual-compilation');
+          return {
+            name,
+            nativeEntries: rows.reduce((sum, row) => sum + row.resources.nativeEntries, 0),
+            compileCalls,
+            modules,
+            instances,
+          };
+        });
+      }
     }
-    const activeRuns = evidence.runs.filter((row) => row.cohort === 'fast-current-only');
+    const activeRuns = evidence.runs.filter(
+      (row) =>
+        row.side === 'current' &&
+        row.cohort === (contextReuse ? 'fast-paired' : 'fast-current-only'),
+    );
     evidence.activeCharacterizations = activeDefinitions.map((definition) => {
       const runs = activeRuns.filter((row) => row.workload === definition.name);
       const count = (name) =>
@@ -357,7 +422,55 @@ async function observe({
             b.map((row) => row[field]),
           ),
       );
-      if (!same(project(a), project(b))) evidence.failures.push(key + ':' + mismatches.join(','));
+      const invariantMismatches = [];
+      if (contextReuse) {
+        const unique = (rows, field) =>
+          [...new Set(rows.flatMap((row) => row[field]).map(canonical))].sort();
+        const total = (rows, field, omit = []) => {
+          const values = {};
+          for (const row of rows)
+            for (const [name, count] of Object.entries(row[field]))
+              if (!omit.includes(name)) values[name] = (values[name] ?? 0) + count;
+          return values;
+        };
+        for (const field of ['modules', 'bindings'])
+          if (!same(unique(a, field), unique(b, field))) invariantMismatches.push(field);
+        for (const field of ['ordinaryCalls', 'observedCalls'])
+          if (!same(total(a, field), total(b, field))) invariantMismatches.push(field);
+        for (const field of ['semantic'])
+          if (
+            !same(
+              a.map((row) => row[field]),
+              b.map((row) => row[field]),
+            )
+          )
+            invariantMismatches.push(field);
+        const ownershipCalls = [
+          'compile',
+          'probe',
+          'instantiate',
+          'publish',
+          'release',
+          'valid',
+          'activate',
+          'contextVersion',
+          'boundaryObserved',
+        ];
+        if (!same(total(a, 'hostCalls', ownershipCalls), total(b, 'hostCalls', ownershipCalls)))
+          invariantMismatches.push('unexpected-host-call-change');
+        const cacheResources = [
+          'compilations',
+          'cacheHits',
+          'generatedBytes',
+          'cachedArtifacts',
+          'cachedBytes',
+        ];
+        if (!same(total(a, 'resources', cacheResources), total(b, 'resources', cacheResources)))
+          invariantMismatches.push('non-cache-resource-change');
+        if (invariantMismatches.length)
+          evidence.failures.push(key + ':' + invariantMismatches.join(','));
+      } else if (!same(project(a), project(b)))
+        evidence.failures.push(key + ':' + mismatches.join(','));
       return {
         key,
         baselineRunCalls: a.length,
@@ -366,11 +479,26 @@ async function observe({
         currentModules: b.flatMap((row) => row.modules).length,
         mismatches,
         identical: !mismatches.length,
+        ...(contextReuse
+          ? { invariantMismatches, invariantsPreserved: !invariantMismatches.length }
+          : {}),
       };
     });
     evidence.msrComparisons = evidence.comparisons.filter((row) =>
       row.key.startsWith('inherited-msr-control:'),
     );
+    if (contextReuse) {
+      evidence.fastComparisons = evidence.comparisons.filter((row) =>
+        row.key.startsWith('fast-paired:'),
+      );
+      if (evidence.fastComparisons.length !== 11)
+        evidence.failures.push('missing paired fast controls');
+      evidence.warmComparisons = evidence.comparisons.filter((row) =>
+        row.key.startsWith('warm-reuse:'),
+      );
+      if (evidence.warmComparisons.length !== 7)
+        evidence.failures.push('missing paired warm controls');
+    }
     evidence.comparisons = evidence.comparisons.filter((row) => row.key.startsWith('inherited:'));
     if (includeFast && evidence.msrComparisons.length !== 2)
       evidence.failures.push('missing inherited EFER controls');
@@ -401,7 +529,10 @@ if (!browserMode) {
     kernels: pathToFileURL(resolve(root, 'benchmarks/kernels.mjs')).href,
     pagingKernels: pathToFileURL(resolve(root, 'scripts/paging-kernels.mjs')).href,
     fastKernels: pathToFileURL(resolve(root, 'scripts/fast-system-kernels.mjs')).href,
+    reuseKernels: pathToFileURL(resolve(root, 'scripts/context-reuse-kernels.mjs')).href,
     includeFast: args.includes('--include-fast'),
+    contextReuse,
+    sameBuildControl: args.includes('--baseline-control'),
     iterations: Number(value('--iterations', 101)),
   });
 } else {
@@ -416,7 +547,13 @@ if (!browserMode) {
         response.end('<!doctype html><title>fast-system observer</title>');
         return;
       }
-      if (['/scripts/paging-kernels.mjs', '/scripts/fast-system-kernels.mjs'].includes(pathname)) {
+      if (
+        [
+          '/scripts/paging-kernels.mjs',
+          '/scripts/fast-system-kernels.mjs',
+          '/scripts/context-reuse-kernels.mjs',
+        ].includes(pathname)
+      ) {
         response.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-store' });
         response.end(await readFile(resolve(root, '.' + pathname)));
         return;
@@ -464,7 +601,10 @@ if (!browserMode) {
       kernels: '/benchmarks/kernels.mjs',
       pagingKernels: '/scripts/paging-kernels.mjs',
       fastKernels: '/scripts/fast-system-kernels.mjs',
+      reuseKernels: '/scripts/context-reuse-kernels.mjs',
       includeFast: args.includes('--include-fast'),
+      contextReuse,
+      sameBuildControl: args.includes('--baseline-control'),
       iterations: Number(value('--iterations', 101)),
     });
     result.browserVersion = browser.version();

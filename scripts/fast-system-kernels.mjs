@@ -265,7 +265,7 @@ function scalar(row, n) {
   }
   return { registers, flags: 0x202n, rip: USER };
 }
-function numeric(cpu) {
+export function seedFastNumeric(cpu) {
   cpu.setXmmState(
     Array.from({ length: 16 }, (_, i) => (BigInt(i + 1) << 112n) | 0xfedcba9876543210n),
   );
@@ -312,6 +312,24 @@ function expected(row, initial) {
   };
 }
 
+// Share the literal setup, not the old driver's source-writing sample rearm.
+export function fastReuseFixture(name, iterations) {
+  const row = rows.find((item) => item.name === name);
+  if (!row || row.cycles || row.kind === 'root' || row.kind === 'msr')
+    throw Error('not a source-preserving fast reuse fixture');
+  const initial = scalar(row, iterations);
+  return {
+    row,
+    ram: image(row),
+    mappings: mappings(),
+    context: context(row.kind),
+    paging: { ...PAGING },
+    fastSystem: { ...FAST },
+    initial,
+    expected: expected(row, initial),
+  };
+}
+
 async function measureRows(
   side,
   selectedRows,
@@ -346,7 +364,7 @@ async function measureRows(
     });
     const creationMs = performance.now() - began;
     try {
-      const numericBefore = numeric(cpu);
+      const numericBefore = seedFastNumeric(cpu);
       if (row.debug)
         cpu.setDebugState({
           ...cpu.readDebugState(),
