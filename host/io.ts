@@ -38,7 +38,7 @@ export class IoBridge {
   readonly imports = {
     read: (port: number, width: number): number => {
       const binding = this.admitted(port, width);
-      const value = binding.read.call(binding.receiver, port, width as IoWidth);
+      const value = Reflect.apply(binding.read, binding.receiver, [port, width]);
       if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= 2 ** width)
         throw new TypeError('io.read must return an unsigned integer fitting its width');
       return value;
@@ -46,7 +46,7 @@ export class IoBridge {
     write: (port: number, width: number, value: number): void => {
       const binding = this.admitted(port, width);
       const unsigned = (value >>> 0) % 2 ** width;
-      if (binding.write.call(binding.receiver, port, width as IoWidth, unsigned) !== undefined)
+      if (Reflect.apply(binding.write, binding.receiver, [port, width, unsigned]) !== undefined)
         throw new TypeError('io.write must return undefined');
     },
   };

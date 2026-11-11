@@ -108,3 +108,29 @@ test('I/O execution and reached-effect guards reject early imports without calli
   assert.throws(() => bridge.imports.write(0, 8, 1), /outside/);
   assert.equal(calls, 0);
 });
+
+test('I/O invokes the captured callable without reading its mutable call property', () => {
+  let reads = 0,
+    writes = 0,
+    callGets = 0;
+  function read() {
+    reads++;
+    return 17;
+  }
+  function write() {
+    writes++;
+  }
+  for (const fn of [read, write])
+    Object.defineProperty(fn, 'call', {
+      get() {
+        callGets++;
+        throw new Error('uncaptured call property');
+      },
+    });
+  const bridge = new IoBridge(captureIo({ io: { read, write } }));
+  bridge.executing = true;
+  bridge.effectActive = () => 1;
+  assert.equal(bridge.imports.read(0, 8), 17);
+  bridge.imports.write(0, 8, 1);
+  assert.deepEqual([reads, writes, callGets], [1, 1, 0]);
+});
