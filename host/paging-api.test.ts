@@ -257,7 +257,7 @@ test('paged context rejection precedes the engine cancellation boundary', async 
   }
 });
 
-test('context and mapping getters cannot publish captures after a completed nested run', async () => {
+test('context and mapping getters preserve inherited completed-run publication ordering', async () => {
   for (const projection of ['context', 'mappings'] as const) {
     const f = await fixture();
     let nested: Promise<unknown> | undefined;
@@ -270,26 +270,22 @@ test('context and mapping getters cannot publish captures after a completed nest
             return 'long64';
           },
         });
-        assert.throws(() => f.cpu.setContext(input), /run.*capture/);
-        assert.deepEqual(f.contextImports, []);
+        f.cpu.setContext(input);
+        assert.deepEqual(f.contextImports, [longSnapshot()]);
       } else {
-        assert.throws(
-          () =>
-            f.cpu.setMappings([
-              {
-                get base() {
-                  nested = f.cpu.run({ budget: 0n });
-                  return 0x800000000000n;
-                },
-                backing: 'ram',
-                offset: 0,
-                length: 2,
-                permissions: { read: true, write: true, execute: false },
-              },
-            ]),
-          /run.*capture/,
-        );
-        assert.deepEqual(f.maps, []);
+        f.cpu.setMappings([
+          {
+            get base() {
+              nested = f.cpu.run({ budget: 0n });
+              return 0x800000000000n;
+            },
+            backing: 'ram',
+            offset: 0,
+            length: 2,
+            permissions: { read: true, write: true, execute: false },
+          },
+        ]);
+        assert.equal(f.maps.length, 1);
       }
       await nested;
     } finally {

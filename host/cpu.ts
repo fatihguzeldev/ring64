@@ -257,9 +257,9 @@ export class Cpu {
   }
 
   setMappings(mappings: MemoryMapping[]): void {
-    const generation = this.requireIdle();
+    this.requireIdle();
     const captured = captureMappings(mappings, this.#memoryLimits, this.#memoryModel);
-    this.requireIdle(generation);
+    this.requireIdle();
     validateMappings(captured, this.#backings);
     this.engineCall(() => this.#engine.setMappings(captured));
     this.pruneTranslations();
@@ -271,9 +271,9 @@ export class Cpu {
   }
 
   setContext(context: ExecutionContext): void {
-    const generation = this.requireIdle();
+    this.requireIdle();
     const input = captureContext(context);
-    this.requireIdle(generation);
+    this.requireIdle();
     if (
       this.#memoryModel === 'ia32e-paged' &&
       input.mode !== 'long64' &&
