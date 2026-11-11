@@ -14,16 +14,24 @@ export function ioLifecycleReviewScenarios(compiler: WebAssembly.Module): Scenar
           reads = 0,
           writes = 0,
           premature = 0,
+          callGets = 0,
           crossed = false;
         const receiver = {
           value: 0x17,
           get read() {
             readGets++;
-            return function (this: { value: number }) {
+            const method = function (this: { value: number }) {
               equal(this, receiver, 'original read receiver');
               reads++;
               return this.value;
             };
+            Object.defineProperty(method, 'call', {
+              get() {
+                callGets++;
+                return () => 0x99;
+              },
+            });
+            return method;
           },
           get write() {
             writeGets++;
@@ -55,9 +63,7 @@ export function ioLifecycleReviewScenarios(compiler: WebAssembly.Module): Scenar
             }
             receiver.value = 0x2b;
             Object.defineProperty(receiver, 'read', {
-              value: () => {
-                throw Error('replacement read');
-              },
+              value: () => 0x99,
             });
             Object.defineProperty(receiver, 'write', {
               value: () => {
@@ -87,6 +93,7 @@ export function ioLifecycleReviewScenarios(compiler: WebAssembly.Module): Scenar
           cpu.setState(initial(0x1000n, { 2: 0x80n }));
           const result = await cpu.run({ budget: 2n });
           equal(result.retired, 2n, 'captured functions execute normally');
+          equal(callGets, 0, 'captured callable call property never inspected');
           equal(
             result.state.registers[0]! & 255n,
             0x2bn,

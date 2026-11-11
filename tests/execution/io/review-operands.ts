@@ -177,8 +177,14 @@ export function ioOperandReviewScenarios(compiler: WebAssembly.Module): Scenario
         try {
           const before = initial(0x1000n, { 1: 0x11223344n, 2: 0x80n, 6: 0x10n, 7: 0x5000n });
           cpu.setState(before);
-          const result = await cpu.run({ budget: 3n, repeatBudget: 0n });
+          const result = await cpu.run({ budget: 3n, repeatBudget: 3n });
           equal(result.retired, 3n, 'three bare forms');
+          equal(
+            result.repeatIterations,
+            0n,
+            'positive repeat allowance is untouched by bare forms',
+          );
+          equal(result.remainingRepeatBudget, 3n, 'bare forms preserve the full allowance');
           same(
             trace,
             ['w:128:8:161', 'w:128:8:178', 'r:128:8'],
