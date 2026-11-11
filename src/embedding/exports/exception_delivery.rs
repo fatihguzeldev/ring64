@@ -255,8 +255,7 @@ pub extern "C" fn core_deliver_exception() -> i32 {
                     }
                 }
                 if outcome.context_changed {
-                    core.image.retire_sources();
-                    core.context_version = core.context_version.saturating_add(1);
+                    core.context_changed();
                 }
                 DISPATCH
             }

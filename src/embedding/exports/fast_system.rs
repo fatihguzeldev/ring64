@@ -123,12 +123,11 @@ pub extern "C" fn core_fast_system(
             Ok(prepared) => prepared,
             Err(error) => return failure(core, error),
         };
-        if core.context != prepared.context {
-            core.image.retire_sources();
-            core.observed_owners.clear();
-            core.context_version = core.context_version.wrapping_add(1);
-        }
+        let context_changed = core.context != prepared.context;
         core.context = prepared.context;
+        if context_changed {
+            core.context_changed();
+        }
         core.fast_system = prepared.bank;
         unsafe {
             let raw = &mut *core.state.get();

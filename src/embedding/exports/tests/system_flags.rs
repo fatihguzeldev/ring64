@@ -79,12 +79,14 @@ fn boundary_profiles_guard_activation_without_invalidating_source_owners() {
         })
     };
     let (fast, observed) = compile();
+    assert_eq!(mapped::core_publish(fast), 1);
     assert!(!observed);
     scalar_input(0x102, 0);
     assert_eq!(core_import_state(), 0);
     assert_eq!(mapped::core_validity(fast), 1);
     assert_eq!(mapped::core_activate(fast), 0);
     let (step, observed) = compile();
+    assert_eq!(mapped::core_publish(step), 1);
     assert!(observed);
     assert_eq!(mapped::core_activate(step), 1);
     scalar_input(2, 0);
@@ -101,8 +103,8 @@ fn boundary_profiles_guard_activation_without_invalidating_source_owners() {
                 .core
                 .as_ref()
                 .unwrap()
-                .observed_owners
-                .contains(&step)
+                .translation_owners
+                .contains(step)
         )
     });
 }

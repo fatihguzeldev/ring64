@@ -1,5 +1,6 @@
 use super::*;
 mod access_faults;
+mod context_reuse;
 mod exception_delivery;
 mod exception_review;
 mod external_interrupts;
@@ -218,6 +219,7 @@ fn mapped_exports_register_sources_and_report_active_write_status() {
         serde_json::json!([{ "start": "0x1000", "length": 5 }])
     );
     assert_eq!(mapped::core_validity(owner), 1);
+    assert_eq!(mapped::core_publish(owner), 1);
     assert_eq!(mapped::core_activate(owner), 1);
     assert_eq!(core_store(0x4007, 1, 0x77), 1);
     assert_eq!(mapped::core_validity(owner), 1);

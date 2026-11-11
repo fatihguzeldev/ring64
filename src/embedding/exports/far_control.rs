@@ -122,8 +122,7 @@ fn core_far_control_impl<const OBSERVED: bool, const PAGED: bool>(
             scratch[8..].copy_from_slice(&outcome.sp.to_le_bytes());
         }
         if outcome.context_changed {
-            core.image.retire_sources();
-            core.context_version = core.context_version.saturating_add(1);
+            core.context_changed();
         }
         0
     })

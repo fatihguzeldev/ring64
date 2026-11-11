@@ -117,6 +117,6 @@ fn far_transport_uses_live_sp_and_leaves_canonical_registers_for_generated_publi
         );
         assert_eq!(core.context.selector(Segment::Cs), 0);
         assert_eq!(core.context_version, 1);
-        assert!(!core.image.owner_valid(1));
+        assert!(core.image.owner_valid(1));
     });
 }

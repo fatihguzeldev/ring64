@@ -174,7 +174,7 @@ pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
             protection_fault: None,
             system_memory_fault: None,
             debug_exception: None,
-            observed_owners: HashSet::new(),
+            translation_owners: Default::default(),
             debug_candidate: 0,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
@@ -237,14 +237,19 @@ pub extern "C" fn core_set_mappings() -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_validity(owner: u64) -> i32 {
-    BRIDGE.with_borrow(|bridge| i32::from(bridge.core.as_ref().unwrap().image.owner_valid(owner)))
+    BRIDGE.with_borrow(|bridge| i32::from(bridge.core.as_ref().unwrap().owner_alive(owner)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_publish(owner: u64) -> i32 {
+    BRIDGE.with_borrow_mut(|bridge| i32::from(bridge.core.as_mut().unwrap().publish_owner(owner)))
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_activate(owner: u64) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
-        i32::from(core.owner_matches_boundary(owner) && core.image.activate(owner))
+        i32::from(core.activate_owner(owner))
     })
 }
 
@@ -252,7 +257,7 @@ pub extern "C" fn core_activate(owner: u64) -> i32 {
 pub extern "C" fn core_release(owner: u64) {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
-        core.observed_owners.remove(&owner);
+        core.translation_owners.release(owner);
         core.image.release(owner);
     });
 }

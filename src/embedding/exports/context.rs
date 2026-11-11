@@ -93,9 +93,8 @@ pub extern "C" fn core_set_context() -> i32 {
         core.segment_fault = None;
         core.divide_failed = false;
         if core.context != context {
-            core.image.retire_sources();
             core.context = context;
-            core.context_version = core.context_version.saturating_add(1);
+            core.context_changed();
         }
         0
     })

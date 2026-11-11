@@ -120,8 +120,7 @@ fn core_software_event_impl<const OBSERVED: bool, const PAGED: bool>(
             }
         }
         if outcome.context_changed {
-            core.image.retire_sources();
-            core.context_version = core.context_version.saturating_add(1);
+            core.context_changed();
         }
         0
     })

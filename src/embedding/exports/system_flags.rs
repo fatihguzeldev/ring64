@@ -51,10 +51,6 @@ impl Core {
             || state.debug.registers.active()
             || state.debug.continuation.slots != 0
     }
-
-    pub(super) fn owner_matches_boundary(&self, owner: u64) -> bool {
-        self.observed_owners.contains(&owner) == self.boundary_observed()
-    }
 }
 
 #[unsafe(no_mangle)]

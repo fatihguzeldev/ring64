@@ -118,8 +118,7 @@ fn core_protection_impl<const OBSERVED: bool, const PAGED: bool>(
                 u8::from(outcome.value.is_some()) | (u8::from(outcome.zero == Some(true)) << 1);
         }
         if outcome.context_changed {
-            core.image.retire_sources();
-            core.context_version = core.context_version.saturating_add(1);
+            core.context_changed();
         }
         if outcome.context_changed || core.image.active_changed() {
             2

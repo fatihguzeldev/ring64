@@ -273,9 +273,7 @@ pub extern "C" fn core_import_paging() -> i32 {
             return bridge.error("paging state requires a paged CPU");
         };
         if previous.translation_changed(candidate) {
-            core.image.retire_sources();
-            core.observed_owners.clear();
-            core.context_version = core.context_version.wrapping_add(1);
+            core.retire_translations();
         }
         core.paging = Some(candidate);
         core.paging_work.clear();
@@ -334,11 +332,9 @@ pub extern "C" fn core_paging_control(
                 .prepare_msr_write(register, value, &core.context)
                 .map(|(bank, context)| {
                     if core.context != context {
-                        core.image.retire_sources();
-                        core.observed_owners.clear();
-                        core.context_version = core.context_version.wrapping_add(1);
+                        core.context = context;
+                        core.context_changed();
                     }
-                    core.context = context;
                     core.fast_system = bank;
                     (state, None)
                 }),
@@ -372,9 +368,7 @@ pub extern "C" fn core_paging_control(
         match operation {
             Ok((candidate, result)) => {
                 if kind == 4 || kind == 1 && register == 3 || state.translation_changed(candidate) {
-                    core.image.retire_sources();
-                    core.observed_owners.clear();
-                    core.context_version = core.context_version.wrapping_add(1);
+                    core.retire_translations();
                 }
                 core.paging = Some(candidate);
                 if let Some(value) = result {

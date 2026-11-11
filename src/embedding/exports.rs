@@ -1,5 +1,4 @@
 use std::cell::{RefCell, UnsafeCell};
-use std::collections::HashSet;
 
 use crate::dbt::{self, CompileError, Limits};
 use crate::memory::{Access, Cause, Fault, Image};
@@ -52,6 +51,7 @@ mod protection;
 mod software_events;
 mod streaming;
 mod system_flags;
+mod translation;
 mod vector;
 mod x87;
 mod x87_state;
@@ -76,7 +76,7 @@ struct Core {
     protection_fault: Option<crate::x86::protection::ProtectionFault>,
     system_memory_fault: Option<crate::x86::protection::SystemMemoryFault>,
     debug_exception: Option<system_flags::DebugException>,
-    observed_owners: HashSet<u64>,
+    translation_owners: dbt::Owners,
     debug_candidate: u8,
 }
 
@@ -156,7 +156,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             protection_fault: None,
             system_memory_fault: None,
             debug_exception: None,
-            observed_owners: HashSet::new(),
+            translation_owners: Default::default(),
             debug_candidate: 0,
         });
         bridge.info = serde_json::to_vec(&RunState::descriptor()).unwrap();
@@ -419,12 +419,9 @@ pub extern "C" fn core_compile(
                     Ok(owner) => owner,
                     Err(_) => return RESOURCE,
                 };
-                if observed {
-                    if core.observed_owners.try_reserve(1).is_err() {
-                        core.image.release(owner);
-                        return RESOURCE;
-                    }
-                    core.observed_owners.insert(owner);
+                if !core.translation_owners.register(owner, &core.context, observed, core.context_version) {
+                    core.image.release(owner);
+                    return RESOURCE;
                 }
                 bridge.info = serde_json::to_vec(&serde_json::json!({
                     "entries": artifact.entries.iter().map(|pc| format!("0x{pc:x}")).collect::<Vec<_>>(),
