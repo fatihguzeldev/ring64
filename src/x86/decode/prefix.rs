@@ -18,6 +18,7 @@ pub(super) struct Prefixes {
     pub(super) lock: bool,
     pub(super) long64: bool,
     pub(super) mode: Mode,
+    pub(super) paged: bool,
     default32: bool,
 }
 
@@ -115,6 +116,7 @@ where
         lock: false,
         long64: context.is_long64(),
         mode: context.mode(),
+        paged: false,
         default32: context.code32(),
     };
     loop {

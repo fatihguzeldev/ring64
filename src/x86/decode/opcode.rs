@@ -622,6 +622,9 @@ fn two_byte<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if let Some(result) = super::paging::two_byte(opcode, prefixes, cursor) {
+        return result;
+    }
     if matches!(opcode, 0x21 | 0x23) {
         if prefixes.repeat.is_some() {
             return Err(DecodeError::Unsupported);

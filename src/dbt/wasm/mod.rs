@@ -14,6 +14,7 @@ mod memory;
 mod mmx;
 mod multiply_divide;
 mod numeric_state;
+mod paging;
 mod protection;
 mod software_events;
 mod stack;
@@ -90,6 +91,7 @@ struct Emitter {
     system_flags: Option<u32>,
     debug_step: Option<u32>,
     debug_register: Option<u32>,
+    paging_control: Option<u32>,
     debug_begin: Option<u32>,
     external_step: Option<u32>,
     halt: Option<u32>,
@@ -281,6 +283,10 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::DebugRegister { .. }));
+    let has_paging = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Paging(_)));
     let has_system_flags = unit
         .instructions
         .iter()
@@ -409,6 +415,21 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         let index = next_type;
         types.ty().function(
             [ValType::I32, ValType::I64, ValType::I64, ValType::I64],
+            [ValType::I32],
+        );
+        next_type += 1;
+        index
+    });
+    let paging_type = has_paging.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [
+                ValType::I32,
+                ValType::I32,
+                ValType::I64,
+                ValType::I64,
+                ValType::I64,
+            ],
             [ValType::I32],
         );
         next_type += 1;
@@ -670,6 +691,12 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         run_index += 1;
         function
     });
+    let paging_control = paging_type.map(|index| {
+        imports.import("env", "paging_control", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let debug_begin = debug_begin_type.map(|index| {
         imports.import("env", "debug_begin", EntityType::Function(index));
         let function = run_index;
@@ -773,6 +800,7 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         system_flags,
         debug_step,
         debug_register,
+        paging_control,
         debug_begin,
         external_step,
         halt,
@@ -831,6 +859,10 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         emitter.gates(exit_depth);
         emitter.begin(instruction.operation, exit_depth);
         match instruction.operation {
+            Operation::Paging(operation) => {
+                emitter.paging_control(operation, instruction.next_pc, exit_depth);
+                continue;
+            }
             Operation::Halt => {
                 emitter.halt(instruction.next_pc, exit_depth);
                 continue;

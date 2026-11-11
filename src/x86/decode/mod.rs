@@ -10,6 +10,7 @@ mod mmx;
 mod numeric_image;
 mod opcode;
 mod operand;
+mod paging;
 mod prefix;
 mod protection;
 mod software_events;
@@ -74,8 +75,25 @@ pub fn decode_with_context<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    decode_with_profile(pc, context, false, read)
+}
+
+pub fn decode_with_profile<F>(
+    pc: u64,
+    context: &ExecutionContext,
+    paged: bool,
+    read: F,
+) -> Result<Instruction, DecodeError>
+where
+    F: FnMut(u64) -> Result<u8, DecodeError>,
+{
     let mut cursor = cursor::Cursor::new(pc, context.is_long64(), read);
-    let (prefixes, opcode) = prefix::read(&mut cursor, context)?;
+    let (mut prefixes, opcode) = prefix::read(&mut cursor, context)?;
+    prefixes.paged = paged
+        && matches!(
+            context.mode(),
+            crate::x86::context::Mode::Long64 | crate::x86::context::Mode::Compatibility
+        );
     let operation = opcode::refine(opcode, prefixes, &mut cursor)?;
     Ok(Instruction {
         pc,
@@ -86,3 +104,7 @@ where
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "tests/paging.rs"]
+mod paging_tests;

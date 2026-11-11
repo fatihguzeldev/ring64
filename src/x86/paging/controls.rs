@@ -111,7 +111,13 @@ impl State {
                 }
                 candidate.cr4 = value;
             }
-            8 => return Err(Unsupported),
+            8 => {
+                return Err(if value & !15 != 0 {
+                    GeneralProtection
+                } else {
+                    Unsupported
+                });
+            }
             _ => return Err(Undefined),
         }
         Ok(candidate)
@@ -128,6 +134,22 @@ impl State {
             efer: (value & EFER_NXE) | EFER_FIXED,
             ..self
         })
+    }
+
+    pub fn read_msr(self, index: u32) -> Result<u64, ControlFailure> {
+        if index == EFER_MSR {
+            Ok(self.efer)
+        } else {
+            Err(ControlFailure::Unsupported)
+        }
+    }
+
+    pub fn prepare_msr_write(self, index: u32, value: u64) -> Result<Self, ControlFailure> {
+        if index == EFER_MSR {
+            self.prepare_efer_write(value)
+        } else {
+            Err(ControlFailure::Unsupported)
+        }
     }
 
     pub fn translation_changed(self, other: Self) -> bool {
@@ -247,6 +269,10 @@ mod tests {
             state.prepare_cr_write(0, 0x33, Mode::Compatibility),
             Err(Unsupported)
         );
+        assert_eq!(
+            state.prepare_cr_write(8, 16, Mode::Long64),
+            Err(GeneralProtection)
+        );
         for value in [
             0x80000031, 0x80000037, 0x8000003b, 0x80000013, 0x80040033, 0xe0000033,
         ] {
@@ -339,5 +365,22 @@ mod tests {
         }
         assert_eq!(state.prepare_efer_write(0x501), Err(Unsupported));
         assert_eq!(state, bank());
+    }
+
+    #[test]
+    fn efer_is_the_selected_msr_and_other_indices_remain_private() {
+        let state = bank();
+        assert_eq!(state.read_msr(0xc0000080), Ok(0x500));
+        assert_eq!(
+            state.prepare_msr_write(0xc0000080, 0xd00),
+            Ok(State {
+                efer: 0xd00,
+                ..state
+            })
+        );
+        for index in [0, 0x174, 0xc0000081, u32::MAX] {
+            assert_eq!(state.read_msr(index), Err(Unsupported));
+            assert_eq!(state.prepare_msr_write(index, u64::MAX), Err(Unsupported));
+        }
     }
 }

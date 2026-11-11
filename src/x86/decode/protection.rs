@@ -112,6 +112,9 @@ where
                 _ => return Err(DecodeError::Unsupported),
             },
             0x01 => {
+                if prefixes.paged && operands.selector == 7 {
+                    return super::paging::invlpg(operands, prefixes, cursor);
+                }
                 if operands.mode == 3 || operands.selector > 3 {
                     return Err(DecodeError::Unsupported);
                 }

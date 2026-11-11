@@ -767,8 +767,23 @@ impl FarInstruction {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PagingInstruction {
+    ControlRegister {
+        register: u8,
+        gpr: u8,
+        write: bool,
+        width: Width,
+    },
+    ModelSpecificRegister {
+        write: bool,
+    },
+    InvalidatePage(Address),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
     Halt,
+    Paging(PagingInstruction),
     DebugRegister {
         register: u8,
         gpr: u8,
