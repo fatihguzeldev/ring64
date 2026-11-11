@@ -34,6 +34,17 @@ software-event kernels cover STR, an explicit guest busy-byte reset with LTR/STR
 
 `--matched-delivery` instead enables allowance0 on both builds for inherited no-event kernels; it is mutually exclusive with `--exception-idle`. TF stepping is excluded, while the separately bounded `event-*` kernels keep their existing delivery work. `external-*` kernels cover IRQ/NMI entry/IRET, STI;HLT, wakeup, pending/private repair, early IRET unblock, idle REP reentry, shutdown and executable aliases. paired empty/queued controls alternate sample order for masked IRQ, blocked NMI and short resumes. external service caps at1001 requests per sample; ordinary controls cap at1000001 loop iterations. run-call timings exclude intake/reset/repair, and HLT/REP preparation has separate counters. these measure synthetic idle service, without an active-run or hardware arrival-latency claim.
 
+paging verification tools freeze built artifacts before comparison:
+
+```sh
+node scripts/paging-performance.mjs --baseline /path/to/built/c1380a4 --tag paging
+node scripts/paging-characterize.mjs --tag paging
+node scripts/paging-characterize.mjs --browser --tag paging
+node scripts/paging-mutations.mjs
+```
+
+the inherited comparison covers all170 report and169 matched-delivery kernels. separate paged kernels check identity/nonidentity mappings, page sizes, fragmented accesses, root changes, invalidation, faults and handler repair. warm tables still use walks; no retained TLB is modeled. cold-loop rows clear A/D once per sample and include amortized compilation. the leaf-store pair instead clears only the data PTE before each measured cold call, with warm code and zero measured compilations. host reset and output guards stay outside summed run timing; wall time and exact work denominators are recorded separately. mutation checks build and restore an isolated source copy.
+
 ## use
 
 after `npm run build`, this node example executes one guest instruction. the same host module works in a browser with fetched compiler bytes. the runtime must support BigInt and standard fixed128 WebAssembly SIMD, including for scalar guests. `createCpu` checks SIMD support before allocating its Core and rejects unsupported runtimes with `TypeError`.
