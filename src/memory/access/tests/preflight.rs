@@ -110,7 +110,13 @@ fn preflight_matches_widened_byte_admission_across_fragments_permissions_and_add
                                     image.last_mapping.set(2);
                                     image.previous_mapping.set(1);
                                     assert_eq!(
-                                        image.preflight(address, width, access, rmw, cache_scalar),
+                                        image.preflight::<false>(
+                                            address,
+                                            width,
+                                            access,
+                                            rmw,
+                                            cache_scalar
+                                        ),
                                         expected,
                                         "base{base:x} gap{gap} masks{masks:?} address{address:x} width{width} access{access:?} rmw{rmw} cache{cache_scalar}"
                                     );

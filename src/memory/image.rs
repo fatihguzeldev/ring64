@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use super::address::span_failure;
+use super::address::{physical_span_failure, span_failure};
 use super::validity::Validity;
 
 #[derive(Clone, Copy, Debug)]
@@ -46,6 +46,7 @@ pub struct Image {
     pub(super) backings: Vec<Backing>,
     pub(super) mappings: Vec<Mapping>,
     limits: MemoryLimits,
+    physical: bool,
     pub(super) validity: Validity,
     pub(super) last_mapping: Cell<usize>,
     pub(super) previous_mapping: Cell<usize>,
@@ -127,6 +128,23 @@ impl Image {
         mappings: Vec<MappingInput>,
         limits: MemoryLimits,
     ) -> Result<Self, MemoryError> {
+        Self::mapped_in_plane(backings, mappings, limits, false)
+    }
+
+    pub fn physical_mapped(
+        backings: Vec<(String, Vec<u8>)>,
+        mappings: Vec<MappingInput>,
+        limits: MemoryLimits,
+    ) -> Result<Self, MemoryError> {
+        Self::mapped_in_plane(backings, mappings, limits, true)
+    }
+
+    fn mapped_in_plane(
+        backings: Vec<(String, Vec<u8>)>,
+        mappings: Vec<MappingInput>,
+        limits: MemoryLimits,
+        physical: bool,
+    ) -> Result<Self, MemoryError> {
         if limits.max_backing_bytes == 0 || limits.max_backings == 0 || limits.max_mappings == 0 {
             return Err(MemoryError::Invalid(
                 "memory limits must be positive wasm32 integers",
@@ -143,6 +161,7 @@ impl Image {
             backings: Vec::new(),
             mappings: Vec::new(),
             limits,
+            physical,
             validity: Validity::default(),
             last_mapping: Cell::new(usize::MAX),
             previous_mapping: Cell::new(usize::MAX),
@@ -230,13 +249,15 @@ impl Image {
                 .position(|backing| backing.id == input.backing)
                 .ok_or(MemoryError::Invalid("mapping refers to unknown backing"))?;
             if input.length == 0
-                || span_failure(input.base, u64::from(input.length)).is_some()
+                || self.mapping_span_failure(input.base, u64::from(input.length))
                 || u64::from(input.offset) + u64::from(input.length)
                     > self.backings[backing].bytes.len() as u64
             {
-                return Err(MemoryError::Invalid(
-                    "mapping must be a nonempty canonical nonwrapping backing slice",
-                ));
+                return Err(MemoryError::Invalid(if self.physical {
+                    "mapping must be a nonempty 52-bit physical backing slice"
+                } else {
+                    "mapping must be a nonempty canonical nonwrapping backing slice"
+                }));
             }
             mappings.push(Mapping {
                 base: input.base,
@@ -259,6 +280,14 @@ impl Image {
         self.previous_mapping.set(usize::MAX);
         self.refresh_watchers();
         Ok(())
+    }
+
+    pub(super) fn mapping_span_failure(&self, address: u64, length: u64) -> bool {
+        if self.physical {
+            physical_span_failure(address, length).is_some()
+        } else {
+            span_failure(address, length).is_some()
+        }
     }
 
     pub(super) fn locate(&self, address: u64) -> Option<&Mapping> {

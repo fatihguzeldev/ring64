@@ -1,10 +1,81 @@
-use super::address::check_span;
+use super::address::{check_physical_span, check_span};
 use super::image::locate_index;
 use super::{Access, Cause, Fault, Image};
 
 impl Image {
+    pub fn physical_fetch(&self, address: u64) -> Result<u8, Fault> {
+        let first = self.preflight::<true>(address, 1, Access::Execute, false, false)?;
+        Ok(self.byte_after_preflight(address, first))
+    }
+
+    pub fn physical_read(&self, address: u64, width: u32) -> Result<u64, Fault> {
+        assert!(
+            matches!(width, 1 | 2 | 4 | 8),
+            "unsupported scalar access width"
+        );
+        let first = self.preflight::<true>(address, width, Access::Read, false, true)?;
+        Ok(self.scalar_after_preflight(address, width, first))
+    }
+
+    pub fn physical_read_for_write(&self, address: u64, width: u32) -> Result<u64, Fault> {
+        assert!(
+            matches!(width, 1 | 2 | 4 | 8),
+            "unsupported scalar access width"
+        );
+        let first = self.preflight::<true>(address, width, Access::Write, true, true)?;
+        Ok(self.scalar_after_preflight(address, width, first))
+    }
+
+    pub fn physical_write(&mut self, address: u64, width: u32, value: u64) -> Result<(), Fault> {
+        assert!(
+            matches!(width, 1 | 2 | 4 | 8),
+            "unsupported scalar access width"
+        );
+        let first = self.preflight::<true>(address, width, Access::Write, false, true)?;
+        self.write_after_preflight(address, &value.to_le_bytes()[..width as usize], first);
+        Ok(())
+    }
+
+    pub fn physical_read_bytes(&self, address: u64, length: u32) -> Result<Vec<u8>, Fault> {
+        let first = self.preflight::<true>(address, length, Access::Read, false, false)?;
+        Ok(self.bytes_after_preflight(address, length, first))
+    }
+
+    pub fn physical_write_bytes(&mut self, address: u64, bytes: &[u8]) -> Result<(), Fault> {
+        let width = u32::try_from(bytes.len()).expect("memory copy length exceeds wasm32");
+        let first = self.preflight::<true>(address, width, Access::Write, false, false)?;
+        self.write_after_preflight(address, bytes, first);
+        Ok(())
+    }
+
+    pub fn physical_check_read(&self, address: u64, width: u32) -> Result<(), Fault> {
+        self.preflight::<true>(address, width, Access::Read, false, false)
+            .map(|_| ())
+    }
+
+    pub fn physical_check_write(&self, address: u64, width: u32) -> Result<(), Fault> {
+        self.preflight::<true>(address, width, Access::Write, false, false)
+            .map(|_| ())
+    }
+
+    pub fn physical_check_execute(&self, address: u64, width: u32) -> Result<(), Fault> {
+        self.preflight::<true>(address, width, Access::Execute, false, false)
+            .map(|_| ())
+    }
+
+    pub fn physical_check_access(
+        &self,
+        address: u64,
+        width: u32,
+        access: Access,
+        rmw: bool,
+    ) -> Result<(), Fault> {
+        self.preflight::<true>(address, width, access, rmw, false)
+            .map(|_| ())
+    }
+
     pub fn fetch(&self, address: u64) -> Result<u8, Fault> {
-        let index = self.preflight(address, 1, Access::Execute, false, false)?;
+        let index = self.preflight::<false>(address, 1, Access::Execute, false, false)?;
         Ok(self.byte_after_preflight(address, index))
     }
 
@@ -14,10 +85,10 @@ impl Image {
             "unsupported scalar access width"
         );
         if width == 1 {
-            let first = self.preflight(address, 1, Access::Read, false, true)?;
+            let first = self.preflight::<false>(address, 1, Access::Read, false, true)?;
             return Ok(u64::from(self.byte_after_preflight(address, first)));
         }
-        let first = self.preflight(address, width, Access::Read, false, true)?;
+        let first = self.preflight::<false>(address, width, Access::Read, false, true)?;
         Ok(self.scalar_after_preflight(address, width, first))
     }
 
@@ -27,10 +98,10 @@ impl Image {
             "unsupported scalar access width"
         );
         if width == 1 {
-            let first = self.preflight(address, 1, Access::Write, true, true)?;
+            let first = self.preflight::<false>(address, 1, Access::Write, true, true)?;
             return Ok(u64::from(self.byte_after_preflight(address, first)));
         }
-        let first = self.preflight(address, width, Access::Write, true, true)?;
+        let first = self.preflight::<false>(address, width, Access::Write, true, true)?;
         Ok(self.scalar_after_preflight(address, width, first))
     }
 
@@ -39,7 +110,7 @@ impl Image {
             matches!(width, 1 | 2 | 4 | 8),
             "unsupported scalar access width"
         );
-        let first = self.preflight(address, width, Access::Write, false, true)?;
+        let first = self.preflight::<false>(address, width, Access::Write, false, true)?;
         let mapping = &self.mappings[first];
         let relative = address - mapping.base;
         if u64::from(width) <= u64::from(mapping.length) - relative {
@@ -67,7 +138,11 @@ impl Image {
     }
 
     pub fn read_bytes(&self, address: u64, length: u32) -> Result<Vec<u8>, Fault> {
-        let mut index = self.preflight(address, length, Access::Read, false, false)?;
+        let first = self.preflight::<false>(address, length, Access::Read, false, false)?;
+        Ok(self.bytes_after_preflight(address, length, first))
+    }
+
+    fn bytes_after_preflight(&self, address: u64, length: u32, mut index: usize) -> Vec<u8> {
         let mut output = Vec::with_capacity(length as usize);
         let mut cursor = u128::from(address);
         let end = cursor + u128::from(length);
@@ -79,12 +154,12 @@ impl Image {
             cursor += count as u128;
             index += 1;
         }
-        Ok(output)
+        output
     }
 
     pub fn read_vector(&self, address: u64, width: u32) -> Result<[u8; 16], Fault> {
         assert!(matches!(width, 2 | 4 | 8 | 10 | 16));
-        let mut index = self.preflight(address, width, Access::Read, false, false)?;
+        let mut index = self.preflight::<false>(address, width, Access::Read, false, false)?;
         let mapping = &self.mappings[index];
         let relative = address - mapping.base;
         if u64::from(width) <= u64::from(mapping.length) - relative {
@@ -124,18 +199,18 @@ impl Image {
 
     pub fn write_bytes(&mut self, address: u64, bytes: &[u8]) -> Result<(), Fault> {
         let width = u32::try_from(bytes.len()).expect("memory copy length exceeds u32");
-        let first = self.preflight(address, width, Access::Write, false, false)?;
+        let first = self.preflight::<false>(address, width, Access::Write, false, false)?;
         self.write_after_preflight(address, bytes, first);
         Ok(())
     }
 
     pub fn check_write(&self, address: u64, width: u32) -> Result<(), Fault> {
-        self.preflight(address, width, Access::Write, false, false)
+        self.preflight::<false>(address, width, Access::Write, false, false)
             .map(|_| ())
     }
 
     pub fn check_read(&self, address: u64, width: u32) -> Result<(), Fault> {
-        self.preflight(address, width, Access::Read, false, false)
+        self.preflight::<false>(address, width, Access::Read, false, false)
             .map(|_| ())
     }
 
@@ -147,7 +222,7 @@ impl Image {
         output: &mut [u8],
     ) -> Result<(), Fault> {
         Self::check_fields(width, fields, output.len());
-        let mut index = self.preflight(address, width, Access::Read, false, false)?;
+        let mut index = self.preflight::<false>(address, width, Access::Read, false, false)?;
         for &(start, length) in fields {
             let mut cursor = address + u64::from(start);
             while self.mappings[index].end() <= u128::from(cursor) {
@@ -180,7 +255,7 @@ impl Image {
         bytes: &[u8],
     ) -> Result<(), Fault> {
         Self::check_fields(width, fields, bytes.len());
-        let mut index = self.preflight(address, width, Access::Write, false, false)?;
+        let mut index = self.preflight::<false>(address, width, Access::Write, false, false)?;
         if fields.is_empty() {
             return Ok(());
         }
@@ -267,7 +342,7 @@ impl Image {
     }
 
     #[inline]
-    fn preflight(
+    fn preflight<const PHYSICAL: bool>(
         &self,
         address: u64,
         width: u32,
@@ -275,7 +350,11 @@ impl Image {
         rmw: bool,
         cache_scalar: bool,
     ) -> Result<usize, Fault> {
-        check_span(address, width, access)?;
+        if PHYSICAL {
+            check_physical_span(address, width, access)?;
+        } else {
+            check_span(address, width, access)?;
+        }
         if width == 0 {
             return Ok(0);
         }

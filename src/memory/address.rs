@@ -1,6 +1,7 @@
 const LOW_CANONICAL_END: u64 = 0x0000_7fff_ffff_ffff;
 const HIGH_CANONICAL_START: u64 = 0xffff_8000_0000_0000;
 pub(super) const ADDRESS_DOMAIN_END: u128 = 1u128 << 64;
+pub const PHYSICAL_ADDRESS_END: u64 = 1 << 52;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Cause {
@@ -32,6 +33,30 @@ pub fn canonical48(address: u64) -> bool {
 
 pub(crate) fn check_span(address: u64, width: u32, access: Access) -> Result<(), Fault> {
     match span_failure(address, u64::from(width)) {
+        Some((cause, failing)) => Err(Fault {
+            address,
+            width,
+            access,
+            cause,
+            failing,
+        }),
+        None => Ok(()),
+    }
+}
+
+pub(super) fn physical_span_failure(address: u64, length: u64) -> Option<(Cause, u128)> {
+    if length == 0 {
+        return None;
+    }
+    let end = u128::from(address) + u128::from(length);
+    (end > u128::from(PHYSICAL_ADDRESS_END)).then_some((
+        Cause::AddressRange,
+        u128::from(address.max(PHYSICAL_ADDRESS_END)),
+    ))
+}
+
+pub(super) fn check_physical_span(address: u64, width: u32, access: Access) -> Result<(), Fault> {
+    match physical_span_failure(address, u64::from(width)) {
         Some((cause, failing)) => Err(Fault {
             address,
             width,
