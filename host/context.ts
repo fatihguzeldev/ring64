@@ -138,6 +138,7 @@ function captureSegment(
   const wide = raw || mode === 'long64' || (full && mode === 'compatibility' && name !== 'cs');
   if (!wide && base > 0xffffffffn) throw new TypeError('segment base must fit u32');
   if (
+    !raw &&
     (mode === 'long64' || mode === 'compatibility') &&
     (name === 'fs' || name === 'gs') &&
     !canonical(base)

@@ -58,7 +58,8 @@ fn cache(
         || mode == Mode::Long64
         || full && mode == Mode::Compatibility && segment != Segment::Cs;
     if !wide && base > u64::from(u32::MAX)
-        || matches!(mode, Mode::Long64 | Mode::Compatibility)
+        || !raw
+            && matches!(mode, Mode::Long64 | Mode::Compatibility)
             && matches!(segment, Segment::Fs | Segment::Gs)
             && !canonical48(base)
     {

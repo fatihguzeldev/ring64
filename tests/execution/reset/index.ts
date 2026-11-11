@@ -1,3 +1,4 @@
+import { rawActivationScenarios } from './raw-activation.js';
 import { negativeScenarios } from './negative.js';
 import { systemScenarios } from './system.js';
 import { pagingSwitchScenarios } from './paging-switch.js';
@@ -13,4 +14,5 @@ export const resetScenarios = (compiler: WebAssembly.Module) => [
   ...pagingSwitchScenarios(compiler),
   ...systemScenarios(compiler),
   ...negativeScenarios(compiler),
+  ...rawActivationScenarios(compiler),
 ];

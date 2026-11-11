@@ -347,3 +347,28 @@ test('physical full context owns retained transitional CS wide roots and unusabl
   user.cpl = 3;
   assert.throws(() => captureContext(user, true), TypeError);
 });
+
+test('physical full IA32e checkpoints retain noncanonical raw FS GS and roots until architectural use', () => {
+  for (const mode of ['compatibility', 'long64'] as const) {
+    const source = longSnapshot();
+    source.mode = mode;
+    source.segments.fs.base = 0x800000000000n;
+    source.segments.gs.base = 0xffff7fff00000000n;
+    source.gdtr.base = 0x800000000001n;
+    source.idtr.base = 0x800000000002n;
+    source.ldtr.base = 0x800000000003n;
+    source.tr.base = 0x800000000004n;
+    assert.throws(() => captureContext(source), TypeError);
+    assert.deepEqual(captureContext(source, true), source);
+    const json = JSON.parse(
+      JSON.stringify(source, (_, v: unknown) =>
+        typeof v === 'bigint' ? `0x${v.toString(16)}` : v,
+      ),
+    ) as ContextInfo;
+    assert.deepEqual(contextFromJson(json, true), source);
+  }
+  assert.throws(
+    () => captureContext({ mode: 'long64', fsBase: 0x800000000000n, gsBase: 0n }, true),
+    TypeError,
+  );
+});

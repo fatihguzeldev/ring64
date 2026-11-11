@@ -278,3 +278,28 @@ fn activation_checks_loaded_cs_and_16bit_task_before_publishing_mode_or_tables()
     assert_eq!(compat.segment(Segment::Cs).base, 0xffff0000);
     assert_eq!(candidate.validate_physical_context(&compat), Ok(()));
 }
+
+#[test]
+fn physical_full_ia32e_snapshots_retain_noncanonical_raw_bases_until_actual_use() {
+    use crate::x86::context::{AccessFailure, ExecutionContext};
+    let mut json = ExecutionContext::default().to_json();
+    json["segments"]["fs"]["base"] = serde_json::json!("0x800000000000");
+    json["segments"]["gs"]["base"] = serde_json::json!("0xffff7fff00000000");
+    for root in ["gdtr", "idtr", "ldtr", "tr"] {
+        json[root]["base"] = serde_json::json!("0x800000000001");
+    }
+    assert!(ExecutionContext::from_json(&json).is_err());
+    let context = ExecutionContext::from_json_profile(&json, true).unwrap();
+    assert_eq!(context.to_json(), json);
+    assert!(matches!(
+        context.translate(0, 8, Segment::Fs, Access::Read, false),
+        Err(AccessFailure::Linear(crate::memory::Fault {
+            cause: crate::memory::Cause::Noncanonical,
+            ..
+        }))
+    ));
+    json["mode"] = serde_json::json!("compatibility");
+    json["segments"]["cs"]["long"] = serde_json::json!(false);
+    let context = ExecutionContext::from_json_profile(&json, true).unwrap();
+    assert_eq!(context.to_json(), json);
+}
