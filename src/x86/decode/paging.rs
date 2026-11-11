@@ -9,6 +9,22 @@ pub(super) fn two_byte<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if prefixes.paged && matches!(opcode, 0x05 | 0x07 | 0x34 | 0x35) {
+        use crate::x86::fast_system::Instruction;
+        return Some(
+            if prefixes.lock || matches!(opcode, 0x05 | 0x07) && !prefixes.long64 {
+                Err(DecodeError::UndefinedEncoding)
+            } else {
+                let wide = prefixes.long64 && prefixes.rex.width() == Width::W64;
+                Ok(Operation::FastSystem(match opcode {
+                    0x05 => Instruction::Syscall,
+                    0x07 => Instruction::Sysret { wide },
+                    0x34 => Instruction::Sysenter,
+                    _ => Instruction::Sysexit { wide },
+                }))
+            },
+        );
+    }
     if !prefixes.paged || !matches!(opcode, 0x20 | 0x22 | 0x30 | 0x32) {
         return None;
     }

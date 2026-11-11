@@ -112,6 +112,19 @@ where
                 _ => return Err(DecodeError::Unsupported),
             },
             0x01 => {
+                if prefixes.paged
+                    && operands.mode == 3
+                    && operands.selector == 7
+                    && operands.rm & 7 == 0
+                {
+                    return if prefixes.lock || !prefixes.long64 {
+                        Err(DecodeError::UndefinedEncoding)
+                    } else {
+                        Ok(Operation::FastSystem(
+                            crate::x86::fast_system::Instruction::Swapgs,
+                        ))
+                    };
+                }
                 if prefixes.paged && operands.selector == 7 {
                     return super::paging::invlpg(operands, prefixes, cursor);
                 }

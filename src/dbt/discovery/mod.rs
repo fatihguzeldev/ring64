@@ -121,6 +121,7 @@ pub(crate) fn discover_with_profile(
             | Operation::JumpMemory { .. }
             | Operation::Return { .. }
             | Operation::Far(_)
+            | Operation::FastSystem(_)
             | Operation::Halt => {}
             Operation::SoftwareEvent(event) => {
                 if event.kind == crate::x86::instruction::SoftwareEventKind::Into {

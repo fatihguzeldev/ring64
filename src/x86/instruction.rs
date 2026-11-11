@@ -784,6 +784,7 @@ pub enum PagingInstruction {
 pub enum Operation {
     Halt,
     Paging(PagingInstruction),
+    FastSystem(crate::x86::fast_system::Instruction),
     DebugRegister {
         register: u8,
         gpr: u8,

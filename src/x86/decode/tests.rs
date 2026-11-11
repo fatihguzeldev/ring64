@@ -11,6 +11,7 @@ mod arithmetic_bits;
 mod conditions;
 mod exchange;
 mod far;
+mod fast_system;
 mod float;
 mod integer_memory;
 mod logical;
