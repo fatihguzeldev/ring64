@@ -30,6 +30,7 @@ pub enum DecodeError {
     Fetch(Fault),
     Segment(SegmentFault),
     Paging(crate::x86::paging::walk::Failure),
+    PagingRestart,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,7 +55,11 @@ impl DecodeError {
                 Some(DecodeFault::UndefinedOpcode)
             }
             Self::InstructionLength => Some(DecodeFault::InstructionLength),
-            Self::Unsupported | Self::Fetch(_) | Self::Segment(_) | Self::Paging(_) => None,
+            Self::Unsupported
+            | Self::Fetch(_)
+            | Self::Segment(_)
+            | Self::Paging(_)
+            | Self::PagingRestart => None,
         }
     }
 }

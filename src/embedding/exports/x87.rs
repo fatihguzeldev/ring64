@@ -22,7 +22,7 @@ pub extern "C" fn core_x87(
     flags: u64,
     rax: u64,
 ) -> i32 {
-    core_x87_impl::<false>(operation, offset, segment, instruction_pc, flags, rax)
+    core_x87_impl::<false, false>(operation, offset, segment, instruction_pc, flags, rax)
 }
 
 #[unsafe(no_mangle)]
@@ -34,10 +34,10 @@ pub extern "C" fn core_x87_observed(
     flags: u64,
     rax: u64,
 ) -> i32 {
-    core_x87_impl::<true>(operation, offset, segment, instruction_pc, flags, rax)
+    core_x87_impl::<true, false>(operation, offset, segment, instruction_pc, flags, rax)
 }
 
-fn core_x87_impl<const OBSERVED: bool>(
+fn core_x87_impl<const OBSERVED: bool, const PAGED: bool>(
     operation: u32,
     offset: u64,
     segment: u32,
@@ -89,17 +89,17 @@ fn core_x87_impl<const OBSERVED: bool>(
             };
             address = Some(linear);
             if operation.is_store() {
-                if let Err(fault) = core.image.check_write(linear, width) {
-                    core.fault = Some(fault);
-                    return DATA;
+                if let Err(fault) = guest_access!(core, PAGED, check_write(linear, width)) {
+                    core.access_failure(fault);
+                    return core.memory_failure_reason();
                 }
                 0
             } else {
-                match core.image.read_vector(linear, width) {
+                match guest_access!(core, PAGED, read_vector(linear, width)) {
                     Ok(bytes) => u128::from_le_bytes(bytes),
                     Err(fault) => {
-                        core.fault = Some(fault);
-                        return DATA;
+                        core.access_failure(fault);
+                        return core.memory_failure_reason();
                     }
                 }
             }
@@ -119,12 +119,13 @@ fn core_x87_impl<const OBSERVED: bool>(
         }
         if effect.store {
             let linear = address.expect("x87 memory store address");
-            if let Err(fault) = core
-                .image
-                .write_bytes(linear, &effect.value.to_le_bytes()[..width as usize])
-            {
-                core.fault = Some(fault);
-                return DATA;
+            if let Err(fault) = guest_access!(
+                core,
+                PAGED,
+                write_bytes(linear, &effect.value.to_le_bytes()[..width as usize])
+            ) {
+                core.access_failure(fault);
+                return core.memory_failure_reason();
             }
         }
         unsafe {
@@ -151,4 +152,28 @@ fn core_x87_impl<const OBSERVED: bool>(
             0
         }
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_x87(
+    operation: u32,
+    offset: u64,
+    segment: u32,
+    instruction_pc: u64,
+    flags: u64,
+    rax: u64,
+) -> i32 {
+    core_x87_impl::<false, true>(operation, offset, segment, instruction_pc, flags, rax)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_x87_observed(
+    operation: u32,
+    offset: u64,
+    segment: u32,
+    instruction_pc: u64,
+    flags: u64,
+    rax: u64,
+) -> i32 {
+    core_x87_impl::<true, true>(operation, offset, segment, instruction_pc, flags, rax)
 }

@@ -12,6 +12,31 @@ use super::layout::{
     SEGMENT, TARGET, UNSUPPORTED,
 };
 
+macro_rules! guest_access {
+    ($core:expr, $paged:expr, $method:ident($($argument:expr),* $(,)?)) => {{
+        if $paged {
+            let cpl = $core.context.cpl();
+            let mut memory = crate::x86::paging::access::Memory::new(
+                &mut $core.image, $core.paging.as_ref().expect("paged helper profile"),
+                cpl, &mut $core.paging_work,
+            );
+            crate::x86::access::GuestMemory::$method(&mut memory, $($argument),*)
+        } else {
+            $core.image.$method($($argument),*).map_err(AccessFailure::Linear)
+        }
+    }};
+}
+
+macro_rules! guest_semantics {
+    ($core:expr,$paged:expr,$operation:path,$($argument:expr),* $(,)?) => {{
+        if $paged {
+            let cpl=$core.context.cpl();
+            let mut memory=crate::x86::paging::access::Memory::new(&mut $core.image,$core.paging.as_ref().expect("paged helper profile"),cpl,&mut $core.paging_work);
+            $operation(&mut $core.context,&mut memory,$($argument),*)
+        } else {$operation(&mut $core.context,&mut $core.image,$($argument),*)}
+    }};
+}
+
 mod context;
 mod debug;
 mod exception_delivery;
@@ -33,6 +58,7 @@ mod x87_state;
 struct Core {
     image: Image,
     paging: Option<crate::x86::paging::State>,
+    paging_work: crate::x86::paging::access::AccessState,
     paging_failure: Option<crate::x86::paging::walk::Failure>,
     paging_system: Option<crate::x86::protection::SystemPagingFault>,
     state: Box<UnsafeCell<RunState>>,
@@ -111,6 +137,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
         bridge.core = Some(Core {
             image,
             paging: None,
+            paging_work: Default::default(),
             paging_failure: None,
             paging_system: None,
             state,
@@ -146,10 +173,12 @@ pub extern "C" fn core_import_state() -> i32 {
         let old_end = event_end + size_of::<RawInterruptState>();
         let source_end = old_end + size_of::<super::layout::debug::DebugSource>();
         let new_end = source_end + size_of::<super::layout::debug::Continuation>();
+        let paging_end = new_end + size_of::<super::layout::paging::RawPagingSource>();
         if bridge.input.len() != SCALAR_STATE_SIZE
             && bridge.input.len() != event_end
             && bridge.input.len() != old_end
             && bridge.input.len() != new_end
+            && bridge.input.len() != paging_end
         {
             return bridge.error("state input length differs");
         }
@@ -191,7 +220,7 @@ pub extern "C" fn core_import_state() -> i32 {
             Ok(state) => state,
             Err(message) => return bridge.error(message),
         };
-        let (source, continuation) = if bridge.input.len() == new_end {
+        let (source, continuation) = if bridge.input.len() >= new_end {
             let source = match super::layout::debug::DebugSource::from_bytes(
                 &bridge.input[old_end..source_end],
             ) {
@@ -219,6 +248,24 @@ pub extern "C" fn core_import_state() -> i32 {
             pending.debug = source.decode().unwrap();
         } else if source != super::layout::debug::DebugSource::default() {
             return bridge.error("debug source requires pending exception");
+        }
+        let paging_source = if bridge.input.len() == paging_end {
+            match super::layout::paging::RawPagingSource::from_bytes(
+                &bridge.input[new_end..paging_end],
+            ) {
+                Ok(source) => source,
+                Err(message) => return bridge.error(message),
+            }
+        } else {
+            super::layout::paging::RawPagingSource::default()
+        };
+        if let Err(message) = paging_source.attach(&mut decoded) {
+            return bridge.error(message);
+        }
+        if matches!(decoded, crate::x86::exception::EventState::Pending(event) if event.vector==14)
+            && bridge.core.as_ref().unwrap().paging.is_none()
+        {
+            return bridge.error("page fault source requires paged execution");
         }
         if let Err(message) = decoded.validate(
             state.rip,
@@ -308,20 +355,25 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
         if debug != 0 {
             return debug;
         }
-        let decoded = decode::decode_with_context(pc, &core.context, |offset| {
-            core.context
-                .fetch(&core.image, offset)
-                .map_err(|failure| match failure {
-                    AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
-                    AccessFailure::Segment(fault) => DecodeError::Segment(fault),
-                    AccessFailure::Paging(fault) => DecodeError::Paging(fault),
-                })
-        });
+        let decoded = if core.paging.is_some() {
+            core.paged_decode(pc)
+        } else {
+            decode::decode_with_context(pc, &core.context, |offset| {
+                core.context
+                    .fetch(&core.image, offset)
+                    .map_err(|failure| match failure {
+                        AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
+                        AccessFailure::Segment(fault) => DecodeError::Segment(fault),
+                        AccessFailure::Paging(fault) => DecodeError::Paging(fault),
+                    })
+            })
+        };
         core.decode_fault = decoded
             .as_ref()
             .err()
             .and_then(|error| error.architectural_fault());
         match decoded {
+            Err(DecodeError::PagingRestart) => 26,
             Err(DecodeError::Paging(failure)) => core.paging_failure(failure),
             Ok(_) => 0,
             Err(DecodeError::Segment(fault)) => {
@@ -355,9 +407,12 @@ pub extern "C" fn core_compile(
         let core = bridge.core.as_mut().unwrap();
         let limits = Limits { max_instructions, max_source_bytes, max_artifact_bytes };
         let observed = core.boundary_observed();
-        match dbt::compile_with_context_observed(&core.image, &core.context, pc, limits, observed) {
+        match dbt::compile_with_paging(&core.image, &core.context, core.paging.as_ref(), pc, limits, observed) {
             Ok(artifact) => {
-                let owner = match core.image.register_source(artifact.source_ranges.iter().map(|range| (range.start, range.length))) {
+                let owner = match core.image.register_dependencies(
+                    artifact.source_ranges.iter().map(|range| (range.start, range.length)),
+                    artifact.read_dependencies.iter().map(|range| (range.start, range.length)),
+                ) {
                     Ok(owner) => owner,
                     Err(_) => return RESOURCE,
                 };
@@ -390,19 +445,19 @@ pub extern "C" fn core_compile(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_load(address: u64, width: u32) -> u64 {
-    core_load_impl::<false>(address, width)
+    core_load_impl::<false, false>(address, width)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_load_observed(address: u64, width: u32) -> u64 {
-    core_load_impl::<true>(address, width)
+    core_load_impl::<true, false>(address, width)
 }
 
-fn core_load_impl<const OBSERVED: bool>(address: u64, width: u32) -> u64 {
+fn core_load_impl<const OBSERVED: bool, const PAGED: bool>(address: u64, width: u32) -> u64 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
-        match core.image.read(address, width) {
+        match guest_access!(core, PAGED, read(address, width)) {
             Ok(value) => {
                 if OBSERVED {
                     core.debug_operand(address, width, Access::Read);
@@ -410,7 +465,7 @@ fn core_load_impl<const OBSERVED: bool>(address: u64, width: u32) -> u64 {
                 value
             }
             Err(fault) => {
-                core.fault = Some(fault);
+                core.access_failure(fault);
                 unsafe {
                     (*core.state.get()).fault_segment = Segment::Ds as u32;
                 }
@@ -422,19 +477,22 @@ fn core_load_impl<const OBSERVED: bool>(address: u64, width: u32) -> u64 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_load_for_write(address: u64, width: u32) -> u64 {
-    core_load_for_write_impl::<false>(address, width)
+    core_load_for_write_impl::<false, false>(address, width)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_load_for_write_observed(address: u64, width: u32) -> u64 {
-    core_load_for_write_impl::<true>(address, width)
+    core_load_for_write_impl::<true, false>(address, width)
 }
 
-fn core_load_for_write_impl<const OBSERVED: bool>(address: u64, width: u32) -> u64 {
+fn core_load_for_write_impl<const OBSERVED: bool, const PAGED: bool>(
+    address: u64,
+    width: u32,
+) -> u64 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
-        match core.image.read_for_write(address, width) {
+        match guest_access!(core, PAGED, read_for_write(address, width)) {
             Ok(value) => {
                 if OBSERVED {
                     core.debug_operand(address, width, Access::Read);
@@ -442,7 +500,7 @@ fn core_load_for_write_impl<const OBSERVED: bool>(address: u64, width: u32) -> u
                 value
             }
             Err(fault) => {
-                core.fault = Some(fault);
+                core.access_failure(fault);
                 unsafe {
                     (*core.state.get()).fault_segment = Segment::Ds as u32;
                 }
@@ -454,19 +512,23 @@ fn core_load_for_write_impl<const OBSERVED: bool>(address: u64, width: u32) -> u
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_store(address: u64, width: u32, value: u64) -> i32 {
-    core_store_impl::<false>(address, width, value)
+    core_store_impl::<false, false>(address, width, value)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_store_observed(address: u64, width: u32, value: u64) -> i32 {
-    core_store_impl::<true>(address, width, value)
+    core_store_impl::<true, false>(address, width, value)
 }
 
-fn core_store_impl<const OBSERVED: bool>(address: u64, width: u32, value: u64) -> i32 {
+fn core_store_impl<const OBSERVED: bool, const PAGED: bool>(
+    address: u64,
+    width: u32,
+    value: u64,
+) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.fault = None;
-        match core.image.write(address, width, value) {
+        match guest_access!(core, PAGED, write(address, width, value)) {
             Ok(()) => {
                 if OBSERVED {
                     core.debug_operand(address, width, Access::Write);
@@ -474,7 +536,7 @@ fn core_store_impl<const OBSERVED: bool>(address: u64, width: u32, value: u64) -
                 if core.image.active_changed() { 2 } else { 1 }
             }
             Err(fault) => {
-                core.fault = Some(fault);
+                core.access_failure(fault);
                 unsafe {
                     (*core.state.get()).fault_segment = Segment::Ds as u32;
                 }
@@ -580,13 +642,12 @@ pub extern "C" fn core_fault_info(reason: i32) {
 #[unsafe(no_mangle)]
 pub extern "C" fn core_read_memory(address: u64, length: u32) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
-        match bridge
-            .core
-            .as_ref()
-            .unwrap()
-            .image
-            .read_bytes(address, length)
-        {
+        let core = bridge.core.as_ref().unwrap();
+        match if core.paging.is_some() {
+            core.image.physical_read_bytes(address, length)
+        } else {
+            core.image.read_bytes(address, length)
+        } {
             Ok(bytes) => {
                 bridge.output = bytes;
                 0
@@ -605,7 +666,12 @@ pub extern "C" fn core_write_memory(address: u64) -> i32 {
         let Bridge {
             core, input, info, ..
         } = bridge;
-        match core.as_mut().unwrap().image.write_bytes(address, input) {
+        let core = core.as_mut().unwrap();
+        match if core.paging.is_some() {
+            core.image.physical_write_bytes(address, input)
+        } else {
+            core.image.write_bytes(address, input)
+        } {
             Ok(()) => 0,
             Err(fault) => {
                 *info = serde_json::to_vec(&fault_json(&fault)).unwrap();
@@ -638,3 +704,33 @@ pub extern "C" fn core_dispose() {
 
 #[cfg(test)]
 mod tests;
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_load(address: u64, width: u32) -> u64 {
+    core_load_impl::<false, true>(address, width)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_load_observed(address: u64, width: u32) -> u64 {
+    core_load_impl::<true, true>(address, width)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_load_for_write(address: u64, width: u32) -> u64 {
+    core_load_for_write_impl::<false, true>(address, width)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_load_for_write_observed(address: u64, width: u32) -> u64 {
+    core_load_for_write_impl::<true, true>(address, width)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_store(address: u64, width: u32, value: u64) -> i32 {
+    core_store_impl::<false, true>(address, width, value)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_store_observed(address: u64, width: u32, value: u64) -> i32 {
+    core_store_impl::<true, true>(address, width, value)
+}

@@ -11,7 +11,7 @@ pub extern "C" fn core_software_event(
     input_flags: u64,
     next_pc: u64,
 ) -> i32 {
-    core_software_event_impl::<false>(operation, input_sp, input_flags, next_pc)
+    core_software_event_impl::<false, false>(operation, input_sp, input_flags, next_pc)
 }
 
 #[unsafe(no_mangle)]
@@ -21,10 +21,10 @@ pub extern "C" fn core_software_event_observed(
     input_flags: u64,
     next_pc: u64,
 ) -> i32 {
-    core_software_event_impl::<true>(operation, input_sp, input_flags, next_pc)
+    core_software_event_impl::<true, false>(operation, input_sp, input_flags, next_pc)
 }
 
-fn core_software_event_impl<const OBSERVED: bool>(
+fn core_software_event_impl<const OBSERVED: bool, const PAGED: bool>(
     operation: u32,
     input_sp: u64,
     input_flags: u64,
@@ -58,9 +58,10 @@ fn core_software_event_impl<const OBSERVED: bool>(
             (*core.state.get()).fault_segment = Segment::Cs as u32;
         }
         let before = OBSERVED.then(|| core.context.clone());
-        let outcome = match event::execute(
-            &mut core.context,
-            &mut core.image,
+        let outcome = match guest_semantics!(
+            core,
+            PAGED,
+            event::execute,
             operation,
             EventInputs {
                 flags: input_flags,
@@ -78,7 +79,7 @@ fn core_software_event_impl<const OBSERVED: bool>(
                 return if core.segment_fault.is_some() {
                     SEGMENT
                 } else {
-                    DATA
+                    core.memory_failure_reason()
                 };
             }
             Err(EventFailure::StackLimit {
@@ -124,4 +125,24 @@ fn core_software_event_impl<const OBSERVED: bool>(
         }
         0
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_software_event(
+    operation: u32,
+    input_sp: u64,
+    input_flags: u64,
+    next_pc: u64,
+) -> i32 {
+    core_software_event_impl::<false, true>(operation, input_sp, input_flags, next_pc)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_software_event_observed(
+    operation: u32,
+    input_sp: u64,
+    input_flags: u64,
+    next_pc: u64,
+) -> i32 {
+    core_software_event_impl::<true, true>(operation, input_sp, input_flags, next_pc)
 }

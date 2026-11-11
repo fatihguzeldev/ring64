@@ -21,6 +21,7 @@ pub struct Artifact {
     pub block_count: usize,
     pub source_bytes: usize,
     pub source_ranges: Vec<SourceRange>,
+    pub read_dependencies: Vec<SourceRange>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,8 +55,19 @@ pub fn compile_with_context_observed(
     limits: Limits,
     observed: bool,
 ) -> Result<Artifact, CompileError> {
-    let unit = discovery::discover_with_context(image, context, entry, limits)?;
-    let bytes = wasm::emit_observed(&unit, observed);
+    compile_with_paging(image, context, None, entry, limits, observed)
+}
+
+pub fn compile_with_paging(
+    image: &Image,
+    context: &ExecutionContext,
+    paging: Option<&crate::x86::paging::State>,
+    entry: u64,
+    limits: Limits,
+    observed: bool,
+) -> Result<Artifact, CompileError> {
+    let unit = discovery::discover_with_profile(image, context, paging, entry, limits)?;
+    let bytes = wasm::emit_profile(&unit, observed, paging.is_some());
     if bytes.len() > limits.max_artifact_bytes as usize {
         return Err(CompileError::Resource);
     }
@@ -69,6 +81,7 @@ pub fn compile_with_context_observed(
         block_count: unit.block_count,
         source_bytes: unit.source_bytes,
         source_ranges: unit.source_ranges,
+        read_dependencies: unit.read_dependencies,
         bytes,
     })
 }

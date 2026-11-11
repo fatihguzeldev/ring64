@@ -4,15 +4,19 @@ use crate::x86::numeric_images::{self, ImageOp};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_numeric_image(operation: u32, offset: u64, segment: u32) -> i32 {
-    core_numeric_image_impl::<false>(operation, offset, segment)
+    core_numeric_image_impl::<false, false>(operation, offset, segment)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_numeric_image_observed(operation: u32, offset: u64, segment: u32) -> i32 {
-    core_numeric_image_impl::<true>(operation, offset, segment)
+    core_numeric_image_impl::<true, false>(operation, offset, segment)
 }
 
-fn core_numeric_image_impl<const OBSERVED: bool>(operation: u32, offset: u64, segment: u32) -> i32 {
+fn core_numeric_image_impl<const OBSERVED: bool, const PAGED: bool>(
+    operation: u32,
+    offset: u64,
+    segment: u32,
+) -> i32 {
     let Some(operation) = ImageOp::try_decode(operation) else {
         return -1;
     };
@@ -68,12 +72,13 @@ fn core_numeric_image_impl<const OBSERVED: bool>(operation: u32, offset: u64, se
                 let state = &*core.state.get();
                 numeric_images::save(operation, &before, &state.xmm, state.mxcsr)
             };
-            if let Err(fault) =
-                core.image
-                    .write_fields(address, width, operation.spans(), &saved.bytes)
-            {
-                core.fault = Some(fault);
-                return DATA;
+            if let Err(fault) = guest_access!(
+                core,
+                PAGED,
+                write_fields(address, width, operation.spans(), &saved.bytes)
+            ) {
+                core.access_failure(fault);
+                return core.memory_failure_reason();
             }
             unsafe {
                 (*core.state.get()).x87 = saved.x87;
@@ -86,12 +91,13 @@ fn core_numeric_image_impl<const OBSERVED: bool>(operation: u32, offset: u64, se
             if core.image.active_changed() { 2 } else { 0 }
         } else {
             let mut bytes = [0; 512];
-            if let Err(fault) =
-                core.image
-                    .read_fields(address, width, operation.spans(), &mut bytes)
-            {
-                core.fault = Some(fault);
-                return DATA;
+            if let Err(fault) = guest_access!(
+                core,
+                PAGED,
+                read_fields(address, width, operation.spans(), &mut bytes)
+            ) {
+                core.access_failure(fault);
+                return core.memory_failure_reason();
             }
             let restored = unsafe {
                 let state = &*core.state.get();
@@ -119,4 +125,18 @@ fn core_numeric_image_impl<const OBSERVED: bool>(operation: u32, offset: u64, se
             }
         }
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_numeric_image(operation: u32, offset: u64, segment: u32) -> i32 {
+    core_numeric_image_impl::<false, true>(operation, offset, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_numeric_image_observed(
+    operation: u32,
+    offset: u64,
+    segment: u32,
+) -> i32 {
+    core_numeric_image_impl::<true, true>(operation, offset, segment)
 }

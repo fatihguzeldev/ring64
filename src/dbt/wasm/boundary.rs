@@ -77,6 +77,9 @@ impl Emitter {
     }
 
     pub(super) fn profile_guard(&mut self, exit_depth: u32) {
+        if self.paged {
+            return;
+        }
         let observed = i32::from(self.observed);
         self.op(Op::LocalGet(SYSTEM))
             .op(Op::I64Const(0x10100))

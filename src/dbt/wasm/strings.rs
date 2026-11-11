@@ -74,7 +74,13 @@ impl Emitter {
         }
         self.exit(REPEAT_BUDGET, exit_depth + 3);
         self.op(Op::End);
-        if self.stores {
+        if self.paged {
+            self.op(Op::LocalGet(self.boundary_result.unwrap()))
+                .op(Op::I32Eqz)
+                .op(Op::If(BlockType::Empty));
+            self.exit(DISPATCH, exit_depth + 3);
+            self.op(Op::End);
+        } else if self.stores {
             // An unfinished code-writing repeat must refetch its current form.
             self.op(Op::LocalGet(STORE_STATUS))
                 .op(Op::I32Const(2))

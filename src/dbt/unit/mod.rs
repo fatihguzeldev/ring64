@@ -7,4 +7,5 @@ pub(crate) struct Unit {
     pub block_count: usize,
     pub source_bytes: usize,
     pub source_ranges: Vec<SourceRange>,
+    pub read_dependencies: Vec<SourceRange>,
 }

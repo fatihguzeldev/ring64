@@ -42,6 +42,9 @@ fn valid_flags(flags: u64) -> bool {
 
 impl Core {
     pub(super) fn boundary_observed(&self) -> bool {
+        if self.paging.is_some() {
+            return true;
+        }
         let state = unsafe { &*self.state.get() };
         state.flags & (flags::TF | flags::RF) != 0
             || state.interruptibility != 0

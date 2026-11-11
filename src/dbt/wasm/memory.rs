@@ -75,6 +75,9 @@ impl Emitter {
     }
 
     fn memory_failure(&mut self, exit_depth: u32) {
+        if self.paged {
+            self.record_fault_segment(self.segment);
+        }
         if self.restore_string_flags {
             self.restore_repeat_flags();
         }

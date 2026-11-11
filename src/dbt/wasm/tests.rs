@@ -43,6 +43,7 @@ fn unit(instructions: Vec<Instruction>) -> Unit {
         context: crate::x86::context::ExecutionContext::default(),
         source_bytes: instructions.len(),
         source_ranges: vec![],
+        read_dependencies: vec![],
         block_count: 1,
         instructions,
     }

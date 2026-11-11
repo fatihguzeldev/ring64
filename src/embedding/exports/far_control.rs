@@ -12,7 +12,7 @@ pub extern "C" fn core_far_control(
     next_pc: u64,
     segment: u32,
 ) -> i32 {
-    core_far_control_impl::<false>(descriptor, offset, selector, input_sp, next_pc, segment)
+    core_far_control_impl::<false, false>(descriptor, offset, selector, input_sp, next_pc, segment)
 }
 
 #[unsafe(no_mangle)]
@@ -24,10 +24,10 @@ pub extern "C" fn core_far_control_observed(
     next_pc: u64,
     segment: u32,
 ) -> i32 {
-    core_far_control_impl::<true>(descriptor, offset, selector, input_sp, next_pc, segment)
+    core_far_control_impl::<true, false>(descriptor, offset, selector, input_sp, next_pc, segment)
 }
 
-fn core_far_control_impl<const OBSERVED: bool>(
+fn core_far_control_impl<const OBSERVED: bool, const PAGED: bool>(
     descriptor: u32,
     offset: u64,
     selector: u32,
@@ -69,9 +69,10 @@ fn core_far_control_impl<const OBSERVED: bool>(
             (*core.state.get()).fault_segment = segment as u32;
         }
         let before = OBSERVED.then(|| core.context.clone());
-        let outcome = match far::execute(
-            &mut core.context,
-            &mut core.image,
+        let outcome = match guest_semantics!(
+            core,
+            PAGED,
+            far::execute,
             descriptor,
             FarOperands {
                 offset,
@@ -91,7 +92,7 @@ fn core_far_control_impl<const OBSERVED: bool>(
                 return if core.segment_fault.is_some() {
                     SEGMENT
                 } else {
-                    DATA
+                    core.memory_failure_reason()
                 };
             }
             Err(FarFailure::Protection(fault)) => {
@@ -126,4 +127,28 @@ fn core_far_control_impl<const OBSERVED: bool>(
         }
         0
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_far_control(
+    descriptor: u32,
+    offset: u64,
+    selector: u32,
+    input_sp: u64,
+    next_pc: u64,
+    segment: u32,
+) -> i32 {
+    core_far_control_impl::<false, true>(descriptor, offset, selector, input_sp, next_pc, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_far_control_observed(
+    descriptor: u32,
+    offset: u64,
+    selector: u32,
+    input_sp: u64,
+    next_pc: u64,
+    segment: u32,
+) -> i32 {
+    core_far_control_impl::<true, true>(descriptor, offset, selector, input_sp, next_pc, segment)
 }

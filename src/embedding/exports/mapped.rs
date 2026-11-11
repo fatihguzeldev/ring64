@@ -72,7 +72,10 @@ fn mappings(value: &Value, capacity: usize) -> Result<Vec<MappingInput>, MemoryE
     Ok(mappings)
 }
 
-fn initial_image(input: &[u8], metadata_len: u32) -> Result<Image, MemoryError> {
+fn initial_image(
+    input: &[u8],
+    metadata_len: u32,
+) -> Result<(Image, Option<crate::x86::paging::State>), MemoryError> {
     let metadata_len = metadata_len as usize;
     let config = json(input.get(..metadata_len).ok_or_else(invalid)?)?;
     let caps = &config["memoryLimits"];
@@ -109,19 +112,35 @@ fn initial_image(input: &[u8], metadata_len: u32) -> Result<Image, MemoryError> 
         backings.push((id.into(), copy(&input[cursor..cursor + length])?));
         cursor += length;
     }
-    Image::mapped(backings, maps, limits)
+    match config.get("memoryModel") {
+        None | Some(Value::String(_))
+            if config.get("memoryModel").is_none_or(|v| v == "linear") =>
+        {
+            if config.get("paging").is_some() {
+                return Err(invalid());
+            }
+            Image::mapped(backings, maps, limits).map(|image| (image, None))
+        }
+        Some(Value::String(model)) if model == "ia32e-paged" => {
+            let state =
+                super::paging::parse_bank(&config["paging"]).map_err(MemoryError::Invalid)?;
+            Image::physical_mapped(backings, maps, limits).map(|image| (image, Some(state)))
+        }
+        _ => Err(invalid()),
+    }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
-        let image = match initial_image(&bridge.input, metadata_len) {
+        let (image, paging) = match initial_image(&bridge.input, metadata_len) {
             Ok(image) => image,
             Err(error) => return memory_error(bridge, error),
         };
         bridge.core = Some(Core {
             image,
-            paging: None,
+            paging,
+            paging_work: Default::default(),
             paging_failure: None,
             paging_system: None,
             state: Box::new(UnsafeCell::new(RunState {

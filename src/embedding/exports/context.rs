@@ -68,6 +68,14 @@ pub extern "C" fn core_set_context() -> i32 {
             Err(message) => return bridge.error(message),
         };
         let core = bridge.core.as_mut().unwrap();
+        if core.paging.is_some()
+            && !matches!(
+                context.mode(),
+                crate::x86::context::Mode::Long64 | crate::x86::context::Mode::Compatibility
+            )
+        {
+            return bridge.error("paged execution requires an IA32e context");
+        }
         unsafe {
             (*core.state.get()).interruptibility = 0;
             (*core.state.get()).set_event(crate::x86::exception::EventState::Ready);
@@ -95,15 +103,19 @@ pub extern "C" fn core_set_context() -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_segmented_load(offset: u64, width: u32, segment: u32) -> u64 {
-    core_segmented_load_impl::<false>(offset, width, segment)
+    core_segmented_load_impl::<false, false>(offset, width, segment)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_segmented_load_observed(offset: u64, width: u32, segment: u32) -> u64 {
-    core_segmented_load_impl::<true>(offset, width, segment)
+    core_segmented_load_impl::<true, false>(offset, width, segment)
 }
 
-fn core_segmented_load_impl<const OBSERVED: bool>(offset: u64, width: u32, segment: u32) -> u64 {
+fn core_segmented_load_impl<const OBSERVED: bool, const PAGED: bool>(
+    offset: u64,
+    width: u32,
+    segment: u32,
+) -> u64 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         let Some(address) = core.segment_address(
@@ -115,7 +127,7 @@ fn core_segmented_load_impl<const OBSERVED: bool>(offset: u64, width: u32, segme
         ) else {
             return 0;
         };
-        match core.image.read(address, width) {
+        match guest_access!(core, PAGED, read(address, width)) {
             Ok(value) => {
                 if OBSERVED {
                     core.debug_operand(address, width, Access::Read);
@@ -123,7 +135,7 @@ fn core_segmented_load_impl<const OBSERVED: bool>(offset: u64, width: u32, segme
                 value
             }
             Err(fault) => {
-                core.fault = Some(fault);
+                core.access_failure(fault);
                 0
             }
         }
@@ -132,7 +144,7 @@ fn core_segmented_load_impl<const OBSERVED: bool>(offset: u64, width: u32, segme
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_segmented_load_for_write(offset: u64, width: u32, segment: u32) -> u64 {
-    core_segmented_load_for_write_impl::<false>(offset, width, segment)
+    core_segmented_load_for_write_impl::<false, false>(offset, width, segment)
 }
 
 #[unsafe(no_mangle)]
@@ -141,10 +153,10 @@ pub extern "C" fn core_segmented_load_for_write_observed(
     width: u32,
     segment: u32,
 ) -> u64 {
-    core_segmented_load_for_write_impl::<true>(offset, width, segment)
+    core_segmented_load_for_write_impl::<true, false>(offset, width, segment)
 }
 
-fn core_segmented_load_for_write_impl<const OBSERVED: bool>(
+fn core_segmented_load_for_write_impl<const OBSERVED: bool, const PAGED: bool>(
     offset: u64,
     width: u32,
     segment: u32,
@@ -160,7 +172,7 @@ fn core_segmented_load_for_write_impl<const OBSERVED: bool>(
         ) else {
             return 0;
         };
-        match core.image.read_for_write(address, width) {
+        match guest_access!(core, PAGED, read_for_write(address, width)) {
             Ok(value) => {
                 if OBSERVED {
                     core.debug_operand(address, width, Access::Read);
@@ -168,7 +180,7 @@ fn core_segmented_load_for_write_impl<const OBSERVED: bool>(
                 value
             }
             Err(fault) => {
-                core.fault = Some(fault);
+                core.access_failure(fault);
                 0
             }
         }
@@ -177,7 +189,7 @@ fn core_segmented_load_for_write_impl<const OBSERVED: bool>(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_segmented_store(offset: u64, width: u32, value: u64, segment: u32) -> i32 {
-    core_segmented_store_impl::<false>(offset, width, value, segment)
+    core_segmented_store_impl::<false, false>(offset, width, value, segment)
 }
 
 #[unsafe(no_mangle)]
@@ -187,10 +199,10 @@ pub extern "C" fn core_segmented_store_observed(
     value: u64,
     segment: u32,
 ) -> i32 {
-    core_segmented_store_impl::<true>(offset, width, value, segment)
+    core_segmented_store_impl::<true, false>(offset, width, value, segment)
 }
 
-fn core_segmented_store_impl<const OBSERVED: bool>(
+fn core_segmented_store_impl<const OBSERVED: bool, const PAGED: bool>(
     offset: u64,
     width: u32,
     value: u64,
@@ -207,7 +219,7 @@ fn core_segmented_store_impl<const OBSERVED: bool>(
         ) else {
             return 0;
         };
-        match core.image.write(address, width, value) {
+        match guest_access!(core, PAGED, write(address, width, value)) {
             Ok(()) => {
                 if OBSERVED {
                     core.debug_operand(address, width, Access::Write);
@@ -215,7 +227,7 @@ fn core_segmented_store_impl<const OBSERVED: bool>(
                 if core.image.active_changed() { 2 } else { 1 }
             }
             Err(fault) => {
-                core.fault = Some(fault);
+                core.access_failure(fault);
                 0
             }
         }
@@ -230,7 +242,7 @@ pub extern "C" fn core_access_reason() -> i32 {
         } else if bridge.core.as_ref().unwrap().segment_fault.is_some() {
             SEGMENT
         } else {
-            bridge.core.as_ref().unwrap().memory_failure_reason()
+            DATA
         }
     })
 }
@@ -252,4 +264,52 @@ pub extern "C" fn core_target_check(target: u64) -> i32 {
             }
         }
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_segmented_load(offset: u64, width: u32, segment: u32) -> u64 {
+    core_segmented_load_impl::<false, true>(offset, width, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_segmented_load_observed(offset: u64, width: u32, segment: u32) -> u64 {
+    core_segmented_load_impl::<true, true>(offset, width, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_segmented_load_for_write(
+    offset: u64,
+    width: u32,
+    segment: u32,
+) -> u64 {
+    core_segmented_load_for_write_impl::<false, true>(offset, width, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_segmented_load_for_write_observed(
+    offset: u64,
+    width: u32,
+    segment: u32,
+) -> u64 {
+    core_segmented_load_for_write_impl::<true, true>(offset, width, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_segmented_store(
+    offset: u64,
+    width: u32,
+    value: u64,
+    segment: u32,
+) -> i32 {
+    core_segmented_store_impl::<false, true>(offset, width, value, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_segmented_store_observed(
+    offset: u64,
+    width: u32,
+    value: u64,
+    segment: u32,
+) -> i32 {
+    core_segmented_store_impl::<true, true>(offset, width, value, segment)
 }

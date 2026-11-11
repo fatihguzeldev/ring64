@@ -31,7 +31,7 @@ pub(super) fn system_fault_json(fault: &SystemMemoryFault) -> serde_json::Value 
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_protection(descriptor: u32, offset: u64, input: u64, segment: u32) -> i32 {
-    core_protection_impl::<false>(descriptor, offset, input, segment)
+    core_protection_impl::<false, false>(descriptor, offset, input, segment)
 }
 
 #[unsafe(no_mangle)]
@@ -41,10 +41,10 @@ pub extern "C" fn core_protection_observed(
     input: u64,
     segment: u32,
 ) -> i32 {
-    core_protection_impl::<true>(descriptor, offset, input, segment)
+    core_protection_impl::<true, false>(descriptor, offset, input, segment)
 }
 
-fn core_protection_impl<const OBSERVED: bool>(
+fn core_protection_impl<const OBSERVED: bool, const PAGED: bool>(
     descriptor: u32,
     offset: u64,
     input: u64,
@@ -74,9 +74,10 @@ fn core_protection_impl<const OBSERVED: bool>(
             (*core.state.get()).fault_segment = segment as u32;
         }
         let before = OBSERVED.then(|| core.context.clone());
-        let outcome = match semantics::execute(
-            &mut core.context,
-            &mut core.image,
+        let outcome = match guest_semantics!(
+            core,
+            PAGED,
+            semantics::execute,
             descriptor,
             offset,
             input,
@@ -89,7 +90,7 @@ fn core_protection_impl<const OBSERVED: bool>(
                 return if core.segment_fault.is_some() {
                     SEGMENT
                 } else {
-                    DATA
+                    core.memory_failure_reason()
                 };
             }
             Err(Failure::Protection(fault)) => {
@@ -126,4 +127,24 @@ fn core_protection_impl<const OBSERVED: bool>(
             0
         }
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_protection(
+    descriptor: u32,
+    offset: u64,
+    input: u64,
+    segment: u32,
+) -> i32 {
+    core_protection_impl::<false, true>(descriptor, offset, input, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_protection_observed(
+    descriptor: u32,
+    offset: u64,
+    input: u64,
+    segment: u32,
+) -> i32 {
+    core_protection_impl::<true, true>(descriptor, offset, input, segment)
 }

@@ -84,7 +84,7 @@ pub extern "C" fn core_import_xmm() -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_vector_load(offset: u64, width: u32, segment: u32, alignment: u32) -> u32 {
-    core_vector_load_impl::<false>(offset, width, segment, alignment)
+    core_vector_load_impl::<false, false>(offset, width, segment, alignment)
 }
 
 #[unsafe(no_mangle)]
@@ -94,10 +94,10 @@ pub extern "C" fn core_vector_load_observed(
     segment: u32,
     alignment: u32,
 ) -> u32 {
-    core_vector_load_impl::<true>(offset, width, segment, alignment)
+    core_vector_load_impl::<true, false>(offset, width, segment, alignment)
 }
 
-fn core_vector_load_impl<const OBSERVED: bool>(
+fn core_vector_load_impl<const OBSERVED: bool, const PAGED: bool>(
     offset: u64,
     width: u32,
     segment: u32,
@@ -109,7 +109,7 @@ fn core_vector_load_impl<const OBSERVED: bool>(
         else {
             return 0;
         };
-        match core.image.read_vector(address, width) {
+        match guest_access!(core, PAGED, read_vector(address, width)) {
             Ok(bytes) => unsafe {
                 if OBSERVED {
                     core.debug_operand(address, width, Access::Read);
@@ -119,7 +119,7 @@ fn core_vector_load_impl<const OBSERVED: bool>(
                 state.vector_scratch.as_ptr() as u32
             },
             Err(fault) => {
-                core.fault = Some(fault);
+                core.access_failure(fault);
                 0
             }
         }
@@ -134,7 +134,7 @@ pub extern "C" fn core_vector_store(
     alignment: u32,
     value_ptr: u32,
 ) -> i32 {
-    core_vector_store_impl::<false>(offset, width, segment, alignment, value_ptr)
+    core_vector_store_impl::<false, false>(offset, width, segment, alignment, value_ptr)
 }
 
 #[unsafe(no_mangle)]
@@ -145,10 +145,10 @@ pub extern "C" fn core_vector_store_observed(
     alignment: u32,
     value_ptr: u32,
 ) -> i32 {
-    core_vector_store_impl::<true>(offset, width, segment, alignment, value_ptr)
+    core_vector_store_impl::<true, false>(offset, width, segment, alignment, value_ptr)
 }
 
-fn core_vector_store_impl<const OBSERVED: bool>(
+fn core_vector_store_impl<const OBSERVED: bool, const PAGED: bool>(
     offset: u64,
     width: u32,
     segment: u32,
@@ -170,7 +170,7 @@ fn core_vector_store_impl<const OBSERVED: bool>(
         else {
             return 0;
         };
-        match core.image.write_bytes(address, &bytes[..width as usize]) {
+        match guest_access!(core, PAGED, write_bytes(address, &bytes[..width as usize])) {
             Ok(()) => {
                 if OBSERVED {
                     core.debug_operand(address, width, Access::Write);
@@ -178,9 +178,51 @@ fn core_vector_store_impl<const OBSERVED: bool>(
                 if core.image.active_changed() { 2 } else { 1 }
             }
             Err(fault) => {
-                core.fault = Some(fault);
+                core.access_failure(fault);
                 0
             }
         }
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_vector_load(
+    offset: u64,
+    width: u32,
+    segment: u32,
+    alignment: u32,
+) -> u32 {
+    core_vector_load_impl::<false, true>(offset, width, segment, alignment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_vector_load_observed(
+    offset: u64,
+    width: u32,
+    segment: u32,
+    alignment: u32,
+) -> u32 {
+    core_vector_load_impl::<true, true>(offset, width, segment, alignment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_vector_store(
+    offset: u64,
+    width: u32,
+    segment: u32,
+    alignment: u32,
+    value_ptr: u32,
+) -> i32 {
+    core_vector_store_impl::<false, true>(offset, width, segment, alignment, value_ptr)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_vector_store_observed(
+    offset: u64,
+    width: u32,
+    segment: u32,
+    alignment: u32,
+    value_ptr: u32,
+) -> i32 {
+    core_vector_store_impl::<true, true>(offset, width, segment, alignment, value_ptr)
 }

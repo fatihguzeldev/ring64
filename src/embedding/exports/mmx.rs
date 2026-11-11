@@ -5,15 +5,19 @@ use crate::x86::mmx::{self, Op};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_mmx(operation: u32, operand: u64, segment: u32) -> i32 {
-    core_mmx_impl::<false>(operation, operand, segment)
+    core_mmx_impl::<false, false>(operation, operand, segment)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_mmx_observed(operation: u32, operand: u64, segment: u32) -> i32 {
-    core_mmx_impl::<true>(operation, operand, segment)
+    core_mmx_impl::<true, false>(operation, operand, segment)
 }
 
-fn core_mmx_impl<const OBSERVED: bool>(operation: u32, operand: u64, segment: u32) -> i32 {
+fn core_mmx_impl<const OBSERVED: bool, const PAGED: bool>(
+    operation: u32,
+    operand: u64,
+    segment: u32,
+) -> i32 {
     let Some(operation) = Op::try_decode(operation) else {
         return -1;
     };
@@ -61,17 +65,17 @@ fn core_mmx_impl<const OBSERVED: bool>(operation: u32, operand: u64, segment: u3
             };
             address = Some(linear);
             if operation.is_store() {
-                if let Err(fault) = core.image.check_write(linear, width) {
-                    core.fault = Some(fault);
-                    return DATA;
+                if let Err(fault) = guest_access!(core, PAGED, check_write(linear, width)) {
+                    core.access_failure(fault);
+                    return core.memory_failure_reason();
                 }
                 0
             } else {
-                match core.image.read_vector(linear, width) {
+                match guest_access!(core, PAGED, read_vector(linear, width)) {
                     Ok(bytes) => u128::from_le_bytes(bytes),
                     Err(fault) => {
-                        core.fault = Some(fault);
-                        return DATA;
+                        core.access_failure(fault);
+                        return core.memory_failure_reason();
                     }
                 }
             }
@@ -98,13 +102,17 @@ fn core_mmx_impl<const OBSERVED: bool>(operation: u32, operand: u64, segment: u3
             return SIMD_EXCEPTION;
         }
         if operation.is_store()
-            && let Err(fault) = core.image.write_bytes(
-                address.unwrap(),
-                &outcome.value.to_le_bytes()[..width as usize],
+            && let Err(fault) = guest_access!(
+                core,
+                PAGED,
+                write_bytes(
+                    address.unwrap(),
+                    &outcome.value.to_le_bytes()[..width as usize],
+                )
             )
         {
-            core.fault = Some(fault);
-            return DATA;
+            core.access_failure(fault);
+            return core.memory_failure_reason();
         }
         unsafe {
             let state = &mut *core.state.get();
@@ -137,4 +145,14 @@ fn core_mmx_impl<const OBSERVED: bool>(operation: u32, operand: u64, segment: u3
             0
         }
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_mmx(operation: u32, operand: u64, segment: u32) -> i32 {
+    core_mmx_impl::<false, true>(operation, operand, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_mmx_observed(operation: u32, operand: u64, segment: u32) -> i32 {
+    core_mmx_impl::<true, true>(operation, operand, segment)
 }

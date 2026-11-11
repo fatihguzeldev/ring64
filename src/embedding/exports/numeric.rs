@@ -102,15 +102,15 @@ pub extern "C" fn core_float(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_load_mxcsr(offset: u64, segment: u32) -> i32 {
-    core_load_mxcsr_impl::<false>(offset, segment)
+    core_load_mxcsr_impl::<false, false>(offset, segment)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_load_mxcsr_observed(offset: u64, segment: u32) -> i32 {
-    core_load_mxcsr_impl::<true>(offset, segment)
+    core_load_mxcsr_impl::<true, false>(offset, segment)
 }
 
-fn core_load_mxcsr_impl<const OBSERVED: bool>(offset: u64, segment: u32) -> i32 {
+fn core_load_mxcsr_impl<const OBSERVED: bool, const PAGED: bool>(offset: u64, segment: u32) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.simd_exception = None;
@@ -127,11 +127,11 @@ fn core_load_mxcsr_impl<const OBSERVED: bool>(offset: u64, segment: u32) -> i32 
                 DATA
             };
         };
-        let value = match core.image.read(address, 4) {
+        let value = match guest_access!(core, PAGED, read(address, 4)) {
             Ok(value) => value as u32,
             Err(fault) => {
-                core.fault = Some(fault);
-                return DATA;
+                core.access_failure(fault);
+                return core.memory_failure_reason();
             }
         };
         if value > 0xffff {
@@ -151,15 +151,18 @@ fn core_load_mxcsr_impl<const OBSERVED: bool>(offset: u64, segment: u32) -> i32 
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_store_mxcsr(offset: u64, segment: u32) -> i32 {
-    core_store_mxcsr_impl::<false>(offset, segment)
+    core_store_mxcsr_impl::<false, false>(offset, segment)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_store_mxcsr_observed(offset: u64, segment: u32) -> i32 {
-    core_store_mxcsr_impl::<true>(offset, segment)
+    core_store_mxcsr_impl::<true, false>(offset, segment)
 }
 
-fn core_store_mxcsr_impl<const OBSERVED: bool>(offset: u64, segment: u32) -> i32 {
+fn core_store_mxcsr_impl<const OBSERVED: bool, const PAGED: bool>(
+    offset: u64,
+    segment: u32,
+) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         let value = unsafe { (*core.state.get()).mxcsr.to_le_bytes() };
@@ -173,7 +176,7 @@ fn core_store_mxcsr_impl<const OBSERVED: bool>(offset: u64, segment: u32) -> i32
         else {
             return 0;
         };
-        match core.image.write_bytes(address, &value) {
+        match guest_access!(core, PAGED, write_bytes(address, &value)) {
             Ok(()) => {
                 if OBSERVED {
                     core.debug_operand(address, 4, Access::Write);
@@ -181,9 +184,29 @@ fn core_store_mxcsr_impl<const OBSERVED: bool>(offset: u64, segment: u32) -> i32
                 if core.image.active_changed() { 2 } else { 1 }
             }
             Err(fault) => {
-                core.fault = Some(fault);
+                core.access_failure(fault);
                 0
             }
         }
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_load_mxcsr(offset: u64, segment: u32) -> i32 {
+    core_load_mxcsr_impl::<false, true>(offset, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_load_mxcsr_observed(offset: u64, segment: u32) -> i32 {
+    core_load_mxcsr_impl::<true, true>(offset, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_store_mxcsr(offset: u64, segment: u32) -> i32 {
+    core_store_mxcsr_impl::<false, true>(offset, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_store_mxcsr_observed(offset: u64, segment: u32) -> i32 {
+    core_store_mxcsr_impl::<true, true>(offset, segment)
 }

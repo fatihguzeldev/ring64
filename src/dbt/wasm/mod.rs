@@ -57,6 +57,7 @@ const REPEAT_REMAINING: u32 = 35;
 const ENTRY_FLAGS: u32 = 36;
 
 struct Emitter {
+    paged: bool,
     body: Function,
     entries: BTreeMap<u64, u32>,
     current_index: u32,
@@ -118,7 +119,13 @@ pub(crate) fn emit(unit: &Unit) -> Vec<u8> {
     emit_observed(unit, false)
 }
 
+#[cfg(test)]
 pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
+    emit_profile(unit, observed, false)
+}
+
+pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> {
+    let observed = observed || paged;
     let vector_banks = vector::Banks::for_unit(unit);
     let has_repeat = unit
         .instructions
@@ -573,7 +580,7 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         run_index += 1;
         function
     });
-    let access_reason = segmented.then(|| {
+    let access_reason = (segmented || paged).then(|| {
         imports.import("env", "access_reason", EntityType::Function(2));
         let function = run_index;
         run_index += 1;
@@ -768,6 +775,7 @@ pub(crate) fn emit_observed(unit: &Unit, observed: bool) -> Vec<u8> {
         [next_local, next_local + 1, next_local + 2]
     });
     let mut emitter = Emitter {
+        paged,
         current_index: 0,
         entry_lookup: dynamic_targets.then_some(run_index + 1),
         multiply_high,

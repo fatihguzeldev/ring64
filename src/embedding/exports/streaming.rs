@@ -10,7 +10,7 @@ pub extern "C" fn core_masked_store(
     mask_bits: u32,
     segment: u32,
 ) -> i32 {
-    core_masked_store_impl::<false>(offset, width, data_ptr, mask_bits, segment)
+    core_masked_store_impl::<false, false>(offset, width, data_ptr, mask_bits, segment)
 }
 
 #[unsafe(no_mangle)]
@@ -21,10 +21,10 @@ pub extern "C" fn core_masked_store_observed(
     mask_bits: u32,
     segment: u32,
 ) -> i32 {
-    core_masked_store_impl::<true>(offset, width, data_ptr, mask_bits, segment)
+    core_masked_store_impl::<true, false>(offset, width, data_ptr, mask_bits, segment)
 }
 
-fn core_masked_store_impl<const OBSERVED: bool>(
+fn core_masked_store_impl<const OBSERVED: bool, const PAGED: bool>(
     offset: u64,
     width: u32,
     data_ptr: u32,
@@ -72,16 +72,19 @@ fn core_masked_store_impl<const OBSERVED: bool>(
             };
         };
         let result = if mask_bits == 0 {
-            core.image.check_write(address, width)
+            guest_access!(core, PAGED, check_write(address, width))
         } else {
             let bytes = unsafe { (*core.state.get()).vector_scratch };
             let selection = masked::select(mask_bits as u16, width);
-            core.image
-                .write_fields(address, width, selection.fields(), &bytes)
+            guest_access!(
+                core,
+                PAGED,
+                write_fields(address, width, selection.fields(), &bytes)
+            )
         };
         if let Err(fault) = result {
-            core.fault = Some(fault);
-            return DATA;
+            core.access_failure(fault);
+            return core.memory_failure_reason();
         }
         if OBSERVED {
             for index in 0..width {
@@ -103,6 +106,15 @@ fn core_masked_store_impl<const OBSERVED: bool>(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn core_clflush(offset: u64, segment: u32) -> i32 {
+    core_clflush_impl::<false>(offset, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_clflush(offset: u64, segment: u32) -> i32 {
+    core_clflush_impl::<true>(offset, segment)
+}
+
+fn core_clflush_impl<const PAGED: bool>(offset: u64, segment: u32) -> i32 {
     let Some(segment) = Segment::ALL.get(segment as usize).copied() else {
         return -1;
     };
@@ -132,12 +144,34 @@ pub extern "C" fn core_clflush(offset: u64, segment: u32) -> i32 {
                 };
             }
         };
-        match core.image.check_read(address, 1) {
+        match guest_access!(core, PAGED, check_read(address, 1)) {
             Ok(()) => 0,
             Err(fault) => {
-                core.fault = Some(fault);
-                DATA
+                core.access_failure(fault);
+                core.memory_failure_reason()
             }
         }
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_masked_store(
+    offset: u64,
+    width: u32,
+    data_ptr: u32,
+    mask_bits: u32,
+    segment: u32,
+) -> i32 {
+    core_masked_store_impl::<false, true>(offset, width, data_ptr, mask_bits, segment)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn core_paged_masked_store_observed(
+    offset: u64,
+    width: u32,
+    data_ptr: u32,
+    mask_bits: u32,
+    segment: u32,
+) -> i32 {
+    core_masked_store_impl::<true, true>(offset, width, data_ptr, mask_bits, segment)
 }

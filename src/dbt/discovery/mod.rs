@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use crate::memory::{Access, Image, canonical48};
 use crate::x86::{
     context::{AccessFailure, ExecutionContext, Segment},
-    decode::{DecodeError, decode_with_context},
+    decode::DecodeError,
     instruction::{Operand, Operation},
 };
 
@@ -14,9 +14,20 @@ pub(crate) fn discover(image: &Image, entry: u64, limits: Limits) -> Result<Unit
     discover_with_context(image, &ExecutionContext::default(), entry, limits)
 }
 
+#[cfg(test)]
 pub(crate) fn discover_with_context(
     image: &Image,
     context: &ExecutionContext,
+    entry: u64,
+    limits: Limits,
+) -> Result<Unit, CompileError> {
+    discover_with_profile(image, context, None, entry, limits)
+}
+
+pub(crate) fn discover_with_profile(
+    image: &Image,
+    context: &ExecutionContext,
+    paging: Option<&crate::x86::paging::State>,
     entry: u64,
     limits: Limits,
 ) -> Result<Unit, CompileError> {
@@ -25,7 +36,8 @@ pub(crate) fn discover_with_context(
     let mut instructions = BTreeMap::new();
     let mut source = BTreeSet::new();
     let mut linear_source = BTreeSet::new();
-    let identity_source = context.is_long64();
+    let mut read_dependencies = BTreeSet::new();
+    let identity_source = context.is_long64() && paging.is_none();
     while let Some(pc) = pending.pop_front() {
         if instructions.len() >= limits.max_instructions as usize {
             break;
@@ -34,22 +46,42 @@ pub(crate) fn discover_with_context(
             continue;
         }
         let mut fetched = Vec::new();
-        let Ok(instruction) = decode_with_context(pc, context, |offset| {
-            // Long64 CS offsets are linear; fetch already checks the full byte span.
-            if identity_source {
-                return image.fetch(offset).map_err(DecodeError::Fetch);
-            }
-            let linear = context
-                .translate(offset, 1, Segment::Cs, Access::Execute, false)
-                .map_err(|failure| match failure {
-                    AccessFailure::Segment(fault) => DecodeError::Segment(fault),
-                    AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
-                    AccessFailure::Paging(fault) => DecodeError::Paging(fault),
-                })?;
-            let byte = image.fetch(linear).map_err(DecodeError::Fetch)?;
-            fetched.push(linear);
-            Ok(byte)
-        }) else {
+        let mut table_bytes = Vec::new();
+        let Ok(instruction) =
+            crate::x86::decode::decode_with_profile(pc, context, paging.is_some(), |offset| {
+                // Long64 CS offsets are linear; fetch already checks the full byte span.
+                if identity_source {
+                    return image.fetch(offset).map_err(DecodeError::Fetch);
+                }
+                let linear = context
+                    .translate(offset, 1, Segment::Cs, Access::Execute, false)
+                    .map_err(|failure| match failure {
+                        AccessFailure::Segment(fault) => DecodeError::Segment(fault),
+                        AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
+                        AccessFailure::Paging(fault) => DecodeError::Paging(fault),
+                    })?;
+                if let Some(paging) = paging {
+                    let request = crate::x86::paging::walk::Request {
+                        linear,
+                        access: Access::Execute,
+                        user: context.cpl() == 3,
+                    };
+                    let translated = crate::x86::paging::walk::peek(image, paging, request)
+                        .map_err(DecodeError::Paging)?;
+                    let byte = image
+                        .physical_fetch(translated.physical)
+                        .map_err(DecodeError::Fetch)?;
+                    fetched.push(translated.physical);
+                    for entry in translated.entries() {
+                        table_bytes.extend(*entry..*entry + 8);
+                    }
+                    return Ok(byte);
+                }
+                let byte = image.fetch(linear).map_err(DecodeError::Fetch)?;
+                fetched.push(linear);
+                Ok(byte)
+            })
+        else {
             // A future diagnostic is a frontier, never an early guest exit.
             continue;
         };
@@ -64,6 +96,7 @@ pub(crate) fn discover_with_context(
         }
         source.extend(bytes);
         linear_source.extend(fetched);
+        read_dependencies.extend(table_bytes);
         match instruction.operation {
             Operation::Jump { target } => {
                 if !context.is_long64() || canonical48(target) {
@@ -151,7 +184,25 @@ pub(crate) fn discover_with_context(
         instructions: instructions.into_values().collect(),
         source_bytes: source.len(),
         source_ranges,
+        read_dependencies: ranges(&read_dependencies),
     })
+}
+
+fn ranges(bytes: &BTreeSet<u64>) -> Vec<SourceRange> {
+    let mut ranges: Vec<SourceRange> = Vec::new();
+    for &address in bytes {
+        if let Some(last) = ranges.last_mut()
+            && u128::from(last.start) + u128::from(last.length) == u128::from(address)
+        {
+            last.length += 1;
+        } else {
+            ranges.push(SourceRange {
+                start: address,
+                length: 1,
+            });
+        }
+    }
+    ranges
 }
 
 #[cfg(test)]

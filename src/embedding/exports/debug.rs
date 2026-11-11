@@ -171,7 +171,7 @@ impl Core {
                 .matches(address, width, access)
         };
     }
-    fn finish_debug(
+    pub(super) fn finish_debug(
         &mut self,
         pc: u64,
         resume: u64,
