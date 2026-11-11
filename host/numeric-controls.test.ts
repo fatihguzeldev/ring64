@@ -122,3 +122,20 @@ test('numeric source tail roundtrips without shifting prior transport and reject
   for (const changed of [{ offset: 727 }, { bytes: 32 }, { family: 0 }, { instructionPc: 39 }])
     assert.throws(() => validateNumericSourceLayout({ ...layout, ...changed }, 768, 728));
 });
+
+test('absent numeric sources reject every nonzero tail byte through relative views and field offsets', () => {
+  for (const sourceLayout of [layout, { ...layout, kind: 4, family: 0 }]) {
+    validateNumericSourceLayout(sourceLayout, 768, 728);
+    const bytes = new Uint8Array(784),
+      view = new DataView(bytes.buffer, 16, 768);
+    assert.equal(readNumericSource(view, sourceLayout), undefined);
+    for (let index = 0; index < sourceLayout.bytes; index++) {
+      for (const value of [1, 0x80]) {
+        view.setUint8(sourceLayout.offset + index, value);
+        assert.throws(() => readNumericSource(view, sourceLayout), `nonzero byte${index}`);
+        view.setUint8(sourceLayout.offset + index, 0);
+      }
+    }
+    assert.equal(readNumericSource(view, sourceLayout), undefined);
+  }
+});

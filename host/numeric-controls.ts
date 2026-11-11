@@ -206,8 +206,9 @@ export function readNumericSource(
   const offset = l.offset,
     kind = view.getUint32(offset + l.kind, true);
   if (!kind) {
-    if (new Uint8Array(view.buffer, view.byteOffset + offset, l.bytes).some(Boolean))
-      throw new Error('nonzero absent numeric source');
+    for (let index = 0; index < l.bytes; index += 4)
+      if (view.getUint32(offset + index, true) !== 0)
+        throw new Error('nonzero absent numeric source');
     return undefined;
   }
   const bits = view.getUint32(offset + l.controls, true),
