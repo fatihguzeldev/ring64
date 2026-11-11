@@ -1,3 +1,4 @@
+import { legacyControlScenarios } from './controls.js';
 import { createCpu } from '../../../host/index.js';
 import {
   legacyCpu,
@@ -12,6 +13,7 @@ import {
 
 export function legacyPagingScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
+    ...legacyControlScenarios(compiler),
     ...[false, true].map((pae) => ({
       name: `legacy ${pae ? 'PAE' : 'nonPAE'} public generated access and raw bank`,
       async run() {

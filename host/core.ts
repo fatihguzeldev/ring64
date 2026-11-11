@@ -173,7 +173,7 @@ export interface PageFault {
   errorCode: number;
 }
 
-export interface PhysicalMemoryFault {
+export interface PhysicalAccessFault {
   instructionPc: bigint;
   address: bigint;
   access: 'read' | 'write' | 'execute';
@@ -189,6 +189,26 @@ export interface PhysicalMemoryFault {
   selector?: number;
   referenceVector?: number;
 }
+
+export interface PdpteLoadFault {
+  instructionPc: bigint;
+  phase: 'pdpte-load';
+  address?: never;
+  access?: never;
+  segment?: never;
+  table?: never;
+  systemPhase?: never;
+  selector?: never;
+  referenceVector?: never;
+  control: 'cr0' | 'cr3' | 'cr4';
+  slot: 0 | 1 | 2 | 3;
+  physicalAddress: bigint;
+  width: 8;
+  failingPhysicalAddress: bigint;
+  physicalAccess: 'read';
+  cause: 'unmapped' | 'permission' | 'address-range';
+}
+export type PhysicalMemoryFault = PhysicalAccessFault | PdpteLoadFault;
 
 export interface Span {
   base: bigint;
@@ -1502,19 +1522,41 @@ export class Core {
   physicalMemoryFault(reason: string): PhysicalMemoryFault | undefined {
     if (reason !== 'physical-memory-fault') return undefined;
     this.#exports.core_fault_info(this.#layout.reasons.indexOf(reason));
-    const raw = this.info<
-      Omit<
-        PhysicalMemoryFault,
-        'instructionPc' | 'address' | 'physicalAddress' | 'failingPhysicalAddress'
-      > & { address: string; physicalAddress: string; failingPhysicalAddress: string }
-    >();
+    const raw = this.info<Record<string, unknown>>();
+    if (raw.phase === 'pdpte-load') {
+      if (
+        !['cr0', 'cr3', 'cr4'].includes(raw.control as string) ||
+        !Number.isInteger(raw.slot) ||
+        (raw.slot as number) < 0 ||
+        (raw.slot as number) > 3 ||
+        raw.width !== 8 ||
+        raw.physicalAccess !== 'read' ||
+        [
+          'address',
+          'access',
+          'segment',
+          'table',
+          'systemPhase',
+          'selector',
+          'referenceVector',
+        ].some((key) => key in raw) ||
+        !['unmapped', 'permission', 'address-range'].includes(raw.cause as string)
+      )
+        throw new Error('core returned invalid PDPTE-load fault');
+      return {
+        ...raw,
+        instructionPc: this.diagnosticPc(),
+        physicalAddress: BigInt(raw.physicalAddress as string),
+        failingPhysicalAddress: BigInt(raw.failingPhysicalAddress as string),
+      } as PdpteLoadFault;
+    }
     return {
       ...raw,
       instructionPc: this.diagnosticPc(),
-      address: BigInt(raw.address),
-      physicalAddress: BigInt(raw.physicalAddress),
-      failingPhysicalAddress: BigInt(raw.failingPhysicalAddress),
-    };
+      address: BigInt(raw.address as string),
+      physicalAddress: BigInt(raw.physicalAddress as string),
+      failingPhysicalAddress: BigInt(raw.failingPhysicalAddress as string),
+    } as PhysicalAccessFault;
   }
 
   numericFault(reason: string): NumericFault | undefined {

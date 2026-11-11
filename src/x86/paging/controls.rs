@@ -137,6 +137,16 @@ impl State {
         })
     }
 
+    pub fn needs_pdpte_reload(self, candidate: Self, register: u8) -> bool {
+        candidate.legacy_pae()
+            && match register {
+                0 => (self.cr0 ^ candidate.cr0) & 0xe0000000 != 0,
+                3 => true,
+                4 => (self.cr4 ^ candidate.cr4) & 0x001000b0 != 0,
+                _ => false,
+            }
+    }
+
     pub fn load_pdpte(self, image: &crate::memory::Image) -> Result<[u64; 4], PdpteFailure> {
         let mut entries = [0; 4];
         let root = self.cr3 & 0xffffffe0;

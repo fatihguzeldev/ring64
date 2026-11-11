@@ -213,6 +213,7 @@ pub extern "C" fn core_deliver_exception() -> i32 {
         core.divide_failed = false;
         core.decode_fault = None;
         core.paging_failure = None;
+        core.pdpte_load_fault = None;
         core.paging_system = None;
         let outcome = if let Some(bank) = core.paging {
             core.paging_work.clear();

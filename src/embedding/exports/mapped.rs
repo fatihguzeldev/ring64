@@ -196,6 +196,7 @@ pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
             physical_controls,
             paging_work: Default::default(),
             paging_failure: None,
+            pdpte_load_fault: None,
             paging_system: None,
             state: Box::new(UnsafeCell::new(RunState {
                 rip: entry,

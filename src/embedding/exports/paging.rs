@@ -47,6 +47,14 @@ impl Core {
         })
     }
     pub(super) fn paging_failure_json(&self) -> Option<serde_json::Value> {
+        if let Some((control, slot, fault)) = self.pdpte_load_fault {
+            return Some(serde_json::json!({
+                "phase":"pdpte-load","control":format!("cr{control}"),"slot":slot,
+                "physicalAddress":format!("0x{:x}",fault.address),"width":fault.width,
+                "failingPhysicalAddress":format!("0x{:x}",fault.failing),"physicalAccess":"read",
+                "cause":match fault.cause {Cause::Unmapped=>"unmapped",Cause::Permission=>"permission",Cause::AddressRange=>"address-range",Cause::Noncanonical=>unreachable!("physical address")}
+            }));
+        }
         let mut json = match self.paging_failure? {
             Failure::Page(fault) => {
                 serde_json::json!({"vector":14,"address":format!("0x{:x}",fault.address),"access":access_name(fault.access),"errorCode":fault.error_code})
@@ -165,6 +173,7 @@ pub extern "C" fn core_paged_debug_begin(pc: u64, flags: u64, shadow: u32) -> i3
         core.numeric_fault = None;
         core.numeric_form = None;
         core.paging_failure = None;
+        core.pdpte_load_fault = None;
         core.paging_system = None;
         core.debug_candidate = 0;
         unsafe {
@@ -341,26 +350,31 @@ pub extern "C" fn core_paging_control(
         }
         let operation = match kind {
             0 => state.read_cr(register as u8).map(|v| (state, Some(v))),
-            1 => state
-                .prepare_cr_write(
-                    register as u8,
-                    if core.context.is_long64() {
-                        value
-                    } else {
-                        u64::from(value as u32)
-                    },
-                    core.context.mode(),
-                )
-                .map(|s| (s, None)),
+            1 => {
+                let value = if core.context.is_long64() {
+                    value
+                } else {
+                    u64::from(value as u32)
+                };
+                if core.physical_controls {
+                    state.prepare_physical_cr_write(register as u8, value, core.context.mode())
+                } else {
+                    state.prepare_cr_write(register as u8, value, core.context.mode())
+                }
+                .map(|s| (s, None))
+            }
             2 => if register == paging::EFER_MSR {
                 state.read_msr(register)
             } else {
                 core.fast_system.read_msr(register, &core.context)
             }
             .map(|v| (state, Some(v))),
-            3 if register == paging::EFER_MSR => {
-                state.prepare_msr_write(register, value).map(|s| (s, None))
+            3 if register == paging::EFER_MSR => if core.physical_controls {
+                state.prepare_physical_efer_write(value)
+            } else {
+                state.prepare_msr_write(register, value)
             }
+            .map(|s| (s, None)),
             3 => core
                 .fast_system
                 .prepare_msr_write(register, value, &core.context)
@@ -407,7 +421,28 @@ pub extern "C" fn core_paging_control(
             _ => return -1,
         };
         match operation {
-            Ok((candidate, result)) => {
+            Ok((mut candidate, result)) => {
+                if core.physical_controls
+                    && kind == 1
+                    && state.needs_pdpte_reload(candidate, register as u8)
+                {
+                    match candidate.load_pdpte(&core.image) {
+                        Ok(entries) => candidate.pdpte = Some(entries),
+                        Err(paging::PdpteFailure::Physical { slot, fault }) => {
+                            core.pdpte_load_fault = Some((register as u8, slot, fault));
+                            return 25;
+                        }
+                        Err(paging::PdpteFailure::Reserved) => {
+                            core.protection_fault = Some(ProtectionFault {
+                                vector: 13,
+                                error_code: 0,
+                                phase: ProtectionPhase::Target,
+                                selector: None,
+                            });
+                            return super::super::layout::PROTECTION;
+                        }
+                    }
+                }
                 if kind == 4 || kind == 1 && register == 3 || state.translation_changed(candidate) {
                     core.retire_translations();
                 }

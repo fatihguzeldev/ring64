@@ -68,6 +68,7 @@ struct Core {
     physical_controls: bool,
     paging_work: crate::x86::paging::access::AccessState,
     paging_failure: Option<crate::x86::paging::walk::Failure>,
+    pdpte_load_fault: Option<(u8, u8, Fault)>,
     paging_system: Option<crate::x86::protection::SystemPagingFault>,
     state: Box<UnsafeCell<RunState>>,
     fault: Option<Fault>,
@@ -154,6 +155,7 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
             physical_controls: false,
             paging_work: Default::default(),
             paging_failure: None,
+            pdpte_load_fault: None,
             paging_system: None,
             state,
             fault: None,
@@ -346,6 +348,7 @@ pub extern "C" fn core_clear_fault() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
         core.paging_failure = None;
+        core.pdpte_load_fault = None;
         core.paging_system = None;
         core.debug_candidate = 0;
         core.fault = None;
