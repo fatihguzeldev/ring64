@@ -63,7 +63,16 @@ impl State {
     }
 
     pub fn read_msr(self, index: u32, context: &ExecutionContext) -> Result<u64, ControlFailure> {
-        admit_msr(context)?;
+        self.read_msr_profile(index, context, false)
+    }
+
+    pub fn read_msr_profile(
+        self,
+        index: u32,
+        context: &ExecutionContext,
+        physical: bool,
+    ) -> Result<u64, ControlFailure> {
+        admit_msr(context, physical)?;
         Ok(match index {
             0xc0000081 => self.star,
             0xc0000082 => self.lstar,
@@ -84,7 +93,17 @@ impl State {
         value: u64,
         context: &ExecutionContext,
     ) -> Result<(Self, ExecutionContext), ControlFailure> {
-        admit_msr(context)?;
+        self.prepare_msr_write_profile(index, value, context, false)
+    }
+
+    pub fn prepare_msr_write_profile(
+        self,
+        index: u32,
+        value: u64,
+        context: &ExecutionContext,
+        physical: bool,
+    ) -> Result<(Self, ExecutionContext), ControlFailure> {
+        admit_msr(context, physical)?;
         let mut bank = self;
         let mut context = context.clone();
         match index {
@@ -128,8 +147,10 @@ fn admit_profile(context: &ExecutionContext) -> Result<(), ControlFailure> {
     }
 }
 
-fn admit_msr(context: &ExecutionContext) -> Result<(), ControlFailure> {
-    admit_profile(context)?;
+fn admit_msr(context: &ExecutionContext, physical: bool) -> Result<(), ControlFailure> {
+    if !physical {
+        admit_profile(context)?;
+    }
     if context.cpl() == 0 {
         Ok(())
     } else {

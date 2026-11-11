@@ -151,9 +151,12 @@ fn initial_image(input: &[u8], metadata_len: u32) -> Result<InitialImage, Memory
             })
         }
         Some(Value::String(model)) if model == "physical" => {
-            if config.get("fastSystem").is_some() {
-                return Err(invalid());
-            }
+            let fast_system = config
+                .get("fastSystem")
+                .map(super::fast_system::parse_bank)
+                .transpose()
+                .map_err(MemoryError::Invalid)?
+                .unwrap_or_default();
             let context = ExecutionContext::from_json_profile(&config["context"], true)
                 .map_err(MemoryError::Invalid)?;
             let state =
@@ -164,7 +167,7 @@ fn initial_image(input: &[u8], metadata_len: u32) -> Result<InitialImage, Memory
             Image::physical_mapped(backings, maps, limits).map(|image| InitialImage {
                 image,
                 paging: Some(state),
-                fast_system: Default::default(),
+                fast_system,
                 context,
                 physical_controls: true,
             })

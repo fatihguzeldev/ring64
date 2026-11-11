@@ -1,5 +1,5 @@
 use super::*;
-use crate::embedding::layout::{ALIGNMENT, X87_EXCEPTION};
+use crate::embedding::layout::ALIGNMENT;
 use crate::x86::context::Mode;
 use crate::x86::mmx::{self, Op};
 
@@ -42,7 +42,7 @@ fn core_mmx_impl<const OBSERVED: bool, const PAGED: bool>(
             (state.x87, state.mxcsr)
         };
         if operation.checks_pending() && before.pending() != 0 {
-            return X87_EXCEPTION;
+            return core.pending_x87_reason();
         }
         let width = operation.memory_bytes();
         let mut address = None;

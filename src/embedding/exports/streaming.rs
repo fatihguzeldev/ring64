@@ -1,5 +1,4 @@
 use super::*;
-use crate::embedding::layout::X87_EXCEPTION;
 use crate::x86::masked;
 
 #[unsafe(no_mangle)]
@@ -53,7 +52,7 @@ fn core_masked_store_impl<const OBSERVED: bool, const PAGED: bool>(
             state.target = 0;
             state.fault_segment = segment as u32;
             if width == 8 && state.x87.pending() != 0 {
-                return X87_EXCEPTION;
+                return core.pending_x87_reason();
             }
         }
         unsafe {

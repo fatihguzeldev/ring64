@@ -220,7 +220,7 @@ export type MemoryOptions =
       memoryModel: 'physical';
       context: ExecutionContext;
       paging: PagingState;
-      fastSystem?: never;
+      fastSystem?: FastSystemState;
       memory: { backings: MemoryBackingInput[]; mappings: MemoryMapping[] };
       entry: bigint;
       memoryLimits: MemoryLimits;
@@ -234,8 +234,8 @@ export function captureInitialMemory(options: MemoryOptions): InitialMemory {
     throw new TypeError('memoryModel must be linear, ia32e-paged or physical');
   if (memoryModel === 'linear' && 'paging' in options)
     throw new TypeError('linear memory cannot carry a paging state');
-  if (memoryModel !== 'ia32e-paged' && 'fastSystem' in options)
-    throw new TypeError('fast-system state requires ia32e-paged memory');
+  if (memoryModel === 'linear' && 'fastSystem' in options)
+    throw new TypeError('linear memory cannot carry a fast-system state');
   if (
     memoryModel !== 'linear' &&
     (!('memory' in options) ||

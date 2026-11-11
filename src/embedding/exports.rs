@@ -36,6 +36,7 @@ macro_rules! guest_semantics {
     }};
 }
 
+mod admission;
 mod context;
 mod debug;
 mod exception_delivery;
@@ -50,6 +51,7 @@ mod numeric_controls;
 mod numeric_image;
 mod paging;
 mod protection;
+mod reset;
 mod software_events;
 mod streaming;
 mod system_flags;
@@ -417,7 +419,7 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
         match decoded {
             Err(DecodeError::PagingRestart) => 26,
             Err(DecodeError::Paging(failure)) => core.paging_failure(failure),
-            Ok(instruction) => core.numeric_admission(instruction.operation, pc),
+            Ok(instruction) => core.instruction_admission(instruction.operation, pc),
             Err(DecodeError::Segment(fault)) => {
                 core.segment_fault = Some(fault);
                 SEGMENT

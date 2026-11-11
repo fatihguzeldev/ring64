@@ -1,5 +1,5 @@
 use super::*;
-use crate::embedding::layout::{ALIGNMENT, GENERAL_PROTECTION, X87_EXCEPTION};
+use crate::embedding::layout::{ALIGNMENT, GENERAL_PROTECTION};
 use crate::x86::numeric_images::{self, ImageOp};
 
 #[unsafe(no_mangle)]
@@ -41,7 +41,7 @@ fn core_numeric_image_impl<const OBSERVED: bool, const PAGED: bool>(
             state.x87
         };
         if operation.is_waiting() && before.pending() != 0 {
-            return X87_EXCEPTION;
+            return core.pending_x87_reason();
         }
         let width = operation.width();
         let access = if operation.is_store() {

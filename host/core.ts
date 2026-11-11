@@ -429,6 +429,7 @@ type CoreExports = WebAssembly.Exports & {
   core_info_ptr(): number;
   core_info_len(): number;
   core_dispose(): void;
+  core_reset(): number;
   core_numeric_fault_info?(): void;
 };
 
@@ -714,10 +715,9 @@ export class Core {
     const isPaged = memoryModel !== 'linear';
     const physicalControls = memoryModel === 'physical';
     const paging = isPaged ? capturePagingState(memory.paging!) : undefined;
-    const fastSystem =
-      isPaged && !physicalControls
-        ? captureFastSystemState(memory.fastSystem ?? zeroFastSystemState())
-        : undefined;
+    const fastSystem = isPaged
+      ? captureFastSystemState(memory.fastSystem ?? zeroFastSystemState())
+      : undefined;
     const module =
       compiler instanceof WebAssembly.Module
         ? compiler
@@ -823,6 +823,8 @@ export class Core {
       ]) {
         if (typeof exports[name] !== 'function') throw new Error(`core must export ${name}`);
       }
+      if (physicalControls && typeof exports.core_reset !== 'function')
+        throw new Error('core must export core_reset');
       if (isPaged)
         for (const name of [
           'core_paging_state',
@@ -839,7 +841,7 @@ export class Core {
         exports,
         {
           ...(isPaged
-            ? { memoryModel, paging, ...(physicalControls ? { context } : { fastSystem }) }
+            ? { memoryModel, paging, fastSystem, ...(physicalControls ? { context } : {}) }
             : {}),
           memoryLimits: memory.memoryLimits,
           backings: memory.backings.map(({ id, bytes }) => ({
@@ -1081,15 +1083,13 @@ export class Core {
       throw new TypeError(this.info<{ error: string }>().error);
   }
   readFastSystemState(): FastSystemState {
-    if (!this.isPaged || this.physicalControls)
-      throw new TypeError('method requires ia32e-paged memory');
+    if (!this.isPaged) throw new TypeError('method requires ia32e-paged memory');
     if (this.#exports.core_fast_system_state() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
     return fastSystemStateFromJson(this.info<unknown>());
   }
   setFastSystemState(state: FastSystemState): void {
-    if (!this.isPaged || this.physicalControls)
-      throw new TypeError('method requires ia32e-paged memory');
+    if (!this.isPaged) throw new TypeError('method requires ia32e-paged memory');
     writeInput(this.#exports, captureFastSystemState(state));
     if (this.#exports.core_import_fast_system() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
@@ -1649,6 +1649,11 @@ export class Core {
 
   releaseIo(): void {
     this.io?.release();
+  }
+
+  reset(): void {
+    if (!this.physicalControls) throw new TypeError('reset requires physical memory');
+    if (this.#exports.core_reset() !== 0) throw new TypeError(this.info<{ error: string }>().error);
   }
 
   dispose(): void {

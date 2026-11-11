@@ -52,6 +52,16 @@ pub enum PdpteFailure {
 }
 
 impl State {
+    pub fn reset() -> Self {
+        Self {
+            cr0: 0x60000010,
+            cr2: 0,
+            cr3: 0,
+            cr4: 0,
+            efer: 0,
+            pdpte: None,
+        }
+    }
     pub fn legacy_pae(self) -> bool {
         self.cr0 & (1 << 31) != 0 && self.cr4 & (1 << 5) != 0 && self.efer & (1 << 10) == 0
     }

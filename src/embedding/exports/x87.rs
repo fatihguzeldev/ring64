@@ -69,7 +69,7 @@ fn core_x87_impl<const OBSERVED: bool, const PAGED: bool>(
             state.x87.pending()
         };
         if operation.is_waiting() && pending != 0 {
-            return X87_EXCEPTION;
+            return core.pending_x87_reason();
         }
         let width = operation.memory_bytes();
         let mut address = None;
@@ -173,4 +173,14 @@ pub extern "C" fn core_paged_x87_observed(
     rax: u64,
 ) -> i32 {
     core_x87_impl::<true, true>(operation, offset, segment, instruction_pc, flags, rax)
+}
+
+impl Core {
+    pub(super) fn pending_x87_reason(&self) -> i32 {
+        if self.paging.is_some_and(|bank| bank.cr0 & 0x20 == 0) {
+            UNSUPPORTED
+        } else {
+            X87_EXCEPTION
+        }
+    }
 }

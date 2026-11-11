@@ -15,6 +15,7 @@ export function transitionScenarios(compiler: WebAssembly.Module): Scenario[] {
         ram.set(hex('66b810008ed88ec08ed0bc00400000'), 0x2000);
         const cpu = await physicalCpu(compiler, ram, rom);
         try {
+          cpu.reset();
           const near = await cpu.run({ budget: 1n });
           equal(near.state.rip, 0xf000n, 'near keeps high reset base');
           const pe = await cpu.run({ budget: 5n });
@@ -43,6 +44,7 @@ export function transitionScenarios(compiler: WebAssembly.Module): Scenario[] {
         const { ram, rom } = transitionProgram(),
           cpu = await physicalCpu(compiler, ram, rom);
         try {
+          cpu.reset();
           const result = await cpu.run({ budget: 100n, stop: 0x403n });
           equal(result.reason, 'stop', 'final real target');
           equal(result.retired, 69n, 'exact guest retirement');

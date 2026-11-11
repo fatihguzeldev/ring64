@@ -6,6 +6,7 @@ mod exception_review;
 mod external_interrupts;
 mod far_bridge;
 mod protection_bridge;
+mod reset;
 mod software_events;
 mod streaming_bridge;
 mod system_flags;

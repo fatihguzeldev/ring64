@@ -185,7 +185,7 @@ pub extern "C" fn core_paged_debug_begin(pc: u64, flags: u64, shadow: u32) -> i3
         }
         match core.paged_decode(pc) {
             Ok(instruction) if !core.image.active_changed() => {
-                core.numeric_admission(instruction.operation, pc)
+                core.instruction_admission(instruction.operation, pc)
             }
             Ok(_) | Err(DecodeError::PagingRestart) => 26,
             Err(DecodeError::Paging(failure)) => core.paging_failure(failure),
@@ -366,7 +366,8 @@ pub extern "C" fn core_paging_control(
             2 => if register == paging::EFER_MSR {
                 state.read_msr(register)
             } else {
-                core.fast_system.read_msr(register, &core.context)
+                core.fast_system
+                    .read_msr_profile(register, &core.context, core.physical_controls)
             }
             .map(|v| (state, Some(v))),
             3 if register == paging::EFER_MSR => if core.physical_controls {
@@ -377,7 +378,7 @@ pub extern "C" fn core_paging_control(
             .map(|s| (s, None)),
             3 => core
                 .fast_system
-                .prepare_msr_write(register, value, &core.context)
+                .prepare_msr_write_profile(register, value, &core.context, core.physical_controls)
                 .map(|(bank, context)| {
                     if core.context != context {
                         core.context = context;

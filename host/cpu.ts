@@ -165,11 +165,8 @@ export async function createCpu(options: Options): Promise<Cpu> {
   const memory = captureInitialMemory(options);
   if (memory.memoryModel !== 'linear') {
     memory.paging = capturePagingState(options.paging!);
-    if (memory.memoryModel === 'ia32e-paged')
-      memory.fastSystem =
-        'fastSystem' in options
-          ? captureFastSystemState(options.fastSystem!)
-          : zeroFastSystemState();
+    memory.fastSystem =
+      'fastSystem' in options ? captureFastSystemState(options.fastSystem!) : zeroFastSystemState();
   }
   const contextInput = options.context;
   const context =
@@ -200,6 +197,7 @@ export async function createCpu(options: Options): Promise<Cpu> {
 export class Cpu {
   #lifecycle: 'idle' | 'running' | 'failed' | 'disposed' = 'idle';
   #runGeneration = 0;
+  #captureToken: { readonly reset: object } = { reset: {} };
   readonly #cache: Translations;
   #core: Core | undefined;
   readonly #limits: Limits;
@@ -227,15 +225,23 @@ export class Cpu {
     );
   }
 
-  private requireIdle(runGeneration?: number): number {
+  private requireIdle(
+    captureToken?: { readonly reset: object },
+    allowCompletedRun = false,
+  ): { readonly reset: object } {
     if (this.#lifecycle !== 'idle') throw new Error(`cpu is ${this.#lifecycle}`);
-    if (runGeneration !== undefined && runGeneration !== this.#runGeneration)
-      throw new Error('cpu run started during input capture');
-    return this.#runGeneration;
+    if (
+      captureToken !== undefined &&
+      captureToken !== this.#captureToken &&
+      (!allowCompletedRun || captureToken.reset !== this.#captureToken.reset)
+    )
+      throw new Error('cpu run or reset started during input capture');
+    return this.#captureToken;
   }
 
   private requirePhysicalMemory(): void {
-    if (this.#memoryModel === 'linear') throw new TypeError('method requires physical memory');
+    if (this.#memoryModel === 'linear')
+      throw new TypeError('method requires physical or ia32e-paged memory');
   }
 
   private requireMemoryModel(model: MemoryModel): void {
@@ -267,9 +273,9 @@ export class Cpu {
   }
 
   addBacking(input: MemoryBackingInput): void {
-    this.requireIdle();
+    const generation = this.requireIdle();
     const captured = captureBackings([input], this.#memoryLimits, this.#backings);
-    this.requireIdle();
+    this.requireIdle(generation, true);
     const lengths = validateBackings(captured, this.#backings, this.#memoryLimits);
     this.engineCall(() => this.#engine.addBacking(captured[0]!));
     this.#backings = lengths;
@@ -284,9 +290,9 @@ export class Cpu {
   }
 
   setMappings(mappings: MemoryMapping[]): void {
-    this.requireIdle();
+    const generation = this.requireIdle();
     const captured = captureMappings(mappings, this.#memoryLimits, this.#memoryModel);
-    this.requireIdle();
+    this.requireIdle(generation, true);
     validateMappings(captured, this.#backings);
     this.engineCall(() => this.#engine.setMappings(captured));
     this.pruneTranslations();
@@ -298,9 +304,9 @@ export class Cpu {
   }
 
   setContext(context: ExecutionContext): void {
-    this.requireIdle();
+    const generation = this.requireIdle();
     const input = captureContext(context, this.#memoryModel === 'physical');
-    this.requireIdle();
+    this.requireIdle(generation, true);
     if (
       this.#memoryModel === 'ia32e-paged' &&
       input.mode !== 'long64' &&
@@ -333,9 +339,9 @@ export class Cpu {
     this.engineCall(() => this.#engine.requestNmi());
   }
   setXmmState(state: bigint[]): void {
-    this.requireIdle();
+    const generation = this.requireIdle();
     const bank = captureXmmState(state);
-    this.requireIdle();
+    this.requireIdle(generation, true);
     this.engineCall(() => this.#engine.setXmmState(bank));
   }
   readDebugState(): DebugState {
@@ -364,12 +370,12 @@ export class Cpu {
   }
   readFastSystemState(): FastSystemState {
     this.requireIdle();
-    this.requireMemoryModel('ia32e-paged');
+    this.requirePhysicalMemory();
     return this.engineCall(() => this.#engine.readFastSystemState());
   }
   setFastSystemState(state: FastSystemState): void {
     const generation = this.requireIdle();
-    this.requireMemoryModel('ia32e-paged');
+    this.requirePhysicalMemory();
     const input = captureFastSystemState(state);
     this.requireIdle(generation);
     this.engineCall(() => this.#engine.setFastSystemState(input));
@@ -384,9 +390,9 @@ export class Cpu {
     return this.engineCall(() => this.#engine.readMxcsr());
   }
   setMxcsr(value: number): void {
-    this.requireIdle();
+    const generation = this.requireIdle();
     const input = captureMxcsr(value);
-    this.requireIdle();
+    this.requireIdle(generation, true);
     this.engineCall(() => this.#engine.setMxcsr(input));
   }
   readX87State(): X87State {
@@ -394,9 +400,9 @@ export class Cpu {
     return this.engineCall(() => this.#engine.readX87State());
   }
   setX87State(value: X87State): void {
-    this.requireIdle();
+    const generation = this.requireIdle();
     const input = captureX87State(value);
-    this.requireIdle();
+    this.requireIdle(generation, true);
     this.engineCall(() => this.#engine.setX87State(input));
   }
   readMemory(address: bigint, length: number): Uint8Array {
@@ -405,11 +411,11 @@ export class Cpu {
     return this.engineCall(() => this.#engine.readMemory(address, length));
   }
   writeMemory(address: bigint, bytes: Uint8Array): void {
-    this.requireIdle();
+    const generation = this.requireIdle();
     this.requireMemoryModel('linear');
     unsigned64(address, 'address');
     const input = copyMemoryInput(bytes);
-    this.requireIdle();
+    this.requireIdle(generation, true);
     this.engineCall(() => this.#engine.writeOwnedMemory(address, input));
     this.pruneTranslations();
   }
@@ -427,6 +433,14 @@ export class Cpu {
     this.engineCall(() => this.#engine.writeOwnedMemory(address, input));
     this.pruneTranslations();
   }
+  reset(): void {
+    this.requireIdle();
+    this.requireMemoryModel('physical');
+    this.engineCall(() => this.#engine.reset());
+    this.#cache.clear();
+    this.#captureToken = { reset: {} };
+  }
+
   inspectTranslations() {
     this.requireIdle();
     return this.#cache.inspect();
@@ -470,6 +484,7 @@ export class Cpu {
     if (this.#runGeneration === Number.MAX_SAFE_INTEGER)
       throw new Error('cpu run generation exhausted');
     this.#runGeneration++;
+    this.#captureToken = { reset: this.#captureToken.reset };
     this.#lifecycle = 'running';
     const began = performance.now();
     const resources = {

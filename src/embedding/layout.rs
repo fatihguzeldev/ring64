@@ -277,6 +277,16 @@ impl Default for RunState {
 }
 
 impl RunState {
+    pub fn reset() -> Self {
+        let mut state = Self {
+            rip: 0xfff0,
+            ..Self::default()
+        };
+        state.registers[2] = 0x600;
+        state.x87.control_word = 0x40;
+        state.x87.tag_word = 0x5555;
+        state
+    }
     pub fn import(&mut self, state: State) {
         self.registers = state.registers;
         self.flags = state.flags;
