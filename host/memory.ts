@@ -1,8 +1,9 @@
 import { byteLength, unsigned64, type Span } from './core.js';
+import type { ExecutionContext } from './context.js';
 import type { PagingState } from './paging.js';
 import type { FastSystemState } from './fast-system.js';
 
-export type MemoryModel = 'linear' | 'ia32e-paged';
+export type MemoryModel = 'linear' | 'ia32e-paged' | 'physical';
 
 export interface MemoryBackingInput {
   id: string;
@@ -133,7 +134,7 @@ export function captureMappings(
   limits: MemoryLimits,
   memoryModel: MemoryModel = 'linear',
 ): MemoryMapping[] {
-  if (memoryModel !== 'linear' && memoryModel !== 'ia32e-paged')
+  if (memoryModel !== 'linear' && memoryModel !== 'ia32e-paged' && memoryModel !== 'physical')
     throw new TypeError('unsupported memory model');
   if (!Array.isArray(input)) throw new TypeError('mappings must be an array');
   const count = input.length;
@@ -160,7 +161,7 @@ export function captureMappings(
     const end = base + BigInt(length);
     const lowEnd = 0x800000000000n;
     const highStart = 0xffff800000000000n;
-    if (memoryModel === 'ia32e-paged' && end > 1n << 52n)
+    if (memoryModel !== 'linear' && end > 1n << 52n)
       throw new TypeError('physical mapping must have a nonwrapping unsigned52 address range');
     if (memoryModel === 'linear' && (end > 1n << 64n || !(end <= lowEnd || base >= highStart)))
       throw new TypeError('mapping must have a nonwrapping canonical48 address range');
@@ -214,24 +215,37 @@ export type MemoryOptions =
       memoryLimits: MemoryLimits;
       code?: never;
       ram?: never;
+    }
+  | {
+      memoryModel: 'physical';
+      context: ExecutionContext;
+      paging: PagingState;
+      fastSystem?: never;
+      memory: { backings: MemoryBackingInput[]; mappings: MemoryMapping[] };
+      entry: bigint;
+      memoryLimits: MemoryLimits;
+      code?: never;
+      ram?: never;
     };
 
 export function captureInitialMemory(options: MemoryOptions): InitialMemory {
   const memoryModel = 'memoryModel' in options ? options.memoryModel : 'linear';
-  if (memoryModel !== 'linear' && memoryModel !== 'ia32e-paged')
+  if (memoryModel !== 'linear' && memoryModel !== 'ia32e-paged' && memoryModel !== 'physical')
     throw new TypeError('memoryModel must be linear or ia32e-paged');
   if (memoryModel === 'linear' && 'paging' in options)
     throw new TypeError('linear memory cannot carry a paging state');
-  if (memoryModel === 'linear' && 'fastSystem' in options)
+  if (memoryModel !== 'ia32e-paged' && 'fastSystem' in options)
     throw new TypeError('linear memory cannot carry a fast-system state');
   if (
-    memoryModel === 'ia32e-paged' &&
+    memoryModel !== 'linear' &&
     (!('memory' in options) ||
       !('entry' in options) ||
       !('memoryLimits' in options) ||
       !('paging' in options))
   )
     throw new TypeError('paged memory requires explicit memory, entry, limits and paging state');
+  if (memoryModel === 'physical' && !('context' in options))
+    throw new TypeError('physical memory requires an explicit context');
   let backings: MemoryBackingInput[];
   let mappings: MemoryMapping[];
   let memoryLimits: MemoryLimits;

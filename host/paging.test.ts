@@ -55,3 +55,49 @@ test('paging projection decodes owned unsigned words and rejects malformed backe
   ])
     assert.throws(() => pagingStateFromJson(value), /paging/);
 });
+
+test('legacy PAE quartet captures exactly four own words without iterating and owns its snapshot', () => {
+  const words = [0x3001n, 0n, 0n, 0xfffffffffffffffen] as [bigint, bigint, bigint, bigint];
+  const reads = new Map<PropertyKey, number>();
+  const tuple = new Proxy(words, {
+    get(target, key, receiver) {
+      reads.set(key, (reads.get(key) ?? 0) + 1);
+      if (key === Symbol.iterator) throw new Error('must not iterate caller array');
+      return Reflect.get(target, key, receiver) as unknown;
+    },
+  });
+  const captured = capturePagingState({ ...bank(), efer: 0n, pdpte: tuple });
+  assert.deepEqual(captured.pdpte, words);
+  assert.deepEqual(
+    [...reads],
+    [
+      ['length', 1],
+      ['0', 1],
+      ['1', 1],
+      ['2', 1],
+      ['3', 1],
+    ],
+  );
+  words[0] = 0x4001n;
+  assert.equal(captured.pdpte![0], 0x3001n);
+  for (const pdpte of [
+    undefined,
+    null,
+    [],
+    [1n, 2n, 3n],
+    [1n, 2n, 3n, 4n, 5n],
+    [0n, 0n, 0n, -1n],
+    [0n, 0n, 0n, 1n << 64n],
+    Array(4),
+  ])
+    assert.throws(() => capturePagingState({ ...bank(), pdpte } as never), TypeError);
+  const wire = {
+    cr0: '0x80000033',
+    cr2: '0x0',
+    cr3: '0x1000',
+    cr4: '0x628',
+    efer: '0x0',
+    pdpte: ['0x3001', '0x0', '0x0', '0xfffffffffffffffe'],
+  };
+  assert.deepEqual(pagingStateFromJson(wire).pdpte, [0x3001n, 0n, 0n, 0xfffffffffffffffen]);
+});

@@ -96,11 +96,7 @@ where
 {
     let mut cursor = cursor::Cursor::new(pc, context.is_long64(), read);
     let (mut prefixes, opcode) = prefix::read(&mut cursor, context)?;
-    prefixes.paged = paged
-        && matches!(
-            context.mode(),
-            crate::x86::context::Mode::Long64 | crate::x86::context::Mode::Compatibility
-        );
+    prefixes.paged = paged;
     let operation = opcode::refine(opcode, prefixes, &mut cursor)?;
     Ok(Instruction {
         pc,

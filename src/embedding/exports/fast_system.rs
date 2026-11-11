@@ -27,7 +27,7 @@ pub(super) fn parse_bank(value: &serde_json::Value) -> Result<State, &'static st
 pub extern "C" fn core_fast_system_state() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_ref().unwrap();
-        if core.paging.is_none() { return bridge.error("fast system state requires a paged CPU"); }
+        if core.paging.is_none() || core.physical_controls { return bridge.error("fast system state requires a paged CPU"); }
         let bank = core.fast_system;
         bridge.info = serde_json::to_vec(&serde_json::json!({
             "star":format!("0x{:x}",bank.star),"lstar":format!("0x{:x}",bank.lstar),
@@ -50,7 +50,7 @@ pub extern "C" fn core_import_fast_system() -> i32 {
             Err(message) => return bridge.error(message),
         };
         let core = bridge.core.as_mut().unwrap();
-        if core.paging.is_none() {
+        if core.paging.is_none() || core.physical_controls {
             return bridge.error("fast system state requires a paged CPU");
         }
         core.fast_system = bank;

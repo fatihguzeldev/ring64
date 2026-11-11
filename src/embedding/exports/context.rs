@@ -68,7 +68,15 @@ pub extern "C" fn core_set_context() -> i32 {
             Err(message) => return bridge.error(message),
         };
         let core = bridge.core.as_mut().unwrap();
-        if core.paging.is_some()
+        if core.physical_controls {
+            if let Err(message) = core
+                .paging
+                .expect("physical controls")
+                .validate_physical(context.mode())
+            {
+                return bridge.error(message);
+            }
+        } else if core.paging.is_some()
             && !matches!(
                 context.mode(),
                 crate::x86::context::Mode::Long64 | crate::x86::context::Mode::Compatibility

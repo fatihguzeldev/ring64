@@ -163,13 +163,18 @@ export async function createCpu(options: Options): Promise<Cpu> {
   const limits = checkedLimits(options.limits);
   const io = captureIo(options);
   const memory = captureInitialMemory(options);
-  if (memory.memoryModel === 'ia32e-paged') {
+  if (memory.memoryModel !== 'linear') {
     memory.paging = capturePagingState(options.paging!);
-    memory.fastSystem =
-      'fastSystem' in options ? captureFastSystemState(options.fastSystem!) : zeroFastSystemState();
+    if (memory.memoryModel === 'ia32e-paged')
+      memory.fastSystem =
+        'fastSystem' in options
+          ? captureFastSystemState(options.fastSystem!)
+          : zeroFastSystemState();
   }
   const contextInput = options.context;
   const context = contextInput === undefined ? undefined : captureContext(contextInput);
+  if (memory.memoryModel === 'physical' && context === undefined)
+    throw new TypeError('physical memory requires a non-undefined context');
   if (
     memory.memoryModel === 'ia32e-paged' &&
     context &&
@@ -224,6 +229,10 @@ export class Cpu {
     if (runGeneration !== undefined && runGeneration !== this.#runGeneration)
       throw new Error('cpu run started during input capture');
     return this.#runGeneration;
+  }
+
+  private requirePhysicalMemory(): void {
+    if (this.#memoryModel === 'linear') throw new TypeError('method requires physical memory');
   }
 
   private requireMemoryModel(model: MemoryModel): void {
@@ -339,12 +348,12 @@ export class Cpu {
   }
   readPagingState(): PagingState {
     this.requireIdle();
-    this.requireMemoryModel('ia32e-paged');
+    this.requirePhysicalMemory();
     return this.engineCall(() => this.#engine.readPagingState());
   }
   setPagingState(state: PagingState): void {
     const generation = this.requireIdle();
-    this.requireMemoryModel('ia32e-paged');
+    this.requirePhysicalMemory();
     const input = capturePagingState(state);
     this.requireIdle(generation);
     this.engineCall(() => this.#engine.setPagingState(input));
@@ -403,12 +412,12 @@ export class Cpu {
   }
   readPhysicalMemory(address: bigint, length: number): Uint8Array {
     this.requireIdle();
-    this.requireMemoryModel('ia32e-paged');
+    this.requirePhysicalMemory();
     return this.engineCall(() => this.#engine.readMemory(address, length));
   }
   writePhysicalMemory(address: bigint, bytes: Uint8Array): void {
     const generation = this.requireIdle();
-    this.requireMemoryModel('ia32e-paged');
+    this.requirePhysicalMemory();
     unsigned64(address, 'address');
     const input = copyMemoryInput(bytes);
     this.requireIdle(generation);
@@ -461,7 +470,7 @@ export class Cpu {
     this.#lifecycle = 'running';
     const began = performance.now();
     const resources = {
-      ...(this.#memoryModel === 'ia32e-paged' ? { pagingRestarts: 0 } : {}),
+      ...(this.#memoryModel !== 'linear' ? { pagingRestarts: 0 } : {}),
       compilations: 0,
       cacheHits: 0,
       nativeEntries: 0,

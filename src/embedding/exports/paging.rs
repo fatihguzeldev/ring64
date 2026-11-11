@@ -245,9 +245,25 @@ pub(super) fn parse_bank(value: &serde_json::Value) -> Result<paging::State, &'s
         cr3: word("cr3")?,
         cr4: word("cr4")?,
         efer: word("efer")?,
-        pdpte: None,
+        pdpte: value
+            .get("pdpte")
+            .map(|entries| {
+                let entries = entries
+                    .as_array()
+                    .filter(|entries| entries.len() == 4)
+                    .ok_or("captured PDPTEs require four words")?;
+                let mut result = [0; 4];
+                for (index, entry) in entries.iter().enumerate() {
+                    result[index] = entry
+                        .as_str()
+                        .and_then(|v| v.strip_prefix("0x"))
+                        .and_then(|v| u64::from_str_radix(v, 16).ok())
+                        .ok_or("invalid captured PDPTE word")?;
+                }
+                Ok(result)
+            })
+            .transpose()?,
     };
-    state.validate()?;
     Ok(state)
 }
 
@@ -255,10 +271,12 @@ pub(super) fn parse_bank(value: &serde_json::Value) -> Result<paging::State, &'s
 pub extern "C" fn core_paging_state() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let Some(state) = bridge.core.as_ref().unwrap().paging else { return bridge.error("paging state requires a paged CPU"); };
-        bridge.info = serde_json::to_vec(&serde_json::json!({
+        let mut json = serde_json::json!({
             "cr0":format!("0x{:x}",state.cr0),"cr2":format!("0x{:x}",state.cr2),
             "cr3":format!("0x{:x}",state.cr3),"cr4":format!("0x{:x}",state.cr4),"efer":format!("0x{:x}",state.efer),
-        })).unwrap();
+        });
+        if let Some(entries) = state.pdpte { json["pdpte"] = serde_json::json!(entries.map(|entry| format!("0x{entry:x}"))); }
+        bridge.info = serde_json::to_vec(&json).unwrap();
         0
     })
 }
@@ -277,6 +295,14 @@ pub extern "C" fn core_import_paging() -> i32 {
         let Some(previous) = core.paging else {
             return bridge.error("paging state requires a paged CPU");
         };
+        let validation = if core.physical_controls {
+            candidate.validate_physical(core.context.mode())
+        } else {
+            candidate.validate()
+        };
+        if let Err(message) = validation {
+            return bridge.error(message);
+        }
         if previous.translation_changed(candidate) {
             core.retire_translations();
         }

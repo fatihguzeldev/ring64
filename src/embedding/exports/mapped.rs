@@ -72,17 +72,15 @@ fn mappings(value: &Value, capacity: usize) -> Result<Vec<MappingInput>, MemoryE
     Ok(mappings)
 }
 
-fn initial_image(
-    input: &[u8],
-    metadata_len: u32,
-) -> Result<
-    (
-        Image,
-        Option<crate::x86::paging::State>,
-        crate::x86::fast_system::State,
-    ),
-    MemoryError,
-> {
+struct InitialImage {
+    image: Image,
+    paging: Option<crate::x86::paging::State>,
+    fast_system: crate::x86::fast_system::State,
+    context: ExecutionContext,
+    physical_controls: bool,
+}
+
+fn initial_image(input: &[u8], metadata_len: u32) -> Result<InitialImage, MemoryError> {
     let metadata_len = metadata_len as usize;
     let config = json(input.get(..metadata_len).ok_or_else(invalid)?)?;
     let caps = &config["memoryLimits"];
@@ -126,19 +124,50 @@ fn initial_image(
             if config.get("paging").is_some() || config.get("fastSystem").is_some() {
                 return Err(invalid());
             }
-            Image::mapped(backings, maps, limits).map(|image| (image, None, Default::default()))
+            Image::mapped(backings, maps, limits).map(|image| InitialImage {
+                image,
+                paging: None,
+                fast_system: Default::default(),
+                context: Default::default(),
+                physical_controls: false,
+            })
         }
         Some(Value::String(model)) if model == "ia32e-paged" => {
             let state =
                 super::paging::parse_bank(&config["paging"]).map_err(MemoryError::Invalid)?;
+            state.validate().map_err(MemoryError::Invalid)?;
             let fast_system = config
                 .get("fastSystem")
                 .map(super::fast_system::parse_bank)
                 .transpose()
                 .map_err(MemoryError::Invalid)?
                 .unwrap_or_default();
-            Image::physical_mapped(backings, maps, limits)
-                .map(|image| (image, Some(state), fast_system))
+            Image::physical_mapped(backings, maps, limits).map(|image| InitialImage {
+                image,
+                paging: Some(state),
+                fast_system,
+                context: Default::default(),
+                physical_controls: false,
+            })
+        }
+        Some(Value::String(model)) if model == "physical" => {
+            if config.get("fastSystem").is_some() {
+                return Err(invalid());
+            }
+            let context =
+                ExecutionContext::from_json(&config["context"]).map_err(MemoryError::Invalid)?;
+            let state =
+                super::paging::parse_bank(&config["paging"]).map_err(MemoryError::Invalid)?;
+            state
+                .validate_physical(context.mode())
+                .map_err(MemoryError::Invalid)?;
+            Image::physical_mapped(backings, maps, limits).map(|image| InitialImage {
+                image,
+                paging: Some(state),
+                fast_system: Default::default(),
+                context,
+                physical_controls: true,
+            })
         }
         _ => Err(invalid()),
     }
@@ -147,7 +176,13 @@ fn initial_image(
 #[unsafe(no_mangle)]
 pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
-        let (image, paging, fast_system) = match initial_image(&bridge.input, metadata_len) {
+        let InitialImage {
+            image,
+            paging,
+            fast_system,
+            context,
+            physical_controls,
+        } = match initial_image(&bridge.input, metadata_len) {
             Ok(image) => image,
             Err(error) => return memory_error(bridge, error),
         };
@@ -158,6 +193,7 @@ pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
             image,
             fast_system,
             paging,
+            physical_controls,
             paging_work: Default::default(),
             paging_failure: None,
             paging_system: None,
@@ -168,7 +204,7 @@ pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
             fault: None,
             divide_failed: false,
             decode_fault: None,
-            context: ExecutionContext::default(),
+            context,
             context_version: 0,
             segment_fault: None,
             alignment_fault: None,

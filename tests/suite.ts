@@ -27,6 +27,7 @@ import { externalInterruptScenarios } from './execution/external-interrupts/inde
 import { accessFaultScenarios } from './execution/access-faults/index.js';
 
 import { hardwareDebugScenarios } from './execution/hardware-debug/index.js';
+import { legacyPagingScenarios } from './execution/legacy-paging/index.js';
 import { pagingScenarios } from './execution/paging/index.js';
 import { fastSystemScenarios } from './execution/fast-system/index.js';
 import { contextReuseScenarios } from './execution/context-reuse/index.js';
@@ -66,6 +67,7 @@ export async function runScenarios(
     ...accessFaultScenarios(core),
     ...hardwareDebugScenarios(core),
     ...pagingScenarios(core),
+    ...legacyPagingScenarios(core),
     ...fastSystemScenarios(core),
     ...contextReuseScenarios(core),
     ...numericControlScenarios(core),

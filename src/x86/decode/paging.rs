@@ -18,7 +18,13 @@ where
             Ok(Operation::Paging(PagingInstruction::ClearTaskSwitched))
         });
     }
-    if prefixes.paged && matches!(opcode, 0x05 | 0x07 | 0x34 | 0x35) {
+    if prefixes.paged
+        && matches!(
+            prefixes.mode,
+            crate::x86::context::Mode::Long64 | crate::x86::context::Mode::Compatibility
+        )
+        && matches!(opcode, 0x05 | 0x07 | 0x34 | 0x35)
+    {
         use crate::x86::fast_system::Instruction;
         return Some(
             if prefixes.lock || matches!(opcode, 0x05 | 0x07) && !prefixes.long64 {

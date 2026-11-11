@@ -595,6 +595,7 @@ export class Core {
   private constructor(
     exports: CoreExports,
     readonly isPaged = false,
+    readonly physicalControls = false,
     private readonly io?: IoBridge,
   ) {
     this.#exports = exports;
@@ -689,11 +690,14 @@ export class Core {
     context?: ExecutionContext,
     ioBinding?: IoBinding,
   ): Promise<Core> {
-    const isPaged = memory.memoryModel === 'ia32e-paged';
+    const memoryModel = memory.memoryModel ?? 'linear';
+    const isPaged = memoryModel !== 'linear';
+    const physicalControls = memoryModel === 'physical';
     const paging = isPaged ? capturePagingState(memory.paging!) : undefined;
-    const fastSystem = isPaged
-      ? captureFastSystemState(memory.fastSystem ?? zeroFastSystemState())
-      : undefined;
+    const fastSystem =
+      isPaged && !physicalControls
+        ? captureFastSystemState(memory.fastSystem ?? zeroFastSystemState())
+        : undefined;
     const module =
       compiler instanceof WebAssembly.Module
         ? compiler
@@ -814,7 +818,9 @@ export class Core {
       const metadataLength = writeInput(
         exports,
         {
-          ...(isPaged ? { memoryModel: 'ia32e-paged', paging, fastSystem } : {}),
+          ...(isPaged
+            ? { memoryModel, paging, ...(physicalControls ? { context } : { fastSystem }) }
+            : {}),
           memoryLimits: memory.memoryLimits,
           backings: memory.backings.map(({ id, bytes }) => ({
             id: backingKey(id),
@@ -843,8 +849,8 @@ export class Core {
         if (exports.core_io_configure(Number(io.present)) !== 0)
           throw new Error('core refused I/O configuration');
         io.effectActive = exports.core_io_effect_active;
-        const core = new Core(exports, isPaged, io);
-        if (context !== undefined) core.setContext(context);
+        const core = new Core(exports, isPaged, physicalControls, io);
+        if (context !== undefined && !physicalControls) core.setContext(context);
         return core;
       } catch (error) {
         exports.core_dispose();
@@ -1055,13 +1061,15 @@ export class Core {
       throw new TypeError(this.info<{ error: string }>().error);
   }
   readFastSystemState(): FastSystemState {
-    if (!this.isPaged) throw new TypeError('method requires ia32e-paged memory');
+    if (!this.isPaged || this.physicalControls)
+      throw new TypeError('method requires ia32e-paged memory');
     if (this.#exports.core_fast_system_state() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
     return fastSystemStateFromJson(this.info<unknown>());
   }
   setFastSystemState(state: FastSystemState): void {
-    if (!this.isPaged) throw new TypeError('method requires ia32e-paged memory');
+    if (!this.isPaged || this.physicalControls)
+      throw new TypeError('method requires ia32e-paged memory');
     writeInput(this.#exports, captureFastSystemState(state));
     if (this.#exports.core_import_fast_system() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
