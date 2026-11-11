@@ -1,6 +1,5 @@
 use super::*;
-use crate::x86::fast_system::{self, Instruction, State};
-use crate::x86::paging::ControlFailure;
+use crate::x86::fast_system::{self, Failure, Instruction, State};
 use crate::x86::protection::{ProtectionFault, ProtectionPhase};
 
 pub(super) fn parse_bank(value: &serde_json::Value) -> Result<State, &'static str> {
@@ -59,22 +58,25 @@ pub extern "C" fn core_import_fast_system() -> i32 {
     })
 }
 
-pub(super) fn failure(core: &mut Core, failure: ControlFailure) -> i32 {
+fn failure(core: &mut Core, failure: Failure) -> i32 {
     match failure {
-        ControlFailure::Undefined => {
+        Failure::Undefined => {
             core.decode_fault = Some(decode::DecodeFault::UndefinedOpcode);
             INVALID
         }
-        ControlFailure::GeneralProtection => {
+        Failure::Privilege | Failure::Target => {
             core.protection_fault = Some(ProtectionFault {
                 vector: 13,
                 error_code: 0,
-                phase: ProtectionPhase::Target,
+                phase: match failure {
+                    Failure::Privilege => ProtectionPhase::Privilege,
+                    _ => ProtectionPhase::Target,
+                },
                 selector: None,
             });
             super::super::layout::PROTECTION
         }
-        ControlFailure::Unsupported => UNSUPPORTED,
+        Failure::Unsupported => UNSUPPORTED,
     }
 }
 

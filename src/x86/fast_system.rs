@@ -25,6 +25,14 @@ pub enum Instruction {
     Swapgs,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Failure {
+    Undefined,
+    Privilege,
+    Target,
+    Unsupported,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Prepared {
     pub bank: State,
@@ -185,10 +193,12 @@ pub fn prepare(
     scalar: &state::State,
     context: &ExecutionContext,
     next: u64,
-) -> Result<Prepared, ControlFailure> {
-    use ControlFailure::{GeneralProtection, Undefined};
+) -> Result<Prepared, Failure> {
+    use Failure::{Privilege, Target, Undefined, Unsupported};
     use Instruction::*;
-    admit_profile(context)?;
+    if !matches!(context.mode(), Mode::Long64 | Mode::Compatibility) {
+        return Err(Unsupported);
+    }
     if !context.is_long64()
         && matches!(
             instruction,
@@ -199,16 +209,16 @@ pub fn prepare(
         return Err(Undefined);
     }
     if !matches!(instruction, Syscall | Sysenter) && context.cpl() != 0 {
-        return Err(GeneralProtection);
+        return Err(Privilege);
     }
     if matches!(instruction, Sysenter | Sysexit { .. }) && bank.sysenter_cs & 0xfffc == 0 {
-        return Err(GeneralProtection);
+        return Err(Target);
     }
     if matches!(instruction, Sysret { wide: true }) && !canonical48(scalar.registers[1])
         || matches!(instruction, Sysexit { wide: true })
             && (!canonical48(scalar.registers[1]) || !canonical48(scalar.registers[2]))
     {
-        return Err(GeneralProtection);
+        return Err(Target);
     }
     let mut prepared = Prepared {
         bank,

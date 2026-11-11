@@ -2,7 +2,8 @@ use super::*;
 use crate::memory::Access;
 use crate::x86::context::{LoadedSegment, Mode, Segment, SegmentAttributes, SegmentType};
 use crate::x86::flags;
-use ControlFailure::{GeneralProtection, Undefined, Unsupported};
+use ControlFailure::{GeneralProtection, Unsupported};
+use Failure::{Privilege, Target, Undefined};
 
 fn bank() -> State {
     State {
@@ -405,7 +406,7 @@ fn syscall_and_sysenter_admit_all_cpls_but_mode_and_sce_are_real_legality() {
                     &context(mode, 0),
                     4
                 ),
-                Err(Unsupported)
+                Err(Failure::Unsupported)
             );
         }
     }
@@ -467,7 +468,7 @@ fn sysret64_denies_noncanonical_rcx_before_any_publication_but_32_discards_high_
             &context,
             4
         ),
-        Err(GeneralProtection)
+        Err(Target)
     );
     let prepared = prepare(
         Instruction::Sysret { wide: false },
@@ -607,7 +608,7 @@ fn sysexit_canonicality_and_null_selector_failures_are_atomic_and_form_specific(
                 &context,
                 4
             ),
-            Err(GeneralProtection)
+            Err(Target)
         );
         let prepared = prepare(
             Instruction::Sysexit { wide: false },
@@ -634,7 +635,7 @@ fn sysexit_canonicality_and_null_selector_failures_are_atomic_and_form_specific(
         ] {
             assert_eq!(
                 prepare(instruction, bank, &paging(true), &scalar(), &context, 4),
-                Err(GeneralProtection)
+                Err(Target)
             );
         }
     }
@@ -656,9 +657,104 @@ fn returns_and_swapgs_are_privileged_before_target_processing() {
         ] {
             assert_eq!(
                 prepare(instruction, bank(), &paging(true), &scalar, &context, 4),
-                Err(GeneralProtection)
+                Err(Privilege)
             );
         }
+    }
+}
+
+#[test]
+fn transfer_failure_provenance_follows_mode_sce_privilege_then_target() {
+    let mut bad_targets = scalar();
+    bad_targets.registers[1] = 0x8000_0000_0000;
+    bad_targets.registers[2] = 0x8000_0000_0000;
+    let null_enter = State {
+        sysenter_cs: 0x1234_0003,
+        ..bank()
+    };
+    for (instruction, mode, cpl, sce, bank, expected) in [
+        (
+            Instruction::Sysret { wide: true },
+            Mode::Compatibility,
+            3,
+            true,
+            bank(),
+            Undefined,
+        ),
+        (
+            Instruction::Sysret { wide: true },
+            Mode::Long64,
+            3,
+            false,
+            bank(),
+            Undefined,
+        ),
+        (
+            Instruction::Sysret { wide: true },
+            Mode::Long64,
+            3,
+            true,
+            bank(),
+            Privilege,
+        ),
+        (
+            Instruction::Swapgs,
+            Mode::Long64,
+            1,
+            false,
+            bank(),
+            Privilege,
+        ),
+        (
+            Instruction::Sysexit { wide: true },
+            Mode::Long64,
+            2,
+            false,
+            null_enter,
+            Privilege,
+        ),
+        (
+            Instruction::Sysret { wide: true },
+            Mode::Long64,
+            0,
+            true,
+            bank(),
+            Target,
+        ),
+        (
+            Instruction::Sysenter,
+            Mode::Long64,
+            3,
+            false,
+            null_enter,
+            Target,
+        ),
+        (
+            Instruction::Sysexit { wide: true },
+            Mode::Long64,
+            0,
+            false,
+            null_enter,
+            Target,
+        ),
+    ] {
+        let context = context(mode, cpl);
+        let original_context = context.clone();
+        let original_scalar = bad_targets.clone();
+        assert_eq!(
+            prepare(
+                instruction,
+                bank,
+                &paging(sce),
+                &bad_targets,
+                &context,
+                0x400002,
+            ),
+            Err(expected),
+            "{instruction:?}, {mode:?}, CPL{cpl}, SCE{sce}"
+        );
+        assert_eq!(context, original_context);
+        assert_eq!(bad_targets, original_scalar);
     }
 }
 
