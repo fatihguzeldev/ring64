@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -9,6 +9,7 @@ import {
   checkedBaseline,
   encode,
   freeze,
+  hash,
   manifest,
   root,
 } from './fast-system-support.mjs';
@@ -17,6 +18,22 @@ import { checkedContextBaseline, contextBaseline } from './context-reuse-support
 const args = process.argv.slice(2);
 const browserMode = args.includes('--browser');
 const contextReuse = args.includes('--context-reuse');
+const inputFiles = [
+  ...(await readdir(resolve(root, 'benchmarks')))
+    .filter((name) => name.endsWith('.mjs'))
+    .map((name) => 'benchmarks/' + name),
+  'scripts/paging-kernels.mjs',
+  'scripts/fast-system-kernels.mjs',
+  'scripts/context-reuse-kernels.mjs',
+  'scripts/fast-system-observer.mjs',
+];
+const inputHashes = async () =>
+  Object.fromEntries(
+    await Promise.all(
+      inputFiles.sort().map(async (path) => [path, hash(await readFile(resolve(root, path)))]),
+    ),
+  );
+const sourcesBefore = await inputHashes();
 if (contextReuse && !args.includes('--include-fast'))
   throw Error('--context-reuse observes inherited fast kernels and requires --include-fast');
 const value = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
@@ -206,6 +223,11 @@ async function observe({
           const wrapped = function (...args) {
             if (active) active.hostCalls[label] = (active.hostCalls[label] ?? 0) + 1;
             const result = operation.apply(this, args);
+            if (contextReuse && active && name === 'stateView' && result instanceof DataView)
+              active.coreMemoryBytes = Math.max(
+                active.coreMemoryBytes ?? 0,
+                result.buffer.byteLength,
+              );
             if (name === 'compile' && result && active)
               compiled.set(active.side + ':' + key(result.bytes), {
                 observed: result.metadata.boundaryObserved ?? false,
@@ -333,7 +355,9 @@ async function observe({
           await measureInheritedMsr(side, { iterations, samples: 1, workloads: [name] });
       }
       if (contextReuse) {
-        const { measureReuse, reuseNames } = await import(reuseKernels);
+        const { measureReuse, reuseNames, measurePopulation, populationNames } = await import(
+          reuseKernels
+        );
         cohort = 'warm-reuse';
         for (const name of reuseNames) {
           workload = name;
@@ -370,6 +394,59 @@ async function observe({
             instances,
           };
         });
+        cohort = 'population';
+        for (const name of populationNames) {
+          workload = name;
+          for (const side of sides)
+            await measurePopulation(side, {
+              iterations,
+              samples: 1,
+              workloads: [name],
+              requireReuse: side.label === 'current' && !sameBuildControl,
+              onPhase: (value) => {
+                phase = value;
+              },
+            });
+        }
+        evidence.populationCharacterizations = populationNames.map((name) => {
+          const rows = evidence.runs.filter(
+            (row) =>
+              row.cohort === 'population' &&
+              row.workload === name &&
+              row.side === 'current' &&
+              row.phase === 'measured',
+          );
+          const sum = (key) => rows.reduce((total, row) => total + (row.hostCalls[key] ?? 0), 0);
+          const [, count, position] = name.split('-'),
+            population = Number(count),
+            n = rows.length;
+          if (!sameBuildControl && position === 'first') {
+            const expected = {
+              activate: n,
+              valid: population * n,
+              compile: 0,
+              probe: 0,
+              publish: 0,
+              contextVersion: 0,
+              boundaryObserved: 0,
+            };
+            for (const [key, value] of Object.entries(expected))
+              if (sum(key) !== value) evidence.failures.push(name + ':default-call-count:' + key);
+          }
+          return {
+            name,
+            calls: rows.length,
+            activate: sum('activate'),
+            valid: sum('valid'),
+            compile: sum('compile'),
+            publish: sum('publish'),
+            release: sum('release'),
+            peakCoreLinearMemoryBytes: Math.max(...rows.map((row) => row.coreMemoryBytes ?? 0)),
+            maxCachedArtifacts: Math.max(...rows.map((row) => row.resources.cachedArtifacts)),
+            maxCachedBytes: Math.max(...rows.map((row) => row.resources.cachedBytes)),
+          };
+        });
+        phase = undefined;
       }
     }
     const activeRuns = evidence.runs.filter(
@@ -456,7 +533,19 @@ async function observe({
           'contextVersion',
           'boundaryObserved',
         ];
-        if (!same(total(a, 'hostCalls', ownershipCalls), total(b, 'hostCalls', ownershipCalls)))
+        const invariantCalls = (rows) => {
+          const calls = total(rows, 'hostCalls');
+          // Metadata and reason adaptation occur on every cold compile/probe too.
+          for (const name of ['info', 'output'])
+            calls[name] = (calls[name] ?? 0) - (calls.compile ?? 0);
+          calls.reason = (calls.reason ?? 0) - (calls.compile ?? 0) - (calls.probe ?? 0);
+          return Object.fromEntries(
+            Object.entries(calls).filter(
+              ([name, value]) => value !== 0 && !ownershipCalls.includes(name),
+            ),
+          );
+        };
+        if (!same(invariantCalls(a), invariantCalls(b)))
           invariantMismatches.push('unexpected-host-call-change');
         const cacheResources = [
           'compilations',
@@ -498,6 +587,11 @@ async function observe({
       );
       if (evidence.warmComparisons.length !== 7)
         evidence.failures.push('missing paired warm controls');
+      evidence.populationComparisons = evidence.comparisons.filter((row) =>
+        row.key.startsWith('population:'),
+      );
+      if (evidence.populationComparisons.length !== 12)
+        evidence.failures.push('missing population controls');
     }
     evidence.comparisons = evidence.comparisons.filter((row) => row.key.startsWith('inherited:'));
     if (includeFast && evidence.msrComparisons.length !== 2)
@@ -613,6 +707,9 @@ if (!browserMode) {
     await new Promise((done) => server.close(done));
   }
 }
+const sourcesAfter = await inputHashes();
+if (JSON.stringify(sourcesBefore) !== JSON.stringify(sourcesAfter))
+  throw Error('observer inputs changed during observation; discard the mixed-source result');
 await mkdir(dirname(output), { recursive: true });
 await writeFile(
   output,
@@ -620,6 +717,8 @@ await writeFile(
     at: new Date().toISOString(),
     runtime: browserMode ? 'chrome' : 'node',
     manifests: { baseline: old, current },
+    inputSources: sourcesBefore,
+    inputSourcesUnchanged: true,
     baselineControl: args.includes('--baseline-control'),
     ...result,
   }),

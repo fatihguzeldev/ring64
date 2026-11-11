@@ -9,6 +9,9 @@ export const reuseNames = [
   'fast-budget-one-roundtrip',
   'fast-debug-enabled-miss',
 ];
+export const populationNames = [1, 8, 32, 128].flatMap((n) =>
+  ['first', 'last', 'miss'].map((position) => `contexts-${n}-${position}`),
+);
 const canonical = (value) =>
   JSON.stringify(value, (_, x) =>
     typeof x === 'bigint'
@@ -163,20 +166,32 @@ export async function measureReusePair(sides, knobs) {
   const definitions = [],
     samples = [],
     schedule = [];
-  for (const workload of knobs.workloads ?? reuseNames)
+  for (const workload of knobs.workloads ?? (knobs.population ? populationNames : reuseNames))
     for (let sample = 0; sample < knobs.samples; sample++) {
       const order = (sample % 2) ^ Number(knobs.reverse ?? false) ? [1, 0] : [0, 1];
       for (const index of order) {
         const side = sides[index];
-        const result = await measureReuse(side, {
+        const result = await (knobs.population ? measurePopulation : measureReuse)(side, {
           ...knobs,
-          samples: 1,
+          samples: knobs.population ? 1 : 2,
           workloads: [workload],
           requireReuse: side.label === 'current' && !knobs.baselineControl,
         });
         if (sample === 0)
           definitions.push(...result.definitions.map((row) => ({ ...row, side: side.label })));
-        samples.push({ ...result.samples[0], sample, window: sample < 4 ? 'early' : 'later' });
+        samples.push(
+          ...result.samples.map((row, batch) => ({
+            ...row,
+            replicate: sample,
+            batch,
+            sample: sample * result.samples.length + batch,
+            window: knobs.population
+              ? 'independent-warm-replicate'
+              : batch === 0
+                ? 'early-warm-batch'
+                : 'later-warm-batch',
+          })),
+        );
         schedule.push({ workload, sample, side: side.label });
       }
     }
@@ -185,6 +200,125 @@ export async function measureReusePair(sides, knobs) {
     samples,
     schedule,
     pairedSchedule:
-      'Independent untimed warm-up per sample. Alternate A/B then B/A; reverse flips first order. Rearm preserves code, tables, mapping and returned context.',
+      'Independent untimed warm-up per replicate. Reuse replicates contain two consecutive measured batches on that CPU; population replicates contain one. Alternate A/B then B/A; reverse flips first order. Rearm preserves code, tables, mapping and returned context.',
   };
+}
+
+export async function measurePopulation(
+  side,
+  {
+    iterations = 101,
+    samples = 7,
+    workloads = populationNames,
+    requireReuse = false,
+    onPhase,
+  } = {},
+) {
+  const definitions = [],
+    results = [],
+    n = Math.min(iterations, 101);
+  for (const name of workloads) {
+    if (!populationNames.includes(name)) throw Error('unknown population workload');
+    const [, count, position] = name.split('-'),
+      population = Number(count);
+    const bytes = new Uint8Array((population + n * samples + 1) * 8);
+    for (let i = 0; i < bytes.length / 8; i++)
+      for (let j = 0; j < 8; j++)
+        bytes[i * 8 + j] = Number((BigInt(i + 1) >> BigInt(j * 8)) & 255n);
+    const cpu = await side.createCpu({
+      compiler: side.compiler,
+      code: { base: 0x1000n, bytes: Uint8Array.of(0x64, 0x48, 0x8b, 0x03, 0x82) },
+      ram: { base: 0x4000n, bytes },
+      limits: {
+        maxInstructions: 1,
+        maxSourceBytes: 32,
+        maxArtifactBytes: 16384,
+        maxCachedArtifacts: population,
+        maxCachedBytes: 4194304,
+        maxTranslationsPerRun: 1,
+      },
+    });
+    try {
+      const context = cpu.readContext(),
+        initial = { rip: 0x1000n, flags: 2n, registers: Array(16).fill(0n) };
+      const select = (index) =>
+        cpu.setContext({
+          ...context,
+          segments: {
+            ...context.segments,
+            fs: { ...context.segments.fs, base: 0x4000n + BigInt(index * 8) },
+          },
+        });
+      const check = (r, index) => {
+        equal(r.reason, 'budget', name + ' reason');
+        equal(r.retired, 1n, name + ' work');
+        equal(r.state.registers, [BigInt(index + 1), ...Array(15).fill(0n)], name + ' full GPR');
+        equal(r.state.flags, 2n, name + ' flags');
+        equal(r.state.rip, 0x1004n, name + ' RIP');
+      };
+      onPhase?.('warm-up');
+      for (let i = 0; i < population; i++) {
+        select(i);
+        cpu.setState(initial);
+        check(await cpu.run({ budget: 1n }), i);
+      }
+      const target = position === 'first' ? population - 1 : 0;
+      if (position !== 'miss') {
+        select(target);
+        cpu.setState(initial);
+        check(await cpu.run({ budget: 1n }), target);
+      }
+      definitions.push({
+        name,
+        population,
+        position,
+        iterations: n,
+        instructions: n,
+        work: n,
+        workUnit: 'one-instruction Cpu.run',
+        cap: population,
+        timing:
+          'elapsedMs sums Cpu.run only; batchWallMs includes host rearming/assertions and miss-context selection. Context selection is outside elapsedMs; priming and full RAM guard are outside both. first/last describe newest-first candidate order, not global LRU.',
+      });
+      for (let sample = 0; sample < samples; sample++) {
+        onPhase?.('measured');
+        let elapsedMs = 0;
+        const resources = {},
+          began = performance.now();
+        for (let i = 0; i < n; i++) {
+          const index = position === 'miss' ? population + sample * n + i : target;
+          if (position === 'miss') select(index);
+          cpu.setState(initial);
+          const at = performance.now(),
+            r = await cpu.run({ budget: 1n });
+          elapsedMs += performance.now() - at;
+          check(r, index);
+          for (const [key, value] of Object.entries(r.resources))
+            if (typeof value === 'number' && !key.startsWith('cached'))
+              resources[key] = (resources[key] ?? 0) + value;
+        }
+        const batchWallMs = performance.now() - began;
+        equal([...cpu.readMemory(0x4000n, bytes.length)], [...bytes], name + ' data unchanged');
+        const translations = cpu.inspectTranslations();
+        if (translations.length > population) throw Error(name + ': global cap exceeded');
+        if (requireReuse && position !== 'miss' && resources.compilations !== 0)
+          throw Error(name + ': hot variant recompiled');
+        results.push({
+          workload: name,
+          side: side.label,
+          sample,
+          calls: n,
+          retired: BigInt(n),
+          elapsedMs,
+          batchWallMs,
+          resources,
+          cachedArtifacts: translations.length,
+          cachedBytes: translations.reduce((sum, m) => sum + m.byteLength, 0),
+        });
+      }
+    } finally {
+      cpu.dispose();
+    }
+  }
+  return { definitions, samples: results };
 }

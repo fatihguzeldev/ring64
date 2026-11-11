@@ -19,7 +19,7 @@ import { measurePagingPair } from './fast-system-paging-pair.mjs';
 import { measureInheritedMsr, inheritedMsrNames } from './fast-system-kernels.mjs';
 import { measureFast, fastNames } from './fast-system-kernels.mjs';
 import { checkedContextBaseline, contextBaseline } from './context-reuse-support.mjs';
-import { measureReusePair, reuseNames } from './context-reuse-kernels.mjs';
+import { measureReusePair, reuseNames, populationNames } from './context-reuse-kernels.mjs';
 
 const args = process.argv.slice(2);
 const value = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
@@ -27,18 +27,21 @@ const browserMode = args.includes('--browser');
 const msrMode = args.includes('--msr-controls');
 const fastMode = args.includes('--fast-controls');
 const reuseMode = args.includes('--reuse-controls');
+const populationMode = args.includes('--population-controls');
 const contextReuse = args.includes('--context-reuse');
-if ((fastMode || reuseMode) && !contextReuse)
+if ((fastMode || reuseMode || populationMode) && !contextReuse)
   throw Error('reuse/fast controls require --context-reuse');
-if ([fastMode, reuseMode, msrMode].filter(Boolean).length > 1)
+if ([fastMode, reuseMode, populationMode, msrMode].filter(Boolean).length > 1)
   throw Error('select one control cohort');
-const names = reuseMode
-  ? reuseNames
-  : fastMode
-    ? fastNames
-    : msrMode
-      ? inheritedMsrNames
-      : pagingNames;
+const names = populationMode
+  ? populationNames
+  : reuseMode
+    ? reuseNames
+    : fastMode
+      ? fastNames
+      : msrMode
+        ? inheritedMsrNames
+        : pagingNames;
 const tag = value('--tag', new Date().toISOString().replaceAll(/[:.]/g, '-'));
 const reference = await (contextReuse ? checkedContextBaseline : checkedBaseline)(
   value('--baseline', contextReuse ? contextBaseline : baseline),
@@ -63,6 +66,7 @@ const knobs = {
   workloads: value('--workloads', names.join(',')).split(','),
   reverse: args.includes('--reverse'),
   baselineControl: args.includes('--baseline-control'),
+  population: populationMode,
 };
 for (const [name, max] of [
   ['iterations', 1000001],
@@ -90,14 +94,15 @@ if (!browserMode) {
       };
     }),
   );
-  result = reuseMode
-    ? await measureReusePair(sides, knobs)
-    : await measurePagingPair(
-        sides,
-        fastMode ? measureFast : msrMode ? measureInheritedMsr : measurePaging,
-        names,
-        knobs,
-      );
+  result =
+    reuseMode || populationMode
+      ? await measureReusePair(sides, knobs)
+      : await measurePagingPair(
+          sides,
+          fastMode ? measureFast : msrMode ? measureInheritedMsr : measurePaging,
+          names,
+          knobs,
+        );
 } else {
   const roots = new Map(definitions.map(([label, side]) => [label, side.path]));
   const server = createServer(async (request, response) => {
@@ -152,7 +157,7 @@ if (!browserMode) {
     const page = await browser.newPage();
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     result = await page.evaluate(
-      async ({ definitions, knobs, msrMode, fastMode, reuseMode }) => {
+      async ({ definitions, knobs, msrMode, fastMode, reuseMode, populationMode }) => {
         const { measurePaging, pagingNames } = await import('/scripts/paging-kernels.mjs');
         const { measurePagingPair } = await import('/scripts/fast-system-paging-pair.mjs');
         const { measureFast, fastNames, measureInheritedMsr, inheritedMsrNames } =
@@ -171,7 +176,7 @@ if (!browserMode) {
           }),
         );
         return {
-          ...(reuseMode
+          ...(reuseMode || populationMode
             ? await measureReusePair(sides, knobs)
             : await measurePagingPair(
                 sides,
@@ -182,7 +187,7 @@ if (!browserMode) {
           browserUserAgent: navigator.userAgent,
         };
       },
-      { definitions, knobs, msrMode, fastMode, reuseMode },
+      { definitions, knobs, msrMode, fastMode, reuseMode, populationMode },
     );
     result.browserVersion = browser.version();
   } finally {
@@ -214,19 +219,21 @@ await writeFile(
     baselineControl: args.includes('--baseline-control'),
     aa: args.includes('--aa'),
     inheritedReference: reference,
-    cohort: reuseMode
-      ? 'seven source-preserving independently prewarmed context loops'
-      : fastMode
-        ? 'eleven inherited fast-transfer kernels; unchanged whole-RAM rearming'
-        : msrMode
-          ? 'two additional inherited EFER controls'
-          : 'twenty inherited paging kernels',
+    cohort: populationMode
+      ? 'twelve same-PC population/position/cold-miss controls'
+      : reuseMode
+        ? 'seven source-preserving independently prewarmed context loops'
+        : fastMode
+          ? 'eleven inherited fast-transfer kernels; unchanged whole-RAM rearming'
+          : msrMode
+            ? 'two additional inherited EFER controls'
+            : 'twenty inherited paging kernels',
     knobs,
     kernelSha256: hash(
       await readFile(
         resolve(
           root,
-          reuseMode
+          reuseMode || populationMode
             ? 'scripts/context-reuse-kernels.mjs'
             : msrMode || fastMode
               ? 'scripts/fast-system-kernels.mjs'
@@ -241,7 +248,9 @@ await writeFile(
       await readFile(
         resolve(
           root,
-          reuseMode ? 'scripts/context-reuse-kernels.mjs' : 'scripts/fast-system-paging-pair.mjs',
+          reuseMode || populationMode
+            ? 'scripts/context-reuse-kernels.mjs'
+            : 'scripts/fast-system-paging-pair.mjs',
         ),
       ),
     ),
