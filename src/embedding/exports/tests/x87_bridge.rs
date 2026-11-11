@@ -341,3 +341,105 @@ fn x87_identity_code_store_invalidates_only_after_store_and_pop_commit() {
     assert_eq!(after.opcode, 0x11b);
     assert!(BRIDGE.with_borrow(|bridge| bridge.core.as_ref().unwrap().image.owner_valid(owner)));
 }
+
+#[test]
+fn x87_operand_accessed_alias_reports_source_change_without_a_payload_store() {
+    for store in [false, true] {
+        initialize(0x400000, &[0x90]);
+        BRIDGE.with_borrow_mut(|bridge| {
+            let core = bridge.core.as_mut().unwrap();
+            let mut tables = vec![0; 0x4000];
+            for (address, value) in [
+                (0x1000, 0x2027u64),
+                (0x2000, 0x3027),
+                (0x3010, 0x4027),
+                (0x4000, 0x9027),
+            ] {
+                tables[address - 0x1000..address - 0x1000 + 8]
+                    .copy_from_slice(&value.to_le_bytes());
+            }
+            let map = |base, backing: &str, offset, length, execute| MappingInput {
+                base,
+                backing: backing.into(),
+                offset,
+                length,
+                permissions: Permissions {
+                    read: true,
+                    write: true,
+                    execute,
+                },
+            };
+            core.image = Image::physical_mapped(
+                vec![
+                    ("tables".into(), tables),
+                    (
+                        "code".into(),
+                        vec![
+                            0xdf,
+                            if store { 0x33 } else { 0x23 },
+                            0xb8,
+                            7,
+                            0xa0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                        ],
+                    ),
+                    ("data".into(), vec![0x42, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+                ],
+                vec![
+                    map(0x1000, "tables", 0, 0x3800, false),
+                    map(0x4800, "code", 3, 8, false),
+                    map(0x4808, "tables", 0x3808, 0x7f8, false),
+                    map(0x9000, "code", 0, 11, true),
+                    map(0xa000, "data", 0, 10, false),
+                ],
+                MemoryLimits {
+                    max_backings: 3,
+                    max_mappings: 5,
+                    max_backing_bytes: 0x5000,
+                },
+            )
+            .unwrap();
+            core.paging = Some(crate::x86::paging::State {
+                cr3: 0x1000,
+                ..crate::x86::paging::State::default()
+            });
+            let owner = core.image.register_source([(0x9000, 11)]).unwrap();
+            assert!(core.image.activate(owner));
+            if store {
+                let state = unsafe { &mut (*core.state.get()).x87 };
+                state.control_word = 0x37e;
+                state.set_raw(0, 0x7fff8000000000000000);
+                state.set_tag(0, 2);
+            }
+        });
+        let op = Op {
+            kind: if store { Kind::Store } else { Kind::Load },
+            format: Format::Bcd,
+            pop: u8::from(store),
+            encoding: if store { 0x733 } else { 0x723 },
+            ..Op::default()
+        };
+        assert_eq!(
+            x87::core_paged_x87(op.encode(), 0x500000, Segment::Ds as u32, 0x400000, 2, 0),
+            2
+        );
+        BRIDGE.with_borrow(|bridge| {
+            let core = bridge.core.as_ref().unwrap();
+            assert_eq!(core.image.physical_read(0x9003, 4).unwrap(), 0xa027);
+            assert_eq!(core.image.physical_read(0xa000, 1).unwrap(), 0x42);
+            let state = unsafe { &(*core.state.get()).x87 };
+            assert_eq!(state.instruction_pointer, 0x400000);
+            assert_eq!(state.top(), if store { 0 } else { 7 });
+            if store {
+                assert_eq!(state.status_word, 0x8081);
+            } else {
+                assert_eq!(state.raw(7), 0x4004a800000000000000);
+            }
+        });
+    }
+}
