@@ -164,6 +164,10 @@ export type SystemMemoryFault = SystemMemoryAccess & SystemMemoryReference;
 export interface PageFault {
   instructionPc: bigint;
   vector: 14;
+  table?: 'gdt' | 'ldt' | 'idt' | 'tss';
+  systemPhase?: string;
+  selector?: number;
+  referenceVector?: number;
   address: bigint;
   access: 'read' | 'write' | 'execute';
   errorCode: number;
