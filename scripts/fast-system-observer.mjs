@@ -189,7 +189,16 @@ async function observe({
         ? Uint8Array.from(definition.bytes)
         : new Uint8Array(await (await fetch(definition.wasm)).arrayBuffer());
       const compiler = await nativeCompile(bytes),
-        api = new NativeInstance(compiler, {}).exports;
+        api = new NativeInstance(compiler, {
+          io: {
+            read() {
+              throw Error('unexpected port input during observer layout probe');
+            },
+            write() {
+              throw Error('unexpected port output during observer layout probe');
+            },
+          },
+        }).exports;
       const input = api.core_input(2);
       new Uint8Array(api.memory.buffer).set([0x90, 0], input);
       if (api.core_init(0x1000n, 1, 0x4000n, 1) !== 0) throw Error('layout control failed');
