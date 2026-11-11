@@ -98,6 +98,14 @@ const special = [
     store: true,
   },
 ];
+const ioProgressNames = [
+  'io-rep-ins16-address32-descending',
+  'io-rep-ins8-batch',
+  'io-rep-ins8-allowance1',
+  'io-ins-fault-repair',
+  'io-ins-code-edit',
+  'io-ins-pte-edit',
+];
 export const newSpecNames = [
   ...special.map((row) => row.name),
   'io-in-scalar',
@@ -105,6 +113,7 @@ export const newSpecNames = [
   'io-rep-ins8-bitmap',
   'io-rep-ins8-paged-bitmap',
   ...['ins', 'outs'].flatMap((kind) => [8, 16, 32].map((width) => `io-rep-${kind}${width}`)),
+  ...ioProgressNames,
   'legacy32-rmw',
   'legacy-pae-rmw',
   'ia32e-rmw',
@@ -207,8 +216,340 @@ async function physical(side, family, code, ramSize = 0x20000, io, compileLimits
   });
 }
 
+// Sum event counters across public runs; cache sizes remain the last run's gauges.
+function ioRunWork(results) {
+  const counters = ['compilations', 'cacheHits', 'nativeEntries', 'dispatches', 'generatedBytes'];
+  const resources = { ...results.at(-1).resources };
+  for (const key of counters)
+    resources[key] = results.reduce((sum, result) => sum + result.resources[key], 0);
+  if ('pagingRestarts' in resources)
+    resources.pagingRestarts = results.reduce(
+      (sum, result) => sum + result.resources.pagingRestarts,
+      0,
+    );
+  return {
+    publicRuns: results.length,
+    retired: results.reduce((sum, result) => sum + result.retired, 0n),
+    repeatIterations: results.reduce((sum, result) => sum + result.repeatIterations, 0n),
+    resources,
+    timings: Object.fromEntries(
+      Object.keys(results[0].timings).map((key) => [
+        key,
+        results.reduce((sum, result) => sum + result.timings[key], 0),
+      ]),
+    ),
+  };
+}
+
+async function ioProgressKernel(side, name, requested) {
+  if (name.startsWith('io-rep-')) {
+    const descending = name.includes('descending'),
+      allowanceOne = name.endsWith('allowance1'),
+      n = Math.min(requested, 2048),
+      width = descending ? 16 : 8,
+      size = width / 8,
+      value = descending ? 0xbeef : 0x7b,
+      start = 0x5000 + (descending ? (n - 1) * size : 0),
+      code = hex(descending ? '6766f36d' : 'f36c'),
+      ram = new Uint8Array(n * size + 0x1020).fill(0xa5);
+    let callbacks = 0;
+    const transactionGeometry = new Uint32Array(n * 2);
+    const cpu = await side.createCpu({
+      compiler: side.compiler,
+      limits,
+      code: { base: 0x1000n, bytes: code },
+      ram: { base: 0x4000n, bytes: ram },
+      io: {
+        read(port, bits) {
+          transactionGeometry[callbacks * 2] = port;
+          transactionGeometry[callbacks * 2 + 1] = bits;
+          callbacks++;
+          return value;
+        },
+        write() {
+          throw Error('unexpected output');
+        },
+      },
+    });
+    let before;
+    return {
+      cpu,
+      units: n,
+      unit: 'completed input element; batch and allowance1 use identical capped N',
+      prepare() {
+        callbacks = 0;
+        transactionGeometry.fill(0);
+        before = state(n);
+        if (descending) {
+          before.registers[1] |= 0x1122334400000000n;
+          before.registers[7] = 0x5566778800000000n | BigInt(start);
+          before.flags = 0x10402n;
+        }
+        cpu.setState(before);
+        cpu.writeMemory(0x4000n, ram);
+      },
+      async run() {
+        const results = [];
+        for (let i = 0; i < (allowanceOne ? n : 1); i++)
+          results.push(await cpu.run({ budget: 1n, repeatBudget: BigInt(allowanceOne ? 1 : n) }));
+        return results;
+      },
+      validate(results) {
+        const work = ioRunWork(results),
+          last = results.at(-1);
+        check(
+          callbacks === n && work.repeatIterations === BigInt(n) && work.retired === 1n,
+          name + ' same completed work',
+        );
+        check(
+          transactionGeometry.every((value, i) => value === (i % 2 ? width : 0x80)),
+          name + ' full-width callback geometry',
+        );
+        for (let i = 0; i < results.length; i++) {
+          const result = results[i],
+            done = allowanceOne ? i + 1 : n;
+          check(
+            result.reason === (done === n ? 'budget' : 'repeat-budget'),
+            name + ' allowance exit',
+          );
+          check(result.retired === (done === n ? 1n : 0n), name + ' final retirement only');
+          check(
+            result.repeatIterations === BigInt(allowanceOne ? 1 : n),
+            name + ' exact run progress',
+          );
+          const registers = [...before.registers];
+          registers[1] = BigInt(n - done);
+          registers[7] = BigInt(start + (descending ? -1 : 1) * done * size);
+          check(
+            result.state.registers.every((value, bank) => value === registers[bank]),
+            name + ' full raw banks',
+          );
+          check(
+            result.state.rip === 0x1000n + (done === n ? BigInt(code.length) : 0n),
+            name + ' PC',
+          );
+          check(result.state.flags === (descending ? 0x402n : 2n), name + ' flags');
+        }
+        const expected = ram.slice();
+        for (let i = 0; i < n; i++) put(expected, 0x1000 + i * size, BigInt(value), size);
+        check(
+          cpu.readMemory(0x4000n, expected.length).every((value, i) => value === expected[i]),
+          name + ' complete guarded destination',
+        );
+        check(last.remaining === 0n && last.remainingRepeatBudget === 0n, name + ' exhausted work');
+        return {
+          ...work,
+          callbacks,
+          attemptedElements: n,
+          acceptedCallbacks: callbacks,
+          consumedInputs: callbacks,
+          committedElements: n,
+          failedInsDestinations: 0,
+          dataBytes: n * size,
+          addressWidth: descending ? 32 : 64,
+          direction: descending ? 'descending' : 'ascending',
+          owners: cpu.inspectTranslations(),
+        };
+      },
+    };
+  }
+
+  const codeEdit = name === 'io-ins-code-edit',
+    pteEdit = name === 'io-ins-pte-edit';
+  let callbacks = 0;
+  const inputs = codeEdit ? [0x6c, 0x7b] : pteEdit ? [0x22, 0x50] : [0x11, 0x22, 0x33];
+  const transactionGeometry = new Uint32Array(inputs.length * 2);
+  const io = {
+    read(port, width) {
+      transactionGeometry[callbacks * 2] = port;
+      transactionGeometry[callbacks * 2 + 1] = width;
+      return inputs[callbacks++];
+    },
+    write() {
+      throw Error('unexpected output');
+    },
+  };
+  const permissions = (write, execute) => ({ read: true, write, execute });
+  const initialMappings = codeEdit
+    ? [
+        {
+          base: 0x1000n,
+          backing: 'code',
+          offset: 0,
+          length: 3,
+          permissions: permissions(false, true),
+        },
+        {
+          base: 0x2000n,
+          backing: 'code',
+          offset: 0,
+          length: 3,
+          permissions: permissions(true, false),
+        },
+      ]
+    : [
+        {
+          base: 0x1000n,
+          backing: 'code',
+          offset: 0,
+          length: 2,
+          permissions: permissions(false, true),
+        },
+        {
+          base: 0x4000n,
+          backing: 'ram',
+          offset: 0,
+          length: 1,
+          permissions: permissions(true, false),
+        },
+      ];
+  const repairedMappings = [
+    ...initialMappings,
+    {
+      base: 0x4001n,
+      backing: 'repair',
+      offset: 0,
+      length: 1,
+      permissions: permissions(true, false),
+    },
+  ];
+  const cpu = pteEdit
+    ? await physical(side, 'ia32e', hex('f36c'), 0x20000, io)
+    : await side.createCpu({
+        compiler: side.compiler,
+        limits,
+        io,
+        entry: 0x1000n,
+        memoryLimits: { maxBackings: 3, maxMappings: 3, maxBackingBytes: 8 },
+        memory: {
+          backings: codeEdit
+            ? [{ id: 'code', bytes: hex('f36cf5') }]
+            : [
+                { id: 'code', bytes: hex('f36c') },
+                { id: 'ram', bytes: hex('a5') },
+                { id: 'repair', bytes: hex('a5') },
+              ],
+          mappings: initialMappings,
+        },
+      });
+  if (pteEdit) {
+    const bytes = new Uint8Array(8);
+    put(bytes, 0, 0x13063n);
+    cpu.writePhysicalMemory(0x13030n, bytes);
+    cpu.setPagingState({ ...cpu.readPagingState(), efer: 0xd00n });
+  }
+  return {
+    cpu,
+    units: 2,
+    unit: 'completed input element in one fixed source/repair packet',
+    prepare() {
+      callbacks = 0;
+      transactionGeometry.fill(0);
+      const before = state(2);
+      before.registers[7] = codeEdit ? 0x2000n : pteEdit ? 0x6008n : 0x4000n;
+      before.flags = 0x10002n;
+      cpu.setState(before);
+      if (codeEdit) cpu.writeMemory(0x2000n, hex('f36cf5'));
+      else if (pteEdit) {
+        const bytes = new Uint8Array(8);
+        put(bytes, 0, 0x5023n);
+        cpu.writePhysicalMemory(0x13008n, bytes);
+      } else {
+        cpu.setMappings(initialMappings);
+        cpu.writeMemory(0x4000n, hex('a5'));
+      }
+    },
+    async run() {
+      const results = [await cpu.run({ budget: 1n, repeatBudget: 2n })];
+      if (!codeEdit) {
+        if (pteEdit) {
+          const bytes = new Uint8Array(8);
+          put(bytes, 0, 0x5023n);
+          cpu.writePhysicalMemory(0x13008n, bytes);
+        } else cpu.setMappings(repairedMappings);
+        results.push(await cpu.run({ budget: 1n, repeatBudget: 1n }));
+      }
+      return results;
+    },
+    validate(results) {
+      const work = ioRunWork(results),
+        first = results[0],
+        last = results.at(-1);
+      check(last.reason === 'budget' && work.retired === 1n, name + ' completed packet');
+      check(callbacks === inputs.length, name + ' exact external attempts');
+      check(
+        transactionGeometry.every((value, i) => value === (i % 2 ? 8 : 0x80)),
+        name + ' callback geometry',
+      );
+      check(work.repeatIterations === BigInt(codeEdit ? 1 : 2), name + ' completed repeat work');
+      check(last.state.rip === (codeEdit ? 0x1001n : 0x1002n), name + ' final PC');
+      check(last.state.registers[1] === (codeEdit ? 1n : 0n), name + ' count');
+      check(
+        last.state.registers[7] === (codeEdit ? 0x2002n : pteEdit ? 0x600an : 0x4002n),
+        name + ' index',
+      );
+      check(last.state.flags === 2n, name + ' RF after begin');
+      if (codeEdit)
+        check(
+          [...cpu.readMemory(0x1000n, 3)].join(',') === '108,123,245',
+          name + ' new bare form and tail',
+        );
+      else {
+        check(
+          first.reason === (pteEdit ? 'page-fault' : 'data-fault') &&
+            first.retired === 0n &&
+            first.repeatIterations === 1n,
+          name + ' first committed element and later fault',
+        );
+        check(
+          first.state.registers[1] === 1n &&
+            first.state.registers[7] === (pteEdit ? 0x6009n : 0x4001n),
+          name + ' fault preserves preceding progress',
+        );
+        if (pteEdit) {
+          check(
+            first.pageFault.address === 0x1000n && first.pageFault.errorCode === 0x10,
+            name + ' source fetch fault',
+          );
+          check(
+            [...cpu.readPhysicalMemory(0x13008n, 8)].join(',') === '35,80,0,0,0,0,0,0',
+            name + ' repaired leaf',
+          );
+        } else {
+          check(
+            first.fault.address === 0x4001n && first.fault.width === 1,
+            name + ' failed destination',
+          );
+          check(
+            [...cpu.readMemory(0x4000n, 2)].join(',') === '17,51',
+            name + ' fresh retry input; discarded22',
+          );
+        }
+      }
+      return {
+        ...work,
+        callbacks,
+        attemptedElements: inputs.length,
+        acceptedCallbacks: callbacks,
+        consumedInputs: callbacks,
+        committedElements: 2,
+        failedInsDestinations: codeEdit || pteEdit ? 0 : 1,
+        sourceFetchFaults: pteEdit ? 1 : 0,
+        operandAttempts: inputs.length,
+        dataBytes: 2,
+        timedHostRepair: !codeEdit,
+        owners: cpu.inspectTranslations(),
+        ownerWarmth: codeEdit
+          ? 'source bytes restored before each packet; timed recompilation'
+          : 'same CPU across samples',
+      };
+    },
+  };
+}
+
 async function kernel(side, name, requested) {
   if (name.startsWith('transition-')) return transitionKernel(side, name, limits);
+  if (ioProgressNames.includes(name)) return ioProgressKernel(side, name, requested);
   const row = special.find((row) => row.name === name);
   if (row) {
     const cpu = await linear(side, loop(row.body));
@@ -313,7 +654,9 @@ async function kernel(side, name, requested) {
               Object.fromEntries(
                 Object.entries(result.resources).map(([key, value]) => [
                   key,
-                  (sum[key] ?? 0) + value,
+                  key === 'cachedArtifacts' || key === 'cachedBytes'
+                    ? value
+                    : (sum[key] ?? 0) + value,
                 ]),
               ),
             {},
