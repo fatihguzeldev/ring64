@@ -1,7 +1,9 @@
 use super::access::{Lookup, ia32e};
 use super::descriptor::Descriptor;
-use super::{ExecutionContext, Image, ProtectionFault, ProtectionPhase};
+use super::{ExecutionContext, GuestMemory, ProtectionFault, ProtectionPhase};
 use crate::memory::Access;
+#[cfg(test)]
+use crate::memory::Image;
 use crate::x86::context::{
     AccessFailure, LoadedSegment, Mode, Segment, SegmentAttributes, SegmentType,
 };
@@ -31,6 +33,7 @@ pub enum FarFailure {
     },
     Protection(super::ProtectionFault),
     SystemMemory(super::SystemMemoryFault),
+    SystemPaging(super::SystemPagingFault),
     Unsupported,
 }
 
@@ -46,7 +49,7 @@ pub fn valid_in_mode(descriptor: FarDescriptor, context: &ExecutionContext) -> b
 
 pub fn execute(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     descriptor: FarDescriptor,
     operands: FarOperands,
 ) -> Result<FarOutcome, FarFailure> {
@@ -210,10 +213,19 @@ pub fn execute(
         }
     }
 
-    for (address, byte) in code_write.into_iter().chain(stack_write) {
-        image
-            .write(address, 1, u64::from(byte))
-            .expect("admitted private descriptor write");
+    image.prepare_publication().map_err(|failure| {
+        if let Some(write) = code_write
+            .into_iter()
+            .chain(stack_write)
+            .find(|write| write.contains(failure))
+        {
+            system_failure(write.failure(failure))
+        } else {
+            linear_failure(failure, Segment::Ss)
+        }
+    })?;
+    for write in code_write.into_iter().chain(stack_write) {
+        write.commit(image);
     }
     if let Some(slots) = slots {
         for slot in slots {
@@ -319,7 +331,11 @@ struct Write {
     value: u64,
 }
 
-fn lookup(context: &ExecutionContext, image: &Image, selector: u16) -> Result<Loaded, FarFailure> {
+fn lookup(
+    context: &ExecutionContext,
+    image: &impl GuestMemory,
+    selector: u16,
+) -> Result<Loaded, FarFailure> {
     if selector < 4 {
         return Err(selector_fault(selector, 13, ProtectionPhase::Selector));
     }
@@ -332,7 +348,7 @@ fn lookup(context: &ExecutionContext, image: &Image, selector: u16) -> Result<Lo
 
 pub(super) fn code(
     context: &ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     kind: FarKind,
     selector: u16,
 ) -> Result<Loaded, FarFailure> {
@@ -375,7 +391,7 @@ pub(super) fn code(
 
 pub(super) fn stack(
     context: &ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     mode: Mode,
     cpl: u8,
     selector: u16,
@@ -425,7 +441,7 @@ fn stack_geometry(
 
 fn read_stack(
     context: &ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     offset: u64,
     width: Width,
 ) -> Result<u64, FarFailure> {
@@ -459,11 +475,8 @@ fn target_fault() -> FarFailure {
         selector: None,
     })
 }
-fn linear_failure(failure: crate::memory::Fault, segment: Segment) -> FarFailure {
-    FarFailure::Operand {
-        segment,
-        failure: AccessFailure::Linear(failure),
-    }
+fn linear_failure(failure: AccessFailure, segment: Segment) -> FarFailure {
+    FarFailure::Operand { segment, failure }
 }
 fn operand_failure(failure: super::Failure, segment: Segment) -> FarFailure {
     match failure {
@@ -475,6 +488,7 @@ fn system_failure(failure: super::Failure) -> FarFailure {
     match failure {
         super::Failure::Protection(failure) => FarFailure::Protection(failure),
         super::Failure::SystemMemory(failure) => FarFailure::SystemMemory(failure),
+        super::Failure::SystemPaging(failure) => FarFailure::SystemPaging(failure),
         super::Failure::Operand(_) => unreachable!("descriptor access is unsegmented"),
     }
 }

@@ -1,3 +1,4 @@
+pub mod access;
 mod controls;
 pub mod walk;
 

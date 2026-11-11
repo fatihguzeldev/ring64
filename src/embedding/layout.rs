@@ -646,8 +646,10 @@ mod paging_append_tests {
             0,
             0,
         ));
-        let mut state = RunState::default();
-        state.event = RawEventState::encode(pf);
+        let mut state = RunState {
+            event: RawEventState::encode(pf),
+            ..RunState::default()
+        };
         assert!(state.event_state().is_err());
         state.set_event(pf);
         assert_eq!(state.event_state(), Ok(pf));

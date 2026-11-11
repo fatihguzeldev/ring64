@@ -81,6 +81,7 @@ fn core_far_control_impl<const OBSERVED: bool>(
                 segment,
             },
         ) {
+            Err(FarFailure::SystemPaging(fault)) => return core.system_paging_failure(fault),
             Ok(outcome) => outcome,
             Err(FarFailure::Operand { segment, failure }) => {
                 unsafe {

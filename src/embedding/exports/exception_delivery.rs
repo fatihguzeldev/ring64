@@ -221,6 +221,7 @@ pub extern "C" fn core_deliver_exception() -> i32 {
                     DATA
                 }
             }
+            Err(EventFailure::SystemPaging(fault)) => return core.system_paging_failure(fault),
             Err(EventFailure::SystemMemory(fault)) => {
                 core.system_memory_fault = Some(fault);
                 SYSTEM_MEMORY

@@ -6,7 +6,7 @@ use crate::x86::instruction::FarKind;
 
 pub(super) fn execute(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     descriptor: SoftwareEventDescriptor,
     inputs: EventInputs,
 ) -> Result<EventOutcome, EventFailure> {
@@ -170,10 +170,22 @@ pub(super) fn execute(
     if outer {
         clear_inaccessible(&mut prepared, cpl);
     }
-    for (address, byte) in code_write.into_iter().chain(stack_write) {
-        image
-            .write(address, 1, u64::from(byte))
-            .expect("admitted private IRET accessed write");
+    image.prepare_publication().map_err(|failure| {
+        if let Some(write) = code_write
+            .into_iter()
+            .chain(stack_write)
+            .find(|write| write.contains(failure))
+        {
+            descriptor_failure(write.failure(failure))
+        } else {
+            EventFailure::Operand {
+                segment: Segment::Ss,
+                failure,
+            }
+        }
+    })?;
+    for write in code_write.into_iter().chain(stack_write) {
+        write.commit(image);
     }
     let context_changed = *context != prepared;
     *context = prepared;
@@ -185,17 +197,17 @@ pub(super) fn execute(
     })
 }
 
-struct Reader<'a> {
+struct Reader<'a, M: GuestMemory> {
     context: &'a ExecutionContext,
-    image: &'a Image,
+    image: &'a M,
     raw: u64,
     cursor: u64,
     pointer_width: Width,
     width: Width,
 }
 
-impl<'a> Reader<'a> {
-    fn new(context: &'a ExecutionContext, image: &'a Image, sp: u64, width: Width) -> Self {
+impl<'a, M: GuestMemory> Reader<'a, M> {
+    fn new(context: &'a ExecutionContext, image: &'a M, sp: u64, width: Width) -> Self {
         let pointer_width = context.stack_width();
         Self {
             context,
@@ -221,7 +233,7 @@ impl<'a> Reader<'a> {
                 .read_vector(address, width)
                 .map_err(|failure| EventFailure::Operand {
                     segment: Segment::Ss,
-                    failure: AccessFailure::Linear(failure),
+                    failure,
                 })?;
         self.cursor = self.cursor.wrapping_add(u64::from(width)) & self.pointer_width.mask();
         Ok(u64::from_le_bytes(bytes[..8].try_into().unwrap()))
@@ -237,6 +249,7 @@ fn far_failure(failure: far::FarFailure) -> EventFailure {
         far::FarFailure::Operand { segment, failure } => EventFailure::Operand { segment, failure },
         far::FarFailure::Protection(failure) => EventFailure::Protection(failure),
         far::FarFailure::SystemMemory(failure) => EventFailure::SystemMemory(failure),
+        far::FarFailure::SystemPaging(failure) => EventFailure::SystemPaging(failure),
         far::FarFailure::Unsupported => EventFailure::Unsupported,
     }
 }

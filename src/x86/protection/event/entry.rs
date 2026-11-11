@@ -8,7 +8,7 @@ use super::*;
 
 pub(super) fn execute(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     event: SoftwareEventDescriptor,
     inputs: EventInputs,
 ) -> Result<EventOutcome, EventFailure> {
@@ -17,7 +17,7 @@ pub(super) fn execute(
 
 pub(super) fn enter_exception(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     event: ExceptionEvent,
     sp: u64,
     live_flags: u64,
@@ -36,7 +36,7 @@ pub(super) fn enter_exception(
 
 pub(super) fn enter_interrupt(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     event: InterruptEvent,
     sp: u64,
     live_flags: u64,
@@ -61,7 +61,7 @@ enum Source {
 
 fn enter(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     source: Source,
     inputs: EventInputs,
 ) -> Result<EventOutcome, EventFailure> {
@@ -122,6 +122,12 @@ fn enter(
         let selector = u16::from_le_bytes(gate[2..4].try_into().unwrap());
         let mut cache = context.segment(Segment::Cs);
         cache.base = u64::from(selector) << 4;
+        image
+            .prepare_publication()
+            .map_err(|failure| EventFailure::Operand {
+                segment: Segment::Ss,
+                failure,
+            })?;
         frame.commit(image);
         let changed = context.set_segment(
             Segment::Cs,
@@ -304,10 +310,22 @@ fn enter(
         None
     };
     frame.admit(image)?;
-    for (address, byte) in code_write.into_iter().chain(stack_write) {
-        image
-            .write(address, 1, u64::from(byte))
-            .expect("admitted private event accessed write");
+    image.prepare_publication().map_err(|failure| {
+        if let Some(write) = code_write
+            .into_iter()
+            .chain(stack_write)
+            .find(|write| write.contains(failure))
+        {
+            descriptor_failure(write.failure(failure))
+        } else {
+            EventFailure::Operand {
+                segment: Segment::Ss,
+                failure,
+            }
+        }
+    })?;
+    for write in code_write.into_iter().chain(stack_write) {
+        write.commit(image);
     }
     frame.commit(image);
     let context_changed = *context != prepared;
@@ -322,7 +340,7 @@ fn enter(
 
 fn code(
     context: &ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     selector: u16,
     ext: u16,
     idt_error: u16,
@@ -353,7 +371,7 @@ fn code(
 
 fn stack(
     context: &ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     cpl: u8,
     selector: u16,
     ext: u16,
@@ -384,7 +402,7 @@ fn stack(
 
 fn lookup(
     context: &ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     selector: u16,
     vector: u8,
     ext: u16,
@@ -434,7 +452,7 @@ fn task(
 
 fn read_rsp(
     context: &ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     cpl: u8,
     ist: u8,
     ext: u16,
@@ -459,7 +477,7 @@ fn read_rsp(
 
 fn read_legacy_stack(
     context: &ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     cpl: u8,
     ext: u16,
 ) -> Result<(u64, u16), EventFailure> {

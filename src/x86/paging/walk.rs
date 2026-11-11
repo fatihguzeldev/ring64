@@ -92,18 +92,32 @@ impl Request {
 }
 
 pub fn peek(image: &Image, state: &State, request: Request) -> Result<Translation, Failure> {
-    walk_with::<false>(state, request, |address, _| image.physical_read(address, 8))
+    walk_with::<false>(state, request, |address, _| {
+        image.physical_read(address, 8).map(Some)
+    })
+    .map(|translation| translation.expect("observational walk cannot restart"))
 }
 
 pub fn walk(image: &mut Image, state: &State, request: Request) -> Result<Translation, Failure> {
+    fetch_walk(image, state, request, |_| true)
+        .map(|translation| translation.expect("ordinary access does not abandon a walk"))
+}
+
+/// Stop a required-byte walk immediately when an A write invalidates consumed encoding.
+pub fn fetch_walk(
+    image: &mut Image,
+    state: &State,
+    request: Request,
+    mut current: impl FnMut(&Image) -> bool,
+) -> Result<Option<Translation>, Failure> {
     walk_with::<true>(state, request, |address, accessed| {
         if accessed {
             image.physical_check_write(address, 8)?;
-            let current = image.physical_read(address, 8)?;
-            image.physical_write(address, 8, current | ACCESSED)?;
-            Ok(current | ACCESSED)
+            let current_word = image.physical_read(address, 8)?;
+            image.physical_write(address, 8, current_word | ACCESSED)?;
+            Ok(current(image).then_some(current_word | ACCESSED))
         } else {
-            image.physical_read(address, 8)
+            image.physical_read(address, 8).map(Some)
         }
     })
 }
@@ -111,8 +125,8 @@ pub fn walk(image: &mut Image, state: &State, request: Request) -> Result<Transl
 fn walk_with<const EFFECTS: bool>(
     state: &State,
     request: Request,
-    mut entry_access: impl FnMut(u64, bool) -> Result<u64, Fault>,
-) -> Result<Translation, Failure> {
+    mut entry_access: impl FnMut(u64, bool) -> Result<Option<u64>, Fault>,
+) -> Result<Option<Translation>, Failure> {
     let mut table = state.cr3 & ADDRESS;
     let mut user = true;
     let mut writable = true;
@@ -121,8 +135,11 @@ fn walk_with<const EFFECTS: bool>(
     for (index, shift) in [39, 30, 21, 12].into_iter().enumerate() {
         let address = table + ((request.linear >> shift) & 511) * 8;
         entries[index] = address;
-        let entry = entry_access(address, false)
-            .map_err(|f| request.physical_failure(f, PhysicalPhase::WalkRead))?;
+        let Some(entry) = entry_access(address, false)
+            .map_err(|f| request.physical_failure(f, PhysicalPhase::WalkRead))?
+        else {
+            return Ok(None);
+        };
         if entry & 1 == 0 {
             return Err(request.page_fault(state, false, false));
         }
@@ -135,9 +152,13 @@ fn walk_with<const EFFECTS: bool>(
         {
             return Err(request.page_fault(state, true, true));
         }
-        if EFFECTS && entry & ACCESSED == 0 {
-            entry_access(address, true)
-                .map_err(|f| request.physical_failure(f, PhysicalPhase::AccessedWrite))?;
+        if EFFECTS
+            && entry & ACCESSED == 0
+            && entry_access(address, true)
+                .map_err(|f| request.physical_failure(f, PhysicalPhase::AccessedWrite))?
+                .is_none()
+        {
+            return Ok(None);
         }
         user &= entry & 4 != 0;
         writable &= entry & 2 != 0;
@@ -152,14 +173,14 @@ fn walk_with<const EFFECTS: bool>(
                 return Err(request.page_fault(state, true, false));
             }
             let offset_mask = (1u64 << shift) - 1;
-            return Ok(Translation {
+            return Ok(Some(Translation {
                 physical: (entry & ADDRESS & !offset_mask) | (request.linear & offset_mask),
                 leaf: address,
                 dirty: entry & DIRTY == 0,
                 remaining: (1u64 << shift) - (request.linear & offset_mask),
                 entries,
                 count: index + 1,
-            });
+            }));
         }
         table = entry & ADDRESS;
     }
@@ -292,7 +313,7 @@ mod tests {
     fn lower_absence_precedes_upper_permission_and_nonpresent_garbage_is_not_reserved() {
         let (mut image, state) = fixture();
         image.physical_write(0x1000, 8, 0x2001).unwrap();
-        image.physical_write(0x4008, 8, 0xfffffffffffffffE).unwrap();
+        image.physical_write(0x4008, 8, 0xfffffffffffffffe).unwrap();
         assert_eq!(
             walk(
                 &mut image,
@@ -309,7 +330,7 @@ mod tests {
                 error_code: 4
             }))
         );
-        assert_eq!(image.physical_read(0x4008, 8).unwrap(), 0xfffffffffffffffE);
+        assert_eq!(image.physical_read(0x4008, 8).unwrap(), 0xfffffffffffffffe);
     }
 
     #[test]

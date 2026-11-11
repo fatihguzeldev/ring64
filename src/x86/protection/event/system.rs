@@ -1,4 +1,4 @@
-use super::{EventFailure, ExecutionContext, Image};
+use super::{EventFailure, ExecutionContext, GuestMemory};
 use crate::memory::{Access, Cause};
 use crate::x86::protection::{ProtectionFault, ProtectionPhase, SystemMemoryFault};
 use crate::x86::protection::{SystemPhase, SystemReference, Table};
@@ -16,7 +16,7 @@ impl SystemRead {
     pub fn read(
         &self,
         context: &ExecutionContext,
-        image: &Image,
+        image: &impl GuestMemory,
         ext: u16,
     ) -> Result<[u8; 16], EventFailure> {
         let computed = u128::from(self.base) + u128::from(self.offset);
@@ -47,8 +47,23 @@ impl SystemRead {
             }));
         }
         image
-            .read_vector(address as u64, self.width)
-            .map_err(|failure| self.fault(address, failure.cause, failure.failing))
+            .read_system(address as u64, self.width)
+            .map_err(|failure| match failure {
+                super::AccessFailure::Linear(failure) => {
+                    self.fault(address, failure.cause, failure.failing)
+                }
+                super::AccessFailure::Paging(failure) => {
+                    EventFailure::SystemPaging(crate::x86::protection::SystemPagingFault {
+                        failure,
+                        phase: self.phase,
+                        table: self.table,
+                        reference: self.reference,
+                    })
+                }
+                super::AccessFailure::Segment(_) => {
+                    unreachable!("system access has no segment admission")
+                }
+            })
     }
 
     fn fault(&self, address: u128, cause: Cause, failing_address: u128) -> EventFailure {

@@ -121,6 +121,9 @@ pub extern "C" fn core_init_mapped(entry: u64, metadata_len: u32) -> i32 {
         };
         bridge.core = Some(Core {
             image,
+            paging: None,
+            paging_failure: None,
+            paging_system: None,
             state: Box::new(UnsafeCell::new(RunState {
                 rip: entry,
                 ..RunState::default()

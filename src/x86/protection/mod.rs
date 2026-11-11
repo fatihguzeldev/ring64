@@ -1,6 +1,9 @@
 use super::context::{AccessFailure, ExecutionContext, Mode, Segment, TableRegister};
 use super::instruction::{ProtectionDescriptor, ProtectionKind, Width};
-use crate::memory::{Access, Cause, Image};
+#[cfg(test)]
+use crate::memory::Image;
+use crate::memory::{Access, Cause};
+use crate::x86::access::GuestMemory;
 
 mod access;
 mod descriptor;
@@ -11,6 +14,9 @@ pub mod event;
 pub mod far;
 mod reload;
 mod task;
+
+#[cfg(test)]
+mod paging_tests;
 
 #[cfg(test)]
 mod tests;
@@ -115,10 +121,19 @@ pub struct SystemMemoryFault {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SystemPagingFault {
+    pub failure: crate::x86::paging::walk::Failure,
+    pub phase: SystemPhase,
+    pub table: Table,
+    pub reference: SystemReference,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Failure {
     Operand(AccessFailure),
     Protection(ProtectionFault),
     SystemMemory(SystemMemoryFault),
+    SystemPaging(SystemPagingFault),
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -161,7 +176,7 @@ pub fn valid_in_mode(descriptor: ProtectionDescriptor, context: &ExecutionContex
 
 pub fn execute(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     descriptor: ProtectionDescriptor,
     offset: u64,
     input: u64,
@@ -298,7 +313,7 @@ pub fn execute(
 
 fn query(
     context: &ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     kind: ProtectionKind,
     width: Width,
     selector: u16,

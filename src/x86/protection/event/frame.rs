@@ -15,6 +15,7 @@ pub(super) struct Frame {
     raw: u64,
     pointer_width: Width,
     new_stack_error: Option<u16>,
+    cpl: u8,
 }
 
 impl Frame {
@@ -27,6 +28,7 @@ impl Frame {
             raw: sp,
             pointer_width,
             new_stack_error,
+            cpl: context.cpl(),
         }
     }
 
@@ -87,19 +89,19 @@ impl Frame {
         Ok(())
     }
 
-    pub fn admit(&self, image: &Image) -> Result<(), EventFailure> {
+    pub fn admit(&self, image: &impl GuestMemory) -> Result<(), EventFailure> {
         for slot in &self.writes[..self.count] {
             image
-                .check_write(slot.address, slot.width)
+                .check_frame_write(slot.address, slot.width, self.cpl)
                 .map_err(|failure| EventFailure::Operand {
                     segment: Segment::Ss,
-                    failure: AccessFailure::Linear(failure),
+                    failure,
                 })?;
         }
         Ok(())
     }
 
-    pub fn commit(&self, image: &mut Image) {
+    pub fn commit(&self, image: &mut impl GuestMemory) {
         for slot in &self.writes[..self.count] {
             image
                 .write(slot.address, slot.width, slot.value)

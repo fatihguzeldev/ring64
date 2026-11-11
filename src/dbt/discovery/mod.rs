@@ -44,6 +44,7 @@ pub(crate) fn discover_with_context(
                 .map_err(|failure| match failure {
                     AccessFailure::Segment(fault) => DecodeError::Segment(fault),
                     AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
+                    AccessFailure::Paging(fault) => DecodeError::Paging(fault),
                 })?;
             let byte = image.fetch(linear).map_err(DecodeError::Fetch)?;
             fetched.push(linear);

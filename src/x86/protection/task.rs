@@ -5,7 +5,7 @@ use crate::x86::context::TaskRegister;
 
 pub(super) fn load(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     selector: u16,
 ) -> Result<bool, Failure> {
     let fault = |vector, phase| {
@@ -40,10 +40,12 @@ pub(super) fn load(
             return Err(fault(13, ProtectionPhase::Descriptor));
         }
     }
-    let (address, access) = lookup.prepare_busy(context, image, width, descriptor.access)?;
+    let write = lookup.prepare_busy(context, image, width, descriptor.access)?;
     image
-        .write(address, 1, u64::from(access))
-        .expect("admitted private TSS busy write");
+        .prepare_publication()
+        .map_err(|failure| write.failure(failure))?;
+    write.commit(image);
+    let access = descriptor.access | 2;
     Ok(context.set_tr(TaskRegister {
         selector,
         valid: true,

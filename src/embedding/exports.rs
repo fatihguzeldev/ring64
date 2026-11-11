@@ -21,6 +21,7 @@ mod mapped;
 mod mmx;
 mod numeric;
 mod numeric_image;
+mod paging;
 mod protection;
 mod software_events;
 mod streaming;
@@ -31,6 +32,9 @@ mod x87_state;
 
 struct Core {
     image: Image,
+    paging: Option<crate::x86::paging::State>,
+    paging_failure: Option<crate::x86::paging::walk::Failure>,
+    paging_system: Option<crate::x86::protection::SystemPagingFault>,
     state: Box<UnsafeCell<RunState>>,
     fault: Option<Fault>,
     divide_failed: bool,
@@ -106,6 +110,9 @@ pub extern "C" fn core_init(code_base: u64, code_len: u32, ram_base: u64, ram_le
         }));
         bridge.core = Some(Core {
             image,
+            paging: None,
+            paging_failure: None,
+            paging_system: None,
             state,
             fault: None,
             divide_failed: false,
@@ -257,6 +264,8 @@ pub extern "C" fn core_import_state() -> i32 {
 pub extern "C" fn core_clear_fault() -> i32 {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
+        core.paging_failure = None;
+        core.paging_system = None;
         core.debug_candidate = 0;
         core.fault = None;
         core.alignment_fault = None;
@@ -305,6 +314,7 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
                 .map_err(|failure| match failure {
                     AccessFailure::Linear(fault) => DecodeError::Fetch(fault),
                     AccessFailure::Segment(fault) => DecodeError::Segment(fault),
+                    AccessFailure::Paging(fault) => DecodeError::Paging(fault),
                 })
         });
         core.decode_fault = decoded
@@ -312,6 +322,7 @@ pub extern "C" fn core_probe(pc: u64) -> i32 {
             .err()
             .and_then(|error| error.architectural_fault());
         match decoded {
+            Err(DecodeError::Paging(failure)) => core.paging_failure(failure),
             Ok(_) => 0,
             Err(DecodeError::Segment(fault)) => {
                 core.segment_fault = Some(fault);
@@ -510,6 +521,9 @@ pub extern "C" fn core_fault_info(reason: i32) {
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_ref().unwrap();
         let fault = match reason {
+            super::layout::PAGE_FAULT | super::layout::PHYSICAL_MEMORY => {
+                core.paging_failure_json()
+            }
             super::layout::DEBUG_EXCEPTION => core
                 .debug_exception
                 .as_ref()

@@ -82,6 +82,7 @@ fn core_protection_impl<const OBSERVED: bool>(
             input,
             segment,
         ) {
+            Err(Failure::SystemPaging(fault)) => return core.system_paging_failure(fault),
             Ok(outcome) => outcome,
             Err(Failure::Operand(failure)) => {
                 core.access_failure(failure);

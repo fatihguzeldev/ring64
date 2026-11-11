@@ -5,6 +5,9 @@ impl Core {
         match failure {
             AccessFailure::Linear(fault) => self.fault = Some(fault),
             AccessFailure::Segment(fault) => self.segment_fault = Some(fault),
+            AccessFailure::Paging(fault) => {
+                self.paging_failure(fault);
+            }
         }
     }
 
@@ -227,7 +230,7 @@ pub extern "C" fn core_access_reason() -> i32 {
         } else if bridge.core.as_ref().unwrap().segment_fault.is_some() {
             SEGMENT
         } else {
-            DATA
+            bridge.core.as_ref().unwrap().memory_failure_reason()
         }
     })
 }

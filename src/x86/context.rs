@@ -185,6 +185,7 @@ pub struct SegmentFault {
 pub enum AccessFailure {
     Segment(SegmentFault),
     Linear(Fault),
+    Paging(super::paging::walk::Failure),
 }
 
 impl ExecutionContext {

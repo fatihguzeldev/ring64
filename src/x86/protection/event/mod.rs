@@ -1,4 +1,6 @@
-use super::{ExecutionContext, Image, ProtectionFault, ProtectionPhase, SystemMemoryFault};
+use super::{ExecutionContext, GuestMemory, ProtectionFault, ProtectionPhase, SystemMemoryFault};
+#[cfg(test)]
+use crate::memory::Image;
 use crate::x86::context::{AccessFailure, Mode, Segment, SegmentFault};
 use crate::x86::exception::{ExceptionEvent, InterruptEvent};
 use crate::x86::instruction::{SoftwareEventDescriptor, SoftwareEventKind, Width};
@@ -48,6 +50,7 @@ pub enum EventFailure {
     },
     Protection(ProtectionFault),
     SystemMemory(SystemMemoryFault),
+    SystemPaging(super::SystemPagingFault),
     Unsupported,
 }
 
@@ -58,6 +61,7 @@ impl EventFailure {
             Self::StackLimit { protection, .. } => Some(protection),
             Self::Operand { segment, failure } => super::access_fault(context, segment, failure),
             Self::SystemMemory(fault) => super::system_fault(context, fault),
+            Self::SystemPaging(_) => None,
             Self::Unsupported => None,
         }
     }
@@ -72,7 +76,7 @@ pub fn valid_in_mode(descriptor: SoftwareEventDescriptor, context: &ExecutionCon
 
 pub fn execute(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     descriptor: SoftwareEventDescriptor,
     inputs: EventInputs,
 ) -> Result<EventOutcome, EventFailure> {
@@ -95,7 +99,7 @@ pub fn execute(
 
 pub fn enter_exception(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     event: ExceptionEvent,
     sp: u64,
     live_flags: u64,
@@ -111,7 +115,7 @@ pub fn enter_exception(
 
 pub fn enter_interrupt(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     event: InterruptEvent,
     sp: u64,
     live_flags: u64,
@@ -147,6 +151,7 @@ fn descriptor_failure(failure: super::Failure) -> EventFailure {
     match failure {
         super::Failure::Protection(failure) => EventFailure::Protection(failure),
         super::Failure::SystemMemory(failure) => EventFailure::SystemMemory(failure),
+        super::Failure::SystemPaging(failure) => EventFailure::SystemPaging(failure),
         super::Failure::Operand(_) => unreachable!("unsegmented descriptor access"),
     }
 }

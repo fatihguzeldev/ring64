@@ -68,6 +68,7 @@ fn core_software_event_impl<const OBSERVED: bool>(
                 next_pc,
             },
         ) {
+            Err(EventFailure::SystemPaging(fault)) => return core.system_paging_failure(fault),
             Ok(outcome) => outcome,
             Err(EventFailure::Operand { segment, failure }) => {
                 unsafe {

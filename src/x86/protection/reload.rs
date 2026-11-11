@@ -14,7 +14,7 @@ fn fault(selector: u16, vector: u8, phase: ProtectionPhase) -> Failure {
 
 pub(super) fn segment(
     context: &mut ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     target: Segment,
     selector: u16,
 ) -> Result<bool, Failure> {
@@ -99,7 +99,7 @@ pub(super) fn segment(
 
 pub(super) fn ldt(
     context: &mut ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     selector: u16,
 ) -> Result<bool, Failure> {
     if selector < 4 {

@@ -10,6 +10,44 @@ pub(super) struct Lookup {
     pub selector: u16,
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct DescriptorWrite {
+    lookup: Lookup,
+    address: u64,
+    width: u32,
+    offset: u32,
+    byte: u8,
+    phase: SystemPhase,
+}
+
+impl DescriptorWrite {
+    pub fn failure(self, failure: AccessFailure) -> Failure {
+        self.lookup.access_failure(failure, self.phase)
+    }
+
+    pub fn contains(self, failure: AccessFailure) -> bool {
+        let address = match failure {
+            AccessFailure::Linear(failure) => failure.address,
+            AccessFailure::Paging(crate::x86::paging::walk::Failure::Page(failure)) => {
+                failure.address
+            }
+            AccessFailure::Paging(crate::x86::paging::walk::Failure::Physical(failure)) => {
+                failure.linear
+            }
+            AccessFailure::Segment(_) => return false,
+        };
+        address >= self.address && address - self.address < u64::from(self.width)
+    }
+
+    pub fn commit(self, image: &mut impl GuestMemory) {
+        let mut bytes = [0; 16];
+        bytes[self.offset as usize] = self.byte;
+        image
+            .write_system_fields(self.address, self.width, &[(self.offset, 1)], &bytes)
+            .expect("admitted descriptor publication");
+    }
+}
+
 pub(super) fn ia32e(context: &ExecutionContext) -> bool {
     matches!(context.mode(), Mode::Compatibility | Mode::Long64)
 }
@@ -60,6 +98,26 @@ impl Lookup {
         })
     }
 
+    fn access_failure(self, failure: AccessFailure, phase: SystemPhase) -> Failure {
+        match failure {
+            AccessFailure::Linear(f) => self.fault(
+                u128::from(f.address),
+                f.width,
+                f.access,
+                f.cause,
+                f.failing,
+                phase,
+            ),
+            AccessFailure::Paging(failure) => Failure::SystemPaging(SystemPagingFault {
+                failure,
+                phase,
+                table: self.table,
+                reference: SystemReference::Selector(self.selector),
+            }),
+            AccessFailure::Segment(_) => unreachable!("system access has no segment admission"),
+        }
+    }
+
     fn address(
         self,
         context: &ExecutionContext,
@@ -93,91 +151,75 @@ impl Lookup {
     pub fn read(
         self,
         context: &ExecutionContext,
-        image: &Image,
+        image: &impl GuestMemory,
         slice: u32,
     ) -> Result<u64, Failure> {
         let address = self.address(context, slice, 8, Access::Read, SystemPhase::DescriptorRead)?;
         image
-            .read_vector(address, 8)
+            .read_system(address, 8)
             .map(|bytes| u64::from_le_bytes(bytes[..8].try_into().unwrap()))
-            .map_err(|f| {
-                self.fault(
-                    u128::from(f.address),
-                    f.width,
-                    f.access,
-                    f.cause,
-                    f.failing,
-                    SystemPhase::DescriptorRead,
-                )
-            })
+            .map_err(|failure| self.access_failure(failure, SystemPhase::DescriptorRead))
     }
 
     pub fn prepare_accessed(
         self,
         context: &ExecutionContext,
-        image: &Image,
+        image: &impl GuestMemory,
         access_byte: u8,
-    ) -> Result<(u64, u8), Failure> {
+    ) -> Result<DescriptorWrite, Failure> {
         let address = self.address(context, 5, 1, Access::Write, SystemPhase::AccessedWrite)?;
-        image.check_write(address, 1).map_err(|f| {
-            self.fault(
-                u128::from(f.address),
-                f.width,
-                f.access,
-                f.cause,
-                f.failing,
-                SystemPhase::AccessedWrite,
-            )
-        })?;
-        Ok((address, access_byte | 1))
+        image
+            .check_system_write(address, 1)
+            .map_err(|failure| self.access_failure(failure, SystemPhase::AccessedWrite))?;
+        Ok(DescriptorWrite {
+            lookup: self,
+            address,
+            width: 1,
+            offset: 0,
+            byte: access_byte | 1,
+            phase: SystemPhase::AccessedWrite,
+        })
     }
 
     pub fn prepare_busy(
         self,
         context: &ExecutionContext,
-        image: &Image,
+        image: &impl GuestMemory,
         width: u32,
         access_byte: u8,
-    ) -> Result<(u64, u8), Failure> {
+    ) -> Result<DescriptorWrite, Failure> {
         let address = self.address(context, 0, width, Access::Write, SystemPhase::BusyWrite)?;
-        image.check_write(address, width).map_err(|f| {
-            self.fault(
-                u128::from(f.address),
-                f.width,
-                f.access,
-                f.cause,
-                f.failing,
-                SystemPhase::BusyWrite,
-            )
-        })?;
-        Ok((address + 5, access_byte | 2))
+        image
+            .check_system_write_fields(address, width, &[(5, 1)])
+            .map_err(|failure| self.access_failure(failure, SystemPhase::BusyWrite))?;
+        Ok(DescriptorWrite {
+            lookup: self,
+            address,
+            width,
+            offset: 5,
+            byte: access_byte | 2,
+            phase: SystemPhase::BusyWrite,
+        })
     }
 
     pub fn set_accessed(
         self,
         context: &ExecutionContext,
-        image: &mut Image,
+        image: &mut impl GuestMemory,
         access_byte: u8,
     ) -> Result<(), Failure> {
-        let address = self.address(context, 5, 1, Access::Write, SystemPhase::AccessedWrite)?;
+        let write = self.prepare_accessed(context, image, access_byte)?;
         image
-            .write(address, 1, u64::from(access_byte | 1))
-            .map_err(|f| {
-                self.fault(
-                    u128::from(f.address),
-                    f.width,
-                    f.access,
-                    f.cause,
-                    f.failing,
-                    SystemPhase::AccessedWrite,
-                )
-            })
+            .prepare_publication()
+            .map_err(|failure| write.failure(failure))?;
+        write.commit(image);
+        Ok(())
     }
 }
 
 pub(super) fn read_operand(
     context: &ExecutionContext,
-    image: &Image,
+    image: &impl GuestMemory,
     offset: u64,
     width: u32,
     segment: Segment,
@@ -188,13 +230,13 @@ pub(super) fn read_operand(
     let mut bytes = [0; 10];
     image
         .read_fields(address, width, &[(0, width)], &mut bytes)
-        .map_err(|f| Failure::Operand(AccessFailure::Linear(f)))?;
+        .map_err(Failure::Operand)?;
     Ok(bytes)
 }
 
 pub(super) fn write_operand(
     context: &ExecutionContext,
-    image: &mut Image,
+    image: &mut impl GuestMemory,
     offset: u64,
     bytes: &[u8],
     segment: Segment,
@@ -202,7 +244,5 @@ pub(super) fn write_operand(
     let address = context
         .translate(offset, bytes.len() as u32, segment, Access::Write, false)
         .map_err(Failure::Operand)?;
-    image
-        .write_bytes(address, bytes)
-        .map_err(|f| Failure::Operand(AccessFailure::Linear(f)))
+    image.write_bytes(address, bytes).map_err(Failure::Operand)
 }

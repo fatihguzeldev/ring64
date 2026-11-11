@@ -1,0 +1,155 @@
+use super::*;
+use crate::memory::{MappingInput, MemoryLimits, Permissions};
+use crate::x86::paging::walk::{Failure, PageFault, PhysicalPhase};
+
+fn fixture(second: u64, data_write: bool, protected_pte: bool) -> (Image, State) {
+    let mut bytes = vec![0; 0xc000];
+    for (address, word) in [
+        (0x1000, 0x2027u64),
+        (0x2000, 0x3027),
+        (0x3000, 0x4027),
+        (0x4008, 0x9027),
+        (0x4010, second),
+        (0x4038, 0x7027),
+        (0x4040, 0x8027),
+    ] {
+        bytes[address..address + 8].copy_from_slice(&word.to_le_bytes());
+    }
+    let mapping = |base, offset, length, write| MappingInput {
+        base,
+        backing: "ram".into(),
+        offset,
+        length,
+        permissions: Permissions {
+            read: true,
+            write,
+            execute: true,
+        },
+    };
+    let maps = if protected_pte {
+        vec![
+            mapping(0, 0, 0x4038, true),
+            mapping(0x4038, 0x4038, 8, false),
+            mapping(0x4040, 0x4040, 0x7fc0, true),
+        ]
+    } else {
+        vec![
+            mapping(0, 0, 0x9000, true),
+            mapping(0x9000, 0x9000, 0x1000, data_write),
+            mapping(0xa000, 0xa000, 0x2000, true),
+        ]
+    };
+    (
+        Image::physical_mapped(
+            vec![("ram".into(), bytes)],
+            maps,
+            MemoryLimits {
+                max_backing_bytes: 0xc000,
+                max_backings: 1,
+                max_mappings: 3,
+            },
+        )
+        .unwrap(),
+        State {
+            cr3: 0x1000,
+            ..State::default()
+        },
+    )
+}
+
+#[test]
+fn later_page_fault_publishes_no_cross_page_payload_or_dirty_bits() {
+    let (mut image, state) = fixture(0, true, false);
+    let mut work = AccessState::default();
+    let error = Memory::new(&mut image, &state, 3, &mut work)
+        .write(0x1ffe, 4, 0xaabbccdd)
+        .unwrap_err();
+    assert_eq!(
+        error,
+        AccessFailure::Paging(Failure::Page(PageFault {
+            address: 0x2000,
+            access: Access::Write,
+            error_code: 6
+        }))
+    );
+    assert_eq!(image.physical_read(0x9ffe, 2).unwrap(), 0);
+    assert_eq!(image.physical_read(0x4008, 8).unwrap(), 0x9027);
+}
+
+#[test]
+fn earlier_private_payload_refusal_precedes_next_missing_page() {
+    let (mut image, state) = fixture(0, false, false);
+    let mut work = AccessState::default();
+    let error = Memory::new(&mut image, &state, 3, &mut work)
+        .write(0x1ffe, 4, 0xaabbccdd)
+        .unwrap_err();
+    let AccessFailure::Paging(Failure::Physical(error)) = error else {
+        panic!("private physical refusal required")
+    };
+    assert_eq!(
+        (error.linear, error.physical.failing, error.phase),
+        (0x1ffe, 0x9ffe, PhysicalPhase::FinalAccess)
+    );
+    assert_eq!(image.physical_read(0x4010, 8).unwrap(), 0);
+}
+
+#[test]
+fn nonadjacent_fragments_write_exact_bytes_after_all_dirty_admission() {
+    let (mut image, state) = fixture(0xb027, true, false);
+    let mut work = AccessState::default();
+    Memory::new(&mut image, &state, 3, &mut work)
+        .write(0x1ffe, 4, 0xaabbccdd)
+        .unwrap();
+    assert_eq!(image.physical_read(0x9ffe, 2).unwrap(), 0xccdd);
+    assert_eq!(image.physical_read(0xb000, 2).unwrap(), 0xaabb);
+    assert_eq!(image.physical_read(0xa000, 2).unwrap(), 0);
+    assert_eq!(image.physical_read(0x4008, 8).unwrap(), 0x9067);
+    assert_eq!(image.physical_read(0x4010, 8).unwrap(), 0xb067);
+}
+
+#[test]
+fn prepared_frame_dirty_refusal_cannot_leak_earlier_slots_or_dirty_updates() {
+    let (mut image, state) = fixture(0, true, true);
+    let mut work = AccessState::default();
+    let mut memory = Memory::new(&mut image, &state, 0, &mut work);
+    memory.check_frame_write(0x8008, 8, 0).unwrap();
+    memory.check_frame_write(0x7ff8, 8, 0).unwrap();
+    let error = memory.prepare_publication().unwrap_err();
+    assert!(
+        matches!(error,AccessFailure::Paging(Failure::Physical(f)) if f.phase==PhysicalPhase::DirtyWrite && f.physical.failing==0x4038)
+    );
+    assert_eq!(image.physical_read(0x8008, 8).unwrap(), 0);
+    assert_eq!(image.physical_read(0x7ff8, 8).unwrap(), 0);
+    assert_eq!(image.physical_read(0x4040, 8).unwrap(), 0x8027);
+}
+
+#[test]
+fn rmw_retains_its_leaf_and_payload_may_clear_the_planned_dirty_bit() {
+    let (mut image, state) = fixture(0, true, false);
+    image.physical_write(0x4008, 8, 0x4027).unwrap();
+    let mut work = AccessState::default();
+    {
+        let mut memory = Memory::new(&mut image, &state, 0, &mut work);
+        assert_eq!(memory.read_for_write(0x1008, 8).unwrap(), 0x4027);
+        memory.write(0x1008, 8, 0xa027).unwrap();
+    }
+    assert_eq!(image.physical_read(0x4008, 8).unwrap(), 0xa027);
+    assert_eq!(image.physical_read(0xa008, 8).unwrap(), 0);
+    assert_eq!(
+        Memory::new(&mut image, &state, 0, &mut work)
+            .read(0x1008, 8)
+            .unwrap(),
+        0
+    );
+}
+
+#[test]
+fn sparse_nominal_probe_dirties_only_a_participating_page() {
+    let (mut image, state) = fixture(0xb027, true, false);
+    let mut work = AccessState::default();
+    Memory::new(&mut image, &state, 3, &mut work)
+        .write_fields(0x1ff0, 32, &[(0, 2)], &[0x55; 32])
+        .unwrap();
+    assert_eq!(image.physical_read(0x4008, 8).unwrap(), 0x9067);
+    assert_eq!(image.physical_read(0x4010, 8).unwrap(), 0xb027);
+}
