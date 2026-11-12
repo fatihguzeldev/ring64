@@ -48,3 +48,7 @@ Local raw logs are `/tmp/ring64-io-audit-mutation-evidence/report.json`, one log
 `npm run check` passed formatting, lint, both clippy targets, **837 native tests**, the release Core/TypeScript build, **234 Node tests**, and **908 shared Chrome scenarios** under Chrome157.0.8103.79. The last shared scenario batch runs the literal I/O fixtures in both Node and Chrome. README was unchanged, and this audit branch was not pushed.
 
 No wall-time benchmark ran during concurrent compilation. Quiet paired performance, reset/provider preservation, physical PG0 I/O integration and the final combined five-spec gate belong to the integration record; these results do not claim those later checks.
+
+The [integration report](../five-spec-integration/verification.md) records the final
+combined gate, reset/provider preservation, finite independent oracles and quiet
+performance observations; it does not replace the isolated campaign above.

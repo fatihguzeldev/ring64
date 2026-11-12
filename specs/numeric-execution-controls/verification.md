@@ -67,7 +67,7 @@ Restored Core SHA256:
 `06c33fc6c3bd7dc5b944dbe384d93c34ff5043fa7004fe7099d02e4239ba625f`.
 Raw logs/report: `/tmp/ring64-numeric-mutation-evidence/`.
 
-## inactive-path structure and remaining measurements
+## inactive-path structure and integrated measurements
 
 Against the frozen baseline, scalar, direct-vector, floating-helper and MMX loops
 produced byte-identical generated artifacts in both linear and IA32e profiles.
@@ -84,6 +84,7 @@ The assertions compare artifact SHA256 and full import descriptors, not only siz
 Raw structure observations are in the mutation-evidence directory's `structure.json`.
 This establishes generated-body/import stability for those eight checked loops;
 it does not establish unchanged engine latency or whole-application performance.
-Paired Node/Chrome timing, forward/reverse/A-A controls and new fault/repair costs
-remain pending a quiet integrated measurement run. No latency claim is made here.
+Paired Node/Chrome timing, forward/reverse/A-A controls, fault/repair costs and
+final cross-review are recorded in the [integration report](../five-spec-integration/verification.md).
+The byte-identical isolated observations above are not a final combined-tree claim.
 README was not changed.

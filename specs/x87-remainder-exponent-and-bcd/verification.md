@@ -1,6 +1,6 @@
 # x87 special-form verification
 
-Functional implementation and verification on `x87-remainder-exponent-bcd`, based on `e00a41875c54798a554f7c30864e784e569df10d`. The completed source gate below ran at `036c1ec`; later verification-only changes do not change its Wasm. Paired performance measurements remain pending the integrated five-spec build and a quiet measurement window.
+Functional implementation and verification on `x87-remainder-exponent-bcd`, based on `e00a41875c54798a554f7c30864e784e569df10d`. The completed source gate below ran at `036c1ec`; later verification-only changes do not change its Wasm. Final integrated conformance, independent oracles, cross-review and quiet performance observations are recorded in the [integration report](../five-spec-integration/verification.md).
 
 ## implemented boundary
 
@@ -47,6 +47,6 @@ Each experiment compiled and reached its named semantic fixture. The generated G
 
 ## measurement ceiling
 
-No latency, throughput, heap-retention or application-performance conclusion is drawn from concurrent builds or test durations. The frozen predecessor is `/tmp/ring64-five-baseline` at `e00a418`. New forms have no executable predecessor denominator. Integrated verification must still record balanced/reversed/A-A inherited comparisons and candidate-only new-form characterization before performance acceptance is closed. Widened operation immediates may change LEB/generated-byte lengths; no byte-identical-body claim is made.
+No latency, throughput, heap-retention or application-performance conclusion is drawn from concurrent builds or test durations. The frozen predecessor is `/tmp/ring64-five-baseline` at `e00a418`. New forms have no executable predecessor denominator. The [integration report](../five-spec-integration/verification.md) records balanced/reversed/A-A inherited comparisons and candidate-only new-form characterization, with their measurement limits. Widened operation immediates may change LEB/generated-byte lengths; no byte-identical-body claim is made.
 
 README was not edited. No push was performed from this isolated branch; root integration owns final all-five review and delivery.

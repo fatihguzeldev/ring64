@@ -109,3 +109,8 @@ measurements. Matched inherited workload timings, A-A/reversed controls and rese
 cost versus owner/RAM size belong to the quiet integrated measurement run. No boot,
 hardware-cycle, whole-application or unmeasured performance claim is made here.
 README was not changed.
+
+Final combined conformance, cross-review, independent oracles, reset cost versus
+RAM/resident owners and matched inherited measurements are recorded in the
+[integration report](../five-spec-integration/verification.md). The isolated hashes
+and counts above remain unchanged historical observations.

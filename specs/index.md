@@ -31,9 +31,9 @@
 - [fast system transfers](fast-system-transfers/spec.md): Intel IA32e SYSCALL/SYSRET and SYSENTER/SYSEXIT, selected MSR/FS-GS authority, SWAPGS and complete paged user/kernel round trips; [verification](fast-system-transfers/verification.md).
 - [context and code reuse](context-and-code-reuse/spec.md): context-specific generated artifacts with checked activation, dormant-source invalidation, bounded global ownership and warm user/kernel reuse; [verification](context-and-code-reuse/verification.md).
 
-## next five specifications
+## completed five-spec implementation cohort
 
-Selected against implementation baseline `4df41a0`, in the implementation order below. Each contract has received a separate source audit and independent semantic, ownership/boundary and performance/falsification review. They specify public inputs, publication/fault order, consumer changes, literal acceptance packets and future measurement gates. All five remain unimplemented; acceptance cases and mutation/performance gates are requirements, not passed verification results.
+Selected against implementation baseline `4df41a0`, implemented and independently reviewed in the order below. Each contract defines public inputs, publication/fault order, consumer changes and literal acceptance packets. [Integrated verification](five-spec-integration/verification.md) records final conformance, cross-review, semantic mutation campaigns, finite independent oracles and measured performance limits; the individual verification reports retain their isolated historical cohorts.
 
 | order | spec                                                                      | complete execution path                                                                                           | dependency                                                                   |
 | ----- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -85,7 +85,7 @@ descriptor table and segment operations use imported CPL, visible selectors and 
 
 ordinary-code far CALL/JMP and RETF load CS through descriptor protection. CS.D/L selects the next code context within its active execution family. outer RETF restores SS:SP from the current frame and updates CPL; call gates, task switching and event returns add their own state and frame rules.
 
-instruction breakpoints and operand-data watchpoints add DR state, execute/GD fault provenance, TF/data cause aggregation and SS-deferred debug checkpoints. their bounded observation profile includes control-stack operands, strings and selected numeric fields, while implicit descriptor/TSS/event-entry traffic, task debug, I/O and tracing remain separate coverage. debug activity participates in existing artifact admission without a separate cache or inactive per-instruction observer.
+instruction breakpoints and operand-data watchpoints add DR state, execute/GD fault provenance, TF/data cause aggregation and SS-deferred debug checkpoints. their bounded observation profile includes control-stack operands, strings and selected numeric fields, while implicit descriptor/TSS/event-entry traffic, task debug, port-I/O breakpoints and tracing remain separate coverage. debug activity participates in existing artifact admission without a separate cache or inactive per-instruction observer.
 
 four-level IA32e paging adds an explicit physical-backed execution model alongside the existing private-linear model. its controls, permissions, A/D effects, #PF/CR2, implicit system accesses and executable translation dependencies form one contract. speculative discovery remains observational; reached instruction and prepared operand/frame access publish their own effects. legacy paging, reset/mode transitions and advanced translation facilities remain separate.
 

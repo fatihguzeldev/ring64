@@ -1,6 +1,6 @@
 # legacy paging and permissions
 
-Status: implementation-ready specification; implementation not started. Source audit baseline: `4df41a0814beaceb0681dc013f5eac094cdc6660`. Third of five; depends on [numeric execution controls](../numeric-execution-controls/spec.md). Freeze that completed implementation as the actual future measurement baseline.
+Status: implemented; see [verification](verification.md) and the [integrated audit](../five-spec-integration/verification.md). Source audit baseline: `4df41a0814beaceb0681dc013f5eac094cdc6660`. Third of five; depends on [numeric execution controls](../numeric-execution-controls/spec.md). Historical source-audit and executable measurement cohorts are distinguished in the verification records.
 
 ## objective and admitted families
 

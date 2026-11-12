@@ -1,6 +1,6 @@
 # numeric execution controls
 
-Status: implementation-ready specification; implementation not started. Source audit baseline: `4df41a0814beaceb0681dc013f5eac094cdc6660`. Second of five; incorporates the preceding [x87 cohort](../x87-remainder-exponent-and-bcd/spec.md).
+Status: implemented; see [verification](verification.md) and the [integrated audit](../five-spec-integration/verification.md). Source audit baseline: `4df41a0814beaceb0681dc013f5eac094cdc6660`. Second of five; incorporates the preceding [x87 cohort](../x87-remainder-exponent-and-bcd/spec.md).
 
 ## complete execution path and scope
 
