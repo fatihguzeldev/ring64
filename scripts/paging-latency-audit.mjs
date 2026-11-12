@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
 import { freeze, manifest, hash, encode } from './paging-support.mjs';
 import { measurePaging, pagingWorkloads } from './paging-latency-kernels.mjs';
+import { measureReusePair, reuseNames, populationNames } from './context-reuse-kernels.mjs';
 const scriptRoot = dirname(fileURLToPath(import.meta.url));
 const options = {
   iterations: 100001,
@@ -13,19 +14,22 @@ const options = {
   aa: false,
   browser: false,
   smoke: false,
-  workloads: pagingWorkloads,
+  contextReuse: false,
+  population: false,
 };
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
   console.log(
-    'node scripts/paging-latency-audit.mjs --baseline BUILT_REPO --current BUILT_REPO [--browser] [--reverse] [--aa] [--smoke] [--iterations N] [--samples N] [--workloads fetch,load,store,rmw,system] [--output FILE]',
+    'node scripts/paging-latency-audit.mjs --baseline BUILT_REPO --current BUILT_REPO [--context-reuse | --population] [--browser] [--reverse] [--aa] [--smoke] [--iterations N] [--samples N] [--workloads NAME,NAME] [--output FILE]',
   );
   process.exit(0);
 }
 for (let i = 0; i < args.length; i++) {
   const key = args[i];
-  if (['--reverse', '--aa', '--browser', '--smoke'].includes(key)) {
-    options[key.slice(2)] = true;
+  if (
+    ['--reverse', '--aa', '--browser', '--smoke', '--context-reuse', '--population'].includes(key)
+  ) {
+    options[key === '--context-reuse' ? 'contextReuse' : key.slice(2)] = true;
     continue;
   }
   if (
@@ -45,6 +49,14 @@ for (let i = 0; i < args.length; i++) {
 }
 if (!options.baseline || !options.current)
   throw Error('require --baseline BUILT_REPO --current BUILT_REPO');
+if (options.contextReuse && options.population) throw Error('select one context cohort');
+const contextMode = options.contextReuse || options.population;
+const names = options.population
+  ? populationNames
+  : options.contextReuse
+    ? reuseNames
+    : pagingWorkloads;
+options.workloads ??= names;
 for (const [key, min, max] of [
   ['iterations', 1, 10000000],
   ['samples', 2, 100],
@@ -52,7 +64,7 @@ for (const [key, min, max] of [
   if (!Number.isSafeInteger(options[key]) || options[key] < min || options[key] > max)
     throw Error(key + ' outside bounded integer range');
 if (
-  options.workloads.some((name) => !pagingWorkloads.includes(name)) ||
+  options.workloads.some((name) => !names.includes(name)) ||
   new Set(options.workloads).size !== options.workloads.length ||
   !options.workloads.length
 )
@@ -87,7 +99,10 @@ async function nodeRun() {
       compiler: await WebAssembly.compile(await readFile(resolve(side.path, 'build/ring64.wasm'))),
     });
   }
-  return { engine: process.version, ...(await measurePaging(sides, options)) };
+  return {
+    engine: process.version,
+    ...(await (contextMode ? measureReusePair(sides, options) : measurePaging(sides, options))),
+  };
 }
 async function browserRun() {
   const { chromium } = await import('playwright');
@@ -101,7 +116,15 @@ async function browserRun() {
         return;
       }
       let file;
-      if (pathname === '/driver.mjs') file = resolve(scriptRoot, 'paging-latency-kernels.mjs');
+      if (pathname === '/driver.mjs' && !contextMode)
+        file = resolve(scriptRoot, 'paging-latency-kernels.mjs');
+      else if (
+        contextMode &&
+        ['/scripts/context-reuse-kernels.mjs', '/scripts/fast-system-kernels.mjs'].includes(
+          pathname,
+        )
+      )
+        file = resolve(scriptRoot, pathname.slice('/scripts/'.length));
       else {
         const side = manifests.find((x) => pathname.startsWith('/' + x.label + '/'));
         if (!side) throw Error('unknown side');
@@ -142,7 +165,10 @@ async function browserRun() {
     await page.goto('http://127.0.0.1:' + server.address().port);
     const result = await page.evaluate(
       async ({ manifests, options }) => {
-        const { measurePaging } = await import('/driver.mjs');
+        const contextMode = options.contextReuse || options.population;
+        const driver = await import(
+          contextMode ? '/scripts/context-reuse-kernels.mjs' : '/driver.mjs'
+        );
         const sides = [];
         for (const side of manifests) {
           const prefix = '/' + side.label;
@@ -155,7 +181,9 @@ async function browserRun() {
             ),
           });
         }
-        return measurePaging(sides, options);
+        return contextMode
+          ? driver.measureReusePair(sides, options)
+          : driver.measurePaging(sides, options);
       },
       { manifests, options },
     );
@@ -166,24 +194,47 @@ async function browserRun() {
   }
 }
 const result = await (options.browser ? browserRun() : nodeRun());
+if (contextMode && options.smoke)
+  for (const row of result.samples) {
+    delete row.elapsedMs;
+    delete row.batchWallMs;
+    delete row.timings;
+  }
 for (const side of manifests) {
   const after = await manifest(side.path);
   if (after.coreSha256 !== side.coreSha256 || after.hostSha256 !== side.hostSha256)
     throw Error('built artifacts changed during observation: ' + side.label);
 }
 const report = {
-  kind: 'matched-existing-IA32e-paging',
+  kind: options.population
+    ? 'matched-existing-context-population'
+    : options.contextReuse
+      ? 'matched-existing-context-reuse'
+      : 'matched-existing-IA32e-paging',
   control: options.aa ? 'current/current' : 'baseline/current',
   manifests,
   environment: { platform: process.platform, arch: process.arch, cpus: os.cpus()[0]?.model },
   options,
-  kernelSha256: hash(await readFile(resolve(scriptRoot, 'paging-latency-kernels.mjs'))),
+  kernelSha256: hash(
+    await readFile(
+      resolve(scriptRoot, contextMode ? 'context-reuse-kernels.mjs' : 'paging-latency-kernels.mjs'),
+    ),
+  ),
+  ...(contextMode
+    ? { fixtureSha256: hash(await readFile(resolve(scriptRoot, 'fast-system-kernels.mjs'))) }
+    : {}),
   ...result,
 };
 const output =
   options.output ??
   resolve(
-    'build/verification/paging-latency-' +
+    'build/verification/' +
+      (options.population
+        ? 'context-population'
+        : options.contextReuse
+          ? 'context-reuse'
+          : 'paging') +
+      '-latency-' +
       (options.browser ? 'chrome' : 'node') +
       (options.smoke ? '-smoke' : '') +
       '.json',
@@ -191,5 +242,5 @@ const output =
 await mkdir(dirname(output), { recursive: true });
 await writeFile(output, encode(report));
 console.log(
-  `${options.smoke ? 'correctness smoke (timing discarded)' : 'paired observation'}: ${result.results.length} checked samples; ${result.engine}; ${output}`,
+  `${options.smoke ? 'correctness smoke (timing discarded)' : 'paired observation'}: ${(result.results ?? result.samples).length} checked samples; ${result.engine}; ${output}`,
 );
