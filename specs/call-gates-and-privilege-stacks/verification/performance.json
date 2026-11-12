@@ -1,0 +1,3477 @@
+{
+  "ratioDirection": "current/baseline by explicit side labels; A/A uses B/A; never infer direction from execution order",
+  "method": "ratio of side medians on saved later pairs, no denominator floor or dropped zeros; paging cutoff1, inherited cutoff4; first and early values retained in pairs",
+  "clockPolicy": "Raw zero samples retained; baseline median zero gives undefined ratio; no floor, clipping or dropped sample. Side medians summarize these finite ordered observations, not a confidence interval.",
+  "pairCount": 9978,
+  "reports": [
+    {
+      "id": 0,
+      "file": "build/verification/paging-performance-call-gates-controls-aa-matched-chrome.json",
+      "sha256": "e15d87cc13875a6434af4bae6aa7f3d08380acc79d1e54b7d5e6996dd5e78681",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 1,
+      "file": "build/verification/paging-performance-call-gates-controls-aa-matched-node.json",
+      "sha256": "a926da09bce2180d0423557feb81e8f2bfdfdc61402a1ec473524fae9e185f9e",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 2,
+      "file": "build/verification/paging-performance-call-gates-controls-aa-report-chrome.json",
+      "sha256": "ee52724acca32f21f0062515c568935f2acb7f521da7b4ba84fdc767cac6a8c6",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 3,
+      "file": "build/verification/paging-performance-call-gates-controls-aa-report-node.json",
+      "sha256": "b6ae0554cc742bbf77366b582bfa13c994505f0af4c79e8b0a28319204561bca",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 4,
+      "file": "build/verification/paging-performance-call-gates-controls-primary-matched-chrome.json",
+      "sha256": "32a4a83007cbde7be53f7b562addc63537457be931cd638cc1dd6fdfc05b942d",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 5,
+      "file": "build/verification/paging-performance-call-gates-controls-primary-matched-node.json",
+      "sha256": "ccdf23e9f48ad2a44d60822ca22a33d13715c36738ca26340cdf8917641502c6",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 6,
+      "file": "build/verification/paging-performance-call-gates-controls-primary-report-chrome.json",
+      "sha256": "1d296d66cf3916c05b8d9f5e7d2e961b74371aeb54e51404bcc53e79a5671ca7",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 7,
+      "file": "build/verification/paging-performance-call-gates-controls-primary-report-node.json",
+      "sha256": "899bca853ded08a1ff6be42a6110db46c468dd994a7f710f1528bdc2c19ca8e0",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 8,
+      "file": "build/verification/paging-performance-call-gates-controls-reverse-matched-chrome.json",
+      "sha256": "fa544df809eac1d8f3de790fc5a32493ad12cdb6d260c7aed5392dbac30e79a5",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 9,
+      "file": "build/verification/paging-performance-call-gates-controls-reverse-matched-node.json",
+      "sha256": "f96b9f4bd06c6c5a5817a24086ac54cbe12042be833a5830eeb5e93d0965230d",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 10,
+      "file": "build/verification/paging-performance-call-gates-controls-reverse-report-chrome.json",
+      "sha256": "6751a8f6cae30ce724c27ea4cbd25d12d4f8ca96b43493641b94547a869bc7e5",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 11,
+      "file": "build/verification/paging-performance-call-gates-controls-reverse-report-node.json",
+      "sha256": "2465bb933a167352b6e0d0a71ecc0258a9d8413d594f495ca7e40151b3c70c10",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 14,
+      "pairs": 210,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 12,
+      "file": "build/verification/paging-performance-call-gates-deep-aa-matched-chrome.json",
+      "sha256": "ed6f07d02f87c2d2c0541606a1e1b38aea811df92c49db8337fcf020da9dd984",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 13,
+      "file": "build/verification/paging-performance-call-gates-deep-aa-matched-node.json",
+      "sha256": "e7c395a41162cdd152500ea06d4854b9518bb8f681a91babd731185e3ff30cad",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 14,
+      "file": "build/verification/paging-performance-call-gates-deep-aa-report-chrome.json",
+      "sha256": "123ceed36c439199329106f0abc1777b173dc5bb1d095cd72d0ccf412505a29c",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 15,
+      "file": "build/verification/paging-performance-call-gates-deep-aa-report-node.json",
+      "sha256": "2de821263311ec3059559f019edce1aa9820c02d07c84f98618c4035d3fdf6c0",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 16,
+      "file": "build/verification/paging-performance-call-gates-deep-primary-matched-chrome.json",
+      "sha256": "7494ff8c2c40e21f9e080e7b878f2334c83d0a3bc7d55e160fa87f4b729e3d5b",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 17,
+      "file": "build/verification/paging-performance-call-gates-deep-primary-matched-node.json",
+      "sha256": "812749dde483276f24c2d344619403a4fee37efb5532533286e0820315aeffc1",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 18,
+      "file": "build/verification/paging-performance-call-gates-deep-primary-report-chrome.json",
+      "sha256": "c86c6ab77fb95c8686e3a7717cef2efa2852fb486f1ba6ba2457079f4fd95a16",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 19,
+      "file": "build/verification/paging-performance-call-gates-deep-primary-report-node.json",
+      "sha256": "131dbb9309191c0d31f140eddee8ba4d74cce3df495c4f99bcfb3a5a84f3c93a",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 20,
+      "file": "build/verification/paging-performance-call-gates-deep-reverse-matched-chrome.json",
+      "sha256": "cd7596854141be909a26c33021f7e0060368001168fe2f28b0990c900319a77b",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 21,
+      "file": "build/verification/paging-performance-call-gates-deep-reverse-matched-node.json",
+      "sha256": "cb02457f7bfd2e50c181d95acce9ffda7008cd82aed780b80bc72c7bfe1cde37",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 22,
+      "file": "build/verification/paging-performance-call-gates-deep-reverse-report-chrome.json",
+      "sha256": "8964b936484138f121c7d442d1edca2a5f07b830fcc8c5123fd7274f90d3095d",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 23,
+      "file": "build/verification/paging-performance-call-gates-deep-reverse-report-node.json",
+      "sha256": "7995d4e6836578f7e999af77607f84197c8317df6b2d134c0a6cb97ed0e19c6b",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 3,
+      "pairs": 51,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 24,
+      "file": "build/verification/paging-performance-call-gates-wide-matched-chrome.json",
+      "sha256": "310d40f7bc74f16e89f44313f6a91296093fab1561a4e1e1c08b80ad5e502dc6",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 169,
+      "pairs": 1521,
+      "zeroElapsedSamples": 964,
+      "undefinedLaterRatios": 61,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [
+        {
+          "side": "baseline",
+          "workload": "system-flags-step-add-resume",
+          "reason": "TF stepping detects events; excluded from the no-event comparison"
+        },
+        {
+          "side": "current",
+          "workload": "system-flags-step-add-resume",
+          "reason": "TF stepping detects events; excluded from the no-event comparison"
+        }
+      ],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 25,
+      "file": "build/verification/paging-performance-call-gates-wide-matched-node.json",
+      "sha256": "6a6d35b0d473fa5110182a0dc503720f4ec363c1d618e0980cb3324bdaafd05c",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 169,
+      "pairs": 1521,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [
+        {
+          "side": "baseline",
+          "workload": "system-flags-step-add-resume",
+          "reason": "TF stepping detects events; excluded from the no-event comparison"
+        },
+        {
+          "side": "current",
+          "workload": "system-flags-step-add-resume",
+          "reason": "TF stepping detects events; excluded from the no-event comparison"
+        }
+      ],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 26,
+      "file": "build/verification/paging-performance-call-gates-wide-report-chrome.json",
+      "sha256": "fc68cf989601f208413bea2c74591aaf6b6ddc897a8191e335169bf28606e605",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 170,
+      "pairs": 1530,
+      "zeroElapsedSamples": 921,
+      "undefinedLaterRatios": 65,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 27,
+      "file": "build/verification/paging-performance-call-gates-wide-report-node.json",
+      "sha256": "6160e49db3eaa22ce20bd4ef31c0ac22d88b143e90953fc210a7c062b4b5dddb",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 170,
+      "pairs": 1530,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 28,
+      "file": "build/verification/paging-performance-call-gates-x87-aa-report-chrome.json",
+      "sha256": "77cd67eb384c69da702645dd6c183ade0b4919f3d5a4d482ca46058d7647f957",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 2,
+      "pairs": 34,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 29,
+      "file": "build/verification/paging-performance-call-gates-x87-aa-report-node.json",
+      "sha256": "ae002eca4ebb2c3af0762c5133a76c41cf0dd893febf818cc89e2eea084518c3",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 2,
+      "pairs": 34,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 30,
+      "file": "build/verification/paging-performance-call-gates-x87-primary-report-chrome.json",
+      "sha256": "358fc1f58b83f920aa3f2bfbaab77ee9238ffd2779d8ad15cf2a52d9bc29ada6",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 2,
+      "pairs": 34,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 31,
+      "file": "build/verification/paging-performance-call-gates-x87-primary-report-node.json",
+      "sha256": "5e412bb1e959d3bba693dd47d972dba3c0130fe63a7e430b5f144ed90f6f74e9",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 2,
+      "pairs": 34,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 32,
+      "file": "build/verification/paging-performance-call-gates-x87-reverse-report-chrome.json",
+      "sha256": "88aca9eb01d3d0dff71235a925295a6c60ff72c6b56d31f20549aa3efe84d53e",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 2,
+      "pairs": 34,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "browser",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 33,
+      "file": "build/verification/paging-performance-call-gates-x87-reverse-report-node.json",
+      "sha256": "242523be79697af7d9adcb621a60b286056fbd188d0497936f1dfea973ed3720",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 2,
+      "pairs": 34,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "runtime": "node",
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      }
+    },
+    {
+      "id": 34,
+      "file": "build/verification/call-gates-paging-aa-chrome.json",
+      "sha256": "e8ac83663cdba8b7b1e398bf0a54ca5b315bee7bb7f26fc9554e4775d4749f7a",
+      "sides": [
+        {
+          "label": "A",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "B",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 5,
+      "pairs": 90,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": "Apple M4 Pro"
+      }
+    },
+    {
+      "id": 35,
+      "file": "build/verification/call-gates-paging-aa-node.json",
+      "sha256": "d5317810b9c2915cde669884125eb9a4767ee8574e43f1cfdf9f4665b397aa02",
+      "sides": [
+        {
+          "label": "A",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        },
+        {
+          "label": "B",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 5,
+      "pairs": 90,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": "Apple M4 Pro"
+      }
+    },
+    {
+      "id": 36,
+      "file": "build/verification/call-gates-paging-primary-chrome.json",
+      "sha256": "58f774562bcd2d36ae40931198537b0b0ac4aabd2f6de38926a64696e85b2e37",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 5,
+      "pairs": 90,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": "Apple M4 Pro"
+      }
+    },
+    {
+      "id": 37,
+      "file": "build/verification/call-gates-paging-primary-node.json",
+      "sha256": "e1a18e82eac7862ea36b418bd2a0c06f8cae40bbb1ed571940bf8ba9b1b923df",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 5,
+      "pairs": 90,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": "Apple M4 Pro"
+      }
+    },
+    {
+      "id": 38,
+      "file": "build/verification/call-gates-paging-reverse-chrome.json",
+      "sha256": "3e0d9e8d4d9c4d6be2a4c76b054b0941cc3fdaec774cbd5eb504f27d702a9086",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 5,
+      "pairs": 90,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": "Apple M4 Pro"
+      }
+    },
+    {
+      "id": 39,
+      "file": "build/verification/call-gates-paging-reverse-node.json",
+      "sha256": "7ca3ee235cb8d563a8b20e6280d1736041e5d5996548cd9dc7083e1135006b14",
+      "sides": [
+        {
+          "label": "baseline",
+          "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+            "workingTree": [
+              "M src/x86/protection/far.rs",
+              "?? src/x86/protection/far/gate_tests.rs"
+            ]
+          }
+        },
+        {
+          "label": "current",
+          "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+          "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+          "source": {
+            "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+            "workingTree": []
+          }
+        }
+      ],
+      "workloads": 5,
+      "pairs": 90,
+      "zeroElapsedSamples": 0,
+      "undefinedLaterRatios": 0,
+      "semanticResourceUnitMismatchCount": 0,
+      "unavailable": [],
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": "Apple M4 Pro"
+      }
+    }
+  ],
+  "characterization": [
+    {
+      "runtime": "node",
+      "file": "build/verification/call-gates-characterization-node.json",
+      "sha256": "bf47b7ffc5ec3e2497745d76aa1b75beb5a2dcb67fea17e1bacf788bc356813e",
+      "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+      "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+      "requestedIterations": 4096,
+      "samples": 198,
+      "postRunIntegrity": {
+        "core": true,
+        "host": true,
+        "sources": true
+      },
+      "environment": {
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      },
+      "definitions": [
+        {
+          "name": "gate-w2-n0-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 5,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w2-n1-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "8192",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w2-n31-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "253952",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n0-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 5,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n0-pg0",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 5,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-pg0",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-pg0",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n0-nonpae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 5,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-nonpae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-nonpae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n0-pae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 5,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-pae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-pae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-b16",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w2-n31-tr16",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "253952",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-first-accessed",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": true,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-debug-miss",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-debug-parameter-hit",
+          "iterations": "257",
+          "effectiveWork": {
+            "gateCalls": "257",
+            "matchingReturns": "0",
+            "copiedParameters": "257",
+            "copiedBytes": "1028",
+            "frameSlots": "1285",
+            "retiredInstructions": "257",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-same-cpl-count31-ignored",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "8192",
+            "retiredInstructions": "12288",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 2,
+            "frameWrites": 2,
+            "matchingReturnStackReads": 2,
+            "matchingReturnDescriptorReads": 1
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-conforming-count31-ignored",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "8192",
+            "retiredInstructions": "12288",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 2,
+            "frameWrites": 2,
+            "matchingReturnStackReads": 2,
+            "matchingReturnDescriptorReads": 1
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-first-page-ad",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": true,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n2-captured-overlap",
+          "iterations": "257",
+          "effectiveWork": {
+            "gateCalls": "257",
+            "matchingReturns": "257",
+            "copiedParameters": "514",
+            "copiedBytes": "2056",
+            "frameSlots": "1542",
+            "retiredInstructions": "514",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 2,
+            "systemReads": 5,
+            "frameWrites": 6,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-private-page-repair",
+          "iterations": "257",
+          "effectiveWork": {
+            "gateCalls": "257",
+            "matchingReturns": "257",
+            "copiedParameters": "257",
+            "copiedBytes": "1028",
+            "frameSlots": "1285",
+            "retiredInstructions": "514",
+            "failedAttempts": "257"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-short-resumes",
+          "iterations": "257",
+          "effectiveWork": {
+            "gateCalls": "257",
+            "matchingReturns": "257",
+            "copiedParameters": "257",
+            "copiedBytes": "1028",
+            "frameSlots": "1285",
+            "retiredInstructions": "1028",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-gate-edit-A-B-A",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "20480",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-ia32e-fixed-long",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 4,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-ia32e-fixed-compat",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 4,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-ia32e-physical-long",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 4,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-ia32e-physical-compat",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 4,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-equal-loaded-context",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "8192",
+            "retiredInstructions": "12288",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 3,
+            "frameWrites": 2,
+            "matchingReturnStackReads": 2,
+            "matchingReturnDescriptorReads": 1
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-same-context",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "8192",
+            "retiredInstructions": "12288",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 3,
+            "frameWrites": 2,
+            "matchingReturnStackReads": 2,
+            "matchingReturnDescriptorReads": 1
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        }
+      ]
+    },
+    {
+      "runtime": "chrome",
+      "file": "build/verification/call-gates-characterization-chrome.json",
+      "sha256": "844fc94fe7aa621812f340c63bd5c16c6cbd23004ff04251b9588ba454ad17f6",
+      "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+      "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+      "requestedIterations": 4096,
+      "samples": 198,
+      "postRunIntegrity": {
+        "core": true,
+        "host": true,
+        "sources": true
+      },
+      "environment": {
+        "node": "v22.16.0",
+        "cpu": "Apple M4 Pro",
+        "platform": "darwin",
+        "arch": "arm64"
+      },
+      "definitions": [
+        {
+          "name": "gate-w2-n0-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 5,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w2-n1-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "8192",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w2-n31-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "253952",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n0-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 5,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-linear",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n0-pg0",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 5,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-pg0",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-pg0",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n0-nonpae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 5,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-nonpae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-nonpae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n0-pae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 5,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-pae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-pae",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-b16",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w2-n31-tr16",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "253952",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-first-accessed",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": true,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-debug-miss",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-debug-parameter-hit",
+          "iterations": "257",
+          "effectiveWork": {
+            "gateCalls": "257",
+            "matchingReturns": "0",
+            "copiedParameters": "257",
+            "copiedBytes": "1028",
+            "frameSlots": "1285",
+            "retiredInstructions": "257",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-same-cpl-count31-ignored",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "8192",
+            "retiredInstructions": "12288",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 2,
+            "frameWrites": 2,
+            "matchingReturnStackReads": 2,
+            "matchingReturnDescriptorReads": 1
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-conforming-count31-ignored",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "8192",
+            "retiredInstructions": "12288",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 0,
+            "systemReads": 2,
+            "frameWrites": 2,
+            "matchingReturnStackReads": 2,
+            "matchingReturnDescriptorReads": 1
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n31-first-page-ad",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "126976",
+            "copiedBytes": "507904",
+            "frameSlots": "143360",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 31,
+            "systemReads": 5,
+            "frameWrites": 35,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": true,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n2-captured-overlap",
+          "iterations": "257",
+          "effectiveWork": {
+            "gateCalls": "257",
+            "matchingReturns": "257",
+            "copiedParameters": "514",
+            "copiedBytes": "2056",
+            "frameSlots": "1542",
+            "retiredInstructions": "514",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 2,
+            "systemReads": 5,
+            "frameWrites": 6,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-private-page-repair",
+          "iterations": "257",
+          "effectiveWork": {
+            "gateCalls": "257",
+            "matchingReturns": "257",
+            "copiedParameters": "257",
+            "copiedBytes": "1028",
+            "frameSlots": "1285",
+            "retiredInstructions": "514",
+            "failedAttempts": "257"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-short-resumes",
+          "iterations": "257",
+          "effectiveWork": {
+            "gateCalls": "257",
+            "matchingReturns": "257",
+            "copiedParameters": "257",
+            "copiedBytes": "1028",
+            "frameSlots": "1285",
+            "retiredInstructions": "1028",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-w4-n1-gate-edit-A-B-A",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "4096",
+            "copiedBytes": "16384",
+            "frameSlots": "20480",
+            "retiredInstructions": "20480",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 0,
+            "parameterReads": 1,
+            "systemReads": 5,
+            "frameWrites": 5,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-ia32e-fixed-long",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 4,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-ia32e-fixed-compat",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 4,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-ia32e-physical-long",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 4,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-ia32e-physical-compat",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "16384",
+            "retiredInstructions": "16384",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 4,
+            "frameWrites": 4,
+            "matchingReturnStackReads": 4,
+            "matchingReturnDescriptorReads": 2
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-equal-loaded-context",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "8192",
+            "retiredInstructions": "12288",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 3,
+            "frameWrites": 2,
+            "matchingReturnStackReads": 2,
+            "matchingReturnDescriptorReads": 1
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        },
+        {
+          "name": "gate-ia64-same-context",
+          "iterations": "4096",
+          "effectiveWork": {
+            "gateCalls": "4096",
+            "matchingReturns": "4096",
+            "copiedParameters": "0",
+            "copiedBytes": "0",
+            "frameSlots": "8192",
+            "retiredInstructions": "12288",
+            "failedAttempts": "0"
+          },
+          "nominalOperationsPerCompletedCall": {
+            "scope": "Architectural operand/metadata operations from this literal fixture; excludes instruction fetch, translation validation, page walks and page A/D traffic. RETF reads and failed attempts are separate.",
+            "pointerReads": 1,
+            "parameterReads": 0,
+            "systemReads": 3,
+            "frameWrites": 2,
+            "matchingReturnStackReads": 2,
+            "matchingReturnDescriptorReads": 1
+          },
+          "descriptorCold": false,
+          "pagingCold": false,
+          "firstSampleColdMeaning": "one CPU: sample-1 includes first execution; A/D and descriptor A first touches occur only there, warm samples retain them",
+          "contextReuse": "same CPU/compiler/Core across first and warm samples; imported context/state rearmed outside measured run intervals",
+          "timing": "elapsedMs sums awaited run calls only; wallMs also includes host rearming, repair and per-call guards; final checkpoint guards follow the wall timer. creationMs is one CPU creation, not independent cold-start sampling"
+        }
+      ]
+    }
+  ],
+  "contextControls": {
+    "kind": "timing-discarded semantic/owner controls only",
+    "files": [
+      {
+        "file": "build/verification/call-gates-context-reuse-node.json",
+        "sha256": "be57751ce9dd09d139549d562b06e0f4a33337329e6b9cd1ce8edd3567747fee"
+      },
+      {
+        "file": "build/verification/call-gates-context-reuse-chrome.json",
+        "sha256": "fd7e210ac91d34ab381fce954b44160fb05092e4d82c9d5c9dc9949da6ebd6b0"
+      },
+      {
+        "file": "build/verification/call-gates-population-node.json",
+        "sha256": "89acafee512c2cf87099900b68d187da7ba8d28f55692b92226f503256f58104"
+      },
+      {
+        "file": "build/verification/call-gates-population-chrome.json",
+        "sha256": "b27853562391d3eb17ba37dc571813ef6097a1583844be132a58356ad1924486"
+      }
+    ]
+  },
+  "csvHashes": {
+    "timing-pairs.csv": "342bbd0839add070a55a794172855eb6d7e57d52bdf5a484e96a2f8b2b70b46b",
+    "timing-summary.csv": "01386178138901f1f21e1580173e1424ca8f74c64ad0adf81b4a95f4f72f258e",
+    "characterization.csv": "7692c6ee3fc044ee580b90e819a81119411955cbb4e74f3288d9b49ec5946e49"
+  },
+  "zeroCountScope": "zeroElapsedSamples and CSV zero_baseline/zero_current count all saved samples; medians apply later_cutoff"
+}
