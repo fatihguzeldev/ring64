@@ -2,6 +2,7 @@ import { captureIo, type IoProvider } from './io.js';
 import type { DeviceNotAvailable, NumericControlFault } from './numeric-controls.js';
 import { captureDebugState, type DebugState } from './debug.js';
 import { capturePagingState, type PagingState } from './paging.js';
+import { captureTimeState, type TimeState } from './time.js';
 import {
   captureFastSystemState,
   zeroFastSystemState,
@@ -380,6 +381,16 @@ export class Cpu {
     this.requireIdle(generation);
     this.engineCall(() => this.#engine.setFastSystemState(input));
     this.pruneTranslations();
+  }
+  readTimeState(): TimeState {
+    this.requireIdle();
+    return this.engineCall(() => this.#engine.readTimeState());
+  }
+  setTimeState(state: TimeState): void {
+    const generation = this.requireIdle();
+    const input = captureTimeState(state);
+    this.requireIdle(generation);
+    this.engineCall(() => this.#engine.setTimeState(input));
   }
   readXmmState(): bigint[] {
     this.requireIdle();

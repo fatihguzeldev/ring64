@@ -334,6 +334,7 @@ pub extern "C" fn core_paging_control(
     value: u64,
     _pc: u64,
     _flags: u64,
+    retired: u64,
 ) -> i32 {
     use crate::x86::protection::{ProtectionFault, ProtectionPhase};
     use paging::ControlFailure;
@@ -366,6 +367,14 @@ pub extern "C" fn core_paging_control(
                 }
                 .map(|s| (s, None))
             }
+            2 if matches!(
+                register,
+                crate::x86::processor::TSC_MSR | crate::x86::processor::TSC_AUX_MSR
+            ) =>
+            {
+                unsafe { (*core.state.get()).time.read_msr(register, retired) }
+                    .map(|value| (state, Some(value)))
+            }
             2 => if register == paging::EFER_MSR {
                 state.read_msr(register)
             } else {
@@ -373,6 +382,14 @@ pub extern "C" fn core_paging_control(
                     .read_msr_profile(register, &core.context, core.physical_controls)
             }
             .map(|v| (state, Some(v))),
+            3 if matches!(
+                register,
+                crate::x86::processor::TSC_MSR | crate::x86::processor::TSC_AUX_MSR
+            ) =>
+            {
+                unsafe { (*core.state.get()).time.write_msr(register, value, retired) }
+                    .map(|()| (state, None))
+            }
             3 if register == paging::EFER_MSR => if core.physical_controls {
                 state.prepare_physical_efer_write(value)
             } else {

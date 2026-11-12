@@ -29,6 +29,7 @@ import {
 } from './context.js';
 import type { InitialMemory, MemoryBackingInput, MemoryMapping } from './memory.js';
 import { capturePagingState, pagingStateFromJson, type PagingState } from './paging.js';
+import { captureTimeState, validateTimeLayout, type TimeLayout, type TimeState } from './time.js';
 import {
   captureFastSystemState,
   fastSystemStateFromJson,
@@ -235,6 +236,7 @@ export interface UnitMetadata {
 }
 
 interface Layout {
+  time: TimeLayout;
   pagingSource?: PagingSourceLayout;
   numericSource?: NumericSourceLayout;
   debug: DebugLayout;
@@ -295,7 +297,9 @@ type CoreExports = WebAssembly.Exports & {
     value: bigint,
     pc: bigint,
     flags: bigint,
+    retired: bigint,
   ): number;
+  core_processor(kind: number, eax: number, ecx: number, retired: bigint): number;
   core_io(
     descriptor: number,
     port: number,
@@ -702,6 +706,15 @@ export class Core {
       if (typeof exports.core_numeric_fault_info !== 'function')
         throw new Error('core omitted numeric source export');
     }
+    validateTimeLayout(
+      layout.time,
+      layout.size,
+      layout.numericSource
+        ? layout.numericSource.offset + layout.numericSource.bytes
+        : layout.pagingSource
+          ? layout.pagingSource.offset + layout.pagingSource.bytes
+          : layout.debug.offset + layout.debug.layout.bytes,
+    );
     this.stateView();
   }
 
@@ -803,6 +816,7 @@ export class Core {
         'core_vector_load',
         'core_vector_store',
         'core_clear_fault',
+        'core_processor',
         'core_probe',
         'core_compile',
         'core_load',
@@ -1094,6 +1108,21 @@ export class Core {
     if (this.#exports.core_import_fast_system() !== 0)
       throw new TypeError(this.info<{ error: string }>().error);
   }
+  readTimeState(): TimeState {
+    const view = this.stateView(),
+      layout = this.#layout.time;
+    return {
+      tsc: view.getBigUint64(layout.offset + layout.tsc, true),
+      tscAux: view.getUint32(layout.offset + layout.tscAux, true),
+    };
+  }
+  setTimeState(state: TimeState): void {
+    const input = captureTimeState(state),
+      view = this.stateView(),
+      layout = this.#layout.time;
+    view.setBigUint64(layout.offset + layout.tsc, input.tsc, true);
+    view.setUint32(layout.offset + layout.tscAux, input.tscAux, true);
+  }
   readXmmState(): bigint[] {
     const view = this.stateView();
     return Array.from({ length: 16 }, (_, index) => {
@@ -1328,6 +1357,7 @@ export class Core {
       debug_finish: this.#exports.core_debug_finish,
       debug_register: this.#exports.core_debug_register,
       paging_control: this.#exports.core_paging_control,
+      processor: this.#exports.core_processor,
       debug_begin: this.#exports.core_debug_begin,
       external_step: this.#exports.core_external_step,
       halt: this.#exports.core_halt,

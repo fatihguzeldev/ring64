@@ -118,7 +118,7 @@ fn loaded_cs_activation_invalidity_precedes_a_deferred_cr0_facility() {
             .set_segment(Segment::Cs, 8, c.context.segment(Segment::Cs), attrs);
     });
     assert_eq!(
-        super::super::paging::core_paging_control(1, 0, 0x80040033, 0x1000, 2),
+        super::super::paging::core_paging_control(1, 0, 0x80040033, 0x1000, 2, 0),
         crate::embedding::layout::PROTECTION
     );
     BRIDGE.with_borrow(|b| assert_eq!(b.core.as_ref().unwrap().paging.unwrap().cr0, 0x33));

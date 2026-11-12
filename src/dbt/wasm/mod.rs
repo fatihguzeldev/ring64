@@ -445,6 +445,7 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
                 ValType::I64,
                 ValType::I64,
                 ValType::I64,
+                ValType::I64,
             ],
             [ValType::I32],
         );

@@ -87,6 +87,8 @@ fn paging_helpers_receive_live_operands_and_publish_one_completed_boundary() {
             operation: Operation::Paging(operation),
         }]);
         unit.context.set_mode_and_cpl(mode, 0);
+        let mut call = call;
+        call.as_array_mut().unwrap().push(json!("0"));
         let mut packet = execution_case(
             &emit(&unit),
             &[0x1000],
@@ -123,7 +125,7 @@ fn paging_failure_preserves_boundary_and_tf_completion_precedes_post_budget() {
         2,
         (&[], 2, 0x1000, PROTECTION as u32, 2),
     );
-    refusal["accesses"] = json!([{"kind":"paging_control","args":[0,2,"0","1000","2"],"result":{"reason":PROTECTION}}]);
+    refusal["accesses"] = json!([{"kind":"paging_control","args":[0,2,"0","1000","2","0"],"result":{"reason":PROTECTION}}]);
     let mut trap = execution_case(
         &emit_observed(&unit, true),
         &[0x1000],
@@ -134,7 +136,7 @@ fn paging_failure_preserves_boundary_and_tf_completion_precedes_post_budget() {
         (&[(0, 0x1234)], 0x302, 0x1003, DEBUG_EXCEPTION as u32, 0),
     );
     trap["accesses"] = json!([
-        {"kind":"paging_control","args":[0,2,"0","1000","302"],"result":{"reason":0,"value":"1234"}},
+        {"kind":"paging_control","args":[0,2,"0","1000","302","0"],"result":{"reason":0,"value":"1234"}},
         {"kind":"debug_step","args":["1000","1003",1,"302"],"result":DEBUG_EXCEPTION}
     ]);
     run_cases(vec![refusal, trap]);

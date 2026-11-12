@@ -11,6 +11,7 @@ mod far_bridge;
 mod far_plan_lifetime;
 mod paging_decode;
 mod protection_bridge;
+mod processor;
 mod reset;
 mod software_events;
 mod streaming_bridge;

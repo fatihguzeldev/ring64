@@ -1,5 +1,6 @@
 use super::{DIRECTION, Emitter, FLAGS, GPR, REMAINING, REPEAT_REMAINING, RIP, SHADOW, SYSTEM};
 use crate::embedding::layout::RunState;
+use crate::x86::processor::TimeState;
 use std::mem::{offset_of, size_of};
 use wasm_encoder::{Instruction as Op, MemArg};
 
@@ -12,6 +13,12 @@ fn memory(offset: usize) -> MemArg {
 }
 
 impl Emitter {
+    pub(super) fn retired(&mut self) {
+        self.op(Op::LocalGet(1))
+            .op(Op::LocalGet(REMAINING))
+            .op(Op::I64Sub);
+    }
+
     pub(super) fn load_state(&mut self) {
         for register in 0..16 {
             self.op(Op::LocalGet(0))
@@ -66,6 +73,13 @@ impl Emitter {
     }
 
     pub(super) fn publish_state(&mut self) {
+        let tsc = offset_of!(RunState, time) + offset_of!(TimeState, tsc);
+        // Helpers can rebase this same bank for WRMSR; settle each native entry once.
+        self.op(Op::LocalGet(0))
+            .op(Op::LocalGet(0))
+            .op(Op::I64Load(memory(tsc)));
+        self.retired();
+        self.op(Op::I64Add).op(Op::I64Store(memory(tsc)));
         for register in 0..16 {
             self.op(Op::LocalGet(0))
                 .op(Op::LocalGet(GPR + register as u32))

@@ -230,13 +230,25 @@ fn context_reuse_keeps_exact_paging_fences_and_dynamic_nonfences() {
         (4, Segment::Ds as u32, 0x800000000000, false),
         (1, 0, 0x80000033, false),
         (1, 4, 0x628, false),
+        (1, 4, 0x62c, false),
         (1, 2, 0xffffffffffffffff, false),
         (3, 0xc0000080, 0x500, false),
         (3, 0xc0000080, 0x501, false),
     ] {
         paged_fixture();
         let owner = paged_owner();
-        assert_eq!(core_paging_control(kind, register, value, 0x400000, 2), 0);
+        let epoch = context::core_context_version();
+        assert_eq!(
+            core_paging_control(kind, register, value, 0x400000, 2, 0),
+            0
+        );
+        if kind == 1 && register == 4 && value == 0x62c {
+            assert_eq!(
+                context::core_context_version(),
+                epoch,
+                "TSD-only guest write is runtime permission"
+            );
+        }
         assert_eq!(
             mapped::core_validity(owner),
             i32::from(!destructive),
@@ -251,6 +263,13 @@ fn context_reuse_keeps_exact_paging_fences_and_dynamic_nonfences() {
         });
         assert_eq!(core_import_paging(), 0);
         assert_eq!(mapped::core_validity(owner), i32::from(!destructive));
+        if kind == 1 && register == 4 && value == 0x62c {
+            assert_eq!(
+                context::core_context_version(),
+                epoch,
+                "TSD-only host repair is runtime permission"
+            );
+        }
     }
 }
 
@@ -374,7 +393,7 @@ fn context_proof_all_seven_publishers_clear_a_primed_proof_even_at_saturation() 
                     );
                 }
                 _ => assert_eq!(
-                    paging::core_paging_control(3, 0xc0000100, 0x10000, 0x400000, 2),
+                    paging::core_paging_control(3, 0xc0000100, 0x10000, 0x400000, 2, 0),
                     0
                 ),
             }
@@ -414,7 +433,7 @@ fn context_proof_does_not_override_image_alias_death_release_or_paging_fences() 
     paged_fixture();
     let owner = paged_owner();
     assert_eq!(mapped::core_activate(owner), 1);
-    assert_eq!(paging::core_paging_control(1, 3, 0x1000, 0x400000, 2), 0);
+    assert_eq!(paging::core_paging_control(1, 3, 0x1000, 0x400000, 2, 0), 0);
     assert_eq!(
         mapped::core_activate(owner),
         0,
@@ -436,7 +455,7 @@ fn numeric_publication_retains_live_guards_but_cancels_pending_aba_at_epoch_max(
             u64::from_str_radix(info["owner"].as_str().unwrap().trim_start_matches("0x"), 16)
                 .unwrap()
         });
-        assert_eq!(core_paging_control(1, 0, 0x8000003b, 0x400000, 2), 0);
+        assert_eq!(core_paging_control(1, 0, 0x8000003b, 0x400000, 2, 0), 0);
         assert_eq!(mapped::core_validity(installed), 1);
         assert_eq!(
             mapped::core_activate(installed),
@@ -444,7 +463,7 @@ fn numeric_publication_retains_live_guards_but_cancels_pending_aba_at_epoch_max(
             "unspecialized unit retains live admission"
         );
         assert_eq!(mapped::core_validity(pending), 0);
-        assert_eq!(core_paging_control(5, 0, 0, 0x400000, 2), 0);
+        assert_eq!(core_paging_control(5, 0, 0, 0x400000, 2, 0), 0);
         assert_eq!(
             mapped::core_publish(pending),
             0,

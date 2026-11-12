@@ -63,7 +63,7 @@ fn quartet_changes_and_same_cr3_reload_retire_primed_pending_and_aba_owners_at_e
         assert!(fresh > pending);
         assert_eq!(mapped::core_publish(fresh), 1);
         assert_eq!(mapped::core_activate(fresh), 1);
-        assert_eq!(paging::core_paging_control(1, 3, 0x1000, 0x1000, 2), 0);
+        assert_eq!(paging::core_paging_control(1, 3, 0x1000, 0x1000, 2, 0), 0);
         assert_eq!(
             mapped::core_activate(fresh),
             0,

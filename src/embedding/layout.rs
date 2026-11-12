@@ -4,6 +4,7 @@ pub mod paging;
 use crate::x86::exception::{
     EventState, ExceptionEvent, InterruptEvent, InterruptSource, InterruptState,
 };
+use crate::x86::processor::TimeState;
 use crate::x86::state::State;
 use crate::x86::x87::State as X87State;
 
@@ -249,6 +250,7 @@ pub struct RunState {
     pub debug: debug::DebugState,
     pub paging_source: paging::RawPagingSource,
     pub numeric_source: numeric::RawNumericSource,
+    pub time: TimeState,
 }
 
 impl Default for RunState {
@@ -272,6 +274,7 @@ impl Default for RunState {
             debug: debug::DebugState::default(),
             paging_source: paging::RawPagingSource::default(),
             numeric_source: numeric::RawNumericSource::default(),
+            time: TimeState::default(),
         }
     }
 }
@@ -345,6 +348,12 @@ impl RunState {
         let mut paging_source = paging::RawPagingSource::descriptor();
         paging_source["offset"] = serde_json::json!(std::mem::offset_of!(Self, paging_source));
         serde_json::json!({
+            "time": {
+                "offset": std::mem::offset_of!(Self, time),
+                "size": size_of::<TimeState>(),
+                "tsc": std::mem::offset_of!(TimeState, tsc),
+                "tscAux": std::mem::offset_of!(TimeState, tsc_aux),
+            },
             "pagingSource": paging_source,
             "numericSource": numeric_source,
             "debug": { "offset": std::mem::offset_of!(Self,debug), "layout": debug::DebugState::descriptor() },
@@ -408,7 +417,7 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, interruptibility), 164);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
         assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
-        assert_eq!(size_of::<RunState>(), 768);
+        assert_eq!(size_of::<RunState>(), 784);
         assert_eq!(REASONS[18], "debug-exception");
         assert_eq!(RunState::descriptor()["interruptibilityBytes"], 4);
         let mut state = RunState {
@@ -424,7 +433,7 @@ mod tests {
         let mut transport = RunState::default();
         assert_eq!(std::mem::offset_of!(RunState, mxcsr), 448);
         assert_eq!(std::mem::offset_of!(RunState, x87), 456);
-        assert_eq!(size_of::<RunState>(), 768);
+        assert_eq!(size_of::<RunState>(), 784);
         let projection = &RunState::descriptor()["x87"];
         assert_eq!(projection["bytes"], 104);
         assert_eq!(projection["controlWord"], 80);
@@ -443,7 +452,7 @@ mod tests {
         let mut state = RunState::default();
         assert_eq!(std::mem::offset_of!(RunState, xmm), 176);
         assert_eq!(std::mem::offset_of!(RunState, vector_scratch), 432);
-        assert_eq!(size_of::<RunState>(), 768);
+        assert_eq!(size_of::<RunState>(), 784);
         assert_eq!(RunState::descriptor()["scalarSize"], 176);
         assert_eq!(RunState::descriptor()["xmmBytes"], 256);
         assert_eq!(state.xmm, [[0; 16]; 16]);
@@ -455,7 +464,7 @@ mod tests {
     #[test]
     fn repeated_work_extends_transport_after_existing_fields() {
         let descriptor = RunState::descriptor();
-        assert_eq!(descriptor["size"], 768);
+        assert_eq!(descriptor["size"], 784);
         assert_eq!(descriptor["repeatRemaining"], 168);
         assert_eq!(descriptor["reasons"][11], "repeat-budget");
     }
@@ -479,7 +488,7 @@ mod tests {
             ]
         );
         assert_eq!(RunState::descriptor()["reasons"][9], "divide-error");
-        assert_eq!(size_of::<RunState>(), 768);
+        assert_eq!(size_of::<RunState>(), 784);
     }
 
     #[test]
@@ -491,8 +500,8 @@ mod tests {
         assert_eq!(std::mem::offset_of!(RunState, target), 152);
         assert_eq!(std::mem::offset_of!(RunState, fault_segment), 160);
         assert_eq!(std::mem::offset_of!(RunState, repeat_remaining), 168);
-        assert_eq!(size_of::<RunState>(), 768);
-        assert_eq!(RunState::descriptor()["size"], 768);
+        assert_eq!(size_of::<RunState>(), 784);
+        assert_eq!(RunState::descriptor()["size"], 784);
     }
 
     #[test]
@@ -616,7 +625,7 @@ mod debug_append_tests {
     use super::*;
     #[test]
     fn debug_state_appends_without_moving_instruction_or_numeric_offsets() {
-        assert_eq!(size_of::<RunState>(), 768);
+        assert_eq!(size_of::<RunState>(), 784);
         assert_eq!(RunState::descriptor()["debug"]["offset"], 616);
         let mut state = RunState::default();
         assert_eq!(RunState::descriptor()["xmm"], 176);
@@ -636,7 +645,7 @@ mod paging_append_tests {
         assert_eq!(std::mem::offset_of!(RunState, paging_source), 712);
         assert_eq!(std::mem::offset_of!(RunState, debug), 616);
         assert_eq!(std::mem::offset_of!(RunState, event), 560);
-        assert_eq!(size_of::<RunState>(), 768);
+        assert_eq!(size_of::<RunState>(), 784);
         let descriptor = RunState::descriptor();
         assert_eq!(descriptor["pagingSource"]["offset"], 712);
         assert_eq!(descriptor["pagingSource"]["bytes"], 16);

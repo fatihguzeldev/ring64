@@ -51,6 +51,7 @@ mod numeric_controls;
 mod numeric_image;
 mod paging;
 mod protection;
+mod processor;
 mod reset;
 mod software_events;
 mod streaming;

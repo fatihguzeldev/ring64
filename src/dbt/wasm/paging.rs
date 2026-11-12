@@ -45,6 +45,7 @@ impl Emitter {
         }
         self.op(Op::I64Const(self.current_pc as i64));
         self.full_flags();
+        self.retired();
         self.op(Op::Call(
             self.paging_control.expect("paging control import"),
         ))

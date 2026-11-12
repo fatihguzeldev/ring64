@@ -515,7 +515,7 @@ for (const [index,c] of cases.entries()) {
  const debug_step=(pc,resume,completed,full)=>access('debug_step',[bits(pc),bits(resume),completed,bits(full)]);
  const external_step=(pc,full,shadow)=>access('external_step',[bits(pc),bits(full),shadow]);
  const halt=full=>access('halt',[bits(full)]);
- const paging_control=(kind,register,value,pc,full)=>{const result=access('paging_control',[kind,register,bits(value),bits(pc),bits(full)]);if(result.value!==undefined)d.setBigUint64(scratch,BigInt('0x'+result.value),true);return result.reason};
+ const paging_control=(kind,register,value,pc,full,retired)=>{const result=access('paging_control',[kind,register,bits(value),bits(pc),bits(full),bits(retired)]);if(result.value!==undefined)d.setBigUint64(scratch,BigInt('0x'+result.value),true);return result.reason};
  const protection=(op,address,input,segment)=>{const result=access('protection',[op,bits(address),bits(input),segment]);if(result.value!==undefined)d.setBigUint64(scratch,BigInt('0x'+result.value),true);d.setUint8(scratch+8,result.control??0);return result.reason};
  const float=(op,leftlo,lefthi,rightlo,righthi)=>{const result=access('float',[op,bits(leftlo),bits(lefthi),bits(rightlo),bits(righthi)]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);if(result.value!==undefined){const value=BigInt('0x'+result.value);d.setBigUint64(scratch,BigInt.asUintN(64,value),true);d.setBigUint64(scratch+8,value>>64n,true)}return result.reason};
  const load_mxcsr=(address,segment)=>{const result=access('load_mxcsr',[bits(address),segment]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);return result.reason};
