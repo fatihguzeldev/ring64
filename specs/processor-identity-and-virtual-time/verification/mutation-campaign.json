@@ -1,0 +1,369 @@
+{
+  "note": "Prepared campaign definition; execution evidence is recorded separately. Exact unique production anchors; isolated snapshot setup precedes unchanged named semantic assertions. Evidence domains:22 emitted/public instruction-execution rows,1 public host-bank getter row,1 public decoder-frontier row,1 native owner/bridge PAE reload row. A failed build, trap, timeout or generic engine failure is never a semantic kill.",
+  "timeoutMs": 300000,
+  "mutations": [
+    {
+      "name": "omit-common-settlement",
+      "path": "src/dbt/wasm/state.rs",
+      "before": "        self.retired();\n        self.op(Op::I64Add).op(Op::I64Store(memory(tsc)));",
+      "after": "        self.op(Op::I64Const(0));\n        self.op(Op::I64Add).op(Op::I64Store(memory(tsc)));",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "ledger"]
+      ],
+      "assertion": "direct BigInt ledger bank:",
+      "domain": "A completed native entry must credit every retired instruction once.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "double-common-settlement",
+      "path": "src/dbt/wasm/state.rs",
+      "before": "        self.retired();\n        self.op(Op::I64Add).op(Op::I64Store(memory(tsc)));",
+      "after": "        self.retired();\n        self.op(Op::I64Const(2)).op(Op::I64Mul);\n        self.op(Op::I64Add).op(Op::I64Store(memory(tsc)));",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "ledger"]
+      ],
+      "assertion": "direct BigInt ledger bank:",
+      "domain": "Duplicate epilogue credit cannot hide behind correct timestamp outputs.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "stale-canonical-budget-instead-of-original-budget",
+      "path": "src/dbt/wasm/state.rs",
+      "before": "    pub(super) fn retired(&mut self) {\n        self.op(Op::LocalGet(1))\n            .op(Op::LocalGet(REMAINING))\n            .op(Op::I64Sub);\n    }",
+      "after": "    pub(super) fn retired(&mut self) {\n        self.op(Op::LocalGet(0))\n            .op(Op::I64Load(memory(offset_of!(RunState, remaining))))\n            .op(Op::LocalGet(REMAINING))\n            .op(Op::I64Sub);\n    }",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "ledger"]
+      ],
+      "assertion": "direct BigInt ledger bank:",
+      "domain": "Live B-R is independent of stale canonical remaining during generated execution.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "wrmsr-missing-own-retirement-offset",
+      "path": "src/x86/processor.rs",
+      "before": "TSC_MSR => self.tsc = value.wrapping_sub(prior_retired).wrapping_sub(1),",
+      "after": "TSC_MSR => self.tsc = value.wrapping_sub(prior_retired),",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "msr"]
+      ],
+      "assertion": "independent final time bank:",
+      "domain": "WRMSR installs W at its own retirement, rather than W+1.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "preserve-dirty-output-upper32",
+      "path": "src/dbt/wasm/processor.rs",
+      "before": "                .op(Op::LocalSet(GPR + register));",
+      "after": "                .op(Op::LocalGet(GPR + register))\n                .op(Op::I64Const(0xffff_ffff_0000_0000u64 as i64))\n                .op(Op::I64And)\n                .op(Op::I64Or)\n                .op(Op::LocalSet(GPR + register));",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "identity"]
+      ],
+      "assertion": "CPUID full raw sixteen-register packet:",
+      "domain": "All modes require complete zero-extended output banks.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "truncate-aux-reserved-upper32",
+      "path": "src/x86/processor.rs",
+      "before": "                self.tsc_aux = value\n                    .try_into()\n                    .map_err(|_| ControlFailure::GeneralProtection)?;",
+      "after": "                self.tsc_aux = value as u32;",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "msr"]
+      ],
+      "assertion": "AUX upper32 refusal:",
+      "domain": "AUX upper bits select a value fault instead of truncation/publication.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "reverse-tsd-cpl-guard-including-v86",
+      "path": "src/x86/processor.rs",
+      "before": "        || context.cpl() == 0\n        || paging.is_none_or",
+      "after": "        || context.cpl() != 0\n        || paging.is_none_or",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "tsd"]
+      ],
+      "assertion": "TSD live permission:",
+      "domain": "TSD1 allows CPL0 and refuses CPL1/2/3 including v86.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "apply-tsd-to-real-address-mode",
+      "path": "src/x86/processor.rs",
+      "before": "    if context.mode() == Mode::Real\n        || context.cpl() == 0\n        || paging.is_none_or(|state| state.cr4 & paging::CR4_TSD == 0)",
+      "after": "    if context.mode() != Mode::Real && context.cpl() == 0\n        || paging.is_none_or(|state| state.cr4 & paging::CR4_TSD == 0)",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "tsd"]
+      ],
+      "assertion": "TSD live permission:",
+      "domain": "PE0 real execution remains admitted with physical TSD1.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "misclassify-f9-as-fa-neighbor",
+      "path": "src/x86/decode/protection.rs",
+      "before": "                if operands.mode == 3 && operands.selector == 7 && operands.rm & 7 == 1 {",
+      "after": "                if operands.mode == 3 && operands.selector == 7 && operands.rm & 7 == 2 {",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"virtual time decode boundaries preserve LOCK fetch length RF and neighbor priority\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "literal required-byte/frontier packet f00f01f9:",
+      "domain": "RDTSCP exact F9 owns its selected LOCK/decode frontier; neighbors remain inherited.",
+      "evidence": "public-decode-frontier-node"
+    },
+    {
+      "name": "freeze-cpuid-leaf-to-zero",
+      "path": "src/embedding/exports/processor.rs",
+      "before": ".zip(processor::cpuid(eax, ecx))",
+      "after": ".zip(processor::cpuid(eax & 0, ecx))",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "identity"]
+      ],
+      "assertion": "CPUID full raw sixteen-register packet:",
+      "domain": "CPUID uses live low EAX rather than a compiled/frozen query.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "drop-live-retired-delta-at-read",
+      "path": "src/embedding/exports/processor.rs",
+      "before": "raw.time.sample(retired).to_le_bytes()",
+      "after": "raw.time.sample(retired & 0).to_le_bytes()",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "ledger"]
+      ],
+      "assertion": "ledger full raw registers:",
+      "domain": "Timestamp reads see retired prefix inside the current invocation.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "freeze-aux-read-to-zero",
+      "path": "src/embedding/exports/processor.rs",
+      "before": "raw.time.tsc_aux.to_le_bytes()",
+      "after": "(raw.time.tsc_aux & 0).to_le_bytes()",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "raw"]
+      ],
+      "assertion": "raw AUX output zero-extension:",
+      "domain": "Cached RDTSCP observes the current AUX bank.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "clock-only-for-artifacts-containing-reads",
+      "path": "src/dbt/wasm/state.rs",
+      "before": "        self.op(Op::LocalGet(0))\n            .op(Op::LocalGet(0))\n            .op(Op::I64Load(memory(tsc)));\n        self.retired();\n        self.op(Op::I64Add).op(Op::I64Store(memory(tsc)));",
+      "after": "        if self.processor.is_some() {\n            self.op(Op::LocalGet(0))\n                .op(Op::LocalGet(0))\n                .op(Op::I64Load(memory(tsc)));\n            self.retired();\n            self.op(Op::I64Add).op(Op::I64Store(memory(tsc)));\n        }",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"time completed warm runs during capture reject without rolling back run reset dispose or other bank effects\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "time completed warm runs during capture reject without rolling back run reset dispose or other bank effects:.*independent boundary bank",
+      "domain": "No-clock NOP artifacts must still advance the host-visible bank.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "tick-unfinished-rep-after-committed-element",
+      "path": "src/dbt/wasm/strings.rs",
+      "before": "        self.exit(REPEAT_BUDGET, exit_depth + 3);",
+      "after": "        let tsc = std::mem::offset_of!(crate::embedding::layout::RunState, time)\n            + std::mem::offset_of!(crate::x86::processor::TimeState, tsc);\n        let clock = wasm_encoder::MemArg { offset: tsc as u64, align: 3, memory_index: 0 };\n        self.op(Op::LocalGet(0))\n            .op(Op::LocalGet(0))\n            .op(Op::I64Load(clock))\n            .op(Op::I64Const(1))\n            .op(Op::I64Add)\n            .op(Op::I64Store(clock));\n        self.exit(REPEAT_BUDGET, exit_depth + 3);",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "accounting"]
+      ],
+      "assertion": "independent final time bank:",
+      "domain": "Partial REP has retained element effects but zero instruction tick; retired result stays unchanged.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "tick-automatic-event-entry",
+      "path": "src/embedding/exports/exception_delivery.rs",
+      "before": "                    state.rip = outcome.pc;\n                    state.registers[4] = outcome.sp;",
+      "after": "                    state.time.settle(1);\n                    state.rip = outcome.pc;\n                    state.registers[4] = outcome.sp;",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {exceptionDeliveryScenarios} from './build/tests/execution/exception-delivery/index.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=exceptionDeliveryScenarios(core).filter(s=>s.name===\"exception delivery repairs a protected32 divide error and IRET retries its source exactly once\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "MOV IRET and retried DIV only; entry and failed source tick zero",
+      "domain": "Only actual handler and retried source instructions tick; automatic frame entry does not.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "tick-compilation-discovery",
+      "path": "src/embedding/exports.rs",
+      "before": "        let limits = Limits { max_instructions, max_source_bytes, max_artifact_bytes };",
+      "after": "        unsafe { (*core.state.get()).time.settle(1); }\n        let limits = Limits { max_instructions, max_source_bytes, max_artifact_bytes };",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "accounting"]
+      ],
+      "assertion": "independent final time bank:",
+      "domain": "Compiling/discovering future instructions is observational, including no-work gates.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "scalar-import-mints-a-retirement",
+      "path": "src/embedding/layout.rs",
+      "before": "    pub fn import(&mut self, state: State) {\n        self.registers = state.registers;",
+      "after": "    pub fn import(&mut self, state: State) {\n        self.time.settle(1);\n        self.registers = state.registers;",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "accounting"]
+      ],
+      "assertion": "independent final time bank:",
+      "domain": "Scalar checkpoint restore does not mint or replay a tick.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "reset-mints-a-retirement",
+      "path": "src/embedding/layout.rs",
+      "before": "        state.registers[2] = 0x600;\n        state.x87.control_word = 0x40;",
+      "after": "        state.time.settle(1);\n        state.registers[2] = 0x600;\n        state.x87.control_word = 0x40;",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "lifetime"]
+      ],
+      "assertion": "independent final time bank:",
+      "domain": "Physical reset zeros both time fields rather than adding a reset tick.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "allow-completed-run-during-time-capture",
+      "path": "host/cpu.ts",
+      "before": "    const input = captureTimeState(state);\n    this.requireIdle(generation);\n    this.engineCall(() => this.#engine.setTimeState(input));",
+      "after": "    const input = captureTimeState(state);\n    this.requireIdle(generation, true);\n    this.engineCall(() => this.#engine.setTimeState(input));",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"time completed warm runs during capture reject without rolling back run reset dispose or other bank effects\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "completed warm run invalidates capture",
+      "domain": "A genuinely completed warm run invalidates capture and retains its actual NOP tick.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "tsd-change-retires-translation-owners",
+      "path": "src/x86/paging/controls.rs",
+      "before": "            self.cr4 & !(CR4_NUMERIC | CR4_TSD),\n            self.efer & EFER_NXE,\n            self.pdpte,\n        ) != (\n            other.cr0 & !CR0_NUMERIC,\n            other.cr3,\n            other.cr4 & !(CR4_NUMERIC | CR4_TSD),",
+      "after": "            self.cr4 & !CR4_NUMERIC,\n            self.efer & EFER_NXE,\n            self.pdpte,\n        ) != (\n            other.cr0 & !CR0_NUMERIC,\n            other.cr3,\n            other.cr4 & !CR4_NUMERIC,",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"TSD host and guest changes keep warmed owners and cached PAE PDPTEs without clock side effects\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "TSD host import keeps published owner",
+      "domain": "TSD alone cannot change translation identity or retire published owners.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "tsd-change-reloads-cached-pae-pdpte",
+      "path": "src/x86/paging/controls.rs",
+      "before": "                4 => (self.cr4 ^ candidate.cr4) & 0x001000b0 != 0,",
+      "after": "                4 => (self.cr4 ^ candidate.cr4) & 0x001000b4 != 0,",
+      "commands": [
+        ["cargo", "test", "--locked", "--no-run"],
+        [
+          "cargo",
+          "test",
+          "--locked",
+          "embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt",
+          "--",
+          "--exact",
+          "--nocapture"
+        ]
+      ],
+      "assertion": "embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt.*panicked.*assertion `left == right` failed",
+      "domain": "A TSD-only write must not read an inaccessible current PDPT; actual CR3 reload is the failing control.",
+      "evidence": "native-owner-bridge"
+    },
+    {
+      "name": "host-wall-time-enters-public-tsc",
+      "path": "host/core.ts",
+      "before": "      tsc: view.getBigUint64(layout.offset + layout.tsc, true),",
+      "after": "      tsc: BigInt.asUintN(64, view.getBigUint64(layout.offset + layout.tsc, true) + BigInt(Date.now())),",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "lifetime"]
+      ],
+      "assertion": "default bank:",
+      "domain": "The bank is independent of host wall time from creation onward.",
+      "evidence": "public-host-bank-node"
+    },
+    {
+      "name": "host-hardware-overrides-cpuid-query",
+      "path": "host/core.ts",
+      "before": "      processor: this.#exports.core_processor,",
+      "after": "      processor: (kind: number, eax: number, ecx: number, retired: bigint) =>\n        this.#exports.core_processor(kind, kind === 0 ? eax + (globalThis.navigator?.hardwareConcurrency ?? 1) : eax, ecx, retired),",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "identity"]
+      ],
+      "assertion": "CPUID full raw sixteen-register packet:",
+      "domain": "Host hardware identity cannot supply or bias the immutable profile.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "clear-family-disclosure-blocks-existing-numeric-admission",
+      "path": "src/x86/decode/x87.rs",
+      "before": "    if opcode == 0x9b {",
+      "after": "    if crate::x86::processor::cpuid(1, 0)[3] & 1 == 0 {\n        return Err(DecodeError::Unsupported);\n    }\n    if opcode == 0x9b {",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/identity-time-audit.mjs", "--current", ".", "--groups", "identity"]
+      ],
+      "assertion": "unclaimed SSE2 LFENCE and x87 FLD1 remain admitted:",
+      "domain": "Conservative CPUID family zeros are not a new global numeric admission switch.",
+      "evidence": "emitted-wasm-node"
+    },
+    {
+      "name": "frozen-tsd0-permission-assumption",
+      "path": "src/embedding/exports/processor.rs",
+      "before": "processor::admit_timestamp(&core.context, core.paging)",
+      "after": "processor::admit_timestamp(&core.context, core.paging.map(|state| crate::x86::paging::State { cr4: state.cr4 & !crate::x86::paging::CR4_TSD, ..state }))",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"warm CPL3 timestamp owners read TSD changes live without recompilation or output publication on refusal\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "warm TSD1 denies this same CPL3 read",
+      "domain": "Force the permission helper to a constant TSD0 view after a TSD0 warm read, then toggle the actual bank to TSD1 on the same CPL3 cached owner. This approximates a stale first-warm0 permission assumption for this trace; it is not an implementation of an actual per-owner cache.",
+      "evidence": "emitted-wasm-node"
+    }
+  ]
+}

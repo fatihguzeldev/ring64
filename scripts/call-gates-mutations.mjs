@@ -117,13 +117,20 @@ if (args.includes('--plan')) {
   const campaign = JSON.parse(await readFile(resolve(campaignPath), 'utf8'));
   if (!Array.isArray(campaign.mutations) || !campaign.mutations.length)
     throw Error('campaign requires mutations');
-  const files = spawnSync('git', ['ls-files', '-co', '--exclude-standard', '-z'], {
-    cwd: root,
-    encoding: 'utf8',
-  });
-  if (files.status !== 0) throw Error('cannot enumerate source snapshot');
-  const paths = [...new Set(files.stdout.split('\0').filter(Boolean))].sort();
+  const inventory = () => {
+    const files = spawnSync('git', ['ls-files', '-co', '--exclude-standard', '-z'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    if (files.status !== 0) throw Error('cannot enumerate source snapshot');
+    return [...new Set(files.stdout.split('\0').filter(Boolean))].sort();
+  };
+  const paths = inventory();
   const sourceHash = async () => {
+    if (JSON.stringify(inventory()) !== JSON.stringify(paths))
+      throw Error(
+        'source inventory changed during mutation campaign; discard results and retry in a quiet window',
+      );
     const entries = [];
     for (const path of paths) entries.push([path, hash(await readFile(resolve(root, path)))]);
     return hash(JSON.stringify(entries));
