@@ -23,13 +23,12 @@ impl Core {
                 user: context.cpl() == 3,
             };
             let mut accessed_write = false;
-            let translation =
-                paging::walk::fetch_walk(&mut self.image, paging, request, |image| {
-                    accessed_write = true;
-                    encoding_current(image, paging, &consumed, request.user)
-                })
-                .map_err(DecodeError::Paging)?
-                .ok_or(DecodeError::PagingRestart)?;
+            let translation = paging::walk::fetch_walk(&mut self.image, paging, request, |image| {
+                accessed_write = true;
+                encoding_current(image, paging, &consumed, request.user)
+            })
+            .map_err(DecodeError::Paging)?
+            .ok_or(DecodeError::PagingRestart)?;
             // Only an A write can change encoding during this synchronous byte fetch.
             if accessed_write
                 && (!encoding_current(&self.image, paging, &consumed, request.user)
