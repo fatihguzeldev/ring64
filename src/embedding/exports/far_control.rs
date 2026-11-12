@@ -90,6 +90,9 @@ fn core_far_control_impl<const OBSERVED: bool, const PAGED: bool>(
         } else {
             guest_semantics!(core, PAGED, far::execute, descriptor, operands)
         };
+        if PAGED && result.is_err() {
+            core.paging_work.clear();
+        }
         let outcome = match result {
             Err(FarFailure::SystemPaging(fault)) => return core.system_paging_failure(fault),
             Ok(outcome) => outcome,
