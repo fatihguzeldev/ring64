@@ -610,12 +610,17 @@ pub(super) fn load(value: u128, format: Format) -> Result {
         Result::raw(raw)
     }
 }
+#[inline(always)]
 pub(super) fn store(raw: u128, format: Format, cw: u16) -> Result {
-    if format == Format::Bcd {
-        return special::store_bcd(raw, cw);
-    }
     if format == Format::F80 || format == Format::Register {
         return Result::raw(raw);
+    }
+    store_converted(raw, format, cw)
+}
+
+fn store_converted(raw: u128, format: Format, cw: u16) -> Result {
+    if format == Format::Bcd {
+        return special::store_bcd(raw, cw);
     }
     if matches!(format, Format::I16 | Format::I32 | Format::I64) {
         let width = if format == Format::I16 {
