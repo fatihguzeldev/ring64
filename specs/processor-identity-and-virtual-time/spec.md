@@ -1,6 +1,6 @@
 # processor identity and virtual time
 
-Status: implementation-ready specification; implementation and runtime verification are pending.
+Status: implemented and independently reviewed; [verification](verification.md) records conformance, executed semantic mutations and bounded performance evidence.
 
 ## objective and selected profile
 

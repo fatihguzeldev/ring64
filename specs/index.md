@@ -51,9 +51,9 @@ CPUID/clock providers, x87 transcendentals, hardware task switching, extended-st
 
 [Call gates and privilege stacks](call-gates-and-privilege-stacks/spec.md), implemented against `43dad55`: legacy16/32 and IA32e64 gate CALL/JMP, privilege stacks and every legacy parameter count, matching RETF, paging/debug/context consumers and guest repair. [Verification](call-gates-and-privilege-stacks/verification.md) records independent oracles, adversarial reviews, semantic mutations and bounded performance results. [Selection and review](call-gates-and-privilege-stacks/review.md) retains the original prioritization. This completes the selected increment, not an architectural vertical.
 
-## next prepared specification
+## latest completed increment
 
-[Processor identity and virtual time](processor-identity-and-virtual-time/spec.md), selected against `e785914`: immutable private CPUID disclosure, deterministic per-CPU retirement time, RDTSC/RDTSCP, selected TSC/AUX MSRs and CR4.TSD, with checkpoint/reset, fault/event and cache-lifetime contracts. [Selection and falsification](processor-identity-and-virtual-time/review.md) records current-source/primary-source review, thirteen-area prioritization and resolved counterexamples. This is a prepared contract, not an implemented cohort or complete processor-family claim.
+[Processor identity and virtual time](processor-identity-and-virtual-time/spec.md), implemented against `e785914`: immutable private CPUID disclosure, deterministic per-CPU retirement time, RDTSC/RDTSCP, selected TSC/AUX MSRs and CR4.TSD, with checkpoint/reset, fault/event and cache-lifetime contracts. [Verification](processor-identity-and-virtual-time/verification.md) records independent oracles, semantic mutations, adversarial reviews and bounded performance investigations. [Selection and falsification](processor-identity-and-virtual-time/review.md) retains the original prioritization. This completes the selected increment, not the processor-family or system vertical.
 
 ## scope
 
