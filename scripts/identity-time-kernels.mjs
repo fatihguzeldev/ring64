@@ -411,7 +411,7 @@ export async function measureIdentityTime(side, knobs) {
     method: {
       timing: timing
         ? 'elapsedMs sums awaited Cpu.run only; wallMs also includes loop/timer/result retention. Initial bank/scalar/numeric setup and all output verification are outside both.'
-        : 'validation only; no timing clock is sampled',
+        : 'validation only; no characterization timers are sampled or recorded; the CPU retains its ordinary internal timing instrumentation',
       phases:
         'One new owned CPU per workload and one creationMs observation on its first row. First invocation starts with empty translation cache; each warm sample resets full scalar state and TSC100/AUX89abcdef while preserving cached owners.',
       helperCounts:
