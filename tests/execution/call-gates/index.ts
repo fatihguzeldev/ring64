@@ -10,6 +10,7 @@ import { gateOperandScenarios } from './operands.js';
 import { gatePublicationScenarios } from './publication.js';
 import { gateOwnershipScenarios } from './ownership.js';
 import { gateFrontierScenarios } from './frontiers.js';
+import { gatePagingBoundaryScenarios } from './paging-boundaries.js';
 import type { Scenario } from './fixture.js';
 
 export function callGateScenarios(compiler: WebAssembly.Module): Scenario[] {
@@ -26,5 +27,6 @@ export function callGateScenarios(compiler: WebAssembly.Module): Scenario[] {
     ...gatePublicationScenarios(compiler),
     ...gateOwnershipScenarios(compiler),
     ...gateFrontierScenarios(compiler),
+    ...gatePagingBoundaryScenarios(compiler),
   ];
 }
