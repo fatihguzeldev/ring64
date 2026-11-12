@@ -155,14 +155,18 @@ export async function legacyExtraKernel(side, name, requested) {
         expectedEntries = writer ? (toggle ? 4 : 2) * n + 1 : 1,
         expectedCompilations = writer
           ? (toggle ? 2 : 1) * n + (firstInvocation ? 1 : 0)
-          : firstInvocation ? 1 : 0,
+          : firstInvocation
+            ? 1
+            : 0,
         state = result.state,
         controls = cpu.readPagingState(),
         output = cpu.readPhysicalMemory(dataBase, 16),
         expected = data.slice();
       check(
-        result.reason === 'budget' && result.retired === BigInt(instructions * n) &&
-          result.remaining === 0n && result.repeatIterations === 0n &&
+        result.reason === 'budget' &&
+          result.retired === BigInt(instructions * n) &&
+          result.remaining === 0n &&
+          result.repeatIterations === 0n &&
           result.remainingRepeatBudget === 0n,
         name + ' exact work and allowance',
       );
@@ -175,12 +179,18 @@ export async function legacyExtraKernel(side, name, requested) {
         name + ' exact native entry compilation and dispatch work',
       );
       if (!writer) put(expected, 4, BigInt(n), 4);
-      check(output.every((byte, i) => byte === expected[i]), name + ' complete guarded bytes');
+      check(
+        output.every((byte, i) => byte === expected[i]),
+        name + ' complete guarded bytes',
+      );
       check(state.rip === 0x1000n + BigInt(code.length - 1), name + ' exact final PC');
       check(state.registers[1] === 0n && state.flags === 0x46n, name + ' DEC/JNZ completion');
       check(
-        controls.cr0 === bank.cr0 && controls.cr2 === 0xdeadn && controls.cr3 === bank.cr3 &&
-          controls.cr4 === bank.cr4 && controls.efer === 0n,
+        controls.cr0 === bank.cr0 &&
+          controls.cr2 === 0xdeadn &&
+          controls.cr3 === bank.cr3 &&
+          controls.cr4 === bank.cr4 &&
+          controls.efer === 0n,
         name + ' unchanged final controls',
       );
       const entry = cpu.readPhysicalMemory(leaf, pse36 ? 4 : 8);
@@ -197,10 +207,7 @@ export async function legacyExtraKernel(side, name, requested) {
           name + ' both CR4 readbacks',
         );
       if (!pse36) {
-        check(
-          controls.pdpte.join(',') === '73729,0,0,0',
-          name + ' captured quartet unchanged',
-        );
+        check(controls.pdpte.join(',') === '73729,0,0,0', name + ' captured quartet unchanged');
         const root = cpu.readPhysicalMemory(0x14000n, 32);
         check(
           root.every((byte, i) => byte === source[0x14000 + i]),
@@ -228,7 +235,8 @@ export async function legacyExtraKernel(side, name, requested) {
         warmLeafAccessedDirty: true,
         nativeWalkBoundaryReference: {
           test: 'family_specialization_preserves_literal_entry_access_traces_and_geometry',
-          scope: 'native entry-access callback traces for4KiB leaves; not full-engine physical counters',
+          scope:
+            'native entry-access callback traces for4KiB leaves; not full-engine physical counters',
           entryWidth: pse36 ? 4 : 8,
           warmReadCallbacks: 2,
           coldReadAndUpdateCallbacks: 4,
@@ -239,11 +247,13 @@ export async function legacyExtraKernel(side, name, requested) {
           nativeEntries: expectedEntries,
           compilations: expectedCompilations,
         },
-        ownerWarmth: writer ? 'each guest writer destructively fences; public compilation included' :
-          'source and data A/D preseeded; first invocation still compiles the generated unit',
-        clockCeiling: n < 32
-          ? 'tiny checked batch; clock-floor observations are not latency estimates'
-          : 'synthetic checked batch; compare repeated samples and report timer uncertainty',
+        ownerWarmth: writer
+          ? 'each guest writer destructively fences; public compilation included'
+          : 'source and data A/D preseeded; first invocation still compiles the generated unit',
+        clockCeiling:
+          n < 32
+            ? 'tiny checked batch; clock-floor observations are not latency estimates'
+            : 'synthetic checked batch; compare repeated samples and report timer uncertainty',
       };
     },
   };

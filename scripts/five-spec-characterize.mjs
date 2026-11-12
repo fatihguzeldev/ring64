@@ -52,9 +52,13 @@ if (!browserMode) {
       const file = resolve(base, '.' + pathname);
       if (!(
         file.startsWith(resolve(base, 'build') + '/') ||
-        ['scripts/five-spec-kernels.mjs', 'scripts/five-spec-transitions.mjs'].some(
-          (path) => file === resolve(root, path),
-        )
+        [
+          'scripts/five-spec-kernels.mjs',
+          'scripts/five-spec-transitions.mjs',
+          'scripts/five-spec-x87-extra.mjs',
+          'scripts/five-spec-numeric-extra.mjs',
+          'scripts/five-spec-legacy-extra.mjs',
+        ].some((path) => file === resolve(root, path))
       ))
         throw Error('outside allowed route');
       response.writeHead(200, {
@@ -118,6 +122,14 @@ await writeFile(
     kernelSha256: hash(await readFile(resolve(root, 'scripts/five-spec-kernels.mjs'))),
     transitionFixtureSha256: hash(
       await readFile(resolve(root, 'scripts/five-spec-transitions.mjs')),
+    ),
+    extraFixtureSha256: Object.fromEntries(
+      await Promise.all(
+        ['x87', 'numeric', 'legacy'].map(async (name) => [
+          name,
+          hash(await readFile(resolve(root, `scripts/five-spec-${name}-extra.mjs`))),
+        ]),
+      ),
     ),
     ...results,
   }),

@@ -1,4 +1,7 @@
 import { transitionKernel } from './five-spec-transitions.mjs';
+import { x87ExtraNames, x87ExtraKernel } from './five-spec-x87-extra.mjs';
+import { numericExtraNames, numericExtraKernel } from './five-spec-numeric-extra.mjs';
+import { legacyExtraNames, legacyExtraKernel } from './five-spec-legacy-extra.mjs';
 const limits = {
   maxInstructions: 128,
   maxSourceBytes: 2048,
@@ -107,6 +110,9 @@ const ioProgressNames = [
   'io-ins-pte-edit',
 ];
 export const newSpecNames = [
+  ...x87ExtraNames,
+  ...numericExtraNames,
+  ...legacyExtraNames,
   ...special.map((row) => row.name),
   'io-in-scalar',
   'io-out-scalar',
@@ -548,6 +554,9 @@ async function ioProgressKernel(side, name, requested) {
 }
 
 async function kernel(side, name, requested) {
+  if (x87ExtraNames.includes(name)) return x87ExtraKernel(side, name, requested);
+  if (numericExtraNames.includes(name)) return numericExtraKernel(side, name, requested);
+  if (legacyExtraNames.includes(name)) return legacyExtraKernel(side, name, requested);
   if (name.startsWith('transition-')) return transitionKernel(side, name, limits);
   if (ioProgressNames.includes(name)) return ioProgressKernel(side, name, requested);
   const row = special.find((row) => row.name === name);
