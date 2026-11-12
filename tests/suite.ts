@@ -18,6 +18,7 @@ import { floatingScenarios } from './execution/floating/index.js';
 import { x87Scenarios } from './execution/x87/index.js';
 import { numericStateScenarios } from './execution/mmx/index.js';
 import { farControlScenarios } from './execution/far-control/index.js';
+import { callGateScenarios } from './execution/call-gates/index.js';
 import { protectionScenarios } from './execution/protection/index.js';
 import { streamingScenarios } from './execution/streaming/index.js';
 import { systemFlagScenarios } from './execution/system-flags/index.js';
@@ -62,6 +63,7 @@ export async function runScenarios(
     ...streamingScenarios(core),
     ...protectionScenarios(core),
     ...farControlScenarios(core),
+    ...callGateScenarios(core),
     ...systemFlagScenarios(core),
     ...softwareEventScenarios(core),
     ...exceptionDeliveryScenarios(core),

@@ -135,11 +135,11 @@ export function faultScenarios(compiler: WebAssembly.Module): Scenario[] {
       },
     },
     {
-      name: 'far gate frontier and return invalid LD do not speculatively probe unselected tails',
+      name: 'far absent call gate and invalid type4 and return LD do not probe unselected tails',
       async run() {
-        for (const [kind, reason] of [
-          [0x0c, 'unsupported'],
-          [0x04, 'protection-fault'],
+        for (const [kind, vector] of [
+          [0x0c, 11],
+          [0x04, 13],
         ] as const)
           await using(
             compiler,
@@ -148,7 +148,9 @@ export function faultScenarios(compiler: WebAssembly.Module): Scenario[] {
             async (cpu) => {
               cpu.setState(initial(0x1000n, { 3: 0x6000n, 4: 0x800000000000n }));
               const result = await cpu.run({ budget: 1n });
-              equal(result.reason, reason, 'system target classification');
+              equal(result.reason, 'protection-fault', 'system target classification');
+              equal(result.protectionFault?.vector, vector, 'selected NP or invalid type GP');
+              equal(result.protectionFault?.errorCode, 8, 'selected gate identity');
               equal(result.retired, 0n, 'unexecuted handler');
               equal(result.systemMemoryFault, undefined, 'no upper gate read');
               equal(result.fault, undefined, 'no stack probe');
