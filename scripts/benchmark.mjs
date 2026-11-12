@@ -77,17 +77,26 @@ async function manifest(path, label) {
   }
   let commit, workingTree;
   try {
-    commit = execFileSync('git', ['-C', path, 'rev-parse', 'HEAD'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-    const status = execFileSync('git', ['-C', path, 'status', '--porcelain'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-    workingTree = { dirty: status.length !== 0, changes: status ? status.split('\n') : [] };
-  } catch {
-    commit = 'unknown';
+    const { source } = JSON.parse(await readFile(resolve(path, 'paging-source.json'), 'utf8'));
+    commit = source.commit;
+    workingTree = Array.isArray(source.workingTree)
+      ? { dirty: source.workingTree.length !== 0, changes: source.workingTree }
+      : source.workingTree;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    try {
+      commit = execFileSync('git', ['-C', path, 'rev-parse', 'HEAD'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      const status = execFileSync('git', ['-C', path, 'status', '--porcelain'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      workingTree = { dirty: status.length !== 0, changes: status ? status.split('\n') : [] };
+    } catch {
+      commit = 'unknown';
+    }
   }
   return {
     label,
@@ -255,6 +264,11 @@ const result = {
   benchmarkSha256: benchmarkHash.digest('hex'),
   ...(await (config.browser ? browserRun() : nodeRun())),
 };
+for (const side of manifests) {
+  const after = await manifest(side.path, side.label);
+  if (after.coreSha256 !== side.coreSha256 || after.hostSha256 !== side.hostSha256)
+    throw Error('built artifacts changed during observation: ' + side.label);
+}
 const output =
   config.output ?? resolve(root, `build/verification/performance-${environment.runtime}.json`);
 await mkdir(dirname(output), { recursive: true });
