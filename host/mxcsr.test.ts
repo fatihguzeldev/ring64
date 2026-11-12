@@ -1,4 +1,5 @@
 import { DEBUG_LAYOUT } from '../tests/support/debug-layout.js';
+import { TIME_LAYOUT, TIME_STATE_SIZE } from '../tests/support/time-layout.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Core } from './core.js';
@@ -19,7 +20,8 @@ const options = () => ({
   },
 });
 const layout = {
-  size: 712,
+  size: TIME_STATE_SIZE,
+  time: TIME_LAYOUT,
   debug: DEBUG_LAYOUT,
   scalarSize: 176,
   registers: 0,
@@ -163,8 +165,10 @@ test('MXCSR transport retains unsigned high wasm32 pointers and an exact-end ext
   assert.ok(pointer > 0x7fffffff);
   const f = await fixture(layout, pointer, memory, undefined, pointer - 512);
   assert.ok(f.core);
+  f.core.setTimeState({ tsc: 0xffffffffffffffffn, tscAux: 0xffffffff });
   f.core.setMxcsr(0xffff);
   assert.equal(f.core.readMxcsr(), 0xffff);
+  assert.deepEqual(f.core.readTimeState(), { tsc: 0xffffffffffffffffn, tscAux: 0xffffffff });
   f.core.dispose();
 });
 

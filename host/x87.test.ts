@@ -1,4 +1,5 @@
 import { DEBUG_LAYOUT } from '../tests/support/debug-layout.js';
+import { TIME_LAYOUT, TIME_STATE_SIZE } from '../tests/support/time-layout.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { captureX87State, type X87State } from './x87.js';
@@ -7,7 +8,8 @@ import { captureInitialMemory } from './memory.js';
 import { createCpu } from './cpu.js';
 
 const layout = {
-  size: 712,
+  size: TIME_STATE_SIZE,
+  time: TIME_LAYOUT,
   debug: DEBUG_LAYOUT,
   scalarSize: 176,
   registers: 0,
@@ -260,8 +262,10 @@ test('x87 state and import pointers retain unsigned wasm32 values through exact 
   const f = await fixture(layout, undefined, memory, at, at - 512);
   assert.ok(f.core);
   try {
+    f.core.setTimeState({ tsc: 0x8000000000000000n, tscAux: 0xffffffff });
     f.core.setX87State(state());
     assert.deepEqual(f.core.readX87State(), state());
+    assert.deepEqual(f.core.readTimeState(), { tsc: 0x8000000000000000n, tscAux: 0xffffffff });
   } finally {
     f.core.dispose();
   }

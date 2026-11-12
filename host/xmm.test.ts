@@ -1,4 +1,5 @@
 import { DEBUG_LAYOUT } from '../tests/support/debug-layout.js';
+import { TIME_LAYOUT, TIME_STATE_SIZE } from '../tests/support/time-layout.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { captureXmmState, Core, type Interruptibility } from './core.js';
@@ -20,7 +21,8 @@ const options = () => ({
   limits,
 });
 const layout = {
-  size: 712,
+  size: TIME_STATE_SIZE,
+  time: TIME_LAYOUT,
   debug: DEBUG_LAYOUT,
   scalarSize: 176,
   registers: 0,
@@ -394,6 +396,7 @@ test('required arithmetic and boundary helpers reject construction before core i
     'core_shutdown_can_wake',
     'core_external_step',
     'core_halt',
+    'core_processor',
   ]) {
     const missing = await mockedCore(layout, 8192, undefined, name);
     missing.core?.dispose();
@@ -411,8 +414,10 @@ test('unsigned wasm32 XMM transport supports an extent ending at private memory 
   const fixture = await mockedCore(layout, pointer, memory, undefined, pointer - 512);
   assert.ok(fixture.core);
   const bank = Array.from({ length: 16 }, (_, index) => BigInt(index) << 120n);
+  fixture.core.setTimeState({ tsc: 0xfedcba9876543210n, tscAux: 0x89abcdef });
   fixture.core.setXmmState(bank);
   assert.deepEqual(fixture.core.readXmmState(), bank);
+  assert.deepEqual(fixture.core.readTimeState(), { tsc: 0xfedcba9876543210n, tscAux: 0x89abcdef });
   fixture.core.dispose();
 });
 

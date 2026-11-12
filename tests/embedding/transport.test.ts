@@ -1,4 +1,5 @@
 import { DEBUG_LAYOUT } from '../support/debug-layout.js';
+import { TIME_LAYOUT, TIME_STATE_SIZE } from '../support/time-layout.js';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
@@ -58,7 +59,8 @@ async function fixture(
       initializationError
         ? { error: 'fixture initialization rejected' }
         : {
-            size: 712,
+            size: TIME_STATE_SIZE,
+            time: TIME_LAYOUT,
             debug: DEBUG_LAYOUT,
             scalarSize: 176,
             xmm: 176,
@@ -223,6 +225,9 @@ for (const high of ['input', 'state', 'info', 'output', 'later-input'] as const)
   test(`wasm32 ${high} transport pointers retain their unsigned address above 2 GiB`, async () => {
     const cpu = await createCpu(options(await fixture(high)));
     try {
+      const time = { tsc: 0xfedcba9876543210n, tscAux: 0x89abcdef };
+      assert.deepEqual(cpu.readTimeState(), { tsc: 0n, tscAux: 0 });
+      cpu.setTimeState(time);
       const xmm = Array.from(
         { length: 16 },
         (_, index) => 0xfedc_ba98_7654_3210_0123_4567_89ab_cde0n + BigInt(index),
@@ -248,6 +253,11 @@ for (const high of ['input', 'state', 'info', 'output', 'later-input'] as const)
       assert.deepEqual(cpu.readState(), state);
       assert.deepEqual(cpu.readX87State(), x87);
       assert.deepEqual(cpu.readXmmState(), xmm);
+      assert.deepEqual(
+        cpu.readTimeState(),
+        time,
+        'scalar and numeric imports preserve appended time',
+      );
       assert.deepEqual(cpu.readMemory(0n, 4), Uint8Array.of(0x11, 0x22, 0x33, 0x44));
       cpu.writeMemory(0n, Uint8Array.of(0x55, 0x66, 0x77, 0x88));
       assert.deepEqual(cpu.readMemory(0n, 4), Uint8Array.of(0x55, 0x66, 0x77, 0x88));
@@ -255,6 +265,7 @@ for (const high of ['input', 'state', 'info', 'output', 'later-input'] as const)
       assert.deepEqual(cpu.readXmmState(), xmm.slice().reverse());
       assert.deepEqual(cpu.readState(), state);
       assert.deepEqual(cpu.readX87State(), x87);
+      assert.deepEqual(cpu.readTimeState(), time, 'later input transport never overwrites time');
     } finally {
       cpu.dispose();
     }

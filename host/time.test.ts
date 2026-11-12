@@ -240,7 +240,7 @@ test('a later capture accessor preserves exact exceptions and earlier nested eff
           throw marker;
         },
         get unrelated() {
-          assert.fail('time capture must not enumerate unrelated properties');
+          return assert.fail('time capture must not enumerate unrelated properties');
         },
       },
       {
