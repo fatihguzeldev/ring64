@@ -734,6 +734,7 @@ pub(super) fn compare(a: u128, b: u128) -> Option<Ordering> {
     };
     Some(if neg_a { abs.reverse() } else { abs })
 }
+#[inline(always)]
 pub(super) fn constant(index: u8, cw: u16) -> u128 {
     // The low two bits are the extra bits of the Intel 66-significant-bit ROM.
     const ROM: [(u16, u64, u8); 7] = [

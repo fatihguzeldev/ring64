@@ -11,6 +11,7 @@ fn stack_fault(state: &mut State, overflow: bool) -> bool {
     state.refresh();
     state.control_word & 1 == 0
 }
+#[inline(always)]
 fn push(state: &mut State, value: u128) {
     let p = (state.top() + 7) & 7;
     state.top_to(p);
