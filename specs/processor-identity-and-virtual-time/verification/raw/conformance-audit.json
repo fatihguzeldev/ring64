@@ -1,0 +1,1230 @@
+{
+  "verdict": "No known functional conformance acceptance blocker after source/assertion/receipt review. Performance causal conclusions and final documentation/publication belong to their separate final review.",
+  "auditScope": "Read-only source/assertion/receipt inspection plus this ignored evidence JSON; no guest/build/test/timing or production/docs/README changes.",
+  "testedArtifacts": {
+    "path": "/Users/fatihguzel/ring64/build/verification/identity-time-final-2f94b0d",
+    "source": {
+      "commit": "2f94b0dd881fd4a34b666d64fb98e476effedf86",
+      "workingTree": []
+    },
+    "coreSha256": "a2ac7c44ed8b459b7ac826b44a5d562e2c210234035c73b83c2c9276e99ac260",
+    "coreBytes": 1246882,
+    "hostSha256": "c6d3d80b8ddaff949282e0127061ca913a2f76cd4ef260992f0b821fcd9f83ea",
+    "productionHostSha256": "688881a73bd9e66827b56e7041ba3c35815e9ec7e0706fd729a1c2a75961697a"
+  },
+  "fullVerification": {
+    "command": "npm run check",
+    "receipt": "/tmp/ring64-identity-final-check.log",
+    "receiptSha256": "f157f6145c09544adb5571f96645216df91fc22715c52bc589b8b82529057b88",
+    "nativeTests": 914,
+    "nodeTests": 250,
+    "nodeCommonScenarioRegistry": 1015,
+    "chromeScenarios": 1015,
+    "chromeVersion": "157.0.8103.79",
+    "failed": 0,
+    "ignoredOrSkipped": 0,
+    "interpretation": "The250Node tests include one shared-suite test invoking the same1015scenario registry used in Chrome. Do not add250+1015 as disjoint Node test cases."
+  },
+  "independentOracle": {
+    "casesPerRuntime": 4428,
+    "runtimes": [
+      "node",
+      "chrome"
+    ],
+    "groups": [
+      {
+        "name": "identity",
+        "cases": 1145
+      },
+      {
+        "name": "ledger",
+        "cases": 1843
+      },
+      {
+        "name": "raw",
+        "cases": 244
+      },
+      {
+        "name": "tsd",
+        "cases": 60
+      },
+      {
+        "name": "msr",
+        "cases": 1100
+      },
+      {
+        "name": "accounting",
+        "cases": 9
+      },
+      {
+        "name": "debug",
+        "cases": 4
+      },
+      {
+        "name": "lifetime",
+        "cases": 23
+      }
+    ],
+    "postRunIntegrity": {
+      "core": true,
+      "host": true,
+      "source": true,
+      "oracle": true
+    },
+    "receipts": [
+      "build/verification/identity-time-oracle-node.json",
+      "build/verification/identity-time-oracle-chrome.json"
+    ],
+    "basis": "Literal CPUID words and separate BigInt retirement steps; no expected time obtained from production retired, decoder, clock or transport helpers. Equality covers full16GPR/FLAGS/PC and separate bank, with supplemental context/numeric/debug/event/memory assertions."
+  },
+  "supplementalPublicBoundaries": {
+    "count": 13,
+    "identityTimeScenarioTotal": 21,
+    "names": [
+      "controlled TSD numeric and debug refusals retain literal execute RF LOCK and required-byte priority",
+      "active debug misses preserve full identity timestamp traces across partitions and cached middle entries",
+      "warm CPL3 timestamp owners read TSD changes live without recompilation or output publication on refusal",
+      "same physical CPU returns identical CPUID words after reset and matching real context import",
+      "host delays before and between guest work never advance the private clock",
+      "virtual time decode boundaries preserve LOCK fetch length RF and neighbor priority",
+      "identity and clocks ignore disabled numeric controls and pending x87 while waiting work does not tick",
+      "TSD host and guest changes keep warmed owners and cached PAE PDPTEs without clock side effects",
+      "TSD guest GP handler clears permission IRETs and retries with a literal privilege frame",
+      "partial REP I/O committed elements and later permission failure retain only the retired prefix tick",
+      "time scalar checkpoint ready pending reset and detached import retain distinct ownership",
+      "time completed warm runs during capture reject without rolling back run reset dispose or other bank effects",
+      "virtual time independent CPUs compiler reuse aliases cache eviction and context ABA never freeze the bank"
+    ],
+    "newWarmTsdPackets": 16,
+    "otherCrossCuttingEvidence": "Existing complex paging/far/fast-system/SS/event fixtures gained literal clock assertions; these are within shared1015, not extra disjoint tests."
+  },
+  "acceptanceCoverage": [
+    {
+      "acceptanceGroup": 1,
+      "contract": "Immutable literal CPUID profile, low32 inputs and full zero-extended raw outputs in inherited modes; unclaimed numeric families keep admission.",
+      "evidence": [
+        "oracle identity1145",
+        "same CPU reset literal identity packet",
+        "numeric-disabled/pending x87 packet"
+      ],
+      "assertions": [
+        "CPUID full raw sixteen-register packet",
+        "CPUID ID/FLAGS preservation",
+        "CPUID numeric preservation",
+        "unclaimed SSE2 LFENCE and x87 FLD1 remain admitted",
+        "same CPU post-reset literal CPUID words"
+      ],
+      "owners": [
+        "src/x86/processor.rs",
+        "src/dbt/wasm/processor.rs"
+      ]
+    },
+    {
+      "acceptanceGroup": 2,
+      "contract": "Pre-retirement samples, all short compositions, ordinary no-clock work, huge original budgets, host pauses, source/middle-entry/debug-miss reuse.",
+      "evidence": [
+        "oracle ledger1843",
+        "huge budgets2^32+1/2^63+1/MAX",
+        "active debug miss six-operation trace across partitions/cached middle entries",
+        "host16ms pauses before/between work"
+      ],
+      "assertions": [
+        "literal first sample",
+        "literal second sample",
+        "direct BigInt ledger bank",
+        "huge original allowance sample",
+        "host delay does not enter the timestamp"
+      ],
+      "owners": [
+        "src/dbt/wasm/state.rs"
+      ]
+    },
+    {
+      "acceptanceGroup": 3,
+      "contract": "Modulo64 wrap, low/high halves and AUX boundaries, unchanged upper banks, 40 INC-versus-REX lengths/FLAGS and one-instruction resumes.",
+      "evidence": [
+        "oracle raw244",
+        "all14linear inherited size/stack profiles plus8controlled contexts"
+      ],
+      "assertions": [
+        "sample before own wrap",
+        "RDTSCP all raw banks",
+        "INC width controls FLAGS while long64 REX preserves them"
+      ],
+      "owners": [
+        "src/dbt/wasm/processor.rs",
+        "src/x86/decode/protection.rs"
+      ]
+    },
+    {
+      "acceptanceGroup": 4,
+      "contract": "Live CR4.TSD across CPL/mode families, exact refusal phases, decode/execute/RF/numeric priority, literal GP frame and clear-TSD/IRET/retry.",
+      "evidence": [
+        "oracle TSD60",
+        "16same-CPL3 cached TSD0\u21921\u21920 packets for both reads",
+        "controlled priority six literal packets",
+        "literal privilege GP frame/source sample105/final106"
+      ],
+      "assertions": [
+        "TSD live permission",
+        "warm TSD1 denies this same CPL3 read",
+        "denial retains the exact cached owners",
+        "literal GP privilege frame",
+        "source samples after actual handler work"
+      ],
+      "owners": [
+        "src/x86/processor.rs",
+        "src/x86/paging/controls.rs",
+        "src/embedding/exports/processor.rs"
+      ]
+    },
+    {
+      "acceptanceGroup": 5,
+      "contract": "Selected MSR live inputs and retirement replacement, repeated/backward/noncanonical writes, AUX reserved-value and privilege phases, inherited negative frontiers.",
+      "evidence": [
+        "oracle MSR1100",
+        "1024same-CPU repeated-write prefix/suffix compositions",
+        "8WRMSR+TF exact-value packets",
+        "real/CPL0/1/2/3/v86 and every selected control family"
+      ],
+      "assertions": [
+        "first same-CPU TSC write sample MAX",
+        "second same-CPU backward write sample",
+        "TSC write retires before TF",
+        "AUX upper32 refusal",
+        "MSR CPL guard before semantic owner",
+        "unselected MSR frontier retained"
+      ],
+      "owners": [
+        "src/x86/processor.rs",
+        "src/embedding/exports/paging.rs",
+        "src/dbt/wasm/paging.rs"
+      ]
+    },
+    {
+      "acceptanceGroup": 6,
+      "contract": "Exact retirement at REP/I/O/fault/restart/captured transfer/control/resource/target frontiers; no I/O clear_fault double credit.",
+      "evidence": [
+        "oracle accounting9",
+        "partial I/O bitmap-failure packet",
+        "existing paging/access/far/fast-system scenarios now assert literal clock values",
+        "native emitted common-exit/prefix/alias tests"
+      ],
+      "assertions": [
+        "mid-unit I/O clear_fault does not settle twice",
+        "pre-begin restart performs no guest time work",
+        "captured gate completion alone owns retirement credit",
+        "target resource refusal preserves only independently completed source ticks",
+        "ordinary far CALL ticks once across full mode matrix"
+      ],
+      "owners": [
+        "src/dbt/wasm/state.rs",
+        "src/dbt/wasm/mod.rs"
+      ]
+    },
+    {
+      "acceptanceGroup": 7,
+      "contract": "TF/execute/SS/IRQ/NMI/HLT/pending entry/escalation/shutdown count only actual retired guest work.",
+      "evidence": [
+        "oracle debug4",
+        "SS-deferred literal clock guards",
+        "STI/HLT and IRQ/NMI automatic entry guards",
+        "blocked NMI+IRET guard",
+        "failed-entry/DF/shutdown and pending replay guards"
+      ],
+      "assertions": [
+        "TF sees read outputs",
+        "execute breakpoint leaves outputs",
+        "zero delivery allowance adds no tick to STI HLT",
+        "blocked latch and second NMI frame add no ticks to IRET",
+        "failed source secondary delivery and shutdown are not retired work"
+      ],
+      "owners": [
+        "src/dbt/wasm/state.rs",
+        "src/embedding/exports/exception_delivery.rs",
+        "src/embedding/exports/reset.rs"
+      ]
+    },
+    {
+      "acceptanceGroup": 8,
+      "contract": "Detached validated time bank and strict capture lifetime; independent CPUs; reset/checkpoint/mapping/context/cache identity preserves or explicitly restores time.",
+      "evidence": [
+        "oracle lifetime23",
+        "11dedicated host time tests",
+        "full pending checkpoint constructor/context/paging/numeric/debug/fast/state/time replay",
+        "alias/eviction/backing-reincarnation/context ABA packets",
+        "native epoch0/MAX-1/MAX and real inaccessible-PDPT negative control",
+        "synthetic ABI >2GiB and exact-memory-end bank tests"
+      ],
+      "assertions": [
+        "run during capture rejects stale setter",
+        "completed warm run invalidates capture",
+        "full pending scalar and event replay",
+        "same-name backing reincarnation has live time"
+      ],
+      "owners": [
+        "host/time.ts",
+        "host/cpu.ts",
+        "host/core.ts",
+        "src/embedding/layout.rs"
+      ]
+    }
+  ],
+  "mutations": {
+    "executed": true,
+    "specificAssertionKills": 25,
+    "buildTrapTimeoutGenericKillsCounted": 0,
+    "originalSourceUnchanged": true,
+    "receipt": "build/verification/identity-time-mutations.json",
+    "declaredEvidenceDomains": {
+      "emitted-wasm-node": 22,
+      "public-decode-frontier-node": 1,
+      "native-owner-bridge": 1,
+      "public-host-bank-node": 1
+    },
+    "actualKillSiteNuance": [
+      "22declared emitted/public-instruction workflow rows do not mean25guest-Wasm-opcode faults: scalar import, reset, capture lifetime and translation-owner retirement kill at their named public host/native owner boundaries, often after emitted warmup/prefix work.",
+      "Host wall-time mutation is caught by default-bank readback before guest retirement.",
+      "F9 substitution is caught by the public LOCK/decode frontier invalid-encoding versus unsupported, before generated RDTSCP execution.",
+      "PAE reload mutation is a native owner/bridge test: forbidden TSD-only reload returns private refusal25 where0 is expected; it is not emitted-Wasm proof.",
+      "Row25forces a constantTSD0 permission view and is killed after a real TSD0 warm read on the sameCPL3cached owner; this approximates stale-first0 for that trace and is not an implemented per-owner cache mutant.",
+      "AUX/time/CPUID frozen-value mutants cover wrong constant/delta assumptions alongside live cached-value acceptance; they do not enumerate all possible caching designs."
+    ],
+    "rows": [
+      {
+        "name": "omit-common-settlement",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "direct BigInt ledger bank:",
+        "firstFailure": "Error: direct BigInt ledger bank: {\"tsc\":\"64\",\"tscAux\":2309737967} != {\"tsc\":\"65\",\"tscAux\":2309737967}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "f26693f5c889adf37b18eadace7d3a1549c805143a1c5332f7d745665897d2e2"
+      },
+      {
+        "name": "double-common-settlement",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "direct BigInt ledger bank:",
+        "firstFailure": "Error: direct BigInt ledger bank: {\"tsc\":\"66\",\"tscAux\":2309737967} != {\"tsc\":\"65\",\"tscAux\":2309737967}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "e78c5998390f40dedd6b5b14bdd6c9867483deb31de6f79243c722fcf51b35bb"
+      },
+      {
+        "name": "stale-canonical-budget-instead-of-original-budget",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "direct BigInt ledger bank:",
+        "firstFailure": "Error: direct BigInt ledger bank: {\"tsc\":\"64\",\"tscAux\":2309737967} != {\"tsc\":\"65\",\"tscAux\":2309737967}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "20342c308d9ffee846d04fd50069bc1fbe6adc11fdf4b8cdb5a63195f5793719"
+      },
+      {
+        "name": "wrmsr-missing-own-retirement-offset",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "independent final time bank:",
+        "firstFailure": "Error: independent final time bank: {\"tsc\":\"1\",\"tscAux\":2309737967} != {\"tsc\":\"0\",\"tscAux\":2309737967}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "745201f21a43c9dd45fc31e158cfe92b0a631ea20c038b7ee83a641bce0c4734"
+      },
+      {
+        "name": "preserve-dirty-output-upper32",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "CPUID full raw sixteen-register packet:",
+        "firstFailure": "Error: CPUID full raw sixteen-register packet: [\"decafbad00000001\",\"12345678656e6967\",\"a1b2c3d46e453436\",\"a1b2c3d4676e6952\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"] != [\"1\",\"656e6967\",\"6e453436\",\"676e6952\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f6",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "3a7eb19f8c46d05a7bfd07a147e80c646ae1ee7c71d1d85018feb1ccbf90a5f7"
+      },
+      {
+        "name": "truncate-aux-reserved-upper32",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "AUX upper32 refusal:",
+        "firstFailure": "Error: AUX upper32 refusal: \"budget\" != \"protection-fault\"",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "ffdf83753953f2e6026931b0b9e60cc0383a75e079ca582cceb3e5d7bab52877"
+      },
+      {
+        "name": "reverse-tsd-cpl-guard-including-v86",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "TSD live permission:",
+        "firstFailure": "Error: TSD live permission: \"protection-fault\" != \"budget\"",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "18a4f8bbbfaec3e3fb09fac3aca1a44d1d4a82f4f4af728950196c4d57e58181"
+      },
+      {
+        "name": "apply-tsd-to-real-address-mode",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "TSD live permission:",
+        "firstFailure": "Error: TSD live permission: \"protection-fault\" != \"budget\"",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "890fddcd454b3dd97d5858326861f489207b27bb0a0dd9f7b55f406b10f5b2b2"
+      },
+      {
+        "name": "misclassify-f9-as-fa-neighbor",
+        "declaredEvidenceDomain": "public-decode-frontier-node",
+        "assertion": "literal required-byte/frontier packet f00f01f9:",
+        "firstFailure": "Error: virtual time decode boundaries preserve LOCK fetch length RF and neighbor priority: literal required-byte/frontier packet f00f01f9: expected invalid-encoding, received unsupported",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "e0f61022e04bf55ddb36e71659bf8c3b364971e2399027345f5deabbc3f9c339"
+      },
+      {
+        "name": "freeze-cpuid-leaf-to-zero",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "CPUID full raw sixteen-register packet:",
+        "firstFailure": "Error: CPUID full raw sixteen-register packet: [\"1\",\"656e6967\",\"6e453436\",\"676e6952\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"] != [\"0\",\"0\",\"10\",\"0\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f600",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "3628e22d889bdf5ef8aab452b54e0018d66fc0d49725cc79fd018b2ddace73a7"
+      },
+      {
+        "name": "drop-live-retired-delta-at-read",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "ledger full raw registers:",
+        "firstFailure": "Error: ledger full raw registers: [\"67\",\"89abcdef\",\"0\",\"66\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"] != [\"68\",\"89abcdef\",\"0\",\"66\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "c44fee22f49e873faad3d5059b7609ab243a1078ed518defdc4ed630cfef1dc4"
+      },
+      {
+        "name": "freeze-aux-read-to-zero",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "raw AUX output zero-extension:",
+        "firstFailure": "Error: raw AUX output zero-extension: \"0\" != \"89abcdef\"",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "109969cd316c6283f836babe5064131d7f3db840ca611a58d20de81816f546ff"
+      },
+      {
+        "name": "clock-only-for-artifacts-containing-reads",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "time completed warm runs during capture reject without rolling back run reset dispose or other bank effects:.*independent boundary bank",
+        "firstFailure": "Error: time completed warm runs during capture reject without rolling back run reset dispose or other bank effects: independent boundary bank: expected {\"tsc\":\"65\",\"tscAux\":2309737967}, received {\"tsc\":\"64\",\"tscAux\":2309737967}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "df14191b9cf4147b8eb446ed3f5376dfa29a4b6222753230d98393005108a1b5"
+      },
+      {
+        "name": "tick-unfinished-rep-after-committed-element",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "independent final time bank:",
+        "firstFailure": "Error: independent final time bank: {\"tsc\":\"66\",\"tscAux\":2309737967} != {\"tsc\":\"65\",\"tscAux\":2309737967}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "40c34ea42213cdb0d1cbcb1b7be1ff71d5d90faf161842abd3e0bd5b1224c721"
+      },
+      {
+        "name": "tick-automatic-event-entry",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "MOV IRET and retried DIV only; entry and failed source tick zero",
+        "firstFailure": "Error: exception delivery repairs a protected32 divide error and IRET retries its source exactly once: MOV IRET and retried DIV only; entry and failed source tick zero: expected {\"tsc\":\"67\",\"tscAux\":7}, received {\"tsc\":\"68\",\"tscAux\":7}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "f1474fda23e2863327e69338be81d0b54b6a91715714931ab29918e34cdc8fa7"
+      },
+      {
+        "name": "tick-compilation-discovery",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "independent final time bank:",
+        "firstFailure": "Error: independent final time bank: {\"tsc\":\"68\",\"tscAux\":2309737967} != {\"tsc\":\"67\",\"tscAux\":2309737967}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "8acef6c9d3f479254c376355504bb79670e92c35743a9e65666b40e3f72e56ab"
+      },
+      {
+        "name": "scalar-import-mints-a-retirement",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "independent final time bank:",
+        "firstFailure": "Error: independent final time bank: {\"tsc\":\"68\",\"tscAux\":2309737967} != {\"tsc\":\"67\",\"tscAux\":2309737967}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "1fad14fa6e63ed744f2d997e57370b05ef575f4b178ca724b33fab33e55f255c"
+      },
+      {
+        "name": "reset-mints-a-retirement",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "independent final time bank:",
+        "firstFailure": "Error: independent final time bank: {\"tsc\":\"1\",\"tscAux\":0} != {\"tsc\":\"0\",\"tscAux\":0}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "9272ffcc23a17637e821337575a25d05e060688eaa99eb325580b4ff7cf4774c"
+      },
+      {
+        "name": "allow-completed-run-during-time-capture",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "completed warm run invalidates capture",
+        "firstFailure": "Error: time completed warm runs during capture reject without rolling back run reset dispose or other bank effects: completed warm run invalidates capture must reject",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "f28bee4c816a3ba809d9b2e91d7227c6da7148e63ff0c3a1a41133c36b085582"
+      },
+      {
+        "name": "tsd-change-retires-translation-owners",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "TSD host import keeps published owner",
+        "firstFailure": "Error: TSD host and guest changes keep warmed owners and cached PAE PDPTEs without clock side effects: TSD host import keeps published owner: expected true, received false",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "c2e72ec330a203f7f7a97deb291ba4728c6977cd621f07e1a89572a879f2c32b"
+      },
+      {
+        "name": "tsd-change-reloads-cached-pae-pdpte",
+        "declaredEvidenceDomain": "native-owner-bridge",
+        "assertion": "embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt.*panicked.*assertion `left == right` failed",
+        "firstFailure": "thread 'embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt' (170289666) panicked at src/embedding/exports/tests/processor.rs:243:5:",
+        "finalStatus": 101,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "8c5f905b47498a9baaeefbea85d09bf0dfc1446cc079484dc81fb93faa762114"
+      },
+      {
+        "name": "host-wall-time-enters-public-tsc",
+        "declaredEvidenceDomain": "public-host-bank-node",
+        "assertion": "default bank:",
+        "firstFailure": "Error: default bank: {\"tsc\":\"1a1d1cc8f69\",\"tscAux\":0} != {\"tsc\":\"0\",\"tscAux\":0}",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "cb3a0a9b6e19b10f351641aeabea202e49c33a6a019ac8d1c5266103c6a5c16d"
+      },
+      {
+        "name": "host-hardware-overrides-cpuid-query",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "CPUID full raw sixteen-register packet:",
+        "firstFailure": "Error: CPUID full raw sixteen-register packet: [\"0\",\"0\",\"0\",\"0\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"] != [\"1\",\"656e6967\",\"6e453436\",\"676e6952\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "c6a905dac9c95d7136a5b4a1d40a3f49a50699ebf96a72432d01c71b018af7fc"
+      },
+      {
+        "name": "clear-family-disclosure-blocks-existing-numeric-admission",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "unclaimed SSE2 LFENCE and x87 FLD1 remain admitted:",
+        "firstFailure": "Error: unclaimed SSE2 LFENCE and x87 FLD1 remain admitted: \"unsupported\" != \"budget\"",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "c48e5ca28dbb174f70b2d77f411934799320282f042774dac31d5fedd24e8c34"
+      },
+      {
+        "name": "frozen-tsd0-permission-assumption",
+        "declaredEvidenceDomain": "emitted-wasm-node",
+        "assertion": "warm TSD1 denies this same CPL3 read",
+        "firstFailure": "Error: warm CPL3 timestamp owners read TSD changes live without recompilation or output publication on refusal: warm TSD1 denies this same CPL3 read: expected protection-fault, received budget",
+        "finalStatus": 1,
+        "setupStatuses": [
+          0
+        ],
+        "diagnosticSha256": "fd69e6bd5de634d676c6c199d8a6ec1d8ece61017f565e1865b5145f915b34b5"
+      }
+    ]
+  },
+  "reviewChecks": [
+    {
+      "ok": true,
+      "check": "complete native914passed/0failed/0ignored"
+    },
+    {
+      "ok": true,
+      "check": "complete Node250passed/0failed/0skipped"
+    },
+    {
+      "ok": true,
+      "check": "Chrome1015unique shared scenarios"
+    },
+    {
+      "ok": true,
+      "check": "coreSha256 full suite/final artifact identity"
+    },
+    {
+      "ok": true,
+      "check": "coreBytes full suite/final artifact identity"
+    },
+    {
+      "ok": true,
+      "check": "node4428independent cases"
+    },
+    {
+      "ok": true,
+      "check": "node oracle/final Core+host identity"
+    },
+    {
+      "ok": true,
+      "check": "node complete post-run guards"
+    },
+    {
+      "ok": true,
+      "check": "node unchanged oracle source scripts/identity-time-audit.mjs"
+    },
+    {
+      "ok": true,
+      "check": "node unchanged oracle source scripts/paging-support.mjs"
+    },
+    {
+      "ok": true,
+      "check": "node unchanged oracle source tests/execution/identity-time/oracle.ts"
+    },
+    {
+      "ok": true,
+      "check": "node unchanged oracle source build/tests/execution/identity-time/oracle.js"
+    },
+    {
+      "ok": true,
+      "check": "chrome4428independent cases"
+    },
+    {
+      "ok": true,
+      "check": "chrome oracle/final Core+host identity"
+    },
+    {
+      "ok": true,
+      "check": "chrome complete post-run guards"
+    },
+    {
+      "ok": true,
+      "check": "chrome unchanged oracle source scripts/identity-time-audit.mjs"
+    },
+    {
+      "ok": true,
+      "check": "chrome unchanged oracle source scripts/paging-support.mjs"
+    },
+    {
+      "ok": true,
+      "check": "chrome unchanged oracle source tests/execution/identity-time/oracle.ts"
+    },
+    {
+      "ok": true,
+      "check": "chrome unchanged oracle source build/tests/execution/identity-time/oracle.js"
+    },
+    {
+      "ok": true,
+      "check": "same8independent groups/case counts across runtimes"
+    },
+    {
+      "ok": true,
+      "check": "13supplemental scenario declarations"
+    },
+    {
+      "ok": true,
+      "check": "all13supplemental packets ran in full shared suite"
+    },
+    {
+      "ok": true,
+      "check": "shared registered oracle identity"
+    },
+    {
+      "ok": true,
+      "check": "shared registered oracle ledger"
+    },
+    {
+      "ok": true,
+      "check": "shared registered oracle raw"
+    },
+    {
+      "ok": true,
+      "check": "shared registered oracle tsd"
+    },
+    {
+      "ok": true,
+      "check": "shared registered oracle msr"
+    },
+    {
+      "ok": true,
+      "check": "shared registered oracle accounting"
+    },
+    {
+      "ok": true,
+      "check": "shared registered oracle debug"
+    },
+    {
+      "ok": true,
+      "check": "shared registered oracle lifetime"
+    },
+    {
+      "ok": true,
+      "check": "25actual isolated mutations with restored source"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill omit-common-settlement"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build omit-common-settlement"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process omit-common-settlement"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched omit-common-settlement"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error omit-common-settlement"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill double-common-settlement"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build double-common-settlement"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process double-common-settlement"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched double-common-settlement"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error double-common-settlement"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill stale-canonical-budget-instead-of-original-budget"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build stale-canonical-budget-instead-of-original-budget"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process stale-canonical-budget-instead-of-original-budget"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched stale-canonical-budget-instead-of-original-budget"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error stale-canonical-budget-instead-of-original-budget"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill wrmsr-missing-own-retirement-offset"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build wrmsr-missing-own-retirement-offset"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process wrmsr-missing-own-retirement-offset"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched wrmsr-missing-own-retirement-offset"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error wrmsr-missing-own-retirement-offset"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill preserve-dirty-output-upper32"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build preserve-dirty-output-upper32"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process preserve-dirty-output-upper32"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched preserve-dirty-output-upper32"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error preserve-dirty-output-upper32"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill truncate-aux-reserved-upper32"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build truncate-aux-reserved-upper32"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process truncate-aux-reserved-upper32"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched truncate-aux-reserved-upper32"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error truncate-aux-reserved-upper32"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill reverse-tsd-cpl-guard-including-v86"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build reverse-tsd-cpl-guard-including-v86"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process reverse-tsd-cpl-guard-including-v86"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched reverse-tsd-cpl-guard-including-v86"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error reverse-tsd-cpl-guard-including-v86"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill apply-tsd-to-real-address-mode"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build apply-tsd-to-real-address-mode"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process apply-tsd-to-real-address-mode"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched apply-tsd-to-real-address-mode"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error apply-tsd-to-real-address-mode"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill misclassify-f9-as-fa-neighbor"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build misclassify-f9-as-fa-neighbor"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process misclassify-f9-as-fa-neighbor"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched misclassify-f9-as-fa-neighbor"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error misclassify-f9-as-fa-neighbor"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill freeze-cpuid-leaf-to-zero"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build freeze-cpuid-leaf-to-zero"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process freeze-cpuid-leaf-to-zero"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched freeze-cpuid-leaf-to-zero"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error freeze-cpuid-leaf-to-zero"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill drop-live-retired-delta-at-read"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build drop-live-retired-delta-at-read"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process drop-live-retired-delta-at-read"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched drop-live-retired-delta-at-read"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error drop-live-retired-delta-at-read"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill freeze-aux-read-to-zero"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build freeze-aux-read-to-zero"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process freeze-aux-read-to-zero"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched freeze-aux-read-to-zero"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error freeze-aux-read-to-zero"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill clock-only-for-artifacts-containing-reads"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build clock-only-for-artifacts-containing-reads"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process clock-only-for-artifacts-containing-reads"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched clock-only-for-artifacts-containing-reads"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error clock-only-for-artifacts-containing-reads"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill tick-unfinished-rep-after-committed-element"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build tick-unfinished-rep-after-committed-element"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process tick-unfinished-rep-after-committed-element"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched tick-unfinished-rep-after-committed-element"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error tick-unfinished-rep-after-committed-element"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill tick-automatic-event-entry"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build tick-automatic-event-entry"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process tick-automatic-event-entry"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched tick-automatic-event-entry"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error tick-automatic-event-entry"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill tick-compilation-discovery"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build tick-compilation-discovery"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process tick-compilation-discovery"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched tick-compilation-discovery"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error tick-compilation-discovery"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill scalar-import-mints-a-retirement"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build scalar-import-mints-a-retirement"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process scalar-import-mints-a-retirement"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched scalar-import-mints-a-retirement"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error scalar-import-mints-a-retirement"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill reset-mints-a-retirement"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build reset-mints-a-retirement"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process reset-mints-a-retirement"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched reset-mints-a-retirement"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error reset-mints-a-retirement"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill allow-completed-run-during-time-capture"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build allow-completed-run-during-time-capture"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process allow-completed-run-during-time-capture"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched allow-completed-run-during-time-capture"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error allow-completed-run-during-time-capture"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill tsd-change-retires-translation-owners"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build tsd-change-retires-translation-owners"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process tsd-change-retires-translation-owners"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched tsd-change-retires-translation-owners"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error tsd-change-retires-translation-owners"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill tsd-change-reloads-cached-pae-pdpte"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build tsd-change-reloads-cached-pae-pdpte"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process tsd-change-reloads-cached-pae-pdpte"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched tsd-change-reloads-cached-pae-pdpte"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error tsd-change-reloads-cached-pae-pdpte"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill host-wall-time-enters-public-tsc"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build host-wall-time-enters-public-tsc"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process host-wall-time-enters-public-tsc"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched host-wall-time-enters-public-tsc"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error host-wall-time-enters-public-tsc"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill host-hardware-overrides-cpuid-query"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build host-hardware-overrides-cpuid-query"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process host-hardware-overrides-cpuid-query"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched host-hardware-overrides-cpuid-query"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error host-hardware-overrides-cpuid-query"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill clear-family-disclosure-blocks-existing-numeric-admission"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build clear-family-disclosure-blocks-existing-numeric-admission"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process clear-family-disclosure-blocks-existing-numeric-admission"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched clear-family-disclosure-blocks-existing-numeric-admission"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error clear-family-disclosure-blocks-existing-numeric-admission"
+    },
+    {
+      "ok": true,
+      "check": "actual specific kill frozen-tsd0-permission-assumption"
+    },
+    {
+      "ok": true,
+      "check": "successful setup/build frozen-tsd0-permission-assumption"
+    },
+    {
+      "ok": true,
+      "check": "non-crash specific assertion process frozen-tsd0-permission-assumption"
+    },
+    {
+      "ok": true,
+      "check": "actual pinned assertion matched frozen-tsd0-permission-assumption"
+    },
+    {
+      "ok": true,
+      "check": "first failure semantic rather than generic engine error frozen-tsd0-permission-assumption"
+    },
+    {
+      "ok": true,
+      "check": "native PAE first assertion actually observes forbidden reload refusal25 instead0"
+    },
+    {
+      "ok": true,
+      "check": "all mapped acceptance assertion labels exist in current source"
+    }
+  ],
+  "assertionLabelsMissing": [],
+  "outstandingFunctionalBlockers": [],
+  "claimCeilings": [
+    "Finite private-machine profile; no completeIntel CPU/family, all13verticals, hostCPU/wallclock, frequency, shared-worker ordering, nativecycle/p99/application-throughput claim.",
+    "Epoch saturation is exercised through native owner injection; public API has no setter to createMAXepoch.",
+    "The benchmark/characterization/runtime and counterfactual performance evidence is separate; this conformance audit makes no zero-overhead or performance-clearance assertion.",
+    "Prepared/frozen source identity and actual runtime proof are recorded separately; oracle snapshot081dc92 and final snapshot2f94b0d have exactly equal tested Core/fullhost hashes."
+  ],
+  "sources": {
+    "src/x86/processor.rs": "3a3575ce8504c5433d1da6afc7d62684bfaf5af224e4f31f451c679f8010328c",
+    "src/x86/decode/opcode.rs": "2d9e38411a5f3997ded2bcb993f933349768278c2b05b85e1ba60e75a4c27276",
+    "src/x86/decode/protection.rs": "da882a89baa724ae8ecd951dd2b284877e7744c123f9b1a1b63bc0d5cb68ce24",
+    "src/x86/paging/controls.rs": "c6871ce13c788280c98769bce603a11307d14e76a16957a4f8c3710e8feed9b6",
+    "src/dbt/wasm/processor.rs": "2989c5393d968382c0d36d86b0dc33a9ba5098eb1a186b9e165b2423143ea612",
+    "src/dbt/wasm/state.rs": "2a735400c0f48c52d7763dfa4e6039071495c920a16052e2adc52d061d1b1a7e",
+    "src/embedding/exports/processor.rs": "ce9afb78abdb09c85649fd1972cbccb3f0aae51da21d0911821074e87bf9cdc2",
+    "src/embedding/exports/paging.rs": "94c66c4e16a356511a27f2d5cda70c0dc9d43af648d85a04b2f051353e409621",
+    "src/embedding/layout.rs": "69e874113d4ddb82336cfc789654ea2d009043f77d984b26e0e34b6560caead9",
+    "host/time.ts": "c5a11a42c0f9befce818d6b369ebd1b700fadc6c635527f473d7bd41213ddc43",
+    "host/core.ts": "734c4691bd09f82bcf938e7658b022e4f9dea20a2685d994c2abdb57be997023",
+    "host/cpu.ts": "9b43e9ead78c85e23d714da62a4c2ee8c44947bd3f538ffafb5f7dac4c86e4f7",
+    "tests/execution/identity-time/oracle.ts": "e1adce8439a76a0932cd353d6dabb6a73e97148cb6279f565b997db8016c8bdc",
+    "tests/execution/identity-time/boundaries.ts": "f969a506a09c8070de2970c64fdcf92e0e251e76b8de7d41c19fc86ce837282c"
+  },
+  "readmeSha256": "8b5c428abbf6bdff38ef1dc5d0436873bdffa8283e68a98da23f1fce0f4372ac"
+}

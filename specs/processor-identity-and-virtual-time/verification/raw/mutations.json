@@ -1,0 +1,773 @@
+{
+  "sourceSha256": "be0fd6df93a346aeeed570bdba4de49a0fa866d92832bdd7fb73ce93419e98bc",
+  "originalSourceUnchanged": true,
+  "executed": true,
+  "killed": 25,
+  "records": [
+    {
+      "name": "omit-common-settlement",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "direct BigInt ledger bank:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-CghLwK",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling leb128fmt v0.1.0\n   Compiling smallvec v1.16.5\n   Compiling bitflags v2.13.2\n   Compiling memchr v2.8.3\n   Compiling itoa v1.0.18\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-CghLwK)\n    Finished `release` profile [optimized] target(s) in 10.74s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "ledger"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-CghLwK/build/verification/identity-time-build-1794520977788-58521/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: direct BigInt ledger bank: {\"tsc\":\"64\",\"tscAux\":2309737967} != {\"tsc\":\"65\",\"tscAux\":2309737967}\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-CghLwK/build/verification/identity-time-build-1794520977788-58521/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-CghLwK/build/verification/identity-time-build-1794520977788-58521/identity-oracle.js:342:25\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-CghLwK/build/verification/identity-time-build-1794520977788-58521/identity-oracle.js:169:9)\n    at async Object.ledger (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-CghLwK/build/verification/identity-time-build-1794520977788-58521/identity-oracle.js:323:13)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-CghLwK/build/verification/identity-time-build-1794520977788-58521/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-CghLwK/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "double-common-settlement",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "direct BigInt ledger bank:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-3KqkAw",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling memchr v2.8.3\n   Compiling leb128fmt v0.1.0\n   Compiling bitflags v2.13.2\n   Compiling smallvec v1.16.5\n   Compiling itoa v1.0.18\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-3KqkAw)\n    Finished `release` profile [optimized] target(s) in 9.45s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "ledger"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-3KqkAw/build/verification/identity-time-build-1794520988097-59037/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: direct BigInt ledger bank: {\"tsc\":\"66\",\"tscAux\":2309737967} != {\"tsc\":\"65\",\"tscAux\":2309737967}\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-3KqkAw/build/verification/identity-time-build-1794520988097-59037/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-3KqkAw/build/verification/identity-time-build-1794520988097-59037/identity-oracle.js:342:25\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-3KqkAw/build/verification/identity-time-build-1794520988097-59037/identity-oracle.js:169:9)\n    at async Object.ledger (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-3KqkAw/build/verification/identity-time-build-1794520988097-59037/identity-oracle.js:323:13)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-3KqkAw/build/verification/identity-time-build-1794520988097-59037/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-3KqkAw/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "stale-canonical-budget-instead-of-original-budget",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "direct BigInt ledger bank:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qGgr7b",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling leb128fmt v0.1.0\n   Compiling bitflags v2.13.2\n   Compiling itoa v1.0.18\n   Compiling smallvec v1.16.5\n   Compiling memchr v2.8.3\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qGgr7b)\n    Finished `release` profile [optimized] target(s) in 9.75s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "ledger"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qGgr7b/build/verification/identity-time-build-1794520998689-59585/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: direct BigInt ledger bank: {\"tsc\":\"64\",\"tscAux\":2309737967} != {\"tsc\":\"65\",\"tscAux\":2309737967}\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qGgr7b/build/verification/identity-time-build-1794520998689-59585/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qGgr7b/build/verification/identity-time-build-1794520998689-59585/identity-oracle.js:342:25\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qGgr7b/build/verification/identity-time-build-1794520998689-59585/identity-oracle.js:169:9)\n    at async Object.ledger (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qGgr7b/build/verification/identity-time-build-1794520998689-59585/identity-oracle.js:323:13)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qGgr7b/build/verification/identity-time-build-1794520998689-59585/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qGgr7b/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "wrmsr-missing-own-retirement-offset",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "independent final time bank:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-RTQ8nh",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling leb128fmt v0.1.0\n   Compiling memchr v2.8.3\n   Compiling smallvec v1.16.5\n   Compiling itoa v1.0.18\n   Compiling bitflags v2.13.2\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-RTQ8nh)\n    Finished `release` profile [optimized] target(s) in 10.12s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "msr"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-RTQ8nh/build/verification/identity-time-build-1794521009687-60132/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: independent final time bank: {\"tsc\":\"1\",\"tscAux\":2309737967} != {\"tsc\":\"0\",\"tscAux\":2309737967}\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-RTQ8nh/build/verification/identity-time-build-1794521009687-60132/identity-oracle.js:36:15)\n    at clock (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-RTQ8nh/build/verification/identity-time-build-1794521009687-60132/identity-oracle.js:186:43)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-RTQ8nh/build/verification/identity-time-build-1794521009687-60132/identity-oracle.js:493:17\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-RTQ8nh/build/verification/identity-time-build-1794521009687-60132/identity-oracle.js:169:9)\n    at async Object.msr (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-RTQ8nh/build/verification/identity-time-build-1794521009687-60132/identity-oracle.js:488:13)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-RTQ8nh/build/verification/identity-time-build-1794521009687-60132/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-RTQ8nh/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "preserve-dirty-output-upper32",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "CPUID full raw sixteen-register packet:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-TL0p1g",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling bitflags v2.13.2\n   Compiling smallvec v1.16.5\n   Compiling itoa v1.0.18\n   Compiling leb128fmt v0.1.0\n   Compiling memchr v2.8.3\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-TL0p1g)\n    Finished `release` profile [optimized] target(s) in 9.93s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "identity"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-TL0p1g/build/verification/identity-time-build-1794521020534-60696/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: CPUID full raw sixteen-register packet: [\"decafbad00000001\",\"12345678656e6967\",\"a1b2c3d46e453436\",\"a1b2c3d4676e6952\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"] != [\"1\",\"656e6967\",\"6e453436\",\"676e6952\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"]\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-TL0p1g/build/verification/identity-time-build-1794521020534-60696/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-TL0p1g/build/verification/identity-time-build-1794521020534-60696/identity-oracle.js:262:25\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-TL0p1g/build/verification/identity-time-build-1794521020534-60696/identity-oracle.js:169:9)\n    at async Object.identity (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-TL0p1g/build/verification/identity-time-build-1794521020534-60696/identity-oracle.js:244:9)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-TL0p1g/build/verification/identity-time-build-1794521020534-60696/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-TL0p1g/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "truncate-aux-reserved-upper32",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "AUX upper32 refusal:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-p3iBgo",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling smallvec v1.16.5\n   Compiling bitflags v2.13.2\n   Compiling leb128fmt v0.1.0\n   Compiling itoa v1.0.18\n   Compiling memchr v2.8.3\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-p3iBgo)\n    Finished `release` profile [optimized] target(s) in 9.96s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "msr"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-p3iBgo/build/verification/identity-time-build-1794521031343-61240/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: AUX upper32 refusal: \"budget\" != \"protection-fault\"\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-p3iBgo/build/verification/identity-time-build-1794521031343-61240/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-p3iBgo/build/verification/identity-time-build-1794521031343-61240/identity-oracle.js:513:21\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-p3iBgo/build/verification/identity-time-build-1794521031343-61240/identity-oracle.js:169:9)\n    at async Object.msr (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-p3iBgo/build/verification/identity-time-build-1794521031343-61240/identity-oracle.js:504:13)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-p3iBgo/build/verification/identity-time-build-1794521031343-61240/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-p3iBgo/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "reverse-tsd-cpl-guard-including-v86",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "TSD live permission:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lMJidV",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling itoa v1.0.18\n   Compiling leb128fmt v0.1.0\n   Compiling bitflags v2.13.2\n   Compiling memchr v2.8.3\n   Compiling smallvec v1.16.5\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lMJidV)\n    Finished `release` profile [optimized] target(s) in 10.02s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "tsd"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lMJidV/build/verification/identity-time-build-1794521042220-61788/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: TSD live permission: \"protection-fault\" != \"budget\"\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lMJidV/build/verification/identity-time-build-1794521042220-61788/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lMJidV/build/verification/identity-time-build-1794521042220-61788/identity-oracle.js:443:17\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lMJidV/build/verification/identity-time-build-1794521042220-61788/identity-oracle.js:169:9)\n    at async Object.tsd (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lMJidV/build/verification/identity-time-build-1794521042220-61788/identity-oracle.js:436:13)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lMJidV/build/verification/identity-time-build-1794521042220-61788/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lMJidV/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "apply-tsd-to-real-address-mode",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "TSD live permission:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-g4SP7D",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling memchr v2.8.3\n   Compiling itoa v1.0.18\n   Compiling bitflags v2.13.2\n   Compiling smallvec v1.16.5\n   Compiling leb128fmt v0.1.0\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-g4SP7D)\n    Finished `release` profile [optimized] target(s) in 10.02s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "tsd"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-g4SP7D/build/verification/identity-time-build-1794521053094-62347/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: TSD live permission: \"protection-fault\" != \"budget\"\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-g4SP7D/build/verification/identity-time-build-1794521053094-62347/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-g4SP7D/build/verification/identity-time-build-1794521053094-62347/identity-oracle.js:443:17\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-g4SP7D/build/verification/identity-time-build-1794521053094-62347/identity-oracle.js:169:9)\n    at async Object.tsd (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-g4SP7D/build/verification/identity-time-build-1794521053094-62347/identity-oracle.js:436:13)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-g4SP7D/build/verification/identity-time-build-1794521053094-62347/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-g4SP7D/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "misclassify-f9-as-fa-neighbor",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "literal required-byte/frontier packet f00f01f9:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZDbcN1",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling memchr v2.8.3\n   Compiling smallvec v1.16.5\n   Compiling bitflags v2.13.2\n   Compiling itoa v1.0.18\n   Compiling leb128fmt v0.1.0\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZDbcN1)\n    Finished `release` profile [optimized] target(s) in 9.98s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"virtual time decode boundaries preserve LOCK fetch length RF and neighbor priority\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZDbcN1/build/tests/support/fixture.js:15\n        throw new Error(message);\n              ^\n\nError: virtual time decode boundaries preserve LOCK fetch length RF and neighbor priority: literal required-byte/frontier packet f00f01f9: expected invalid-encoding, received unsupported\n    at check (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZDbcN1/build/tests/support/fixture.js:15:15)\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZDbcN1/build/tests/support/fixture.js:18:5)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZDbcN1/build/tests/execution/identity-time/boundaries.js:316:25\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZDbcN1/build/tests/execution/modes/fixture.js:72:9)\n    at async Object.run (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZDbcN1/build/tests/execution/identity-time/boundaries.js:312:21)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZDbcN1/[eval1]:1:479\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "freeze-cpuid-leaf-to-zero",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "CPUID full raw sixteen-register packet:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-tzk85d",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling smallvec v1.16.5\n   Compiling memchr v2.8.3\n   Compiling bitflags v2.13.2\n   Compiling leb128fmt v0.1.0\n   Compiling itoa v1.0.18\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-tzk85d)\n    Finished `release` profile [optimized] target(s) in 10.14s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "identity"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-tzk85d/build/verification/identity-time-build-1794521074640-63445/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: CPUID full raw sixteen-register packet: [\"1\",\"656e6967\",\"6e453436\",\"676e6952\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"] != [\"0\",\"0\",\"10\",\"0\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"]\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-tzk85d/build/verification/identity-time-build-1794521074640-63445/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-tzk85d/build/verification/identity-time-build-1794521074640-63445/identity-oracle.js:262:25\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-tzk85d/build/verification/identity-time-build-1794521074640-63445/identity-oracle.js:169:9)\n    at async Object.identity (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-tzk85d/build/verification/identity-time-build-1794521074640-63445/identity-oracle.js:244:9)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-tzk85d/build/verification/identity-time-build-1794521074640-63445/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-tzk85d/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "drop-live-retired-delta-at-read",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "ledger full raw registers:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lGO3VG",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling smallvec v1.16.5\n   Compiling itoa v1.0.18\n   Compiling memchr v2.8.3\n   Compiling bitflags v2.13.2\n   Compiling leb128fmt v0.1.0\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lGO3VG)\n    Finished `release` profile [optimized] target(s) in 10.01s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "ledger"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lGO3VG/build/verification/identity-time-build-1794521085464-63994/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: ledger full raw registers: [\"67\",\"89abcdef\",\"0\",\"66\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"] != [\"68\",\"89abcdef\",\"0\",\"66\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"]\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lGO3VG/build/verification/identity-time-build-1794521085464-63994/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lGO3VG/build/verification/identity-time-build-1794521085464-63994/identity-oracle.js:339:25\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lGO3VG/build/verification/identity-time-build-1794521085464-63994/identity-oracle.js:169:9)\n    at async Object.ledger (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lGO3VG/build/verification/identity-time-build-1794521085464-63994/identity-oracle.js:323:13)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lGO3VG/build/verification/identity-time-build-1794521085464-63994/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-lGO3VG/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "freeze-aux-read-to-zero",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "raw AUX output zero-extension:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-bL9fcz",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling leb128fmt v0.1.0\n   Compiling smallvec v1.16.5\n   Compiling bitflags v2.13.2\n   Compiling memchr v2.8.3\n   Compiling itoa v1.0.18\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-bL9fcz)\n    Finished `release` profile [optimized] target(s) in 10.03s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "raw"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-bL9fcz/build/verification/identity-time-build-1794521096338-64552/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: raw AUX output zero-extension: \"0\" != \"89abcdef\"\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-bL9fcz/build/verification/identity-time-build-1794521096338-64552/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-bL9fcz/build/verification/identity-time-build-1794521096338-64552/identity-oracle.js:377:13\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-bL9fcz/build/verification/identity-time-build-1794521096338-64552/identity-oracle.js:169:9)\n    at async Object.raw (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-bL9fcz/build/verification/identity-time-build-1794521096338-64552/identity-oracle.js:368:9)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-bL9fcz/build/verification/identity-time-build-1794521096338-64552/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-bL9fcz/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "clock-only-for-artifacts-containing-reads",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "time completed warm runs during capture reject without rolling back run reset dispose or other bank effects:.*independent boundary bank",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling memchr v2.8.3\n   Compiling itoa v1.0.18\n   Compiling bitflags v2.13.2\n   Compiling smallvec v1.16.5\n   Compiling leb128fmt v0.1.0\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5)\n    Finished `release` profile [optimized] target(s) in 9.98s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"time completed warm runs during capture reject without rolling back run reset dispose or other bank effects\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5/build/tests/support/fixture.js:15\n        throw new Error(message);\n              ^\n\nError: time completed warm runs during capture reject without rolling back run reset dispose or other bank effects: independent boundary bank: expected {\"tsc\":\"65\",\"tscAux\":2309737967}, received {\"tsc\":\"64\",\"tscAux\":2309737967}\n    at check (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5/build/tests/support/fixture.js:15:15)\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5/build/tests/support/fixture.js:18:5)\n    at same (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5/build/tests/execution/far-control/fixture.js:83:5)\n    at time (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5/build/tests/execution/identity-time/boundaries.js:8:5)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5/build/tests/execution/identity-time/boundaries.js:585:21\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5/build/tests/execution/identity-time/oracle.js:169:9)\n    at async Object.run (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5/build/tests/execution/identity-time/boundaries.js:572:17)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-9mamD5/[eval1]:1:504\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "tick-unfinished-rep-after-committed-element",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "independent final time bank:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-pFPlU5",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling smallvec v1.16.5\n   Compiling itoa v1.0.18\n   Compiling memchr v2.8.3\n   Compiling leb128fmt v0.1.0\n   Compiling bitflags v2.13.2\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-pFPlU5)\n    Finished `release` profile [optimized] target(s) in 9.98s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "accounting"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-pFPlU5/build/verification/identity-time-build-1794521117764-65635/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: independent final time bank: {\"tsc\":\"66\",\"tscAux\":2309737967} != {\"tsc\":\"65\",\"tscAux\":2309737967}\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-pFPlU5/build/verification/identity-time-build-1794521117764-65635/identity-oracle.js:36:15)\n    at clock (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-pFPlU5/build/verification/identity-time-build-1794521117764-65635/identity-oracle.js:186:43)\n    at using.io.read (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-pFPlU5/build/verification/identity-time-build-1794521117764-65635/identity-oracle.js:653:13)\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-pFPlU5/build/verification/identity-time-build-1794521117764-65635/identity-oracle.js:169:9)\n    at async Object.accounting (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-pFPlU5/build/verification/identity-time-build-1794521117764-65635/identity-oracle.js:641:9)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-pFPlU5/build/verification/identity-time-build-1794521117764-65635/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-pFPlU5/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "tick-automatic-event-entry",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "MOV IRET and retried DIV only; entry and failed source tick zero",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-mcxFSm",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling leb128fmt v0.1.0\n   Compiling itoa v1.0.18\n   Compiling memchr v2.8.3\n   Compiling bitflags v2.13.2\n   Compiling smallvec v1.16.5\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-mcxFSm)\n    Finished `release` profile [optimized] target(s) in 10.08s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {exceptionDeliveryScenarios} from './build/tests/execution/exception-delivery/index.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=exceptionDeliveryScenarios(core).filter(s=>s.name===\"exception delivery repairs a protected32 divide error and IRET retries its source exactly once\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-mcxFSm/build/tests/support/fixture.js:15\n        throw new Error(message);\n              ^\n\nError: exception delivery repairs a protected32 divide error and IRET retries its source exactly once: MOV IRET and retried DIV only; entry and failed source tick zero: expected {\"tsc\":\"67\",\"tscAux\":7}, received {\"tsc\":\"68\",\"tscAux\":7}\n    at check (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-mcxFSm/build/tests/support/fixture.js:15:15)\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-mcxFSm/build/tests/support/fixture.js:18:5)\n    at same (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-mcxFSm/build/tests/execution/far-control/fixture.js:83:5)\n    at using.data.base (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-mcxFSm/build/tests/execution/exception-delivery/basic.js:19:21)\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-mcxFSm/build/tests/execution/modes/fixture.js:72:9)\n    at async Object.run (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-mcxFSm/build/tests/execution/exception-delivery/basic.js:11:17)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-mcxFSm/[eval1]:1:493\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "tick-compilation-discovery",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "independent final time bank:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-LpzL6F",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling leb128fmt v0.1.0\n   Compiling bitflags v2.13.2\n   Compiling memchr v2.8.3\n   Compiling smallvec v1.16.5\n   Compiling itoa v1.0.18\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-LpzL6F)\n    Finished `release` profile [optimized] target(s) in 10.05s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "accounting"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-LpzL6F/build/verification/identity-time-build-1794521139410-66732/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: independent final time bank: {\"tsc\":\"68\",\"tscAux\":2309737967} != {\"tsc\":\"67\",\"tscAux\":2309737967}\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-LpzL6F/build/verification/identity-time-build-1794521139410-66732/identity-oracle.js:36:15)\n    at clock (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-LpzL6F/build/verification/identity-time-build-1794521139410-66732/identity-oracle.js:186:43)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-LpzL6F/build/verification/identity-time-build-1794521139410-66732/identity-oracle.js:631:9\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-LpzL6F/build/verification/identity-time-build-1794521139410-66732/identity-oracle.js:169:9)\n    at async Object.accounting (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-LpzL6F/build/verification/identity-time-build-1794521139410-66732/identity-oracle.js:624:5)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-LpzL6F/build/verification/identity-time-build-1794521139410-66732/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-LpzL6F/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "scalar-import-mints-a-retirement",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "independent final time bank:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-VQAvsl",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling smallvec v1.16.5\n   Compiling leb128fmt v0.1.0\n   Compiling bitflags v2.13.2\n   Compiling memchr v2.8.3\n   Compiling itoa v1.0.18\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-VQAvsl)\n    Finished `release` profile [optimized] target(s) in 10.06s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "accounting"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-VQAvsl/build/verification/identity-time-build-1794521150309-67281/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: independent final time bank: {\"tsc\":\"68\",\"tscAux\":2309737967} != {\"tsc\":\"67\",\"tscAux\":2309737967}\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-VQAvsl/build/verification/identity-time-build-1794521150309-67281/identity-oracle.js:36:15)\n    at clock (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-VQAvsl/build/verification/identity-time-build-1794521150309-67281/identity-oracle.js:186:43)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-VQAvsl/build/verification/identity-time-build-1794521150309-67281/identity-oracle.js:634:9\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-VQAvsl/build/verification/identity-time-build-1794521150309-67281/identity-oracle.js:169:9)\n    at async Object.accounting (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-VQAvsl/build/verification/identity-time-build-1794521150309-67281/identity-oracle.js:624:5)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-VQAvsl/build/verification/identity-time-build-1794521150309-67281/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-VQAvsl/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "reset-mints-a-retirement",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "independent final time bank:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-Uc3tWB",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling bitflags v2.13.2\n   Compiling leb128fmt v0.1.0\n   Compiling itoa v1.0.18\n   Compiling smallvec v1.16.5\n   Compiling memchr v2.8.3\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-Uc3tWB)\n    Finished `release` profile [optimized] target(s) in 10.16s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "lifetime"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-Uc3tWB/build/verification/identity-time-build-1794521161326-67843/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: independent final time bank: {\"tsc\":\"1\",\"tscAux\":0} != {\"tsc\":\"0\",\"tscAux\":0}\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-Uc3tWB/build/verification/identity-time-build-1794521161326-67843/identity-oracle.js:36:15)\n    at clock (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-Uc3tWB/build/verification/identity-time-build-1794521161326-67843/identity-oracle.js:186:43)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-Uc3tWB/build/verification/identity-time-build-1794521161326-67843/identity-oracle.js:862:9\n    at using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-Uc3tWB/build/verification/identity-time-build-1794521161326-67843/identity-oracle.js:169:15)\n    at async Object.lifetime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-Uc3tWB/build/verification/identity-time-build-1794521161326-67843/identity-oracle.js:846:5)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-Uc3tWB/build/verification/identity-time-build-1794521161326-67843/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-Uc3tWB/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "allow-completed-run-during-time-capture",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "completed warm run invalidates capture",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-dR02Vc",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling bitflags v2.13.2\n   Compiling itoa v1.0.18\n   Compiling memchr v2.8.3\n   Compiling smallvec v1.16.5\n   Compiling leb128fmt v0.1.0\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-dR02Vc)\n    Finished `release` profile [optimized] target(s) in 10.16s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"time completed warm runs during capture reject without rolling back run reset dispose or other bank effects\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-dR02Vc/build/tests/support/fixture.js:15\n        throw new Error(message);\n              ^\n\nError: time completed warm runs during capture reject without rolling back run reset dispose or other bank effects: completed warm run invalidates capture must reject\n    at check (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-dR02Vc/build/tests/support/fixture.js:15:15)\n    at throws (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-dR02Vc/build/tests/support/fixture.js:114:5)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-dR02Vc/build/tests/execution/identity-time/boundaries.js:577:21\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-dR02Vc/build/tests/execution/identity-time/oracle.js:169:9)\n    at async Object.run (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-dR02Vc/build/tests/execution/identity-time/boundaries.js:572:17)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-dR02Vc/[eval1]:1:504\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "tsd-change-retires-translation-owners",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "TSD host import keeps published owner",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qTYi8f",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling leb128fmt v0.1.0\n   Compiling smallvec v1.16.5\n   Compiling memchr v2.8.3\n   Compiling bitflags v2.13.2\n   Compiling itoa v1.0.18\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qTYi8f)\n    Finished `release` profile [optimized] target(s) in 10.19s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"TSD host and guest changes keep warmed owners and cached PAE PDPTEs without clock side effects\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qTYi8f/build/tests/support/fixture.js:15\n        throw new Error(message);\n              ^\n\nError: TSD host and guest changes keep warmed owners and cached PAE PDPTEs without clock side effects: TSD host import keeps published owner: expected true, received false\n    at check (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qTYi8f/build/tests/support/fixture.js:15:15)\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qTYi8f/build/tests/support/fixture.js:18:5)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qTYi8f/build/tests/execution/identity-time/boundaries.js:366:25\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qTYi8f/build/tests/execution/identity-time/oracle.js:169:9)\n    at async Object.run (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qTYi8f/build/tests/execution/identity-time/boundaries.js:357:21)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-qTYi8f/[eval1]:1:491\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "tsd-change-reloads-cached-pae-pdpte",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt.*panicked.*assertion `left == right` failed",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FkJY6K",
+      "commands": [
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "--no-run"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling bitflags v2.13.2\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling foldhash v0.2.0\n   Compiling serde v1.0.229\n   Compiling equivalent v1.0.3\n   Compiling leb128fmt v0.1.0\n   Compiling smallvec v1.16.5\n   Compiling memchr v2.8.3\n   Compiling itoa v1.0.18\n   Compiling semver v1.0.28\n   Compiling wasm-encoder v0.259.0\n   Compiling hashbrown v0.17.1\n   Compiling indexmap v2.14.2\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FkJY6K)\n   Compiling wasmparser v0.259.0\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.38s\n  Executable unittests src/lib.rs (/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FkJY6K/target/debug/deps/ring64-d0da364380eacf3c)\n"
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt",
+            "--",
+            "--exact",
+            "--nocapture"
+          ],
+          "status": 101,
+          "signal": null,
+          "diagnostic": "\nrunning 1 test\ntest embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt ... FAILED\n\nfailures:\n\nfailures:\n    embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 913 filtered out; finished in 0.00s\n\n\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s\n     Running unittests src/lib.rs (/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FkJY6K/target/debug/deps/ring64-d0da364380eacf3c)\n\nthread 'embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt' (170289666) panicked at src/embedding/exports/tests/processor.rs:243:5:\nassertion `left == right` failed\n  left: 25\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\nerror: test failed, to rerun pass `--lib`\n"
+        }
+      ]
+    },
+    {
+      "name": "host-wall-time-enters-public-tsc",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "default bank:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-o2wIit",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling itoa v1.0.18\n   Compiling memchr v2.8.3\n   Compiling smallvec v1.16.5\n   Compiling bitflags v2.13.2\n   Compiling leb128fmt v0.1.0\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-o2wIit)\n    Finished `release` profile [optimized] target(s) in 10.41s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "lifetime"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-o2wIit/build/verification/identity-time-build-1794521206590-70090/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: default bank: {\"tsc\":\"1a1d1cc8f69\",\"tscAux\":0} != {\"tsc\":\"0\",\"tscAux\":0}\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-o2wIit/build/verification/identity-time-build-1794521206590-70090/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-o2wIit/build/verification/identity-time-build-1794521206590-70090/identity-oracle.js:741:9\n    at using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-o2wIit/build/verification/identity-time-build-1794521206590-70090/identity-oracle.js:169:15)\n    at async Object.lifetime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-o2wIit/build/verification/identity-time-build-1794521206590-70090/identity-oracle.js:740:5)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-o2wIit/build/verification/identity-time-build-1794521206590-70090/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-o2wIit/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "host-hardware-overrides-cpuid-query",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "CPUID full raw sixteen-register packet:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FbaMtO",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling bitflags v2.13.2\n   Compiling smallvec v1.16.5\n   Compiling itoa v1.0.18\n   Compiling leb128fmt v0.1.0\n   Compiling memchr v2.8.3\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FbaMtO)\n    Finished `release` profile [optimized] target(s) in 10.21s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "identity"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FbaMtO/build/verification/identity-time-build-1794521217657-70638/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: CPUID full raw sixteen-register packet: [\"0\",\"0\",\"0\",\"0\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"] != [\"1\",\"656e6967\",\"6e453436\",\"676e6952\",\"9000\",\"a1b2c3d4e5f60005\",\"a1b2c3d4e5f60006\",\"a1b2c3d4e5f60007\",\"a1b2c3d4e5f60008\",\"a1b2c3d4e5f60009\",\"a1b2c3d4e5f6000a\",\"a1b2c3d4e5f6000b\",\"a1b2c3d4e5f6000c\",\"a1b2c3d4e5f6000d\",\"a1b2c3d4e5f6000e\",\"a1b2c3d4e5f6000f\"]\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FbaMtO/build/verification/identity-time-build-1794521217657-70638/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FbaMtO/build/verification/identity-time-build-1794521217657-70638/identity-oracle.js:262:25\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FbaMtO/build/verification/identity-time-build-1794521217657-70638/identity-oracle.js:169:9)\n    at async Object.identity (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FbaMtO/build/verification/identity-time-build-1794521217657-70638/identity-oracle.js:244:9)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FbaMtO/build/verification/identity-time-build-1794521217657-70638/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-FbaMtO/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "clear-family-disclosure-blocks-existing-numeric-admission",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "unclaimed SSE2 LFENCE and x87 FLD1 remain admitted:",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZMXrx5",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling serde_core v1.0.229\n   Compiling zmij v1.0.23\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling serde_json v1.0.154\n   Compiling smallvec v1.16.5\n   Compiling bitflags v2.13.2\n   Compiling memchr v2.8.3\n   Compiling itoa v1.0.18\n   Compiling leb128fmt v0.1.0\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZMXrx5)\n    Finished `release` profile [optimized] target(s) in 10.16s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "identity"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZMXrx5/build/verification/identity-time-build-1794521228663-71200/identity-oracle.js:36\n        throw Error(`${label}: ${encode(actual)} != ${encode(expected)}`);\n              ^\n\nError: unclaimed SSE2 LFENCE and x87 FLD1 remain admitted: \"unsupported\" != \"budget\"\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZMXrx5/build/verification/identity-time-build-1794521228663-71200/identity-oracle.js:36:15)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZMXrx5/build/verification/identity-time-build-1794521228663-71200/identity-oracle.js:276:9\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZMXrx5/build/verification/identity-time-build-1794521228663-71200/identity-oracle.js:169:9)\n    at async Object.identity (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZMXrx5/build/verification/identity-time-build-1794521228663-71200/identity-oracle.js:274:5)\n    at async checkIdentityTime (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZMXrx5/build/verification/identity-time-build-1794521228663-71200/identity-oracle.js:880:37)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-ZMXrx5/scripts/identity-time-audit.mjs:56:12\n\nNode.js v22.16.0\n"
+        }
+      ]
+    },
+    {
+      "name": "frozen-tsd0-permission-assumption",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "warm TSD1 denies this same CPL3 read",
+      "sandbox": "/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-z2GZol",
+      "commands": [
+        {
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "status": 0,
+          "signal": null,
+          "diagnostic": "\n> ring64@0.1.0 build\n> node scripts/build.mjs\n\n\n   Compiling zmij v1.0.23\n   Compiling serde_core v1.0.229\n   Compiling serde_json v1.0.154\n   Compiling rustc_apfloat v0.2.3+llvm-462a31f5a5ab\n   Compiling itoa v1.0.18\n   Compiling bitflags v2.13.2\n   Compiling memchr v2.8.3\n   Compiling smallvec v1.16.5\n   Compiling leb128fmt v0.1.0\n   Compiling wasm-encoder v0.259.0\n   Compiling ring64 v0.1.0 (/private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-z2GZol)\n    Finished `release` profile [optimized] target(s) in 10.07s\n"
+        },
+        {
+          "argv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"warm CPL3 timestamp owners read TSD changes live without recompilation or output publication on refusal\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "status": 1,
+          "signal": null,
+          "diagnostic": "\nfile:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-z2GZol/build/tests/support/fixture.js:15\n        throw new Error(message);\n              ^\n\nError: warm CPL3 timestamp owners read TSD changes live without recompilation or output publication on refusal: warm TSD1 denies this same CPL3 read: expected protection-fault, received budget\n    at check (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-z2GZol/build/tests/support/fixture.js:15:15)\n    at equal (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-z2GZol/build/tests/support/fixture.js:18:5)\n    at file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-z2GZol/build/tests/execution/identity-time/boundaries.js:215:29\n    at async using (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-z2GZol/build/tests/execution/identity-time/oracle.js:169:9)\n    at async Object.run (file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-z2GZol/build/tests/execution/identity-time/boundaries.js:196:25)\n    at async file:///private/var/folders/bh/y69sm55j0xq_xp8xd87qtsnw0000gn/T/ring64-call-gate-mutant-z2GZol/[eval1]:1:500\n\nNode.js v22.16.0\n"
+        }
+      ]
+    }
+  ]
+}
