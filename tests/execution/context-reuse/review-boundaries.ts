@@ -115,6 +115,7 @@ export function reviewBoundaryScenarios(compiler: WebAssembly.Module, make: Fact
               interrupts: { irq: 0x20, nmiPending: false, nmiBlocked: false },
             });
             const guarded = cpu.readMemory(0x4000n, setup.ram.length);
+            cpu.setTimeState({ tsc: 100n, tscAux: 7 });
             const result = await cpu.run({
               budget: frontier === 'stop' ? 1n : 3n,
               ...(frontier === 'stop' ? { stop: 0x2000n } : {}),
@@ -131,6 +132,11 @@ export function reviewBoundaryScenarios(compiler: WebAssembly.Module, make: Fact
               'only completed source instructions retire',
             );
             equal(result.deliveryAttempts, 1n, 'one automatic entry');
+            equal(
+              cpu.readTimeState().tsc,
+              frontier === 'stop' ? 100n : 102n,
+              'target resource refusal preserves only independently completed source ticks',
+            );
             equal(
               result.resources.compilations,
               frontier === 'stop' ? 0 : 1,
@@ -163,6 +169,11 @@ export function reviewBoundaryScenarios(compiler: WebAssembly.Module, make: Fact
             const returned = await cpu.run({ budget: 1n, eventDelivery: { budget: 1n } });
             equal(returned.reason, 'budget', 'resume executes the actual IRET');
             equal(returned.retired, 1n, 'automatic entry is not replayed');
+            equal(
+              cpu.readTimeState().tsc,
+              frontier === 'stop' ? 101n : 103n,
+              'resumed IRET ticks once after committed entry',
+            );
             equal(returned.deliveryAttempts, 0n, 'consumed event has no second attempt');
             same(
               returned.state,

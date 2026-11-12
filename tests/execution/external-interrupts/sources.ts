@@ -36,6 +36,7 @@ export function sourceScenarios(compiler: WebAssembly.Module): Scenario[] {
           execution(),
           async (cpu) => {
             cpu.setState(input(0x1100n, { 4: 0x8000n }, 0x202n, { sti: true, ss: false }));
+            cpu.setTimeState({ tsc: 100n, tscAux: 7 });
             cpu.requestInterrupt(0x20);
             cpu.requestNmi();
             const captured = await cpu.run({ budget: 1n, eventDelivery: { budget: 0n } });
@@ -76,6 +77,11 @@ export function sourceScenarios(compiler: WebAssembly.Module): Scenario[] {
               'preserved IF permits IRQ before unmapped NMI-handler bytes',
             );
             equal(nested.retired, 0n, 'no source or handler instruction fetched');
+            equal(
+              cpu.readTimeState().tsc,
+              100n,
+              'NMI and nested IRQ arbitration/frames perform zero clock work',
+            );
             same(
               cpu.readMemory(0x7fe8n, 12),
               image([0x2000n, 8n, 0x202n], 4),

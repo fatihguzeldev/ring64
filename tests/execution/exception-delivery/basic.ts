@@ -34,11 +34,17 @@ export function basicScenarios(compiler: WebAssembly.Module): Scenario[] {
           execution,
           async (cpu) => {
             cpu.setState(initial(0x1000n, { 0: 6n, 1: 0n, 2: 0n, 4: 0x8000n }, 0x202n));
+            cpu.setTimeState({ tsc: 100n, tscAux: 7 });
             const result = await cpu.run({
               budget: 3n,
               exceptionDelivery: { budget: 2n },
             });
             delivery(result, 'budget', 3n, 1n, 1n);
+            same(
+              cpu.readTimeState(),
+              { tsc: 103n, tscAux: 7 },
+              'MOV IRET and retried DIV only; entry and failed source tick zero',
+            );
             ready(result);
             noDeliveryFault(result);
             equal(result.state.rip, 0x1002n, 'DIV continuation');

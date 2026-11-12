@@ -202,7 +202,13 @@ export function gatePagingScenarios(compiler: WebAssembly.Module): Scenario[] {
             },
             async (cpu) => {
               cpu.setState(initial(0x1017n, { 4: 0x4000n }));
+              cpu.setTimeState({ tsc: 100n, tscAux: 7 });
               const result = await cpu.run({ budget: 1n, repeatBudget: 0n });
+              equal(
+                cpu.readTimeState().tsc,
+                badSS ? 100n : 101n,
+                'captured gate completion alone owns retirement credit',
+              );
               equal(
                 cpu.readPhysicalMemory(0x101cn, 1)[0],
                 0x33,

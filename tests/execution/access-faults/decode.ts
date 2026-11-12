@@ -84,7 +84,7 @@ export function decodeScenarios(compiler: WebAssembly.Module): Scenario[] {
           ['66'.repeat(14) + 'b8', 'event-budget', 13],
           ['66'.repeat(14), 'fetch-fault', 0],
           ['82', 'unsupported', 0],
-          ['0fa2', 'unsupported', 0],
+          ['0f33', 'unsupported', 0],
           ['f0f090', 'unsupported', 0],
           ['c8000000', 'unsupported', 0],
         ] as const)

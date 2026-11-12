@@ -28,7 +28,13 @@ export function shadowScenarios(compiler: WebAssembly.Module): Scenario[] {
                   dr7: 0x00030405n,
                 });
                 cpu.setState(initial(0x1000n, { 3: 0x6000n, 4: sp }, flags));
+                cpu.setTimeState({ tsc: 100n, tscAux: 7 });
                 const first = await cpu.run({ budget: 1n });
+                equal(
+                  cpu.readTimeState().tsc,
+                  101n,
+                  'SS producer ticks despite deferred data cause',
+                );
                 equal(first.reason, 'budget', 'producer suppresses own trap');
                 same(
                   first.state.debugContinuation,
@@ -45,6 +51,11 @@ export function shadowScenarios(compiler: WebAssembly.Module): Scenario[] {
                   same(gate.state, original, 'initial gate preserves history');
                 }
                 const next = await cpu.run({ budget: 1n });
+                equal(
+                  cpu.readTimeState().tsc,
+                  102n,
+                  'deferred debug successor ticks once before trap',
+                );
                 equal(next.reason, 'debug-exception', 'successor selects historical hit');
                 equal(next.retired, 1n, 'successor retirement');
                 equal(next.debugException?.breakpoints, 1, 'bank disable cannot erase history');

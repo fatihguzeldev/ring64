@@ -236,6 +236,7 @@ export function gatePagingBoundaryScenarios(compiler: WebAssembly.Module): Scena
               },
             ]);
             cpu.setState(initial(SOURCE, { 4: 0x4000n }));
+            cpu.setTimeState({ tsc: 100n, tscAux: 7 });
             const entered = await cpu.run({
               budget: stop ? 2n : 1n,
               ...(stop ? { stop: TARGET } : {}),
@@ -246,6 +247,7 @@ export function gatePagingBoundaryScenarios(compiler: WebAssembly.Module): Scena
               'post-transfer gate precedes target fetch',
             );
             equal(entered.retired, 1n, 'one captured CALL');
+            equal(cpu.readTimeState().tsc, 101n, 'completed gate ticks before target frontier');
             equal(entered.state.registers[4], 0x8ff0n, 'committed four-slot frame');
             const frame = cpu.readMemory(0x8ff0n, 16);
             const refused = await cpu.run({ budget: 1n });
@@ -253,11 +255,13 @@ export function gatePagingBoundaryScenarios(compiler: WebAssembly.Module): Scena
             equal(refused.fault?.address, TARGET, 'actual target read');
             equal(refused.fault?.cause, 'permission', 'private Execute permission');
             equal(refused.retired, 0n, 'no replay on refused target');
+            equal(cpu.readTimeState().tsc, 101n, 'target fetch refusal cannot recredit gate');
             same(cpu.readMemory(0x8ff0n, 16), frame, 'private refusal leaves one frame');
             cpu.setMappings([
               { base: 0n, backing: 'ram', offset: 0, length: RAM_SIZE, permissions: RWX },
             ]);
             complete(await cpu.run({ budget: 1n }));
+            equal(cpu.readTimeState().tsc, 102n, 'repaired target NOP alone ticks');
             equal(cpu.readState().rip, TARGET + 1n, 'repaired target instruction only');
             same(cpu.readMemory(0x8ff0n, 16), frame, 'private repair never republishes gate');
             numeric();

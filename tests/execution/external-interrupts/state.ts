@@ -187,6 +187,7 @@ export function stateScenarios(compiler: WebAssembly.Module): Scenario[] {
           execution(),
           async (cpu) => {
             cpu.setState(input());
+            cpu.setTimeState({ tsc: 100n, tscAux: 7 });
             cpu.requestNmi();
             const accepted = await cpu.run({ budget: 1n, eventDelivery: { budget: 0n } });
             equal(accepted.reason, 'event-budget', 'acceptance occurs without attempt');
@@ -199,6 +200,11 @@ export function stateScenarios(compiler: WebAssembly.Module): Scenario[] {
             cpu.requestNmi();
             const refused = await cpu.run({ budget: 1n, eventDelivery: { budget: 1n } });
             equal(refused.reason, 'system-memory-fault', 'private IDT permission refusal');
+            equal(
+              cpu.readTimeState().tsc,
+              100n,
+              'NMI acceptance blocking and refused entry tick zero',
+            );
             check(
               refused.systemMemoryFault && 'vector' in refused.systemMemoryFault,
               'vector-bearing gate diagnostic',
@@ -271,6 +277,11 @@ export function stateScenarios(compiler: WebAssembly.Module): Scenario[] {
               'IRET permits pending second NMI before post-work gate',
             );
             equal(returned.retired, 1n, 'only IRET retires');
+            equal(
+              cpu.readTimeState().tsc,
+              101n,
+              'blocked latch and second NMI frame add no ticks to IRET',
+            );
             equal(returned.deliveryAttempts, 1n, 'one second-NMI attempt');
             equal(returned.state.rip, 0x2000n, 'second NMI handler');
             same(

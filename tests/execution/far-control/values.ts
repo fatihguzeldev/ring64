@@ -63,8 +63,14 @@ export function valueScenarios(compiler: WebAssembly.Module): Scenario[] {
                     p2 = (p1 - w) & mask,
                     afterSP = (oldSP & ~mask) | p2;
                   cpu.setState(before);
+                  cpu.setTimeState({ tsc: 100n, tscAux: 7 });
                   const first = await cpu.run({ budget: 1n, repeatBudget: 13n });
                   completion(first, 1n, 1n, 13n);
+                  same(
+                    cpu.readTimeState(),
+                    { tsc: 101n, tscAux: 7 },
+                    'ordinary far CALL ticks once across full mode matrix',
+                  );
                   state(first.state, changed(before, 0x2000n, { 4: afterSP }));
                   const expected = hex('cc'.repeat(64));
                   expected.set(
@@ -84,6 +90,7 @@ export function valueScenarios(compiler: WebAssembly.Module): Scenario[] {
                   same(cpu.readContext(), loaded, 'callee code cache');
                   const returned = await cpu.run({ budget: 1n, repeatBudget: 13n });
                   completion(returned, 1n, 1n, 13n);
+                  same(cpu.readTimeState(), { tsc: 102n, tscAux: 7 }, 'ordinary RETF ticks once');
                   state(returned.state, changed(before, next));
                   const caller = structuredClone(execution);
                   if (!real) caller.segments.cs = loadedCode(targetCode, 8);
@@ -97,6 +104,11 @@ export function valueScenarios(compiler: WebAssembly.Module): Scenario[] {
                   same(cpu.readContext(), caller, 'caller context roundtrip');
                   const resumed = await cpu.run({ budget: 1n, repeatBudget: 13n });
                   completion(resumed, 1n, 1n, 13n);
+                  same(
+                    cpu.readTimeState(),
+                    { tsc: 103n, tscAux: 7 },
+                    'context import adds no credit before successor NOP',
+                  );
                   state(resumed.state, changed(before, next + 1n));
                   numeric();
                 },

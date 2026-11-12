@@ -165,13 +165,16 @@ export function pagingFetchScenarios(compiler: WebAssembly.Module): Scenario[] {
         const small = await aliasCpu(compiler, 'refetch', 1);
         const large = await aliasCpu(compiler, 'refetch', 8);
         try {
-          for (const cpu of [small, large])
+          for (const cpu of [small, large]) {
             cpu.setState(initial(PC + 0xfffn, { 0: 0xffffffff80000001n }, 0x10002n));
+            cpu.setTimeState({ tsc: 100n, tscAux: 7 });
+          }
           const suspended = await small.run({ budget: 1n });
           equal(suspended.reason, 'resource-limit', 'ceiling-th abandoned admission yields');
           equal(suspended.resources.pagingRestarts, 1, 'one restart');
           equal(suspended.resources.compilations, 0, 'no fictitious compilation');
           equal(suspended.retired, 0n, 'no obsolete REX instruction begins');
+          equal(small.readTimeState().tsc, 100n, 'pre-begin restart performs no guest time work');
           equal(suspended.state.flags, 0x10002n, 'RF preserved before begin');
           equal(word(small, 0x4008n), 0xa063n, 'completed A visible through opcode alias');
           const resumed = await small.run({ budget: 1n });
@@ -181,6 +184,12 @@ export function pagingFetchScenarios(compiler: WebAssembly.Module): Scenario[] {
           equal(resumed.state.registers[0], 0x80000001n, 'current opcode result');
           equal(resumed.resources.pagingRestarts, 0, 'set A is no-op');
           same(resumed.state, direct.state, 'bounded resumes match sufficient allowance');
+          same(small.readTimeState(), { tsc: 101n, tscAux: 7 }, 'resumed actual MOVSXD ticks once');
+          same(
+            large.readTimeState(),
+            small.readTimeState(),
+            'restart allowance cannot alter guest time',
+          );
         } finally {
           small.dispose();
           large.dispose();
@@ -194,7 +203,13 @@ export function pagingFetchScenarios(compiler: WebAssembly.Module): Scenario[] {
           const cpu = await aliasCpu(compiler, kind);
           try {
             cpu.setState(initial(PC, { 0: 0x1234567880000001n, 7: 0x500000n }, 0x8d7n));
+            cpu.setTimeState({ tsc: 100n, tscAux: 7 });
             const result = await cpu.run({ budget: 2n });
+            equal(
+              cpu.readTimeState().tsc,
+              102n,
+              'post-begin alias replacement counts only two completed instructions',
+            );
             equal(result.reason, 'budget', 'two instructions');
             equal(result.retired, 2n, 'completed data operation never replayed');
             equal(result.state.flags, 0x8d7n, 'changed instruction preserves flags');

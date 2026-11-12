@@ -129,10 +129,12 @@ export function activityScenarios(compiler: WebAssembly.Module): Scenario[] {
           execution(),
           async (cpu) => {
             cpu.setState(input());
+            cpu.setTimeState({ tsc: 100n, tscAux: 7 });
             equal(cpu.requestInterrupt(0x20), true, 'empty IRQ intake');
             const staged = await cpu.run({ budget: 2n, eventDelivery: { budget: 0n } });
             equal(staged.reason, 'event-budget', 'acceptance before last allowance gate');
             equal(staged.retired, 2n, 'STI and HLT both retire');
+            equal(cpu.readTimeState().tsc, 102n, 'zero delivery allowance adds no tick to STI HLT');
             same(
               staged.state.event,
               {
@@ -159,6 +161,11 @@ export function activityScenarios(compiler: WebAssembly.Module): Scenario[] {
             });
             equal(entered.reason, 'stop', 'retained IRQ serviced before newly queued NMI');
             equal(entered.deliveryAttempts, 1n, 'one IRQ attempt');
+            equal(
+              cpu.readTimeState().tsc,
+              102n,
+              'IRQ frame and queued NMI add no instruction retirement',
+            );
             same(
               entered.state.interrupts,
               { ...EMPTY, nmiPending: true },

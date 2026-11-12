@@ -149,7 +149,13 @@ export function escalationScenarios(compiler: WebAssembly.Module): Scenario[] {
             execution,
             async (cpu) => {
               cpu.setState(initial(0x1000n, { 0: 6n, 1: 0n, 2: 0n, 4: 0x8000n }, 0x202n));
+              cpu.setTimeState({ tsc: 100n, tscAux: 7 });
               const result = await cpu.run({ budget: 1n, exceptionDelivery: { budget: 2n } });
+              equal(
+                cpu.readTimeState().tsc,
+                100n,
+                'failed source secondary delivery and shutdown are not retired work',
+              );
               delivery(result, missing ? 'system-memory-fault' : 'shutdown', 0n, 2n, 0n);
               if (missing) {
                 same(
