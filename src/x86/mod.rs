@@ -12,6 +12,7 @@ pub mod mmx;
 pub mod numeric_controls;
 pub mod numeric_images;
 pub mod paging;
+pub mod processor;
 pub mod protection;
 pub mod state;
 pub mod x87;

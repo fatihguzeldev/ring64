@@ -1,6 +1,7 @@
 use crate::x86::context::{ExecutionContext, Mode, Segment};
 
 pub const EFER_MSR: u32 = 0xc0000080;
+pub const CR4_TSD: u64 = 1 << 2;
 const CR0_FIXED: u64 = 0x80000033;
 const CR0_WP: u64 = 1 << 16;
 const CR0_NUMERIC: u64 = 0xe;
@@ -81,7 +82,7 @@ impl State {
             || pg && !pe
             || self.cr0 & 0x60000000 == 0x20000000
             || self.cr3 & !0x000f_ffff_ffff_fff8 != 0
-            || self.cr4 & !0x638 != 0
+            || self.cr4 & !0x63c != 0
             || self.efer & !0xd01 != 0
             || (self.efer & 0x400 != 0) != lma
             || lma && self.cr4 & 0x20 == 0
@@ -217,7 +218,7 @@ impl State {
                 {
                     return Err(GeneralProtection);
                 }
-                if value & !0x638 != 0 {
+                if value & !0x63c != 0 {
                     return Err(Unsupported);
                 }
                 candidate.cr4 = value;
@@ -282,7 +283,7 @@ impl State {
         if self.pdpte.is_some()
             || self.cr0 & !(CR0_WP | CR0_NUMERIC) != CR0_FIXED & !CR0_NUMERIC
             || self.cr3 & !CR3_ALLOWED != 0
-            || self.cr4 & !CR4_NUMERIC != CR4_FIXED & !CR4_NUMERIC
+            || self.cr4 & !(CR4_NUMERIC | CR4_TSD) != CR4_FIXED & !CR4_NUMERIC
             || self.efer & !(EFER_NXE | EFER_SCE) != EFER_FIXED
         {
             Err("paging controls do not match the normalized IA32e profile")
@@ -347,7 +348,7 @@ impl State {
                 {
                     return Err(GeneralProtection);
                 }
-                if value & !CR4_NUMERIC != CR4_FIXED & !CR4_NUMERIC {
+                if value & !(CR4_NUMERIC | CR4_TSD) != CR4_FIXED & !CR4_NUMERIC {
                     return Err(Unsupported);
                 }
                 candidate.cr4 = value;
@@ -398,13 +399,13 @@ impl State {
         (
             self.cr0 & !CR0_NUMERIC,
             self.cr3,
-            self.cr4 & !CR4_NUMERIC,
+            self.cr4 & !(CR4_NUMERIC | CR4_TSD),
             self.efer & EFER_NXE,
             self.pdpte,
         ) != (
             other.cr0 & !CR0_NUMERIC,
             other.cr3,
-            other.cr4 & !CR4_NUMERIC,
+            other.cr4 & !(CR4_NUMERIC | CR4_TSD),
             other.efer & EFER_NXE,
             other.pdpte,
         )
@@ -424,6 +425,65 @@ mod tests {
             cr4: 0x628,
             efer: 0x500,
             pdpte: None,
+        }
+    }
+
+    #[test]
+    fn timestamp_disable_is_a_live_permission_not_translation_or_numeric_state() {
+        let fixed = bank();
+        let disabled = State {
+            cr4: fixed.cr4 | 4,
+            ..fixed
+        };
+        assert_eq!(disabled.validate(), Ok(()));
+        assert_eq!(
+            fixed.prepare_cr_write(4, disabled.cr4, Mode::Long64),
+            Ok(disabled)
+        );
+        assert!(!fixed.translation_changed(disabled));
+        assert_eq!(fixed.numeric_controls(), disabled.numeric_controls());
+        for (state, mode) in [
+            (State::reset(), Mode::Real),
+            (
+                State {
+                    cr0: 0x60000011,
+                    ..State::reset()
+                },
+                Mode::Protected,
+            ),
+            (
+                State {
+                    cr0: 0x80000033,
+                    cr4: 0x608,
+                    efer: 0,
+                    ..State::default()
+                },
+                Mode::Protected,
+            ),
+            (
+                State {
+                    cr0: 0x80000033,
+                    cr4: 0x628,
+                    efer: 0,
+                    pdpte: Some([0x3001, 0, 0, 0]),
+                    ..State::default()
+                },
+                Mode::Protected,
+            ),
+            (State::default(), Mode::Long64),
+        ] {
+            let candidate = State {
+                cr4: state.cr4 | 4,
+                ..state
+            };
+            assert_eq!(candidate.validate_physical(mode), Ok(()));
+            assert_eq!(
+                state.prepare_physical_cr_write(4, candidate.cr4, mode),
+                Ok(candidate)
+            );
+            assert!(!state.translation_changed(candidate));
+            assert_eq!(state.numeric_controls(), candidate.numeric_controls());
+            assert!(!state.needs_pdpte_reload(candidate, 4));
         }
     }
 
