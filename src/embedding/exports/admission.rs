@@ -15,6 +15,14 @@ impl Core {
         {
             return INVALID;
         }
+        // Both callers clear diagnostics first; NE1/all-enabled needs no saved numeric PC.
+        if self
+            .paging
+            .as_ref()
+            .is_none_or(|bank| bank.cr0 & 0x2c == 0x20 && bank.cr4 & 0x600 == 0x600)
+        {
+            return 0;
+        }
         let reason = self.numeric_admission(operation, pc);
         if reason != 0 {
             return reason;
