@@ -336,6 +336,83 @@ export function numericControlScenarios(compiler: WebAssembly.Module): Scenario[
       },
     },
     {
+      name: 'numeric disabled-to-default repair preserves retained owners RF and distinct XM provenance',
+      async run() {
+        await usingPaged(
+          compiler,
+          { code: '90d9d0f20f5ec1', limits: { maxInstructions: 1 } },
+          async (cpu) => {
+            const setOperands = (right: bigint) => {
+              const xmm = cpu.readXmmState();
+              xmm[0] = 0x3ff0000000000000n;
+              xmm[1] = right;
+              cpu.setXmmState(xmm);
+            };
+            setOperands(0x3ff0000000000000n);
+            for (const pc of [PC, PC + 1n, PC + 3n]) {
+              cpu.setState(initial(pc));
+              equal((await cpu.run({ budget: 1n })).retired, 1n, 'prime one owner per entry');
+            }
+            const owners = cpu
+              .inspectTranslations()
+              .map((artifact) => artifact.owner)
+              .sort();
+            equal(owners.length, 3, 'three distinct installed entries');
+            for (const cr0 of [0x80000031n, 0x80000033n]) {
+              const enabled = { ...BANK, cr0 };
+              for (const disabled of [cr0 | 4n, cr0 | 8n]) {
+                cpu.setPagingState({ ...enabled, cr0: disabled });
+                cpu.setState(initial(PC + 1n, {}, 0x10002n));
+                const fault = await cpu.run({ budget: 1n });
+                equal(fault.reason, 'device-not-available', 'EM or TS wins before begin');
+                equal(fault.retired, 0n, 'denied FNOP does not retire');
+                equal(fault.state.flags, 0x10002n, 'denied FNOP retains RF');
+                equal(fault.deviceNotAvailable?.instructionPc, PC + 1n, 'fault source PC');
+                cpu.setPagingState(enabled);
+                for (const pc of [PC, PC + 1n]) {
+                  cpu.setState(initial(pc, {}, 0x10002n));
+                  const repaired = await cpu.run({ budget: 1n });
+                  equal(repaired.reason, 'budget', 'default scalar and numeric execute');
+                  equal(repaired.retired, 1n, 'one repaired instruction');
+                  equal(repaired.resources.compilations, 0, 'reuse the retained owner');
+                  equal(repaired.state.flags, 2n, 'normal instruction begin clears RF');
+                  equal(repaired.deviceNotAvailable, undefined, 'no stale NM source');
+                  equal(repaired.numericControlFault, undefined, 'no stale numeric UD');
+                }
+              }
+              cpu.setPagingState({ ...enabled, cr4: 0x228n });
+              cpu.setMxcsr(0x1d80);
+              setOperands(0n);
+              cpu.setState(initial(PC + 3n, {}, 0x10002n));
+              const numericUd = await cpu.run({ budget: 1n });
+              equal(numericUd.reason, 'invalid-encoding', 'OSXMMEXCPT0 numeric UD');
+              equal(numericUd.retired, 0n, 'unmasked result does not retire');
+              equal(numericUd.state.flags, 2n, 'numeric fault is after begin');
+              check(numericUd.numericControlFault?.phase === 'numeric', 'numeric source');
+              equal(numericUd.numericControlFault.instructionPc, PC + 3n, 'current source PC');
+              equal(cpu.readMxcsr(), 0x1d84, 'unmasked ZE status survives');
+              cpu.setPagingState(enabled);
+              const xm = await cpu.run({ budget: 1n });
+              equal(xm.reason, 'simd-exception', 'default repair restores XM route');
+              equal(xm.retired, 0n, 'XM suppresses retirement');
+              equal(xm.resources.compilations, 0, 'same installed numeric owner');
+              equal(xm.numericControlFault, undefined, 'old UD source cleared');
+              equal(xm.deviceNotAvailable, undefined, 'old NM source cleared');
+              equal(xm.simdException?.instructionPc, PC + 3n, 'XM source PC');
+              same(
+                cpu
+                  .inspectTranslations()
+                  .map((artifact) => artifact.owner)
+                  .sort(),
+                owners,
+                'stable owners',
+              );
+            }
+          },
+        );
+      },
+    },
+    {
       name: 'numeric OSXMMEXCPT0 publishes MXCSR before typed numeric UD and suppresses destination',
       async run() {
         await usingPaged(compiler, { code: 'f20f5ec1' }, async (cpu) => {
