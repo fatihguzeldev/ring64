@@ -55,5 +55,84 @@ pub(super) fn load(
     }))
 }
 
+// The cached task register owns stack-field layout and admission. Callers choose
+// the entry policy (privilege RSP versus IST); neither alignment nor frame state
+// belongs to the TSS read.
+fn cached_task(context: &ExecutionContext, last: u32, ext: u16) -> Result<TaskRegister, Failure> {
+    let task = context.tr();
+    let kind = task.attributes & 15;
+    let valid = task.valid
+        && task.selector >= 4
+        && task.selector & 4 == 0
+        && task.attributes & 0x90 == 0x80
+        && if ia32e(context) {
+            kind == 11
+        } else {
+            matches!(kind, 3 | 11)
+        };
+    if !valid || last > task.limit {
+        return Err(Failure::Protection(ProtectionFault {
+            vector: 10,
+            error_code: (task.selector & 0xfffc) | ext,
+            phase: ProtectionPhase::Descriptor,
+            selector: Some(task.selector),
+        }));
+    }
+    Ok(task)
+}
+
+pub(super) fn read_rsp_at(
+    context: &ExecutionContext,
+    image: &impl GuestMemory,
+    offset: u32,
+    ext: u16,
+) -> Result<u64, Failure> {
+    let task = cached_task(context, offset + 7, ext)?;
+    let bytes = super::access::SystemRead {
+        base: task.base,
+        offset,
+        width: 8,
+        table: Table::Tss,
+        reference: SystemReference::Selector(task.selector),
+        phase: SystemPhase::TssRead,
+    }
+    .read(context, image, ext)?;
+    Ok(u64::from_le_bytes(bytes[..8].try_into().unwrap()))
+}
+
+pub(super) fn read_legacy_stack(
+    context: &ExecutionContext,
+    image: &impl GuestMemory,
+    cpl: u8,
+    ext: u16,
+) -> Result<(u64, u16), Failure> {
+    let wide = context.tr().attributes & 15 == 11;
+    let (offset, width) = if wide {
+        (4 + u32::from(cpl) * 8, 4)
+    } else {
+        (2 + u32::from(cpl) * 4, 2)
+    };
+    let task = cached_task(context, offset + width + 1, ext)?;
+    let attempt = super::access::SystemRead {
+        base: task.base,
+        offset: offset + width,
+        width: 2,
+        table: Table::Tss,
+        reference: SystemReference::Selector(task.selector),
+        phase: SystemPhase::TssRead,
+    };
+    let ss = attempt.read(context, image, ext)?;
+    let sp = super::access::SystemRead {
+        offset,
+        width,
+        ..attempt
+    }
+    .read(context, image, ext)?;
+    Ok((
+        u64::from_le_bytes(sp[..8].try_into().unwrap()),
+        u16::from_le_bytes(ss[..2].try_into().unwrap()),
+    ))
+}
+
 #[cfg(test)]
 mod tests;

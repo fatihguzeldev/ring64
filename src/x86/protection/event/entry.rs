@@ -423,33 +423,6 @@ fn lookup(
     Ok(Loaded { lookup, descriptor })
 }
 
-fn task(
-    context: &ExecutionContext,
-    last: u32,
-    ext: u16,
-) -> Result<crate::x86::context::TaskRegister, EventFailure> {
-    let task = context.tr();
-    let kind = task.attributes & 15;
-    let valid = task.valid
-        && task.selector >= 4
-        && task.selector & 4 == 0
-        && task.attributes & 0x90 == 0x80
-        && if ia32e(context) {
-            kind == 11
-        } else {
-            matches!(kind, 3 | 11)
-        };
-    if !valid || last > task.limit {
-        return Err(selector_fault(
-            task.selector,
-            10,
-            ext,
-            ProtectionPhase::Descriptor,
-        ));
-    }
-    Ok(task)
-}
-
 fn read_rsp(
     context: &ExecutionContext,
     image: &impl GuestMemory,
@@ -462,17 +435,7 @@ fn read_rsp(
     } else {
         28 + u32::from(ist) * 8
     };
-    let task = task(context, offset + 7, ext)?;
-    let bytes = SystemRead {
-        base: task.base,
-        offset,
-        width: 8,
-        table: Table::Tss,
-        reference: SystemReference::Selector(task.selector),
-        phase: SystemPhase::TssRead,
-    }
-    .read(context, image, ext)?;
-    Ok(u64::from_le_bytes(bytes[..8].try_into().unwrap()))
+    super::super::task::read_rsp_at(context, image, offset, ext).map_err(descriptor_failure)
 }
 
 fn read_legacy_stack(
@@ -481,30 +444,5 @@ fn read_legacy_stack(
     cpl: u8,
     ext: u16,
 ) -> Result<(u64, u16), EventFailure> {
-    let wide = context.tr().attributes & 15 == 11;
-    let (offset, width) = if wide {
-        (4 + u32::from(cpl) * 8, 4)
-    } else {
-        (2 + u32::from(cpl) * 4, 2)
-    };
-    let task = task(context, offset + width + 1, ext)?;
-    let attempt = SystemRead {
-        base: task.base,
-        offset: offset + width,
-        width: 2,
-        table: Table::Tss,
-        reference: SystemReference::Selector(task.selector),
-        phase: SystemPhase::TssRead,
-    };
-    let ss = attempt.read(context, image, ext)?;
-    let sp = SystemRead {
-        offset,
-        width,
-        ..attempt
-    }
-    .read(context, image, ext)?;
-    Ok((
-        u64::from_le_bytes(sp[..8].try_into().unwrap()),
-        u16::from_le_bytes(ss[..2].try_into().unwrap()),
-    ))
+    super::super::task::read_legacy_stack(context, image, cpl, ext).map_err(descriptor_failure)
 }

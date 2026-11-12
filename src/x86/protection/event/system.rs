@@ -1,6 +1,4 @@
 use super::{EventFailure, ExecutionContext, GuestMemory};
-use crate::memory::{Access, Cause};
-use crate::x86::protection::{ProtectionFault, ProtectionPhase, SystemMemoryFault};
 use crate::x86::protection::{SystemPhase, SystemReference, Table};
 
 pub(super) struct SystemRead {
@@ -19,64 +17,16 @@ impl SystemRead {
         image: &impl GuestMemory,
         ext: u16,
     ) -> Result<[u8; 16], EventFailure> {
-        let computed = u128::from(self.base) + u128::from(self.offset);
-        let ia32e = super::super::access::ia32e(context);
-        let address = if ia32e {
-            computed
-        } else {
-            u128::from(computed as u32)
-        };
-        let end = address + u128::from(self.width);
-        let domain = 1u128 << if ia32e { 64 } else { 32 };
-        if address >= domain || end > domain {
-            return Err(self.fault(address, Cause::AddressRange, address.max(domain)));
-        }
-        if self.table == Table::Tss
-            && (!crate::memory::canonical48(address as u64)
-                || !crate::memory::canonical48((end - 1) as u64))
-            && ia32e
-        {
-            let SystemReference::Selector(selector) = self.reference else {
-                unreachable!("TSS selector provenance")
-            };
-            return Err(EventFailure::Protection(ProtectionFault {
-                vector: 10,
-                error_code: (selector & 0xfffc) | ext,
-                phase: ProtectionPhase::Descriptor,
-                selector: Some(selector),
-            }));
-        }
-        image
-            .read_system(address as u64, self.width)
-            .map_err(|failure| match failure {
-                super::AccessFailure::Linear(failure) => {
-                    self.fault(address, failure.cause, failure.failing)
-                }
-                super::AccessFailure::Paging(failure) => {
-                    EventFailure::SystemPaging(crate::x86::protection::SystemPagingFault {
-                        failure,
-                        phase: self.phase,
-                        table: self.table,
-                        reference: self.reference,
-                    })
-                }
-                super::AccessFailure::Segment(_) => {
-                    unreachable!("system access has no segment admission")
-                }
-            })
-    }
-
-    fn fault(&self, address: u128, cause: Cause, failing_address: u128) -> EventFailure {
-        EventFailure::SystemMemory(SystemMemoryFault {
-            address,
+        super::super::access::SystemRead {
+            base: self.base,
+            offset: self.offset,
             width: self.width,
-            access: Access::Read,
-            cause,
-            failing_address,
-            phase: self.phase,
             table: self.table,
             reference: self.reference,
-        })
+            phase: self.phase,
+        }
+        .read(context, image, ext)
+        .map_err(super::descriptor_failure)
     }
 }
 
