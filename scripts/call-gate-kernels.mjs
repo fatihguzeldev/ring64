@@ -591,7 +591,7 @@ const zero = (keys) => Object.fromEntries(keys.map((key) => [key, 0]));
 const add = (to, from) => {
   for (const key of Object.keys(to)) to[key] += from[key] ?? 0;
 };
-export async function measureCallGates(side, { iterations, samples, workloads }) {
+export async function measureCallGates(side, { iterations, samples, workloads, onSample }) {
   const definitions = [],
     results = [];
   for (const input of performanceRows.filter((row) => workloads.includes(row.name))) {
@@ -662,6 +662,13 @@ export async function measureCallGates(side, { iterations, samples, workloads })
     });
     try {
       for (let sample = -1; sample < samples; sample++) {
+        if (onSample)
+          await onSample('before', {
+            workload: input.name,
+            sample,
+            cpu,
+            definition: definitions.at(-1),
+          });
         const targetB = input.kind === 'gate-edit' && sample % 2 === 0;
         if (input.kind === 'gate-edit') {
           put(f.ram, GDT + 56n, targetB ? TARGET + 0x100n : TARGET, 2);
@@ -838,6 +845,14 @@ export async function measureCallGates(side, { iterations, samples, workloads })
           timings,
           finalGauge: result.resources,
         });
+        if (onSample)
+          await onSample('after', {
+            workload: input.name,
+            sample,
+            cpu,
+            definition: definitions.at(-1),
+            result: results.at(-1),
+          });
       }
     } finally {
       cpu.dispose();
