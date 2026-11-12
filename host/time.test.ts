@@ -223,6 +223,50 @@ test('physical reset during time capture remains effective and rejects stale pub
   }
 });
 
+test('a later capture accessor preserves exact exceptions and earlier nested effects without enumeration', async () => {
+  const cpu = await createCpu(options());
+  try {
+    cpu.setTimeState({ tsc: 100n, tscAux: 7 });
+    const marker = { source: 'second accessor' };
+    const reads: PropertyKey[] = [];
+    const input = new Proxy(
+      {
+        get tsc() {
+          cpu.setTimeState({ tsc: 200n, tscAux: 9 });
+          cpu.setState({ ...cpu.readState(), flags: 0x402n });
+          return 300n;
+        },
+        get tscAux(): number {
+          throw marker;
+        },
+        get unrelated() {
+          assert.fail('time capture must not enumerate unrelated properties');
+        },
+      },
+      {
+        get(target, key, receiver) {
+          reads.push(key);
+          return Reflect.get(target, key, receiver);
+        },
+        ownKeys() {
+          assert.fail('time capture must not enumerate input keys');
+        },
+      },
+    );
+    assert.throws(
+      () => cpu.setTimeState(input),
+      (error) => error === marker,
+    );
+    assert.deepEqual(reads, ['tsc', 'tscAux']);
+    assert.deepEqual(cpu.readTimeState(), { tsc: 200n, tscAux: 9 });
+    assert.equal(cpu.readState().flags, 0x402n);
+    cpu.setTimeState({ tsc: 400n, tscAux: 11 });
+    assert.deepEqual(cpu.readTimeState(), { tsc: 400n, tscAux: 11 });
+  } finally {
+    cpu.dispose();
+  }
+});
+
 test('a completed accessor run retains its real NOP tick while rejecting a stale time import', async () => {
   const cpu = await createCpu(options());
   try {
