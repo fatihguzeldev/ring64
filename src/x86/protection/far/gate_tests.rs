@@ -1,7 +1,7 @@
 use super::*;
 use crate::x86::context::{TableRegister, TaskRegister};
 
-fn fixture(mode: &str) -> (ExecutionContext, Image) {
+pub(super) fn fixture(mode: &str) -> (ExecutionContext, Image) {
     let mut context = tests::context(mode, 3);
     context.set_gdtr(TableRegister {
         base: 0x1000,
@@ -47,7 +47,7 @@ fn fixture(mode: &str) -> (ExecutionContext, Image) {
     (context, image)
 }
 
-fn call(
+pub(super) fn call(
     context: &mut ExecutionContext,
     image: &mut Image,
     source_width: Width,
