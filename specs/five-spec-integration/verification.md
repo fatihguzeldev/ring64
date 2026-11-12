@@ -1,5 +1,8 @@
 # five-spec integration verification
 
+The subsequent [performance recovery](performance-recovery.md) records the
+x87/MMX and IA32e fixes. The measurements below retain their original artifacts.
+
 This record joins the separately reviewed x87 special forms, numeric controls,
 legacy paging, reset/mode transitions and port I/O implementations. The original
 contracts were committed and pushed at `e00a418`. Implementation, integration
