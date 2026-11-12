@@ -6,6 +6,7 @@ mod exception_delivery;
 mod exception_review;
 mod external_interrupts;
 mod far_bridge;
+mod paging_decode;
 mod protection_bridge;
 mod reset;
 mod software_events;

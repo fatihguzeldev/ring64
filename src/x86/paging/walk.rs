@@ -6,7 +6,7 @@ const ACCESSED: u64 = 1 << 5;
 pub const DIRTY: u64 = 1 << 6;
 
 #[cfg(test)]
-pub(super) mod physical_counts {
+pub(crate) mod physical_counts {
     use std::cell::Cell;
 
     // Attempted Image calls and requested byte widths, in this order:
