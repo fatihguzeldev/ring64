@@ -22,15 +22,19 @@ impl Core {
                 access: Access::Execute,
                 user: context.cpl() == 3,
             };
+            let mut accessed_write = false;
             let translation =
                 paging::walk::fetch_walk(&mut self.image, paging, request, |image| {
+                    accessed_write = true;
                     encoding_current(image, paging, &consumed, request.user)
                 })
                 .map_err(DecodeError::Paging)?
                 .ok_or(DecodeError::PagingRestart)?;
-            if !encoding_current(&self.image, paging, &consumed, request.user)
-                || !paging::walk::peek(&self.image, paging, request)
-                    .is_ok_and(|fresh| fresh.physical == translation.physical)
+            // Only an A write can change encoding during this synchronous byte fetch.
+            if accessed_write
+                && (!encoding_current(&self.image, paging, &consumed, request.user)
+                    || !paging::walk::peek(&self.image, paging, request)
+                        .is_ok_and(|fresh| fresh.physical == translation.physical))
             {
                 return Err(DecodeError::PagingRestart);
             }
