@@ -47,9 +47,9 @@ The first spec closes a bounded numeric cohort; transcendental accuracy remains 
 
 CPUID/clock providers, x87 transcendentals, hardware task switching, extended-state/AVX, retained TLB facilities and shared-vCPU atomics remain later work. No new device platform or OS-boot target is implied.
 
-## next specification
+## completed call-gate implementation
 
-[Call gates and privilege stacks](call-gates-and-privilege-stacks/spec.md), prepared against `43dad55`: legacy16/32 and IA32e64 gate CALL/JMP, privilege-stack and parameter-copy preparation, matching RETF, paged/debug/context consumers and independent falsification requirements. [Selection and review](call-gates-and-privilege-stacks/review.md) explains why this precedes identity/time and task switching. This is a specification, not an implemented capability or a completed vertical.
+[Call gates and privilege stacks](call-gates-and-privilege-stacks/spec.md), implemented against `43dad55`: legacy16/32 and IA32e64 gate CALL/JMP, privilege stacks and every legacy parameter count, matching RETF, paging/debug/context consumers and guest repair. [Verification](call-gates-and-privilege-stacks/verification.md) records independent oracles, adversarial reviews, semantic mutations and bounded performance results. [Selection and review](call-gates-and-privilege-stacks/review.md) retains the original prioritization. This completes the selected increment, not an architectural vertical.
 
 ## scope
 
