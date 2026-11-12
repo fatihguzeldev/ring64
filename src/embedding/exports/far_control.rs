@@ -101,6 +101,25 @@ fn core_far_control_impl<const OBSERVED: bool, const PAGED: bool>(
                 return PROTECTION;
             }
             Err(FarFailure::SystemMemory(fault)) => {
+                // CALL/JMP owns selector-coded canonical descriptor sources. Keep
+                // the complete report diagnostic; delivery consumes this companion.
+                use crate::x86::context::Mode;
+                use crate::x86::protection::{
+                    ProtectionFault, ProtectionPhase, SystemReference, Table,
+                };
+                if descriptor.kind != FarKind::Return
+                    && matches!(core.context.mode(), Mode::Compatibility | Mode::Long64)
+                    && fault.cause == Cause::Noncanonical
+                    && matches!(fault.table, Table::Gdt | Table::Ldt)
+                    && let SystemReference::Selector(selector) = fault.reference
+                {
+                    core.protection_fault = Some(ProtectionFault {
+                        vector: 13,
+                        error_code: selector & !3,
+                        phase: ProtectionPhase::Descriptor,
+                        selector: Some(selector),
+                    });
+                }
                 core.system_memory_fault = Some(fault);
                 return SYSTEM_MEMORY;
             }

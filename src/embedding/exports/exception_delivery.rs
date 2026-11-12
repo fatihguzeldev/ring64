@@ -153,8 +153,10 @@ pub extern "C" fn core_stage_exception(reason: i32) -> i32 {
                         .alignment_fault
                         .as_ref()
                         .map(|_| crate::x86::protection::alignment_fault()),
-                    SYSTEM_MEMORY => core.system_memory_fault.and_then(|fault| {
-                        crate::x86::protection::system_fault(&core.context, fault)
+                    SYSTEM_MEMORY => core.protection_fault.or_else(|| {
+                        core.system_memory_fault.and_then(|fault| {
+                            crate::x86::protection::system_fault(&core.context, fault)
+                        })
                     }),
                     _ => unreachable!(),
                 };
