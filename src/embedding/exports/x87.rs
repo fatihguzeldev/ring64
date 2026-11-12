@@ -147,7 +147,11 @@ fn core_x87_impl<const OBSERVED: bool, const PAGED: bool>(
                 core.debug_operand(address, width, Access::Write);
             }
         }
-        if core.image.active_changed() { 2 } else { 0 }
+        if address.is_some() && core.image.active_changed() {
+            2
+        } else {
+            0
+        }
     })
 }
 
