@@ -8,11 +8,11 @@ pub extern "C" fn core_processor(kind: u32, eax: u32, ecx: u32, retired: u64) ->
     }
     BRIDGE.with_borrow_mut(|bridge| {
         let core = bridge.core.as_mut().unwrap();
-        if kind != 0 {
-            if let Err(fault) = processor::admit_timestamp(&core.context, core.paging) {
-                core.protection_fault = Some(fault);
-                return super::super::layout::PROTECTION;
-            }
+        if kind != 0
+            && let Err(fault) = processor::admit_timestamp(&core.context, core.paging)
+        {
+            core.protection_fault = Some(fault);
+            return super::super::layout::PROTECTION;
         }
         let raw = unsafe { &mut *core.state.get() };
         if kind == 0 {
