@@ -12,7 +12,7 @@ fn reached_decode_faults_preserve_report_frontiers_and_select_distinct_fault_ima
         (vec![0x0f, 0x0b], UNSUPPORTED, Some((6, None))),
         (vec![0xf0, 0xf4], INVALID, Some((6, None))),
         (vec![0x82], UNSUPPORTED, None),
-        (vec![0x0f, 0xa2], UNSUPPORTED, None),
+        (vec![0x0f, 0x33], UNSUPPORTED, None),
         (vec![0xf0, 0xf0], UNSUPPORTED, None),
         (vec![0x66; 14], FETCH, None),
     ] {

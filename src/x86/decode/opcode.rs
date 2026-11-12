@@ -625,6 +625,17 @@ fn two_byte<F>(
 where
     F: FnMut(u64) -> Result<u8, DecodeError>,
 {
+    if matches!(opcode, 0x31 | 0xa2) {
+        return if prefixes.lock {
+            Err(DecodeError::UndefinedEncoding)
+        } else {
+            Ok(Operation::Processor(if opcode == 0xa2 {
+                crate::x86::processor::Instruction::Cpuid
+            } else {
+                crate::x86::processor::Instruction::Rdtsc
+            }))
+        };
+    }
     if let Some(result) = super::paging::two_byte(opcode, prefixes, cursor) {
         return result;
     }

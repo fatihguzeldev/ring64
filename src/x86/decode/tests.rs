@@ -20,6 +20,7 @@ mod modes;
 mod multiply_divide;
 mod near_control;
 mod numeric_state;
+mod processor;
 mod protection;
 mod scalar_data;
 mod software_events;

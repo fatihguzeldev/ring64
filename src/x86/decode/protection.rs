@@ -112,6 +112,15 @@ where
                 _ => return Err(DecodeError::Unsupported),
             },
             0x01 => {
+                if operands.mode == 3 && operands.selector == 7 && operands.rm & 7 == 1 {
+                    return if prefixes.lock {
+                        Err(DecodeError::UndefinedEncoding)
+                    } else {
+                        Ok(Operation::Processor(
+                            crate::x86::processor::Instruction::Rdtscp,
+                        ))
+                    };
+                }
                 if prefixes.paged
                     && operands.mode == 3
                     && operands.selector == 7

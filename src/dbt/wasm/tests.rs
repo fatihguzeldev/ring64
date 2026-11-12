@@ -18,6 +18,7 @@ mod multiply_divide;
 mod near_stack;
 mod numeric_state;
 mod paging;
+mod processor;
 mod protection;
 mod routing;
 mod software_events;
@@ -469,6 +470,9 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 const {layout:l,cases,targetOffset}=JSON.parse(fs.readFileSync(0,'utf8'));
 for (const [index,c] of cases.entries()) {
+ // Expected allowances are authored literals, not values returned by the generated run.
+ if(c.time===undefined){c.time={tsc:'0',tscAux:0};c.expected.time={tsc:(BigInt(c.budget)-BigInt(c.expected.remaining)).toString(),tscAux:0}}
+ if(c.preservingSuffix){const suffix=c.preservingSuffix;suffix.expected.time??={tsc:BigInt.asUintN(64,BigInt(c.expected.time.tsc)+BigInt(suffix.budget)-BigInt(suffix.expected.remaining)).toString(),tscAux:c.expected.time.tscAux}}
  const memory=new WebAssembly.Memory({initial:1}); const d=new DataView(memory.buffer);
  c.registers.forEach((v,i)=>d.setBigUint64(l.registers+8*i,BigInt('0x'+v),true));
  d.setBigUint64(l.flags,BigInt('0x'+c.flags),true); d.setBigUint64(l.rip,BigInt('0x'+c.pc),true);
@@ -476,6 +480,7 @@ for (const [index,c] of cases.entries()) {
  if(c.irq!==undefined)d.setUint32(l.interrupts.offset+l.interrupts.irq,c.irq+1,true);
  if(c.nmiPending)d.setUint32(l.interrupts.offset+l.interrupts.nmiPending,1,true);
  if(c.repeatBudget!==undefined)d.setBigUint64(l.repeatRemaining,BigInt(c.repeatBudget),true);
+ if(c.time){d.setBigUint64(l.time.offset+l.time.tsc,BigInt(c.time.tsc),true);d.setUint32(l.time.offset+l.time.tscAux,c.time.tscAux,true)}
  const xmmOffset=l.xmm??176,scratch=l.vectorScratch??432;
  if(c.mxcsr!==undefined)d.setUint32(l.mxcsr,Number(c.mxcsr),true);
  const read128=pointer=>(d.getBigUint64(pointer,true)|(d.getBigUint64(pointer+8,true)<<64n)).toString(16);
@@ -515,7 +520,8 @@ for (const [index,c] of cases.entries()) {
  const debug_step=(pc,resume,completed,full)=>access('debug_step',[bits(pc),bits(resume),completed,bits(full)]);
  const external_step=(pc,full,shadow)=>access('external_step',[bits(pc),bits(full),shadow]);
  const halt=full=>access('halt',[bits(full)]);
- const paging_control=(kind,register,value,pc,full,retired)=>{const result=access('paging_control',[kind,register,bits(value),bits(pc),bits(full),bits(retired)]);if(result.value!==undefined)d.setBigUint64(scratch,BigInt('0x'+result.value),true);return result.reason};
+ const paging_control=(kind,register,value,pc,full,retired)=>{const result=access('paging_control',[kind,register,bits(value),bits(pc),bits(full),bits(retired)]);if(result.value!==undefined)d.setBigUint64(scratch,BigInt('0x'+result.value),true);if(result.timeBase!==undefined)d.setBigUint64(l.time.offset+l.time.tsc,BigInt(result.timeBase),true);return result.reason};
+ const processor=(kind,eax,ecx,retired)=>{const result=access('processor',[kind,eax,ecx,bits(retired)]);if(result.words)result.words.forEach((v,i)=>d.setUint32(scratch+4*i,v,true));return result.reason};
  const protection=(op,address,input,segment)=>{const result=access('protection',[op,bits(address),bits(input),segment]);if(result.value!==undefined)d.setBigUint64(scratch,BigInt('0x'+result.value),true);d.setUint8(scratch+8,result.control??0);return result.reason};
  const float=(op,leftlo,lefthi,rightlo,righthi)=>{const result=access('float',[op,bits(leftlo),bits(lefthi),bits(rightlo),bits(righthi)]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);if(result.value!==undefined){const value=BigInt('0x'+result.value);d.setBigUint64(scratch,BigInt.asUintN(64,value),true);d.setBigUint64(scratch+8,value>>64n,true)}return result.reason};
  const load_mxcsr=(address,segment)=>{const result=access('load_mxcsr',[bits(address),segment]);if(result.mxcsr!==undefined)d.setUint32(l.mxcsr,result.mxcsr,true);return result.reason};
@@ -523,7 +529,7 @@ for (const [index,c] of cases.entries()) {
  const x87=(op,address,segment,pc,flags,rax)=>{const result=access('x87',[op,bits(address),segment,bits(pc),bits(flags),bits(rax)]);if(result.flags!==undefined)d.setBigUint64(l.flags,BigInt('0x'+result.flags),true);if(result.rax!==undefined)d.setBigUint64(l.registers,BigInt('0x'+result.rax),true);return result.reason};
  const numericState=(kind,op,address,segment)=>{const result=access(kind,[op,bits(address),segment]);for(const [bank,value] of Object.entries(result.xmmBefore??{}))assert.equal(read128(xmmOffset+16*Number(bank)),value,'live XMM before '+kind);for(const [bank,value] of Object.entries(result.xmm??{})){const raw=BigInt('0x'+value),offset=xmmOffset+16*Number(bank);d.setBigUint64(offset,BigInt.asUintN(64,raw),true);d.setBigUint64(offset+8,raw>>64n,true)}for(const [bank,value] of Object.entries(result.registers??{}))d.setBigUint64(l.registers+8*Number(bank),BigInt('0x'+value),true);return result.reason};
  const mmx=(...args)=>numericState('mmx',...args),numeric_image=(...args)=>numericState('numeric_image',...args);
- const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store,masked_store,clflush,protection,far_control,software_event,flags,debug_begin,debug_step,debug_finish,external_step,halt,paging_control,float,load_mxcsr,store_mxcsr,x87,mmx,numeric_image}});
+ const {instance}=await WebAssembly.instantiate(Uint8Array.from(c.bytes),{env:{memory,load,load_for_write,store,access_failed,segmented_access_failed,segmented_load,segmented_load_for_write,segmented_store,access_reason,target_check,multiply_high,divide,divide_failed,vector_load,vector_store,masked_store,clflush,protection,far_control,software_event,flags,debug_begin,debug_step,debug_finish,external_step,halt,paging_control,processor,float,load_mxcsr,store_mxcsr,x87,mmx,numeric_image}});
  assert.equal(instance.exports.run.length,5,'generated run ABI includes the entry index');
  const snapshot=reason=>{
   const flags=d.getBigUint64(l.flags,true);
@@ -533,6 +539,7 @@ for (const [index,c] of cases.entries()) {
    flags:flags.toString(16),pc:d.getBigUint64(l.rip,true).toString(16),
    reason,remaining:d.getBigUint64(l.remaining,true).toString(),
    ...(c.interruptibility===undefined?{}:{interruptibility:d.getUint32(l.interruptibility,true)}),
+   ...(c.time===undefined?{}:{time:{tsc:d.getBigUint64(l.time.offset+l.time.tsc,true).toString(),tscAux:d.getUint32(l.time.offset+l.time.tscAux,true)}}),
    ...(c.mxcsr===undefined?{}:{mxcsr:d.getUint32(l.mxcsr,true)}),
    ...(c.xmm===undefined?{}:{xmm:Array.from({length:16},(_,i)=>read128(xmmOffset+16*i))}),
    ...(c.x87===undefined?{}:{x87:{registers:Array.from({length:8},(_,i)=>read80(fpBase+fp.registers+10*i)),...Object.fromEntries(['controlWord','statusWord','tagWord','opcode'].map(field=>[field,d.getUint16(fpBase+fp[field],true)])),...Object.fromEntries(['instructionPointer','dataPointer'].map(field=>[field,d.getBigUint64(fpBase+fp[field],true).toString(16)]))}}),

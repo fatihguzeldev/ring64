@@ -786,6 +786,7 @@ pub enum PagingInstruction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
     Halt,
+    Processor(super::processor::Instruction),
     Paging(PagingInstruction),
     FastSystem(crate::x86::fast_system::Instruction),
     DebugRegister {

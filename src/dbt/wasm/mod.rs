@@ -17,6 +17,7 @@ mod mmx;
 mod multiply_divide;
 mod numeric_state;
 mod paging;
+mod processor;
 mod protection;
 mod software_events;
 mod stack;
@@ -96,6 +97,7 @@ struct Emitter {
     debug_step: Option<u32>,
     debug_register: Option<u32>,
     paging_control: Option<u32>,
+    processor: Option<u32>,
     fast_system: Option<u32>,
     debug_begin: Option<u32>,
     external_step: Option<u32>,
@@ -302,6 +304,10 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::FastSystem(_)));
+    let has_processor = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::Processor(_)));
     let has_system_flags = unit
         .instructions
         .iter()
@@ -447,6 +453,15 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
                 ValType::I64,
                 ValType::I64,
             ],
+            [ValType::I32],
+        );
+        next_type += 1;
+        index
+    });
+    let processor_type = has_processor.then(|| {
+        let index = next_type;
+        types.ty().function(
+            [ValType::I32, ValType::I32, ValType::I32, ValType::I64],
             [ValType::I32],
         );
         next_type += 1;
@@ -774,6 +789,12 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
         run_index += 1;
         function
     });
+    let processor = processor_type.map(|index| {
+        imports.import("env", "processor", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let debug_begin = debug_begin_type.map(|index| {
         imports.import("env", "debug_begin", EntityType::Function(index));
         let function = run_index;
@@ -880,6 +901,7 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
         debug_step,
         debug_register,
         paging_control,
+        processor,
         fast_system,
         debug_begin,
         external_step,
@@ -940,6 +962,19 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
         emitter.gates(exit_depth);
         emitter.begin(instruction.operation, exit_depth);
         match instruction.operation {
+            Operation::Processor(operation) => {
+                emitter.processor(operation, exit_depth);
+                if operation == crate::x86::processor::Instruction::Cpuid {
+                    emitter.commit(instruction.next_pc);
+                    if emitter.finish_instruction(exit_depth) {
+                        continue;
+                    }
+                    emitter.external_boundary(exit_depth);
+                    emitter.gates(exit_depth);
+                    emitter.exit(DISPATCH, exit_depth);
+                    continue;
+                }
+            }
             Operation::FastSystem(operation) => {
                 emitter.fast_system(operation, instruction.next_pc, exit_depth);
                 continue;
