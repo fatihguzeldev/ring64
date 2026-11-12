@@ -153,3 +153,68 @@ fn sparse_nominal_probe_dirties_only_a_participating_page() {
     assert_eq!(image.physical_read(0x4008, 8).unwrap(), 0x9067);
     assert_eq!(image.physical_read(0x4010, 8).unwrap(), 0xb027);
 }
+#[test]
+fn ordered_dirty_refusal_identifies_duplicate_spans_and_discards_the_failed_batch() {
+    let mut bytes = vec![0xa5; 0xc000];
+    bytes[0x1000..0x1004].copy_from_slice(&0x20023_u32.to_le_bytes());
+    bytes[0x2004..0x2008].copy_from_slice(&0xa063_u32.to_le_bytes());
+    let mapping = |base, offset, length, write| MappingInput {
+        base,
+        offset,
+        length,
+        backing: "ram".into(),
+        permissions: Permissions {
+            read: true,
+            write,
+            execute: false,
+        },
+    };
+    let mut image = Image::physical_mapped(
+        vec![("ram".into(), bytes)],
+        vec![
+            mapping(0, 0, 0xc000, true),
+            mapping(0x20000, 0x2000, 0x1000, false),
+            mapping(0x30000, 0x2000, 0x1000, true),
+        ],
+        MemoryLimits {
+            max_backing_bytes: 0xc000,
+            max_backings: 1,
+            max_mappings: 3,
+        },
+    )
+    .unwrap();
+    let state = State {
+        cr0: 0x80010033,
+        cr3: 0x1000,
+        cr4: 0x608,
+        efer: 0,
+        ..State::default()
+    };
+    let mut work = AccessState::default();
+    // The same nominal span is admitted twice under distinct captured translations.
+    Memory::new(&mut image, &state, 0, &mut work)
+        .check_system_write(0x1005, 1)
+        .unwrap();
+    image.physical_write(0x30004, 4, 0xb023).unwrap();
+    let mut memory = Memory::new(&mut image, &state, 0, &mut work);
+    memory.check_system_write(0x1005, 1).unwrap();
+    let error = memory.prepare_publication_ordered().unwrap_err();
+    assert_eq!(
+        error.index,
+        Some(1),
+        "address and width cannot identify this owner"
+    );
+    assert!(
+        matches!(error.failure, AccessFailure::Paging(Failure::Physical(f))
+        if f.linear == 0x1005 && f.phase == PhysicalPhase::DirtyWrite
+            && f.physical.address == 0x20004 && f.physical.cause == crate::memory::Cause::Permission)
+    );
+    memory.prepare_publication_ordered().unwrap();
+    assert_eq!(
+        image.physical_read(0x20004, 4).unwrap(),
+        0xb023,
+        "no stale D publication"
+    );
+    assert_eq!(image.physical_read(0xa005, 1).unwrap(), 0xa5);
+    assert_eq!(image.physical_read(0xb005, 1).unwrap(), 0xa5);
+}

@@ -1,6 +1,13 @@
 use super::context::AccessFailure;
 use crate::memory::Image;
 
+/// A refusal belongs to one captured write in the current preparation batch.
+#[derive(Clone, Copy, Debug)]
+pub struct PublicationFailure {
+    pub index: Option<usize>,
+    pub failure: AccessFailure,
+}
+
 /// Instruction and system owners share access semantics without choosing a backing plane.
 pub trait GuestMemory {
     fn fetch(&self, address: u64) -> Result<u8, AccessFailure>;
@@ -58,6 +65,14 @@ pub trait GuestMemory {
     /// Admit and apply every captured dirty update before a prepared owner's publications.
     fn prepare_publication(&mut self) -> Result<(), AccessFailure> {
         Ok(())
+    }
+    /// Preserve the failing captured write's ordinal when the memory owner has one.
+    fn prepare_publication_ordered(&mut self) -> Result<(), PublicationFailure> {
+        self.prepare_publication()
+            .map_err(|failure| PublicationFailure {
+                index: None,
+                failure,
+            })
     }
 }
 

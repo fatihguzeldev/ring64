@@ -244,15 +244,16 @@ pub fn execute_observing(
         }
     }
 
-    image.prepare_publication().map_err(|failure| {
-        if let Some(write) = code_write
-            .into_iter()
-            .chain(stack_write)
-            .find(|write| write.contains(failure))
-        {
-            system_failure(write.failure(failure))
+    image.prepare_publication_ordered().map_err(|fault| {
+        let mut descriptors = code_write.into_iter().chain(stack_write);
+        let descriptor = match fault.index {
+            Some(index) => descriptors.nth(index),
+            None => descriptors.find(|write| write.contains(fault.failure)),
+        };
+        if let Some(write) = descriptor {
+            system_failure(write.failure(fault.failure))
         } else {
-            linear_failure(failure, Segment::Ss)
+            linear_failure(fault.failure, Segment::Ss)
         }
     })?;
     for write in code_write.into_iter().chain(stack_write) {
@@ -568,3 +569,6 @@ mod gate_boundary_tests;
 
 #[cfg(test)]
 mod gate_phase_tests;
+
+#[cfg(test)]
+mod gate_paging_review_tests;

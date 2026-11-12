@@ -5,7 +5,10 @@ use super::{
     walk::{self, PhysicalPhase, Request},
 };
 use crate::memory::{Access, Image, PreparedPhysicalUpdate, PreparedPhysicalWrite, check_span};
-use crate::x86::{access::GuestMemory, context::AccessFailure};
+use crate::x86::{
+    access::{GuestMemory, PublicationFailure},
+    context::AccessFailure,
+};
 
 #[derive(Debug)]
 struct Fragment {
@@ -354,10 +357,19 @@ impl GuestMemory for Memory<'_> {
         self.capture_write(address, width, cpl == 3)
     }
     fn prepare_publication(&mut self) -> Result<(), AccessFailure> {
+        self.prepare_publication_ordered()
+            .map_err(|fault| fault.failure)
+    }
+    fn prepare_publication_ordered(&mut self) -> Result<(), PublicationFailure> {
         let pending = std::mem::take(&mut self.storage.borrow_mut().work.pending);
         let mut updates = Vec::new();
-        for prepared in &pending {
-            updates.extend(self.dirty_admission(prepared, &prepared.fields)?);
+        for (index, prepared) in pending.iter().enumerate() {
+            updates.extend(self.dirty_admission(prepared, &prepared.fields).map_err(
+                |failure| PublicationFailure {
+                    index: Some(index),
+                    failure,
+                },
+            )?);
         }
         self.dirty_publish(&updates);
         self.storage.borrow_mut().work.pending = pending
