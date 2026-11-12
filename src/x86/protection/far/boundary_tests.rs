@@ -114,7 +114,7 @@ fn direct_code_literal_privileges_distinguish_conforming_rpl_and_presence() {
 }
 
 #[test]
-fn system_target_frontier_is_not_a_fake_code_fault_or_a_gate_tail_read() {
+fn system_target_frontier_and_selected_gate_presence_skip_unselected_tails() {
     for mode in ["protected", "compatibility", "long64"] {
         for ty in 0u8..16 {
             let mut context = context(mode, 0);
@@ -137,11 +137,14 @@ fn system_target_frontier_is_not_a_fake_code_fault_or_a_gate_tail_read() {
                 0x4000,
             );
             let frontier = if mode == "protected" {
-                [1, 3, 4, 5, 9, 11, 12].contains(&ty)
+                [1, 3, 5, 9, 11].contains(&ty)
             } else {
-                ty == 12
+                false
             };
-            if frontier {
+            let gate = ty == 12 || mode == "protected" && ty == 4;
+            if gate {
+                descriptor_failure(result, 11, 8);
+            } else if frontier {
                 assert_eq!(result, Err(FarFailure::Unsupported));
             } else {
                 descriptor_failure(result, 13, 8);

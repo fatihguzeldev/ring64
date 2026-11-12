@@ -9,6 +9,8 @@ use crate::x86::context::{
 };
 use crate::x86::instruction::{FarDescriptor, FarKind, Width};
 
+mod gates;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FarOperands {
     pub offset: u64,
@@ -53,6 +55,18 @@ pub fn execute(
     descriptor: FarDescriptor,
     operands: FarOperands,
 ) -> Result<FarOutcome, FarFailure> {
+    execute_observing(context, image, descriptor, operands, |_, _, _| {})
+}
+
+/// Operand observations are tentative until this call succeeds. Metadata accesses
+/// are excluded; the caller discards the current instruction's observations on error.
+pub fn execute_observing(
+    context: &mut ExecutionContext,
+    image: &mut impl GuestMemory,
+    descriptor: FarDescriptor,
+    operands: FarOperands,
+    mut observe: impl FnMut(u64, u32, Access),
+) -> Result<FarOutcome, FarFailure> {
     if !valid_in_mode(descriptor, context) {
         return Err(FarFailure::Unsupported);
     }
@@ -66,9 +80,9 @@ pub fn execute(
     let mut restored_stack = None;
 
     let (mut pc, selector) = if descriptor.kind == FarKind::Return {
-        let pc = read_stack(context, image, old_sp, width)?;
+        let pc = read_stack(context, image, old_sp, width, &mut observe)?;
         let second = step(old_sp, size, stack_width);
-        let selector = read_stack(context, image, second, width)? as u16;
+        let selector = read_stack(context, image, second, width, &mut observe)? as u16;
         next_sp = merge(
             operands.input_sp,
             step(second, size, stack_width),
@@ -76,7 +90,7 @@ pub fn execute(
         );
         (pc, selector)
     } else if descriptor.memory {
-        let bytes = super::access::read_operand(
+        let (bytes, address) = super::access::read_operand_with_address(
             context,
             image,
             operands.offset,
@@ -84,6 +98,7 @@ pub fn execute(
             operands.segment,
         )
         .map_err(|failure| operand_failure(failure, operands.segment))?;
+        observe(address, size as u32 + 2, Access::Read);
         let mut offset = [0; 8];
         offset[..size as usize].copy_from_slice(&bytes[..size as usize]);
         (
@@ -97,7 +112,23 @@ pub fn execute(
     let code = if real {
         None
     } else {
-        Some(code(context, image, descriptor.kind, selector)?)
+        let (loaded, raw) = lookup_raw(context, image, selector)?;
+        if descriptor.kind != FarKind::Return
+            && loaded.descriptor.system()
+            && matches!(loaded.descriptor.access & 15, 4 | 12)
+        {
+            return gates::execute(
+                context,
+                image,
+                descriptor.kind,
+                operands,
+                selector,
+                loaded,
+                raw,
+                &mut observe,
+            );
+        }
+        Some(admit_code(context, descriptor.kind, selector, loaded)?)
     };
     let (mode, cpl) = match code {
         Some(code) => (
@@ -145,9 +176,9 @@ pub fn execute(
                 stack_geometry(context, cursor, u32::from(cleanup), Access::Read)?;
                 cursor = step(cursor, u64::from(cleanup), stack_width);
             }
-            let restored_sp = read_stack(context, image, cursor, width)?;
+            let restored_sp = read_stack(context, image, cursor, width, &mut observe)?;
             cursor = step(cursor, size, stack_width);
-            let restored_ss = read_stack(context, image, cursor, width)? as u16;
+            let restored_ss = read_stack(context, image, cursor, width, &mut observe)? as u16;
             let stack = stack(context, image, mode, cpl, restored_ss)?;
             let target_width = if mode == Mode::Long64 {
                 Width::W64
@@ -210,6 +241,7 @@ pub fn execute(
             image
                 .check_write(slot.address, slot.width)
                 .map_err(|failure| linear_failure(failure, Segment::Ss))?;
+            observe(slot.address, slot.width, Access::Write);
         }
     }
 
@@ -324,7 +356,7 @@ pub(super) struct Stack {
     pub loaded: Option<Loaded>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 struct Write {
     address: u64,
     width: u32,
@@ -336,14 +368,28 @@ fn lookup(
     image: &impl GuestMemory,
     selector: u16,
 ) -> Result<Loaded, FarFailure> {
+    lookup_raw(context, image, selector).map(|(loaded, _)| loaded)
+}
+
+fn lookup_raw(
+    context: &ExecutionContext,
+    image: &impl GuestMemory,
+    selector: u16,
+) -> Result<(Loaded, u64), FarFailure> {
     if selector < 4 {
         return Err(selector_fault(selector, 13, ProtectionPhase::Selector));
     }
     let lookup = Lookup::resolve(context, selector)
         .filter(|lookup| lookup.fits(8))
         .ok_or_else(|| selector_fault(selector, 13, ProtectionPhase::Selector))?;
-    let descriptor = Descriptor::decode(lookup.read(context, image, 0).map_err(system_failure)?);
-    Ok(Loaded { lookup, descriptor })
+    let raw = lookup.read(context, image, 0).map_err(system_failure)?;
+    Ok((
+        Loaded {
+            lookup,
+            descriptor: Descriptor::decode(raw),
+        },
+        raw,
+    ))
 }
 
 pub(super) fn code(
@@ -352,7 +398,15 @@ pub(super) fn code(
     kind: FarKind,
     selector: u16,
 ) -> Result<Loaded, FarFailure> {
-    let loaded = lookup(context, image, selector)?;
+    admit_code(context, kind, selector, lookup(context, image, selector)?)
+}
+
+fn admit_code(
+    context: &ExecutionContext,
+    kind: FarKind,
+    selector: u16,
+    loaded: Loaded,
+) -> Result<Loaded, FarFailure> {
     let d = loaded.descriptor;
     if !d.code() {
         if kind != FarKind::Return
@@ -444,11 +498,13 @@ fn read_stack(
     image: &impl GuestMemory,
     offset: u64,
     width: Width,
+    observe: &mut impl FnMut(u64, u32, Access),
 ) -> Result<u64, FarFailure> {
     let address = stack_geometry(context, offset, u32::from(width.bytes()), Access::Read)?;
     let bytes = image
         .read_vector(address, u32::from(width.bytes()))
         .map_err(|failure| linear_failure(failure, Segment::Ss))?;
+    observe(address, u32::from(width.bytes()), Access::Read);
     Ok(u64::from_le_bytes(bytes[..8].try_into().unwrap()))
 }
 
@@ -501,3 +557,6 @@ mod boundary_tests;
 
 #[cfg(test)]
 mod review_tests;
+
+#[cfg(test)]
+mod gate_tests;

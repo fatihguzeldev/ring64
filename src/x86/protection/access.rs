@@ -220,6 +220,16 @@ pub(super) fn read_operand(
     width: u32,
     segment: Segment,
 ) -> Result<[u8; 10], Failure> {
+    read_operand_with_address(context, image, offset, width, segment).map(|(bytes, _)| bytes)
+}
+
+pub(super) fn read_operand_with_address(
+    context: &ExecutionContext,
+    image: &impl GuestMemory,
+    offset: u64,
+    width: u32,
+    segment: Segment,
+) -> Result<([u8; 10], u64), Failure> {
     let address = context
         .translate(offset, width, segment, Access::Read, false)
         .map_err(Failure::Operand)?;
@@ -227,7 +237,7 @@ pub(super) fn read_operand(
     image
         .read_fields(address, width, &[(0, width)], &mut bytes)
         .map_err(Failure::Operand)?;
-    Ok(bytes)
+    Ok((bytes, address))
 }
 
 pub(super) fn write_operand(
