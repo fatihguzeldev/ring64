@@ -7,6 +7,7 @@ import { gatePublicationScenarios } from './publication.js';
 import { gateDebugScenarios } from './debug.js';
 import { gatePagingScenarios } from './paging.js';
 import { gateLifecycleScenarios } from './lifecycle.js';
+import { gateOperandScenarios } from './operands.js';
 import type { Scenario } from './fixture.js';
 
 export function callGateScenarios(compiler: WebAssembly.Module): Scenario[] {
@@ -20,5 +21,6 @@ export function callGateScenarios(compiler: WebAssembly.Module): Scenario[] {
     ...gateDebugScenarios(compiler),
     ...gatePagingScenarios(compiler),
     ...gateLifecycleScenarios(compiler),
+    ...gateOperandScenarios(compiler),
   ];
 }
