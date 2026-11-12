@@ -6,7 +6,7 @@ impl Core {
         &mut self,
         pc: u64,
     ) -> Result<crate::x86::instruction::Instruction, DecodeError> {
-        let paging = self.paging.expect("paged decode profile");
+        let paging = self.paging.as_ref().expect("paged decode profile");
         let context = &self.context;
         let mut consumed = Vec::new();
         decode::decode_with_profile(pc, context, true, |offset| {
@@ -23,13 +23,13 @@ impl Core {
                 user: context.cpl() == 3,
             };
             let translation =
-                paging::walk::fetch_walk(&mut self.image, &paging, request, |image| {
-                    encoding_current(image, &paging, &consumed, request.user)
+                paging::walk::fetch_walk(&mut self.image, paging, request, |image| {
+                    encoding_current(image, paging, &consumed, request.user)
                 })
                 .map_err(DecodeError::Paging)?
                 .ok_or(DecodeError::PagingRestart)?;
-            if !encoding_current(&self.image, &paging, &consumed, request.user)
-                || !paging::walk::peek(&self.image, &paging, request)
+            if !encoding_current(&self.image, paging, &consumed, request.user)
+                || !paging::walk::peek(&self.image, paging, request)
                     .is_ok_and(|fresh| fresh.physical == translation.physical)
             {
                 return Err(DecodeError::PagingRestart);
