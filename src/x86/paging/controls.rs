@@ -257,6 +257,8 @@ impl State {
         let mut entries = [0; 4];
         let root = self.cr3 & 0xffffffe0;
         for (slot, entry) in entries.iter_mut().enumerate() {
+            #[cfg(test)]
+            super::walk::physical_counts::read(8);
             *entry = image
                 .physical_read(root + slot as u64 * 8, 8)
                 .map_err(|fault| PdpteFailure::Physical {

@@ -5,6 +5,36 @@ const ADDRESS: u64 = 0x000f_ffff_ffff_f000;
 const ACCESSED: u64 = 1 << 5;
 pub const DIRTY: u64 = 1 << 6;
 
+#[cfg(test)]
+pub(super) mod physical_counts {
+    use std::cell::Cell;
+
+    // Attempted Image calls and requested byte widths, in this order:
+    // read/read-bytes, write-check/check-bytes, write/write-bytes.
+    thread_local! { static COUNTS: Cell<[u64; 6]> = const { Cell::new([0; 6]) }; }
+
+    fn record(slot: usize, width: u32) {
+        COUNTS.with(|counts| {
+            let mut current = counts.get();
+            current[slot] += 1;
+            current[slot + 1] += u64::from(width);
+            counts.set(current);
+        });
+    }
+    pub fn read(width: u32) {
+        record(0, width);
+    }
+    pub fn check(width: u32) {
+        record(2, width);
+    }
+    pub fn write(width: u32) {
+        record(4, width);
+    }
+    pub fn take() -> [u64; 6] {
+        COUNTS.with(|counts| counts.replace([0; 6]))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Request {
     pub linear: u64,
@@ -98,6 +128,8 @@ impl Request {
 
 pub fn peek(image: &Image, state: &State, request: Request) -> Result<Translation, Failure> {
     walk_with::<false, false>(state, request, |address, width, _| {
+        #[cfg(test)]
+        physical_counts::read(width);
         image.physical_read(address, width).map(Some)
     })
     .map(|translation| translation.expect("observational walk cannot restart"))
@@ -126,11 +158,19 @@ fn actual_walk<const FETCH: bool>(
 ) -> Result<Option<Translation>, Failure> {
     walk_with::<true, FETCH>(state, request, |address, width, accessed| {
         if accessed {
+            #[cfg(test)]
+            physical_counts::check(width);
             image.physical_check_write(address, width)?;
+            #[cfg(test)]
+            physical_counts::read(width);
             let current_word = image.physical_read(address, width)?;
+            #[cfg(test)]
+            physical_counts::write(width);
             image.physical_write(address, width, current_word | ACCESSED)?;
             Ok(current(image).then_some(current_word | ACCESSED))
         } else {
+            #[cfg(test)]
+            physical_counts::read(width);
             image.physical_read(address, width).map(Some)
         }
     })
@@ -669,6 +709,216 @@ mod tests {
             trace::<true, false>(&state, &warm, geometry, &reads);
             trace::<true, true>(&state, &warm, geometry, &reads);
         }
+    }
+
+    #[test]
+    fn actual_physical_walk_calls_have_literal_width_and_effect_counts() {
+        fn image(words: &[(u64, u64)], width: usize, warm: bool, length: usize) -> Image {
+            let mut bytes = vec![0; length];
+            for &(address, word) in words {
+                let word = word | if warm { 0x20 } else { 0 };
+                bytes[address as usize..address as usize + width]
+                    .copy_from_slice(&word.to_le_bytes()[..width]);
+            }
+            Image::physical_mapped(
+                vec![("tables".into(), bytes)],
+                vec![MappingInput {
+                    base: 0,
+                    backing: "tables".into(),
+                    offset: 0,
+                    length: length as u32,
+                    permissions: Permissions {
+                        read: true,
+                        write: true,
+                        execute: false,
+                    },
+                }],
+                MemoryLimits {
+                    max_backings: 1,
+                    max_mappings: 1,
+                    max_backing_bytes: length as u32,
+                },
+            )
+            .unwrap()
+        }
+        // Counts are explicit Image read/read-bytes, write-check/check-bytes,
+        // write/write-bytes calls in this owner, not full-engine instrumentation.
+        // FETCH uses a no-op encoding-currentness callback. Payload/D work and
+        // any nested embedding encoding checks are outside these measurements.
+        let cases = [
+            (
+                State {
+                    cr3: 0x1000,
+                    ..State::default()
+                },
+                0x1234,
+                vec![
+                    (0x1000, 0x2007),
+                    (0x2000, 0x3007),
+                    (0x3000, 0x4007),
+                    (0x4008, 0xa007),
+                ],
+                8,
+                0xa234,
+                [4, 32, 0, 0, 0, 0],
+                [8, 64, 4, 32, 4, 32],
+                [18, 144, 4, 32, 4, 32],
+            ),
+            (
+                State {
+                    cr0: 0x80000033,
+                    cr2: 0,
+                    cr3: 0x1020,
+                    cr4: 0x628,
+                    efer: 0,
+                    pdpte: Some([0x3001, 0, 0, 0]),
+                },
+                0x1234,
+                vec![(0x3000, 0x4007), (0x4008, 0xa007)],
+                8,
+                0xa234,
+                [2, 16, 0, 0, 0, 0],
+                [4, 32, 2, 16, 2, 16],
+                [7, 56, 2, 16, 2, 16],
+            ),
+            (
+                State {
+                    cr0: 0x80000033,
+                    cr2: 0,
+                    cr3: 0x1000,
+                    cr4: 0x608,
+                    efer: 0,
+                    pdpte: None,
+                },
+                0x1234,
+                vec![(0x1000, 0x4007), (0x4004, 0xa007)],
+                4,
+                0xa234,
+                [2, 8, 0, 0, 0, 0],
+                [4, 16, 2, 8, 2, 8],
+                [7, 28, 2, 8, 2, 8],
+            ),
+            (
+                State {
+                    cr0: 0x80000033,
+                    cr2: 0,
+                    cr3: 0x1000,
+                    cr4: 0x618,
+                    efer: 0,
+                    pdpte: None,
+                },
+                0x400004,
+                vec![(0x1004, 0x2087)],
+                4,
+                0x100000004,
+                [1, 4, 0, 0, 0, 0],
+                [2, 8, 1, 4, 1, 4],
+                [3, 12, 1, 4, 1, 4],
+            ),
+            (
+                State {
+                    cr0: 0x80000033,
+                    cr2: 0,
+                    cr3: 0x1020,
+                    cr4: 0x628,
+                    efer: 0,
+                    pdpte: Some([0x3001, 0, 0, 0]),
+                },
+                0x200004,
+                vec![(0x3008, 0x400087)],
+                8,
+                0x400004,
+                [1, 8, 0, 0, 0, 0],
+                [2, 16, 1, 8, 1, 8],
+                [3, 24, 1, 8, 1, 8],
+            ),
+            (
+                State {
+                    cr3: 0xdead000,
+                    cr4: 0x620,
+                    efer: 0x100,
+                    ..State::reset()
+                },
+                0x1234,
+                vec![],
+                8,
+                0x1234,
+                [0; 6],
+                [0; 6],
+                [0; 6],
+            ),
+        ];
+        for (state, linear, words, width, physical, warm, cold, coherent) in cases {
+            let request = Request {
+                linear,
+                access: Access::Read,
+                user: true,
+            };
+            let mut actual = image(&words, width, false, 0x6000);
+            physical_counts::take();
+            assert_eq!(peek(&actual, &state, request).unwrap().physical, physical);
+            assert_eq!(
+                physical_counts::take(),
+                warm,
+                "observational cold table reads"
+            );
+            assert_eq!(
+                walk(&mut actual, &state, request).unwrap().physical,
+                physical
+            );
+            assert_eq!(
+                physical_counts::take(),
+                cold,
+                "actual current-word A effects"
+            );
+            assert_eq!(
+                walk(&mut actual, &state, request).unwrap().physical,
+                physical
+            );
+            assert_eq!(physical_counts::take(), warm, "warm walk skips A updates");
+            assert_eq!(
+                fetch_walk(&mut actual, &state, request, |_| true)
+                    .unwrap()
+                    .unwrap()
+                    .physical,
+                physical
+            );
+            assert_eq!(
+                physical_counts::take(),
+                warm,
+                "warm FETCH skips hierarchy rereads"
+            );
+            let mut actual = image(&words, width, false, 0x6000);
+            assert_eq!(
+                fetch_walk(&mut actual, &state, request, |_| true)
+                    .unwrap()
+                    .unwrap()
+                    .physical,
+                physical
+            );
+            assert_eq!(
+                physical_counts::take(),
+                coherent,
+                "cold FETCH includes hierarchy rereads"
+            );
+        }
+        let quartet = [0x1001, 0xfffffffffffffffe, 0, 0x2001];
+        let words: Vec<_> = quartet
+            .into_iter()
+            .enumerate()
+            .map(|(slot, word)| (0x5fe0 + slot as u64 * 8, word))
+            .collect();
+        let state = State {
+            cr3: 0x5fe0,
+            ..State::reset()
+        };
+        let actual = image(&words, 8, false, 0x6000);
+        assert_eq!(state.load_pdpte(&actual).unwrap(), quartet);
+        assert_eq!(
+            physical_counts::take(),
+            [4, 32, 0, 0, 0, 0],
+            "captured quartet has four exact reads and no A/D"
+        );
     }
 }
 
