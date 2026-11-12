@@ -83,11 +83,11 @@ pub(super) fn execute(
     image: &mut impl GuestMemory,
     kind: FarKind,
     operands: FarOperands,
-    gate_selector: u16,
     gate: Loaded,
     raw: u64,
     observe: &mut impl FnMut(u64, u32, Access),
 ) -> Result<FarOutcome, FarFailure> {
+    let gate_selector = gate.lookup.selector;
     let wide = ia32e(context);
     let gate_kind = gate.descriptor.access & 15;
     if wide && gate_kind != 12 {

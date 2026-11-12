@@ -122,7 +122,6 @@ pub fn execute_observing(
                 image,
                 descriptor.kind,
                 operands,
-                selector,
                 loaded,
                 raw,
                 &mut observe,
@@ -566,3 +565,6 @@ mod gate_review_tests;
 
 #[cfg(test)]
 mod gate_boundary_tests;
+
+#[cfg(test)]
+mod gate_phase_tests;
