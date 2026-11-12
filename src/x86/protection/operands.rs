@@ -2,7 +2,7 @@
 // slots. Descriptor metadata and event-entry frame writes are separate traffic.
 use super::super::debug::State;
 use super::*;
-use crate::x86::instruction::{FarDescriptor, FarKind, SoftwareEventDescriptor, SoftwareEventKind};
+use crate::x86::instruction::{SoftwareEventDescriptor, SoftwareEventKind};
 
 fn operand(
     bank: &State,
@@ -37,60 +37,6 @@ pub fn protection(
         _ => return 0,
     };
     operand(bank, before, offset, width, segment, access)
-}
-
-pub fn far(
-    bank: &State,
-    before: &ExecutionContext,
-    after: &ExecutionContext,
-    descriptor: FarDescriptor,
-    offset: u64,
-    sp: u64,
-    segment: Segment,
-) -> u8 {
-    let size = u64::from(descriptor.width.bytes());
-    let mask = before.stack_width().mask();
-    let mut slots = if descriptor.memory {
-        operand(bank, before, offset, size as u32 + 2, segment, Access::Read)
-    } else {
-        0
-    };
-    if descriptor.kind == FarKind::Call {
-        for index in 1..=2 {
-            slots |= operand(
-                bank,
-                before,
-                sp.wrapping_sub(index * size) & mask,
-                size as u32,
-                Segment::Ss,
-                Access::Write,
-            );
-        }
-    } else if descriptor.kind == FarKind::Return {
-        for index in 0..2 {
-            slots |= operand(
-                bank,
-                before,
-                sp.wrapping_add(index * size) & mask,
-                size as u32,
-                Segment::Ss,
-                Access::Read,
-            );
-        }
-        if after.cpl() > before.cpl() {
-            for index in 2..4 {
-                slots |= operand(
-                    bank,
-                    before,
-                    sp.wrapping_add(index * size).wrapping_add(offset) & mask,
-                    size as u32,
-                    Segment::Ss,
-                    Access::Read,
-                );
-            }
-        }
-    }
-    slots
 }
 
 pub fn iret(

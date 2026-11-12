@@ -69,20 +69,28 @@ fn core_far_control_impl<const OBSERVED: bool, const PAGED: bool>(
             (*core.state.get()).target = 0;
             (*core.state.get()).fault_segment = segment as u32;
         }
-        let before = OBSERVED.then(|| core.context.clone());
-        let outcome = match guest_semantics!(
-            core,
-            PAGED,
-            far::execute,
-            descriptor,
-            FarOperands {
-                offset,
-                selector: selector as u16,
-                input_sp,
-                next_pc,
-                segment,
-            },
-        ) {
+        let operands = FarOperands {
+            offset,
+            selector: selector as u16,
+            input_sp,
+            next_pc,
+            segment,
+        };
+        let mut candidate = 0;
+        let result = if OBSERVED {
+            let bank = unsafe { (*core.state.get()).debug.registers };
+            guest_semantics!(
+                core,
+                PAGED,
+                far::execute_observing,
+                descriptor,
+                operands,
+                |address, width, access| candidate |= bank.matches(address, width, access),
+            )
+        } else {
+            guest_semantics!(core, PAGED, far::execute, descriptor, operands)
+        };
+        let outcome = match result {
             Err(FarFailure::SystemPaging(fault)) => return core.system_paging_failure(fault),
             Ok(outcome) => outcome,
             Err(FarFailure::Operand { segment, failure }) => {
@@ -125,17 +133,9 @@ fn core_far_control_impl<const OBSERVED: bool, const PAGED: bool>(
             }
             Err(FarFailure::Unsupported) => return UNSUPPORTED,
         };
-        if let Some(before) = before {
-            core.debug_candidate |= crate::x86::protection::operands::far(
-                unsafe { &(*core.state.get()).debug.registers },
-                &before,
-                &core.context,
-                descriptor,
-                offset,
-                input_sp,
-                segment,
-            );
-        }
+        // A failed transfer never publishes tentative operand hits. The semantic
+        // owner supplies captured linear addresses across both stack contexts.
+        core.debug_candidate |= candidate;
         unsafe {
             let scratch = &mut (*core.state.get()).vector_scratch;
             scratch[..8].copy_from_slice(&outcome.pc.to_le_bytes());
