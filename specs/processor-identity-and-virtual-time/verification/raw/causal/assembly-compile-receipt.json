@@ -1,0 +1,169 @@
+{
+  "mode": "off-timing-compile-only-assembly",
+  "node": "v22.16.0",
+  "capturedModuleHashesMatchPriorReceipts": true,
+  "uniqueModules": 8,
+  "captureReport": "/tmp/ring64-x87-assembly-capture.json",
+  "records": [
+    {
+      "workload": "mmx",
+      "variant": "as-is",
+      "sha256": "309b142e8ee4e4488e708a3716861b225d415139cd0a01338f26e717583a34ba",
+      "bytes": 1113,
+      "assembly": "/tmp/ring64-x87-assembly-modules/mmx-as-is.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/309b142e8ee4e4488e708a3716861b225d415139cd0a01338f26e717583a34ba.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true
+    },
+    {
+      "workload": "mmx",
+      "variant": "future-bias",
+      "sha256": "5a1f015906a92582b7a8d30845f50b706da437e8320aa288f61ffbe673216833",
+      "bytes": 1125,
+      "assembly": "/tmp/ring64-x87-assembly-modules/mmx-future-bias.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/5a1f015906a92582b7a8d30845f50b706da437e8320aa288f61ffbe673216833.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true
+    },
+    {
+      "workload": "mmx",
+      "variant": "move-after-publication",
+      "sha256": "2ea1e092f4f54e818c5dbaccf85f39ea72b512363732c5f94bf8264832d32691",
+      "bytes": 1113,
+      "assembly": "/tmp/ring64-x87-assembly-modules/mmx-move-after-publication.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/2ea1e092f4f54e818c5dbaccf85f39ea72b512363732c5f94bf8264832d32691.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true
+    },
+    {
+      "workload": "mmx",
+      "variant": "omit",
+      "sha256": "79faccfe4bb1085721c74d1a37000af1715c1d52798296860f691e6bb018c3aa",
+      "bytes": 1095,
+      "assembly": "/tmp/ring64-x87-assembly-modules/mmx-omit.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/79faccfe4bb1085721c74d1a37000af1715c1d52798296860f691e6bb018c3aa.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true
+    },
+    {
+      "workload": "x87",
+      "variant": "as-is",
+      "sha256": "c3e174d9eb3a460152f4f623486164d842af11d7cf0a4bf7435015cbf0cb52a0",
+      "bytes": 1101,
+      "assembly": "/tmp/ring64-x87-assembly-modules/x87-as-is.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/c3e174d9eb3a460152f4f623486164d842af11d7cf0a4bf7435015cbf0cb52a0.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true
+    },
+    {
+      "workload": "x87",
+      "variant": "future-bias",
+      "sha256": "4de39e07c1c7b95e136085f0e8ad38240647a198a41a6738c777f3ee3095c824",
+      "bytes": 1113,
+      "assembly": "/tmp/ring64-x87-assembly-modules/x87-future-bias.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/4de39e07c1c7b95e136085f0e8ad38240647a198a41a6738c777f3ee3095c824.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true
+    },
+    {
+      "workload": "x87",
+      "variant": "move-after-publication",
+      "sha256": "cf3bcc098f1852481e38907b84e116698cd13f1dd89ae889cd4cb0aa4d9455e6",
+      "bytes": 1101,
+      "assembly": "/tmp/ring64-x87-assembly-modules/x87-move-after-publication.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/cf3bcc098f1852481e38907b84e116698cd13f1dd89ae889cd4cb0aa4d9455e6.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true
+    },
+    {
+      "workload": "x87",
+      "variant": "omit",
+      "sha256": "85bc5d291732fbce834bd42291f4f0d849a79f63e41a7d071867c7a5c8e710a8",
+      "bytes": 1083,
+      "assembly": "/tmp/ring64-x87-assembly-modules/x87-omit.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/85bc5d291732fbce834bd42291f4f0d849a79f63e41a7d071867c7a5c8e710a8.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true
+    }
+  ]
+}

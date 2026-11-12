@@ -1,0 +1,1166 @@
+{
+  "mode": "off-timing-generated-module-TurboFan-static-audit",
+  "node": "v22.16.0",
+  "hostISA": "arm64",
+  "captureReceipt": "/tmp/ring64-x87-assembly-capture.json",
+  "compileReceipt": "/tmp/ring64-x87-assembly-compile-receipt.json",
+  "capturedModuleHashesMatchPriorReceipts": true,
+  "productionSourceModified": false,
+  "records": [
+    {
+      "workload": "mmx",
+      "variant": "as-is",
+      "sha256": "309b142e8ee4e4488e708a3716861b225d415139cd0a01338f26e717583a34ba",
+      "bytes": 1113,
+      "assembly": "/tmp/ring64-x87-assembly-modules/mmx-as-is.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/309b142e8ee4e4488e708a3716861b225d415139cd0a01338f26e717583a34ba.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true,
+      "assemblySha256": "398028b2481ec36e0f8a67f2696caec0a48a1a047725332a9e825350a778997b",
+      "frameAllocationAfterFixed32BytePrologue": 224,
+      "bodyBytesIncludingPadding": 1856,
+      "bodyBytesBeforePadding": 1840,
+      "instructionBytes": 1820,
+      "hotSpan": {
+        "start": "0x130",
+        "backedge": "0x3a8",
+        "staticSpan": {
+          "instructions": 159,
+          "loads": 37,
+          "stores": 15,
+          "spLoads": 20,
+          "spStores": 9,
+          "indirectCalls": 2,
+          "histogram": {
+            "movz": 14,
+            "str": 10,
+            "mov": 15,
+            "ldr": 22,
+            "ldur": 9,
+            "cmp": 12,
+            "b.ls": 1,
+            "b.hs": 1,
+            "adr": 1,
+            "add": 4,
+            "br": 1,
+            "b": 9,
+            "cbz": 7,
+            "cset": 9,
+            "tst": 7,
+            "b.ne": 8,
+            "ldrh": 6,
+            "bic": 2,
+            "eor": 1,
+            "strh": 5,
+            "and": 2,
+            "sub": 6,
+            "nop": 1,
+            "movk": 2,
+            "blr": 2,
+            "orr": 2
+          }
+        }
+      },
+      "normalRecurringCycle": {
+        "instructions": 149,
+        "loads": 37,
+        "stores": 11,
+        "spLoads": 20,
+        "spStores": 5,
+        "indirectCalls": 2,
+        "histogram": {
+          "movz": 14,
+          "str": 6,
+          "mov": 14,
+          "ldr": 22,
+          "ldur": 9,
+          "cmp": 12,
+          "b.ls": 1,
+          "b.hs": 1,
+          "adr": 1,
+          "add": 4,
+          "br": 1,
+          "b": 5,
+          "cbz": 7,
+          "cset": 9,
+          "tst": 7,
+          "b.ne": 8,
+          "ldrh": 6,
+          "bic": 2,
+          "eor": 1,
+          "strh": 5,
+          "and": 2,
+          "sub": 6,
+          "movk": 2,
+          "blr": 2,
+          "orr": 2
+        },
+        "method": "CFG path: dispatcher case0; conditional forward fault/budget/debug/numeric-admission exits not taken; unconditional branches followed; recurring backedge taken. Imported helper internals and stack-check slow paths excluded. This is not measured dynamic instruction retirement.",
+        "pathFile": "/tmp/ring64-x87-assembly-modules/mmx-as-is.normal-cycle.txt",
+        "shapeFile": "/tmp/ring64-x87-assembly-modules/mmx-as-is.normal-cycle.shape.txt",
+        "stackSlotNameMap": {
+          "48": "S0",
+          "16": "S1",
+          "88": "S2",
+          "80": "S3",
+          "56": "S4",
+          "64": "S5",
+          "40": "S6",
+          "216": "S7",
+          "224": "S8",
+          "32": "S9",
+          "24": "S10"
+        }
+      },
+      "originalBudget": {
+        "wasmParameter": 1,
+        "incomingArm64Register": "x2",
+        "savedStackOffset": 72,
+        "allSlotAccesses": [
+          {
+            "offset": "0x18",
+            "instruction": "str x2, [sp, #72]"
+          },
+          {
+            "offset": "0x5e0",
+            "instruction": "ldr x13, [sp, #72]"
+          },
+          {
+            "offset": "0x6b8",
+            "instruction": "ldr x2, [sp, #72]"
+          }
+        ],
+        "recurringLoopSlotAccesses": 0
+      }
+    },
+    {
+      "workload": "mmx",
+      "variant": "future-bias",
+      "sha256": "5a1f015906a92582b7a8d30845f50b706da437e8320aa288f61ffbe673216833",
+      "bytes": 1125,
+      "assembly": "/tmp/ring64-x87-assembly-modules/mmx-future-bias.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/5a1f015906a92582b7a8d30845f50b706da437e8320aa288f61ffbe673216833.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true,
+      "assemblySha256": "a36374b1b66a3644e0f20e1ed417d32badbb7f9561415af1f003e0c9e429aabe",
+      "frameAllocationAfterFixed32BytePrologue": 208,
+      "bodyBytesIncludingPadding": 1824,
+      "bodyBytesBeforePadding": 1796,
+      "instructionBytes": 1776,
+      "hotSpan": {
+        "start": "0x130",
+        "backedge": "0x3a8",
+        "staticSpan": {
+          "instructions": 159,
+          "loads": 37,
+          "stores": 15,
+          "spLoads": 20,
+          "spStores": 9,
+          "indirectCalls": 2,
+          "histogram": {
+            "movz": 14,
+            "str": 10,
+            "mov": 15,
+            "ldr": 22,
+            "ldur": 9,
+            "cmp": 12,
+            "b.ls": 1,
+            "b.hs": 1,
+            "adr": 1,
+            "add": 4,
+            "br": 1,
+            "b": 9,
+            "cbz": 7,
+            "cset": 9,
+            "tst": 7,
+            "b.ne": 8,
+            "ldrh": 6,
+            "bic": 2,
+            "eor": 1,
+            "strh": 5,
+            "and": 2,
+            "sub": 6,
+            "nop": 1,
+            "movk": 2,
+            "blr": 2,
+            "orr": 2
+          }
+        }
+      },
+      "normalRecurringCycle": {
+        "instructions": 149,
+        "loads": 37,
+        "stores": 11,
+        "spLoads": 20,
+        "spStores": 5,
+        "indirectCalls": 2,
+        "histogram": {
+          "movz": 14,
+          "str": 6,
+          "mov": 14,
+          "ldr": 22,
+          "ldur": 9,
+          "cmp": 12,
+          "b.ls": 1,
+          "b.hs": 1,
+          "adr": 1,
+          "add": 4,
+          "br": 1,
+          "b": 5,
+          "cbz": 7,
+          "cset": 9,
+          "tst": 7,
+          "b.ne": 8,
+          "ldrh": 6,
+          "bic": 2,
+          "eor": 1,
+          "strh": 5,
+          "and": 2,
+          "sub": 6,
+          "movk": 2,
+          "blr": 2,
+          "orr": 2
+        },
+        "method": "CFG path: dispatcher case0; conditional forward fault/budget/debug/numeric-admission exits not taken; unconditional branches followed; recurring backedge taken. Imported helper internals and stack-check slow paths excluded. This is not measured dynamic instruction retirement.",
+        "pathFile": "/tmp/ring64-x87-assembly-modules/mmx-future-bias.normal-cycle.txt",
+        "shapeFile": "/tmp/ring64-x87-assembly-modules/mmx-future-bias.normal-cycle.shape.txt",
+        "stackSlotNameMap": {
+          "40": "S0",
+          "8": "S1",
+          "72": "S2",
+          "64": "S3",
+          "48": "S4",
+          "56": "S5",
+          "32": "S6",
+          "200": "S7",
+          "208": "S8",
+          "24": "S9",
+          "16": "S10"
+        }
+      },
+      "originalBudget": {
+        "identityCeiling": "original B is consumed at entry (future-bias) or dead after initialization (omit); entry physical slot reuse is not a B spill trace"
+      }
+    },
+    {
+      "workload": "mmx",
+      "variant": "move-after-publication",
+      "sha256": "2ea1e092f4f54e818c5dbaccf85f39ea72b512363732c5f94bf8264832d32691",
+      "bytes": 1113,
+      "assembly": "/tmp/ring64-x87-assembly-modules/mmx-move-after-publication.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/2ea1e092f4f54e818c5dbaccf85f39ea72b512363732c5f94bf8264832d32691.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true,
+      "assemblySha256": "b1c151ca6c4324a1afd20549d67cc0a2c02d94b2f25fc5c7f8c5922da904b539",
+      "frameAllocationAfterFixed32BytePrologue": 224,
+      "bodyBytesIncludingPadding": 1856,
+      "bodyBytesBeforePadding": 1840,
+      "instructionBytes": 1820,
+      "hotSpan": {
+        "start": "0x130",
+        "backedge": "0x3a8",
+        "staticSpan": {
+          "instructions": 159,
+          "loads": 37,
+          "stores": 15,
+          "spLoads": 20,
+          "spStores": 9,
+          "indirectCalls": 2,
+          "histogram": {
+            "movz": 14,
+            "str": 10,
+            "mov": 15,
+            "ldr": 22,
+            "ldur": 9,
+            "cmp": 12,
+            "b.ls": 1,
+            "b.hs": 1,
+            "adr": 1,
+            "add": 4,
+            "br": 1,
+            "b": 9,
+            "cbz": 7,
+            "cset": 9,
+            "tst": 7,
+            "b.ne": 8,
+            "ldrh": 6,
+            "bic": 2,
+            "eor": 1,
+            "strh": 5,
+            "and": 2,
+            "sub": 6,
+            "nop": 1,
+            "movk": 2,
+            "blr": 2,
+            "orr": 2
+          }
+        }
+      },
+      "normalRecurringCycle": {
+        "instructions": 149,
+        "loads": 37,
+        "stores": 11,
+        "spLoads": 20,
+        "spStores": 5,
+        "indirectCalls": 2,
+        "histogram": {
+          "movz": 14,
+          "str": 6,
+          "mov": 14,
+          "ldr": 22,
+          "ldur": 9,
+          "cmp": 12,
+          "b.ls": 1,
+          "b.hs": 1,
+          "adr": 1,
+          "add": 4,
+          "br": 1,
+          "b": 5,
+          "cbz": 7,
+          "cset": 9,
+          "tst": 7,
+          "b.ne": 8,
+          "ldrh": 6,
+          "bic": 2,
+          "eor": 1,
+          "strh": 5,
+          "and": 2,
+          "sub": 6,
+          "movk": 2,
+          "blr": 2,
+          "orr": 2
+        },
+        "method": "CFG path: dispatcher case0; conditional forward fault/budget/debug/numeric-admission exits not taken; unconditional branches followed; recurring backedge taken. Imported helper internals and stack-check slow paths excluded. This is not measured dynamic instruction retirement.",
+        "pathFile": "/tmp/ring64-x87-assembly-modules/mmx-move-after-publication.normal-cycle.txt",
+        "shapeFile": "/tmp/ring64-x87-assembly-modules/mmx-move-after-publication.normal-cycle.shape.txt",
+        "stackSlotNameMap": {
+          "48": "S0",
+          "16": "S1",
+          "80": "S2",
+          "72": "S3",
+          "56": "S4",
+          "64": "S5",
+          "40": "S6",
+          "208": "S7",
+          "224": "S8",
+          "32": "S9",
+          "24": "S10"
+        }
+      },
+      "originalBudget": {
+        "wasmParameter": 1,
+        "incomingArm64Register": "x2",
+        "savedStackOffset": 216,
+        "allSlotAccesses": [
+          {
+            "offset": "0x18",
+            "instruction": "str x2, [sp, #216]"
+          },
+          {
+            "offset": "0x688",
+            "instruction": "ldr x1, [sp, #216]"
+          },
+          {
+            "offset": "0x6b8",
+            "instruction": "ldr x2, [sp, #216]"
+          }
+        ],
+        "recurringLoopSlotAccesses": 0
+      }
+    },
+    {
+      "workload": "mmx",
+      "variant": "omit",
+      "sha256": "79faccfe4bb1085721c74d1a37000af1715c1d52798296860f691e6bb018c3aa",
+      "bytes": 1095,
+      "assembly": "/tmp/ring64-x87-assembly-modules/mmx-omit.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/79faccfe4bb1085721c74d1a37000af1715c1d52798296860f691e6bb018c3aa.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true,
+      "assemblySha256": "46b5862777fe215f39b2fdb6ee60f43b82a1ae2eb3b633a971ef4f78c0680a45",
+      "frameAllocationAfterFixed32BytePrologue": 208,
+      "bodyBytesIncludingPadding": 1888,
+      "bodyBytesBeforePadding": 1876,
+      "instructionBytes": 1856,
+      "hotSpan": {
+        "start": "0x130",
+        "backedge": "0x3a0",
+        "staticSpan": {
+          "instructions": 157,
+          "loads": 36,
+          "stores": 13,
+          "spLoads": 19,
+          "spStores": 7,
+          "indirectCalls": 2,
+          "histogram": {
+            "movz": 14,
+            "str": 8,
+            "mov": 17,
+            "ldr": 21,
+            "ldur": 9,
+            "cmp": 12,
+            "b.ls": 1,
+            "b.hs": 1,
+            "adr": 1,
+            "add": 4,
+            "br": 1,
+            "b": 7,
+            "cbz": 7,
+            "cset": 9,
+            "tst": 7,
+            "b.ne": 8,
+            "ldrh": 6,
+            "bic": 2,
+            "eor": 1,
+            "strh": 5,
+            "and": 2,
+            "sub": 6,
+            "nop": 2,
+            "movk": 2,
+            "blr": 2,
+            "orr": 2
+          }
+        }
+      },
+      "normalRecurringCycle": {
+        "instructions": 150,
+        "loads": 36,
+        "stores": 11,
+        "spLoads": 19,
+        "spStores": 5,
+        "indirectCalls": 2,
+        "histogram": {
+          "movz": 14,
+          "str": 6,
+          "mov": 16,
+          "ldr": 21,
+          "ldur": 9,
+          "cmp": 12,
+          "b.ls": 1,
+          "b.hs": 1,
+          "adr": 1,
+          "add": 4,
+          "br": 1,
+          "b": 3,
+          "cbz": 7,
+          "cset": 9,
+          "tst": 7,
+          "b.ne": 8,
+          "ldrh": 6,
+          "bic": 2,
+          "eor": 1,
+          "strh": 5,
+          "and": 2,
+          "sub": 6,
+          "nop": 2,
+          "movk": 2,
+          "blr": 2,
+          "orr": 2
+        },
+        "method": "CFG path: dispatcher case0; conditional forward fault/budget/debug/numeric-admission exits not taken; unconditional branches followed; recurring backedge taken. Imported helper internals and stack-check slow paths excluded. This is not measured dynamic instruction retirement.",
+        "pathFile": "/tmp/ring64-x87-assembly-modules/mmx-omit.normal-cycle.txt",
+        "shapeFile": "/tmp/ring64-x87-assembly-modules/mmx-omit.normal-cycle.shape.txt",
+        "stackSlotNameMap": {
+          "40": "S0",
+          "8": "S1",
+          "72": "S2",
+          "64": "S3",
+          "56": "S4",
+          "32": "S5",
+          "48": "S6",
+          "200": "S7",
+          "208": "S8",
+          "24": "S9",
+          "16": "S10"
+        }
+      },
+      "originalBudget": {
+        "identityCeiling": "original B is consumed at entry (future-bias) or dead after initialization (omit); entry physical slot reuse is not a B spill trace"
+      }
+    },
+    {
+      "workload": "x87",
+      "variant": "as-is",
+      "sha256": "c3e174d9eb3a460152f4f623486164d842af11d7cf0a4bf7435015cbf0cb52a0",
+      "bytes": 1101,
+      "assembly": "/tmp/ring64-x87-assembly-modules/x87-as-is.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/c3e174d9eb3a460152f4f623486164d842af11d7cf0a4bf7435015cbf0cb52a0.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true,
+      "assemblySha256": "fae16c85d4a5b36635570bcbaf8d3382fe024b45f91865204bd947d04ef583ce",
+      "frameAllocationAfterFixed32BytePrologue": 224,
+      "bodyBytesIncludingPadding": 2208,
+      "bodyBytesBeforePadding": 2192,
+      "instructionBytes": 2172,
+      "hotSpan": {
+        "start": "0x130",
+        "backedge": "0x4ec",
+        "staticSpan": {
+          "instructions": 240,
+          "loads": 66,
+          "stores": 12,
+          "spLoads": 45,
+          "spStores": 12,
+          "indirectCalls": 5,
+          "histogram": {
+            "movz": 23,
+            "str": 12,
+            "mov": 40,
+            "ldr": 45,
+            "ldur": 21,
+            "cmp": 19,
+            "b.ls": 1,
+            "b.hs": 1,
+            "adr": 1,
+            "add": 1,
+            "br": 1,
+            "b": 11,
+            "nop": 2,
+            "cbz": 11,
+            "cset": 16,
+            "tst": 6,
+            "b.ne": 7,
+            "movk": 5,
+            "blr": 5,
+            "orr": 5,
+            "sub": 7
+          }
+        }
+      },
+      "normalRecurringCycle": {
+        "instructions": 222,
+        "loads": 61,
+        "stores": 7,
+        "spLoads": 40,
+        "spStores": 7,
+        "indirectCalls": 5,
+        "histogram": {
+          "movz": 23,
+          "str": 7,
+          "mov": 39,
+          "ldr": 40,
+          "ldur": 21,
+          "cmp": 19,
+          "b.ls": 1,
+          "b.hs": 1,
+          "adr": 1,
+          "add": 1,
+          "br": 1,
+          "b": 6,
+          "cbz": 11,
+          "cset": 16,
+          "tst": 6,
+          "b.ne": 7,
+          "movk": 5,
+          "blr": 5,
+          "orr": 5,
+          "sub": 7
+        },
+        "method": "CFG path: dispatcher case0; conditional forward fault/budget/debug/numeric-admission exits not taken; unconditional branches followed; recurring backedge taken. Imported helper internals and stack-check slow paths excluded. This is not measured dynamic instruction retirement.",
+        "pathFile": "/tmp/ring64-x87-assembly-modules/x87-as-is.normal-cycle.txt",
+        "shapeFile": "/tmp/ring64-x87-assembly-modules/x87-as-is.normal-cycle.shape.txt",
+        "stackSlotNameMap": {
+          "64": "S0",
+          "16": "S1",
+          "88": "S2",
+          "56": "S3",
+          "40": "S4",
+          "216": "S5",
+          "224": "S6",
+          "32": "S7",
+          "24": "S8"
+        }
+      },
+      "originalBudget": {
+        "wasmParameter": 1,
+        "incomingArm64Register": "x2",
+        "savedStackOffset": 72,
+        "allSlotAccesses": [
+          {
+            "offset": "0x18",
+            "instruction": "str x2, [sp, #72]"
+          },
+          {
+            "offset": "0x748",
+            "instruction": "ldr x13, [sp, #72]"
+          },
+          {
+            "offset": "0x820",
+            "instruction": "ldr x2, [sp, #72]"
+          }
+        ],
+        "recurringLoopSlotAccesses": 0
+      }
+    },
+    {
+      "workload": "x87",
+      "variant": "future-bias",
+      "sha256": "4de39e07c1c7b95e136085f0e8ad38240647a198a41a6738c777f3ee3095c824",
+      "bytes": 1113,
+      "assembly": "/tmp/ring64-x87-assembly-modules/x87-future-bias.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/4de39e07c1c7b95e136085f0e8ad38240647a198a41a6738c777f3ee3095c824.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true,
+      "assemblySha256": "7c032525ee8074fa48480dca7c96e80d1081ac0718bdd2bf7c4d2d5951115887",
+      "frameAllocationAfterFixed32BytePrologue": 208,
+      "bodyBytesIncludingPadding": 2016,
+      "bodyBytesBeforePadding": 2000,
+      "instructionBytes": 1980,
+      "hotSpan": {
+        "start": "0x130",
+        "backedge": "0x4bc",
+        "staticSpan": {
+          "instructions": 228,
+          "loads": 66,
+          "stores": 12,
+          "spLoads": 45,
+          "spStores": 12,
+          "indirectCalls": 5,
+          "histogram": {
+            "mov": 25,
+            "movz": 23,
+            "str": 12,
+            "ldr": 45,
+            "ldur": 21,
+            "cmp": 19,
+            "b.ls": 1,
+            "b.hs": 1,
+            "adr": 1,
+            "add": 1,
+            "br": 1,
+            "b": 11,
+            "nop": 5,
+            "cbz": 11,
+            "cset": 16,
+            "tst": 6,
+            "b.ne": 7,
+            "movk": 5,
+            "blr": 5,
+            "orr": 5,
+            "sub": 7
+          }
+        }
+      },
+      "normalRecurringCycle": {
+        "instructions": 207,
+        "loads": 61,
+        "stores": 7,
+        "spLoads": 40,
+        "spStores": 7,
+        "indirectCalls": 5,
+        "histogram": {
+          "mov": 24,
+          "movz": 23,
+          "str": 7,
+          "ldr": 40,
+          "ldur": 21,
+          "cmp": 19,
+          "b.ls": 1,
+          "b.hs": 1,
+          "adr": 1,
+          "add": 1,
+          "br": 1,
+          "b": 6,
+          "cbz": 11,
+          "cset": 16,
+          "tst": 6,
+          "b.ne": 7,
+          "movk": 5,
+          "blr": 5,
+          "orr": 5,
+          "sub": 7
+        },
+        "method": "CFG path: dispatcher case0; conditional forward fault/budget/debug/numeric-admission exits not taken; unconditional branches followed; recurring backedge taken. Imported helper internals and stack-check slow paths excluded. This is not measured dynamic instruction retirement.",
+        "pathFile": "/tmp/ring64-x87-assembly-modules/x87-future-bias.normal-cycle.txt",
+        "shapeFile": "/tmp/ring64-x87-assembly-modules/x87-future-bias.normal-cycle.shape.txt",
+        "stackSlotNameMap": {
+          "56": "S0",
+          "8": "S1",
+          "72": "S2",
+          "48": "S3",
+          "32": "S4",
+          "200": "S5",
+          "208": "S6",
+          "24": "S7",
+          "16": "S8"
+        }
+      },
+      "originalBudget": {
+        "identityCeiling": "original B is consumed at entry (future-bias) or dead after initialization (omit); entry physical slot reuse is not a B spill trace"
+      }
+    },
+    {
+      "workload": "x87",
+      "variant": "move-after-publication",
+      "sha256": "cf3bcc098f1852481e38907b84e116698cd13f1dd89ae889cd4cb0aa4d9455e6",
+      "bytes": 1101,
+      "assembly": "/tmp/ring64-x87-assembly-modules/x87-move-after-publication.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/cf3bcc098f1852481e38907b84e116698cd13f1dd89ae889cd4cb0aa4d9455e6.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true,
+      "assemblySha256": "6c91f5e260e8a4fafe9f480387aa2e32f1317e430f63b379abf084adeb59e142",
+      "frameAllocationAfterFixed32BytePrologue": 224,
+      "bodyBytesIncludingPadding": 2208,
+      "bodyBytesBeforePadding": 2192,
+      "instructionBytes": 2172,
+      "hotSpan": {
+        "start": "0x130",
+        "backedge": "0x4ec",
+        "staticSpan": {
+          "instructions": 240,
+          "loads": 66,
+          "stores": 12,
+          "spLoads": 45,
+          "spStores": 12,
+          "indirectCalls": 5,
+          "histogram": {
+            "movz": 23,
+            "str": 12,
+            "mov": 40,
+            "ldr": 45,
+            "ldur": 21,
+            "cmp": 19,
+            "b.ls": 1,
+            "b.hs": 1,
+            "adr": 1,
+            "add": 1,
+            "br": 1,
+            "b": 11,
+            "nop": 2,
+            "cbz": 11,
+            "cset": 16,
+            "tst": 6,
+            "b.ne": 7,
+            "movk": 5,
+            "blr": 5,
+            "orr": 5,
+            "sub": 7
+          }
+        }
+      },
+      "normalRecurringCycle": {
+        "instructions": 222,
+        "loads": 61,
+        "stores": 7,
+        "spLoads": 40,
+        "spStores": 7,
+        "indirectCalls": 5,
+        "histogram": {
+          "movz": 23,
+          "str": 7,
+          "mov": 39,
+          "ldr": 40,
+          "ldur": 21,
+          "cmp": 19,
+          "b.ls": 1,
+          "b.hs": 1,
+          "adr": 1,
+          "add": 1,
+          "br": 1,
+          "b": 6,
+          "cbz": 11,
+          "cset": 16,
+          "tst": 6,
+          "b.ne": 7,
+          "movk": 5,
+          "blr": 5,
+          "orr": 5,
+          "sub": 7
+        },
+        "method": "CFG path: dispatcher case0; conditional forward fault/budget/debug/numeric-admission exits not taken; unconditional branches followed; recurring backedge taken. Imported helper internals and stack-check slow paths excluded. This is not measured dynamic instruction retirement.",
+        "pathFile": "/tmp/ring64-x87-assembly-modules/x87-move-after-publication.normal-cycle.txt",
+        "shapeFile": "/tmp/ring64-x87-assembly-modules/x87-move-after-publication.normal-cycle.shape.txt",
+        "stackSlotNameMap": {
+          "64": "S0",
+          "16": "S1",
+          "72": "S2",
+          "56": "S3",
+          "40": "S4",
+          "208": "S5",
+          "224": "S6",
+          "32": "S7",
+          "24": "S8"
+        }
+      },
+      "originalBudget": {
+        "wasmParameter": 1,
+        "incomingArm64Register": "x2",
+        "savedStackOffset": 216,
+        "allSlotAccesses": [
+          {
+            "offset": "0x18",
+            "instruction": "str x2, [sp, #216]"
+          },
+          {
+            "offset": "0x7f0",
+            "instruction": "ldr x1, [sp, #216]"
+          },
+          {
+            "offset": "0x820",
+            "instruction": "ldr x2, [sp, #216]"
+          }
+        ],
+        "recurringLoopSlotAccesses": 0
+      }
+    },
+    {
+      "workload": "x87",
+      "variant": "omit",
+      "sha256": "85bc5d291732fbce834bd42291f4f0d849a79f63e41a7d071867c7a5c8e710a8",
+      "bytes": 1083,
+      "assembly": "/tmp/ring64-x87-assembly-modules/x87-omit.asm.txt",
+      "argv": [
+        "node",
+        "--no-liftoff",
+        "--no-wasm-lazy-compilation",
+        "--print-wasm-code-function-index=4",
+        "--code-comments",
+        "--input-type=module",
+        "-e",
+        "import {readFile} from 'node:fs/promises'; const bytes=await readFile(process.argv[1]); if(!WebAssembly.validate(bytes))throw Error('invalid captured unit'); await WebAssembly.compile(bytes); console.log('COMPILE_ONLY_OK');",
+        "/tmp/ring64-x87-assembly-modules/85bc5d291732fbce834bd42291f4f0d849a79f63e41a7d071867c7a5c8e710a8.wasm"
+      ],
+      "status": 0,
+      "freshNodeCompileOnly": true,
+      "assemblySha256": "820ba999fef118c30deb921d9024c4be0e86d0135b224c4fd8c313ea58e78dd4",
+      "frameAllocationAfterFixed32BytePrologue": 208,
+      "bodyBytesIncludingPadding": 2208,
+      "bodyBytesBeforePadding": 2204,
+      "instructionBytes": 2184,
+      "hotSpan": {
+        "start": "0x130",
+        "backedge": "0x4e4",
+        "staticSpan": {
+          "instructions": 238,
+          "loads": 66,
+          "stores": 12,
+          "spLoads": 45,
+          "spStores": 12,
+          "indirectCalls": 5,
+          "histogram": {
+            "movz": 23,
+            "str": 12,
+            "mov": 35,
+            "ldr": 45,
+            "ldur": 21,
+            "cmp": 19,
+            "b.ls": 1,
+            "b.hs": 1,
+            "adr": 1,
+            "add": 1,
+            "br": 1,
+            "b": 11,
+            "nop": 5,
+            "cbz": 11,
+            "cset": 16,
+            "tst": 6,
+            "b.ne": 7,
+            "movk": 5,
+            "blr": 5,
+            "orr": 5,
+            "sub": 7
+          }
+        }
+      },
+      "normalRecurringCycle": {
+        "instructions": 217,
+        "loads": 61,
+        "stores": 7,
+        "spLoads": 40,
+        "spStores": 7,
+        "indirectCalls": 5,
+        "histogram": {
+          "movz": 23,
+          "str": 7,
+          "mov": 34,
+          "ldr": 40,
+          "ldur": 21,
+          "cmp": 19,
+          "b.ls": 1,
+          "b.hs": 1,
+          "adr": 1,
+          "add": 1,
+          "br": 1,
+          "b": 6,
+          "cbz": 11,
+          "cset": 16,
+          "tst": 6,
+          "b.ne": 7,
+          "movk": 5,
+          "blr": 5,
+          "orr": 5,
+          "sub": 7
+        },
+        "method": "CFG path: dispatcher case0; conditional forward fault/budget/debug/numeric-admission exits not taken; unconditional branches followed; recurring backedge taken. Imported helper internals and stack-check slow paths excluded. This is not measured dynamic instruction retirement.",
+        "pathFile": "/tmp/ring64-x87-assembly-modules/x87-omit.normal-cycle.txt",
+        "shapeFile": "/tmp/ring64-x87-assembly-modules/x87-omit.normal-cycle.shape.txt",
+        "stackSlotNameMap": {
+          "56": "S0",
+          "8": "S1",
+          "64": "S2",
+          "48": "S3",
+          "32": "S4",
+          "200": "S5",
+          "208": "S6",
+          "24": "S7",
+          "16": "S8"
+        }
+      },
+      "originalBudget": {
+        "identityCeiling": "original B is consumed at entry (future-bias) or dead after initialization (omit); entry physical slot reuse is not a B spill trace"
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "workload": "x87",
+      "variant": "omit",
+      "sameNormalizedRecurringShape": false,
+      "normalCycleCountDelta": {
+        "instructions": -5,
+        "loads": 0,
+        "stores": 0,
+        "spLoads": 0,
+        "spStores": 0,
+        "indirectCalls": 0
+      },
+      "normalizedDiff": "/tmp/ring64-x87-assembly-modules/x87-as-is-vs-omit.shape.diff.txt"
+    },
+    {
+      "workload": "x87",
+      "variant": "move-after-publication",
+      "sameNormalizedRecurringShape": true,
+      "normalCycleCountDelta": {
+        "instructions": 0,
+        "loads": 0,
+        "stores": 0,
+        "spLoads": 0,
+        "spStores": 0,
+        "indirectCalls": 0
+      },
+      "normalizedDiff": "/tmp/ring64-x87-assembly-modules/x87-as-is-vs-move-after-publication.shape.diff.txt"
+    },
+    {
+      "workload": "x87",
+      "variant": "future-bias",
+      "sameNormalizedRecurringShape": false,
+      "normalCycleCountDelta": {
+        "instructions": -15,
+        "loads": 0,
+        "stores": 0,
+        "spLoads": 0,
+        "spStores": 0,
+        "indirectCalls": 0
+      },
+      "normalizedDiff": "/tmp/ring64-x87-assembly-modules/x87-as-is-vs-future-bias.shape.diff.txt"
+    },
+    {
+      "workload": "mmx",
+      "variant": "omit",
+      "sameNormalizedRecurringShape": false,
+      "normalCycleCountDelta": {
+        "instructions": 1,
+        "loads": -1,
+        "stores": 0,
+        "spLoads": -1,
+        "spStores": 0,
+        "indirectCalls": 0
+      },
+      "normalizedDiff": "/tmp/ring64-x87-assembly-modules/mmx-as-is-vs-omit.shape.diff.txt"
+    },
+    {
+      "workload": "mmx",
+      "variant": "move-after-publication",
+      "sameNormalizedRecurringShape": false,
+      "normalCycleCountDelta": {
+        "instructions": 0,
+        "loads": 0,
+        "stores": 0,
+        "spLoads": 0,
+        "spStores": 0,
+        "indirectCalls": 0
+      },
+      "normalizedDiff": "/tmp/ring64-x87-assembly-modules/mmx-as-is-vs-move-after-publication.shape.diff.txt"
+    },
+    {
+      "workload": "mmx",
+      "variant": "future-bias",
+      "sameNormalizedRecurringShape": false,
+      "normalCycleCountDelta": {
+        "instructions": 0,
+        "loads": 0,
+        "stores": 0,
+        "spLoads": 0,
+        "spStores": 0,
+        "indirectCalls": 0
+      },
+      "normalizedDiff": "/tmp/ring64-x87-assembly-modules/mmx-as-is-vs-future-bias.shape.diff.txt"
+    }
+  ],
+  "conclusions": [
+    "As-is and move retain original B in one saved stack slot; only entry store, common epilogue reload and entry stack-check slow-path reload access that slot. There are zero accesses in the recurring hot span. Physical x2 reuse in helper calls does not preserve original-B identity.",
+    "Retaining B increases frame allocation by16 bytes compared with omit/future-bias in these compiled units. This establishes a frame-layout difference, not repeated B spill traffic or a performance cause.",
+    "The x87 nonfaulting recurring CFG path has 222 instructions as-is/move,217 omit,207 future-bias. The15-instruction future reduction is exactly15 fewer MOVs; the unchanged61 loads/7stores include40 stack loads/7stack stores. This supports a changed register-shuffle realization, while the isolated timing does not establish a speedup.",
+    "No timer data is produced by this audit. Prior symmetric same-Core counterfactual timing did not show improvement for omit/move/future versus as-is; static instruction/frame differences cannot establish an optimization or explain the historical whole-Core timing gap.",
+    "No production code rewrite or IR-allocation-trace escalation is justified by this particular hypothesis: recurring original-B-slot traffic is absent."
+  ],
+  "abiEvidence": {
+    "nodeTag": "v22.16.0",
+    "sourceVerifiedReadOnlyWith": "git show v22.16.0:<path> in /Users/fatihguzel/node",
+    "registerSource": "https://github.com/nodejs/node/blob/v22.16.0/deps/v8/src/wasm/wasm-linkage.h#L55-L61",
+    "locationSource": "https://github.com/nodejs/node/blob/v22.16.0/deps/v8/src/compiler/wasm-compiler-definitions.h#L108-L130",
+    "arm64GpParameters": [
+      "x7",
+      "x0",
+      "x2",
+      "x3",
+      "x4",
+      "x5",
+      "x6"
+    ],
+    "generatedSignature": [
+      "i32 state",
+      "i64 B",
+      "i64 stop",
+      "i32 stopFlag",
+      "i32 entry"
+    ],
+    "mapping": {
+      "implicitInstance": "x7",
+      "state": "x0",
+      "B": "x2",
+      "stop": "x3",
+      "stopFlag": "x4",
+      "entry": "x5"
+    }
+  },
+  "registerSwapEvidence": {
+    "path": "/tmp/ring64-x87-post-helper-register-windows.json",
+    "asIsAndMovePostHelperSwap": [
+      "mov x16, x8",
+      "mov x8, x9",
+      "mov x9, x16"
+    ],
+    "swapStartingOffsets": [
+      "0x200",
+      "0x2a4",
+      "0x350",
+      "0x3f8",
+      "0x4a0"
+    ],
+    "futureBiasDifference": "15 fewer MOV instructions over the nonfaulting recurring x87 CFG path; memory-operation counts unchanged. These are generated-code consequences of the source transformation, not proven timing causes."
+  },
+  "workingTreeAtAuditCompletion": [],
+  "originalHashedTimingHarness": {
+    "path": "/tmp/ring64-x87-counterfactual.mjs",
+    "sha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998",
+    "unchangedMatchesAllSevenReports": true,
+    "reports": [
+      {
+        "report": "/Users/fatihguzel/ring64/build/verification/identity-time-cf-aa-node.json",
+        "harnessSha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998",
+        "matchesUnchangedOriginalHarness": true
+      },
+      {
+        "report": "/Users/fatihguzel/ring64/build/verification/identity-time-cf-future-primary-node.json",
+        "harnessSha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998",
+        "matchesUnchangedOriginalHarness": true
+      },
+      {
+        "report": "/Users/fatihguzel/ring64/build/verification/identity-time-cf-future-reverse-node.json",
+        "harnessSha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998",
+        "matchesUnchangedOriginalHarness": true
+      },
+      {
+        "report": "/Users/fatihguzel/ring64/build/verification/identity-time-cf-move-primary-node.json",
+        "harnessSha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998",
+        "matchesUnchangedOriginalHarness": true
+      },
+      {
+        "report": "/Users/fatihguzel/ring64/build/verification/identity-time-cf-move-reverse-node.json",
+        "harnessSha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998",
+        "matchesUnchangedOriginalHarness": true
+      },
+      {
+        "report": "/Users/fatihguzel/ring64/build/verification/identity-time-cf-omit-primary-node.json",
+        "harnessSha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998",
+        "matchesUnchangedOriginalHarness": true
+      },
+      {
+        "report": "/Users/fatihguzel/ring64/build/verification/identity-time-cf-omit-reverse-node.json",
+        "harnessSha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998",
+        "matchesUnchangedOriginalHarness": true
+      }
+    ]
+  }
+}

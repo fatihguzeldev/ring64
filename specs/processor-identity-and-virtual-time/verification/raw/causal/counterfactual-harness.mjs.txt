@@ -1,0 +1,233 @@
+import { readFile, readdir, writeFile, mkdir } from 'node:fs/promises';
+import { resolve, dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
+
+const args = process.argv.slice(2);
+const flags = new Set(['--run', '--plan', '--reverse', '--aa']);
+const values = {};
+for (let i = 0; i < args.length; i++) {
+  if (flags.has(args[i])) continue;
+  if (!['--repo', '--snapshot', '--variant', '--iterations', '--samples', '--old-baseline', '--output'].includes(args[i]) || args[i + 1] === undefined || args[i + 1].startsWith('--'))
+    throw Error(`unknown/incomplete argument ${args[i]}`);
+  values[args[i].slice(2)] = args[++i];
+}
+const repo = resolve(values.repo ?? '/Users/fatihguzel/ring64');
+const snapshot = resolve(values.snapshot ?? resolve(repo, 'build/verification/identity-time-final-2f94b0d'));
+const variant = values.variant ?? 'future-bias';
+if (!['omit', 'move-after-publication', 'future-bias'].includes(variant)) throw Error('unknown variant');
+const knobs = { iterations: Number(values.iterations ?? 1000001), samples: Number(values.samples ?? 17), workloads: ['x87-stack-churn', 'mmx-x87-emms'], reverse: args.includes('--reverse') };
+if (!Number.isSafeInteger(knobs.iterations) || knobs.iterations < 1 || knobs.iterations > 1000001 || !Number.isSafeInteger(knobs.samples) || knobs.samples < 1 || knobs.samples > 101) throw Error('invalid experiment work caps');
+const aa = args.includes('--aa');
+const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const encode = (value) => JSON.stringify(value, (_, item) => typeof item === 'bigint' ? item.toString() : item, 2) + '\n';
+const check = (ok, message) => { if (!ok) throw Error(message); };
+const concat = (...arrays) => Uint8Array.from(arrays.flatMap((x) => Array.from(x)));
+const hex = (bytes) => Buffer.from(bytes).toString('hex');
+const uleb = (input) => {
+  check(Number.isSafeInteger(input) && input >= 0 && input <= 0xffffffff, 'ULEB input outside u32');
+  const bytes = []; let value = input;
+  do { const low = value % 128; value = Math.floor(value / 128); bytes.push(low | (value ? 128 : 0)); } while (value);
+  return Uint8Array.from(bytes);
+};
+function readUleb(bytes, start) {
+  let value = 0, scale = 1;
+  for (let i = 0; i < 5; i++, scale *= 128) {
+    const byte = bytes[start + i]; check(byte !== undefined, 'truncated ULEB'); value += (byte & 127) * scale;
+    if (!(byte & 128)) { check(value <= 0xffffffff, 'ULEB overflow'); return { value, next: start + i + 1 }; }
+  }
+  throw Error('overlong ULEB');
+}
+function readString(bytes, start) {
+  const n = readUleb(bytes, start), end = n.next + n.value;
+  check(end <= bytes.length, 'truncated string');
+  return { value: new TextDecoder().decode(bytes.subarray(n.next, end)), next: end };
+}
+function sections(bytes) {
+  check(hex(bytes.subarray(0, 8)) === '0061736d01000000', 'unexpected module header');
+  const found = [], seen = new Set(); let at = 8;
+  while (at < bytes.length) {
+    const start = at, id = bytes[at++], n = readUleb(bytes, at), end = n.next + n.value;
+    check(end <= bytes.length, 'truncated section');
+    if (id) { check(!seen.has(id), 'duplicate section'); seen.add(id); }
+    found.push({ id, start, payload: n.next, end }); at = end;
+  }
+  return found;
+}
+function patternOffsets(bytes, needle) {
+  const offsets = [];
+  for (let at = 0; at <= bytes.length - needle.length; at++) {
+    if (needle.every((value, index) => bytes[at + index] === value)) offsets.push(at);
+  }
+  return offsets;
+}
+function unique(bytes, needle, name) {
+  const offsets = patternOffsets(bytes, needle);
+  check(offsets.length === 1, `${name}: expected unique exact pattern, got ${offsets.length}`);
+  return offsets[0];
+}
+const get = (local) => [0x20, ...uleb(local)];
+const set = (local) => [0x21, ...uleb(local)];
+const mem = (opcode, offset) => [opcode, 3, ...uleb(offset)];
+const TIME = 768, B = 1, R = 23, REASON = 25;
+const epilogue = concat(get(0), get(0), mem(0x29, TIME), get(B), get(R), [0x7d, 0x7c], mem(0x37, TIME));
+const entry = concat(get(B), set(R));
+const futureEntry = concat(get(0), get(0), mem(0x29, TIME), get(B), [0x7c], mem(0x37, TIME));
+const futureExit = concat(get(0), get(0), mem(0x29, TIME), get(R), [0x7d], mem(0x37, TIME));
+const suffix = concat(get(REASON), [0x0b]);
+check(epilogue.length === 18 && suffix.length === 3, 'unexpected chosen encoding');
+
+// Only the generated run function is admitted. The full Core is never rewritten.
+function parseUnit(bytes) {
+  check(WebAssembly.validate(bytes), 'original generated unit is invalid');
+  const ss = sections(bytes), find = (id) => { const s = ss.find((s) => s.id === id); check(s, `missing section${id}`); return bytes.subarray(s.payload, s.end); };
+  const typeBytes = find(1), types = []; let p = readUleb(typeBytes, 0); const typeCount = p.value; let at = p.next;
+  for (let i = 0; i < typeCount; i++) {
+    check(typeBytes[at++] === 0x60, 'only plain function types expected');
+    p = readUleb(typeBytes, at); at = p.next; const params = Array.from(typeBytes.subarray(at, at + p.value)); at += p.value;
+    p = readUleb(typeBytes, at); at = p.next; const returns = Array.from(typeBytes.subarray(at, at + p.value)); at += p.value;
+    types.push({ params, returns });
+  }
+  check(at === typeBytes.length, 'type section tail');
+  const f = find(3), fnCount = readUleb(f, 0); check(fnCount.value === 1, 'expected exactly one defined run function');
+  const fnType = readUleb(f, fnCount.next); check(fnType.next === f.length, 'function section tail');
+  const signature = types[fnType.value];
+  check(JSON.stringify(signature?.params) === JSON.stringify([0x7f, 0x7e, 0x7e, 0x7f, 0x7f]) && signature.returns.length === 1 && signature.returns[0] === 0x7f, 'unexpected five-argument run ABI');
+  const imports = find(2), importNames = []; p = readUleb(imports, 0); at = p.next;
+  for (let i = 0; i < p.value; i++) {
+    let item = readString(imports, at); at = item.next; const module = item.value;
+    item = readString(imports, at); at = item.next; const name = item.value, kind = imports[at++];
+    importNames.push(`${module}.${name}`);
+    if (kind === 0) at = readUleb(imports, at).next;
+    else if (kind === 2) { const flags = readUleb(imports, at); at = flags.next; check(!(flags.value & ~1), 'unexpected memory import flags'); at = readUleb(imports, at).next; if (flags.value & 1) at = readUleb(imports, at).next; }
+    else throw Error('unexpected generated import kind');
+  }
+  check(at === imports.length, 'import section tail');
+  check(!importNames.some((s) => /\.(processor|paging_control)$/.test(s)), 'counterfactual scope excludes timestamp and MSR helpers');
+  const code = ss.find((s) => s.id === 10); check(code, 'missing CodeSection');
+  const payload = bytes.subarray(code.payload, code.end), count = readUleb(payload, 0); check(count.value === 1, 'expected one code body');
+  const n = readUleb(payload, count.next), body = payload.subarray(n.next, n.next + n.value); check(n.next + n.value === payload.length, 'code body tail');
+  p = readUleb(body, 0); at = p.next; const locals = signature.params.slice();
+  for (let i = 0; i < p.value; i++) { const group = readUleb(body, at); at = group.next; const type = body[at++]; check(group.value < 10000, 'excessive local group'); locals.push(...Array(group.value).fill(type)); }
+  check(locals[R] === 0x7e && locals[REASON] === 0x7f, 'live R/reason local types do not match the validated source contract');
+  return { ss, code, body, declarationsEnd: at, imports: importNames, signature, localCount: locals.length };
+}
+function patchUnit(bytes, mode) {
+  const unit = parseUnit(bytes), original = unit.body, code = original.subarray(unit.declarationsEnd);
+  const where = unique(code, epilogue, '18-byte clock epilogue'), load = unique(code, entry, 'entry B-to-R load');
+  check(hex(code.subarray(-3)) === hex(suffix), 'final LocalGet REASON25/End suffix changed');
+  check(load + entry.length < where, 'entry load must precede common publication');
+  check(JSON.stringify(patternOffsets(code, Uint8Array.from(get(B)))) === JSON.stringify([load, where + 8]), 'B must be used only by the entry load and original epilogue');
+  let changed = code;
+  if (mode === 'omit') changed = concat(code.subarray(0, where), code.subarray(where + epilogue.length));
+  else if (mode === 'move-after-publication') {
+    const removed = concat(code.subarray(0, where), code.subarray(where + epilogue.length));
+    changed = concat(removed.subarray(0, -3), epilogue, removed.subarray(-3));
+  } else if (mode === 'future-bias') {
+    changed = concat(code.subarray(0, load + entry.length), futureEntry, code.subarray(load + entry.length, where), futureExit, code.subarray(where + epilogue.length));
+    check(patternOffsets(changed, epilogue).length === 0, 'old epilogue survived future rebase');
+    check(JSON.stringify(patternOffsets(changed, Uint8Array.from(get(B)))) === JSON.stringify([load, load + entry.length + 8]), 'future B use escaped the entry credit');
+  } else check(mode === 'as-is', 'unknown patch mode');
+  const body = concat(original.subarray(0, unit.declarationsEnd), changed);
+  const payload = concat(uleb(1), uleb(body.length), body);
+  const output = concat(bytes.subarray(0, unit.code.start), [10], uleb(payload.length), payload, bytes.subarray(unit.code.end));
+  check(WebAssembly.validate(output), `${mode}: patched generated module is invalid`);
+  const oldNonCode = unit.ss.filter((s) => s.id !== 10).map((s) => hash(bytes.subarray(s.start, s.end)));
+  const newNonCode = sections(output).filter((s) => s.id !== 10).map((s) => hash(output.subarray(s.start, s.end)));
+  check(JSON.stringify(oldNonCode) === JSON.stringify(newNonCode), 'non-Code sections changed');
+  if (mode === 'as-is') check(hash(output) === hash(bytes), 'symmetric as-is wrapper changed bytes');
+  return { output, proof: { mode, originalSha256: hash(bytes), compiledSha256: hash(output), originalBytes: bytes.length, compiledBytes: output.length, originalBodyBytes: original.length, compiledBodyBytes: body.length, epilogueInstructionOffset: where, entryInstructionOffset: load, nonCodeSectionsUnchanged: true, originalValidated: true, compiledValidated: true, imports: unit.imports } };
+}
+const layoutPath = resolve(repo, 'build/verification/identity-time-characterization-validation-node.json');
+const layoutBytes = await readFile(layoutPath), layoutReceipt = JSON.parse(layoutBytes);
+check(JSON.stringify(layoutReceipt.transport.timeBank) === JSON.stringify({ offset: 768, size: 16, tsc: 0, tscAux: 8 }), 'authoritative time layout receipt changed');
+const manifestPath = resolve(repo, 'build/verification/identity-time-final-manifest.json');
+const manifest = JSON.parse(await readFile(manifestPath));
+const sourceFiles = async (directory, suffix) => Object.fromEntries(await Promise.all((await readdir(directory)).filter((s) => s.endsWith(suffix)).sort().map(async (name) => [name, hash(await readFile(resolve(directory, name)))])));
+const identity = async (path) => ({ coreSha256: hash(await readFile(resolve(path, 'build/ring64.wasm'))), hostFiles: await sourceFiles(resolve(path, 'build/host'), '.js'), benchmarkFiles: await sourceFiles(resolve(path, 'benchmarks'), '.mjs') });
+const before = await identity(snapshot);
+check(before.coreSha256 === manifest.coreSha256 && before.coreSha256 === layoutReceipt.manifest.coreSha256, 'frozen Core does not match the validated a2ac7c build');
+for (const file of manifest.hostFiles) check(before.hostFiles[file.name] === file.sha256, `frozen host file changed: ${file.name}`);
+const harnessHash = hash(await readFile(new URL(import.meta.url)));
+const plan = { mode: 'prepared-only-no-engine-or-guest-execution', snapshot, variant, aa, knobs, source: manifest.source, identity: before, harnessSha256: harnessHash, layoutReceipt: { path: layoutPath, sha256: hash(layoutBytes), transport: layoutReceipt.transport }, encodings: { originalEpilogue: hex(epilogue), entryRemaining: hex(entry), futureEntry: hex(futureEntry), futureExit: hex(futureExit), finalSuffix: hex(suffix) }, patchScope: 'Only generated run-function CodeSection/body lengths and instructions; original Core, host, imports, exports, locals, owner/source proofs and metadata byte accounting remain unchanged.', comparisonScope: 'as-is versus selected generated-code variant in the same frozen Core/host; primary/reverse and independent as-is/as-is AA. Benchmark later cutoff sample>=4.', ceilings: ['omit is diagnostic only and deliberately violates the clock contract', 'future-bias is admitted only for the two fixed non-timestamp workloads; no shipping correctness claim', 'recorded resource/unit byte counts remain original owner metadata; compiled byte lengths are recorded separately', 'all setup and ordinary benchmark semantic guards remain unchanged; extra time-bank guard is deferred until the first post-run public guard access'] };
+if (!args.includes('--run')) { const output = resolve(values.output ?? '/tmp/ring64-x87-counterfactual-plan.json'); await writeFile(output, encode(plan)); console.log({ output, mode: plan.mode }); process.exit(0); }
+check(!args.includes('--plan'), '--plan and --run are mutually exclusive');
+const originalCompile = WebAssembly.compile;
+// Compile Core(s) before installing any generated-module wrapper.
+const compiler = await originalCompile(await readFile(resolve(snapshot, 'build/ring64.wasm')));
+const { createCpu } = await import(pathToFileURL(resolve(snapshot, 'build/host/index.js')));
+const { measure } = await import(pathToFileURL(resolve(snapshot, 'benchmarks/kernels.mjs')));
+const old = values['old-baseline'] ? resolve(values['old-baseline']) : undefined;
+const oldIdentity = old ? await identity(old) : undefined;
+const oldCompiler = old ? await originalCompile(await readFile(resolve(old, 'build/ring64.wasm'))) : undefined;
+const oldFactory = old ? (await import(pathToFileURL(resolve(old, 'build/host/index.js')))).createCpu : undefined;
+let active;
+const modules = [], runs = [], fixtures = [];
+function side(label, mode) {
+  return { label, compiler, async createCpu(options) {
+    const cpu = await createCpu(options), id = fixtures.length;
+    const { compiler: ignored, ...plain } = options;
+    const fixture = { id, label, mode, options: structuredClone(plain), setup: [], calls: 0, retired: 0n, pending: undefined };
+    fixtures.push(fixture);
+    const flush = () => {
+      if (!fixture.pending) return;
+      const time = cpu.readTimeState(), expected = mode === 'omit' ? 0n : fixture.retired;
+      check(time.tsc === BigInt.asUintN(64, expected) && time.tscAux === 0, `${label} non-timestamp clock boundary disagrees`);
+      runs.push({ ...fixture.pending, time, diagnosticClockContract: mode !== 'omit' }); fixture.pending = undefined;
+    };
+    return new Proxy(cpu, { get(target, key) {
+      if (key !== 'run') flush();
+      const value = Reflect.get(target, key, target);
+      if (key === 'run') return async (runOptions) => {
+        check(!fixture.pending, 'prior post-run clock guard was not observed'); check(active === undefined && WebAssembly.compile === originalCompile, 'overlapping/global compile wrapper');
+        const ordinal = fixture.calls++;
+        active = { id, label, mode, ordinal };
+        WebAssembly.compile = async (input, ...rest) => {
+          check(active?.id === id, 'compile escaped its run scope');
+          const bytes = ArrayBuffer.isView(input) ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength).slice() : new Uint8Array(input).slice();
+          const patched = patchUnit(bytes, mode); modules.push({ ...active, ...patched.proof });
+          return originalCompile(patched.output, ...rest);
+        };
+        try { const result = await target.run(runOptions); fixture.retired += result.retired; fixture.pending = { id, label, mode, ordinal, retired: result.retired }; return result; }
+        finally { WebAssembly.compile = originalCompile; active = undefined; }
+      };
+      if (typeof value !== 'function') return value;
+      return (...callArgs) => {
+        if (fixture.calls === 0 && ['writeMemory', 'setState', 'setXmmState', 'setMxcsr', 'setX87State'].includes(key)) fixture.setup.push([key, structuredClone(callArgs)]);
+        return value.apply(target, callArgs);
+      };
+    } });
+  } };
+}
+const result = await measure([side('baseline', 'as-is'), side('current', aa ? 'as-is' : variant)], knobs);
+check(result.unavailable.length === 0, 'selected benchmark workload was unavailable');
+check(WebAssembly.compile === originalCompile && active === undefined, 'compile wrapper was not restored');
+const oldUnits = [];
+if (old) {
+  const uniqueFixtures = new Map(fixtures.filter((f) => f.label === 'baseline').map((f) => [hex(f.options.code.bytes), f]));
+  for (const [guestHex, f] of uniqueFixtures) {
+    const cpu = await oldFactory({ ...structuredClone(f.options), compiler: oldCompiler });
+    try {
+      for (const [key, callArgs] of f.setup) cpu[key](...structuredClone(callArgs));
+      check(active === undefined && WebAssembly.compile === originalCompile, 'old capture overlaps a run');
+      WebAssembly.compile = async (input, ...rest) => {
+        const bytes = ArrayBuffer.isView(input) ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength).slice() : new Uint8Array(input).slice();
+        const parsed = parseUnit(bytes); check(patternOffsets(parsed.body, epilogue).length === 0, 'old unit unexpectedly has the new epilogue');
+        oldUnits.push({ guestHex, sha256: hash(bytes), bytes: bytes.length, validated: true, diagnosticOnly: true });
+        return originalCompile(bytes, ...rest);
+      };
+      const capture = await cpu.run({ budget: 1n, repeatBudget: 0n }); check(capture.reason === 'budget' && capture.retired === 1n, 'old off-comparison capture did not complete one instruction');
+    } finally { WebAssembly.compile = originalCompile; cpu.dispose(); }
+  }
+}
+check(JSON.stringify(await identity(snapshot)) === JSON.stringify(before), 'frozen Core/host/benchmark sources changed');
+if (old) check(JSON.stringify(await identity(old)) === JSON.stringify(oldIdentity), 'old frozen inputs changed');
+check(hash(await readFile(new URL(import.meta.url))) === harnessHash, 'experiment harness changed');
+for (const m of modules) {
+  const f = fixtures.find((f) => f.id === m.id), prior = oldUnits.find((o) => o.guestHex === hex(f.options.code.bytes));
+  if (prior) m.matchesOldBaselineUnit = m.mode === 'omit' ? m.compiledSha256 === prior.sha256 : undefined;
+}
+const output = resolve(values.output ?? `/tmp/ring64-x87-counterfactual-${aa ? 'aa' : variant}-${knobs.reverse ? 'reverse' : 'primary'}.json`);
+await mkdir(dirname(output), { recursive: true });
+await writeFile(output, encode({ ...plan, mode: 'executed-generated-code-diagnostic', modules, runs, oldCapture: { path: old, identity: oldIdentity, units: oldUnits, scope: 'optional one-instruction cold generation after comparisons; its times are not recorded or compared' }, postRunIntegrity: { frozenCoreHostBenchmarks: true, compileWrapperRestored: true, harness: true }, ...result }));
+console.log({ output, modules: modules.length, samples: result.samples.length });

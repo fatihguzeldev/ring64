@@ -1,0 +1,268 @@
+{
+  "claim": "Exact archived causal audit, compiled module images, compile-only assembly and executed diagnostic sources. The raw audit retains original local paths. This map resolves its build/verification/identity-time-causal-artifacts prefix to raw/causal; .mjs sources are archived with an added .txt suffix without changing bytes. Generated modules are small isolated evidence images, not the Core binary.",
+  "originalIndex": "build/verification/identity-time-causal-audit.json",
+  "archivedIndex": "raw/causal/causal-audit.json",
+  "calibrationAudit": "raw/causal/instance-calibration-audit.json",
+  "artifacts": [
+    {
+      "file": "raw/causal/assembly-audit.json",
+      "bytes": 37547,
+      "sha256": "920db1fc56a5af262dbdd84da8de3e6d957c626020113ba02572d34879c19c1c"
+    },
+    {
+      "file": "raw/causal/assembly-audit.py",
+      "bytes": 7493,
+      "sha256": "0c22e3e67dbad5d02e354b79941119d4c7d7c8b3c3d01df63c0a259558c3b3c0"
+    },
+    {
+      "file": "raw/causal/assembly-capture-harness.mjs.txt",
+      "bytes": 19982,
+      "sha256": "0fda0b7f96dba95d0a27a8942eef3e678fffe6c2d53bf5872e2442d9492ca3a8"
+    },
+    {
+      "file": "raw/causal/assembly-capture.json",
+      "bytes": 52397,
+      "sha256": "2cff5b1b3145a071d26b88cbb19b08761d29a0109b079a9e4cdf7953ccddb340"
+    },
+    {
+      "file": "raw/causal/assembly-compile-receipt.json",
+      "bytes": 7222,
+      "sha256": "1c4e2e610cb2805013d085bb539cf366c80a0ccef70da0d61723418b68516348"
+    },
+    {
+      "file": "raw/causal/causal-audit.json",
+      "bytes": 48765,
+      "sha256": "d1b43f70b6158df524929977afa0f6bed99be14e2e28344f9d6729aabeb05e55"
+    },
+    {
+      "file": "raw/causal/counterfactual-early-plan.json",
+      "bytes": 6565,
+      "sha256": "d2100a1d05f6403c154b2212f179f13107bf079ab56eb28a51a517272356a288"
+    },
+    {
+      "file": "raw/causal/counterfactual-harness.mjs.txt",
+      "bytes": 19176,
+      "sha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998"
+    },
+    {
+      "file": "raw/causal/independent-targeted-performance-screen.json",
+      "bytes": 75195,
+      "sha256": "632c929988e1896f234584dacabb0af17f2f86b7863137b1f10413b8bba1bd09"
+    },
+    {
+      "file": "raw/causal/instance-calibration-audit.json",
+      "bytes": 15239,
+      "sha256": "82f55ec5f63d20e8fc4d8e40e125f0d7023f61f860ec0460d08917c9fbc734e8"
+    },
+    {
+      "file": "raw/causal/instance-calibration-reviewed-harness.mjs.txt",
+      "bytes": 20198,
+      "sha256": "d029c80c5e0179a611817d1e8da900b4d7177daf7ab1a2430c60e15a527de8ba"
+    },
+    {
+      "file": "raw/causal/modules/2ea1e092f4f54e818c5dbaccf85f39ea72b512363732c5f94bf8264832d32691.wasm",
+      "bytes": 1113,
+      "sha256": "2ea1e092f4f54e818c5dbaccf85f39ea72b512363732c5f94bf8264832d32691"
+    },
+    {
+      "file": "raw/causal/modules/309b142e8ee4e4488e708a3716861b225d415139cd0a01338f26e717583a34ba.wasm",
+      "bytes": 1113,
+      "sha256": "309b142e8ee4e4488e708a3716861b225d415139cd0a01338f26e717583a34ba"
+    },
+    {
+      "file": "raw/causal/modules/4de39e07c1c7b95e136085f0e8ad38240647a198a41a6738c777f3ee3095c824.wasm",
+      "bytes": 1113,
+      "sha256": "4de39e07c1c7b95e136085f0e8ad38240647a198a41a6738c777f3ee3095c824"
+    },
+    {
+      "file": "raw/causal/modules/5a1f015906a92582b7a8d30845f50b706da437e8320aa288f61ffbe673216833.wasm",
+      "bytes": 1125,
+      "sha256": "5a1f015906a92582b7a8d30845f50b706da437e8320aa288f61ffbe673216833"
+    },
+    {
+      "file": "raw/causal/modules/79faccfe4bb1085721c74d1a37000af1715c1d52798296860f691e6bb018c3aa.wasm",
+      "bytes": 1095,
+      "sha256": "79faccfe4bb1085721c74d1a37000af1715c1d52798296860f691e6bb018c3aa"
+    },
+    {
+      "file": "raw/causal/modules/85bc5d291732fbce834bd42291f4f0d849a79f63e41a7d071867c7a5c8e710a8.wasm",
+      "bytes": 1083,
+      "sha256": "85bc5d291732fbce834bd42291f4f0d849a79f63e41a7d071867c7a5c8e710a8"
+    },
+    {
+      "file": "raw/causal/modules/c3e174d9eb3a460152f4f623486164d842af11d7cf0a4bf7435015cbf0cb52a0.wasm",
+      "bytes": 1101,
+      "sha256": "c3e174d9eb3a460152f4f623486164d842af11d7cf0a4bf7435015cbf0cb52a0"
+    },
+    {
+      "file": "raw/causal/modules/cf3bcc098f1852481e38907b84e116698cd13f1dd89ae889cd4cb0aa4d9455e6.wasm",
+      "bytes": 1101,
+      "sha256": "cf3bcc098f1852481e38907b84e116698cd13f1dd89ae889cd4cb0aa4d9455e6"
+    },
+    {
+      "file": "raw/causal/modules/mmx-as-is-vs-future-bias.shape.diff.txt",
+      "bytes": 3254,
+      "sha256": "88fdc28b67cb7b03158a89be7c8189e0864decac2a272487bc74a448b9783d74"
+    },
+    {
+      "file": "raw/causal/modules/mmx-as-is-vs-move-after-publication.shape.diff.txt",
+      "bytes": 441,
+      "sha256": "37fe3854ba926fcbbb60bfaf456497a3e8035be4874a6680fad677fe723b7ec0"
+    },
+    {
+      "file": "raw/causal/modules/mmx-as-is-vs-omit.shape.diff.txt",
+      "bytes": 4323,
+      "sha256": "947b38d142081372fcd19cc8ebc363fd70cbf772a4da511406436e661027c411"
+    },
+    {
+      "file": "raw/causal/modules/mmx-as-is.asm.txt",
+      "bytes": 26745,
+      "sha256": "398028b2481ec36e0f8a67f2696caec0a48a1a047725332a9e825350a778997b"
+    },
+    {
+      "file": "raw/causal/modules/mmx-as-is.normal-cycle.shape.txt",
+      "bytes": 2409,
+      "sha256": "2d2a9281b4b58ba7492b21b1520accbd58abed866205f644eb96a3edf376857e"
+    },
+    {
+      "file": "raw/causal/modules/mmx-as-is.normal-cycle.txt",
+      "bytes": 3423,
+      "sha256": "ff5d52e4b15a835c0fa35262f8fd687e898ebec6fbcddb9adf048ea8d9123424"
+    },
+    {
+      "file": "raw/causal/modules/mmx-future-bias.asm.txt",
+      "bytes": 27814,
+      "sha256": "a36374b1b66a3644e0f20e1ed417d32badbb7f9561415af1f003e0c9e429aabe"
+    },
+    {
+      "file": "raw/causal/modules/mmx-future-bias.normal-cycle.shape.txt",
+      "bytes": 2389,
+      "sha256": "0edce9746f15b509c1f38e545ece2982c4c54df2ee55b64101372c19e78520fb"
+    },
+    {
+      "file": "raw/causal/modules/mmx-future-bias.normal-cycle.txt",
+      "bytes": 3401,
+      "sha256": "68e52c071482da3383a62df7957c3b18df556adc95ed1b04906a3de255329018"
+    },
+    {
+      "file": "raw/causal/modules/mmx-move-after-publication.asm.txt",
+      "bytes": 27766,
+      "sha256": "b1c151ca6c4324a1afd20549d67cc0a2c02d94b2f25fc5c7f8c5922da904b539"
+    },
+    {
+      "file": "raw/causal/modules/mmx-move-after-publication.normal-cycle.shape.txt",
+      "bytes": 2409,
+      "sha256": "7034c9fe0cfd8934fd348cdb69e9200d8885d5c930c33573b86126d0cc52b9c4"
+    },
+    {
+      "file": "raw/causal/modules/mmx-move-after-publication.normal-cycle.txt",
+      "bytes": 3423,
+      "sha256": "6c0e6c4e714d64bfef9501b82afb2b6c4fac2962aac9b6caa41cbeca877b213e"
+    },
+    {
+      "file": "raw/causal/modules/mmx-omit.asm.txt",
+      "bytes": 27984,
+      "sha256": "46b5862777fe215f39b2fdb6ee60f43b82a1ae2eb3b633a971ef4f78c0680a45"
+    },
+    {
+      "file": "raw/causal/modules/mmx-omit.normal-cycle.shape.txt",
+      "bytes": 2409,
+      "sha256": "d43944a75576a60716caa258a8743e70d952970b9eaaa9f7ce99a47dc623e470"
+    },
+    {
+      "file": "raw/causal/modules/mmx-omit.normal-cycle.txt",
+      "bytes": 3418,
+      "sha256": "8e2f9594a2fd3b14d4c7bdf64bdcc552b0f90d52ee2e0112bcb3b5fc8858e529"
+    },
+    {
+      "file": "raw/causal/modules/x87-as-is-vs-future-bias.shape.diff.txt",
+      "bytes": 6237,
+      "sha256": "a333746fb41a9a3b0b04af311df30d81acef1a15aea9b8de0840f48768492090"
+    },
+    {
+      "file": "raw/causal/modules/x87-as-is-vs-move-after-publication.shape.diff.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "raw/causal/modules/x87-as-is-vs-omit.shape.diff.txt",
+      "bytes": 6310,
+      "sha256": "51177e91a465a26b9bb5a812d7a71ca36889cbc8ab01d9f34a9f8ab5d87993cb"
+    },
+    {
+      "file": "raw/causal/modules/x87-as-is.asm.txt",
+      "bytes": 31763,
+      "sha256": "fae16c85d4a5b36635570bcbaf8d3382fe024b45f91865204bd947d04ef583ce"
+    },
+    {
+      "file": "raw/causal/modules/x87-as-is.normal-cycle.shape.txt",
+      "bytes": 3379,
+      "sha256": "a7628c9019ef32ef382dc83c039c948573040dac67318598bf36426783feca51"
+    },
+    {
+      "file": "raw/causal/modules/x87-as-is.normal-cycle.txt",
+      "bytes": 4877,
+      "sha256": "56c52e21e7abe8cc5b0786989a06059c6b187d681253ad8dabc80735c03e6e08"
+    },
+    {
+      "file": "raw/causal/modules/x87-future-bias.asm.txt",
+      "bytes": 30012,
+      "sha256": "7c032525ee8074fa48480dca7c96e80d1081ac0718bdd2bf7c4d2d5951115887"
+    },
+    {
+      "file": "raw/causal/modules/x87-future-bias.normal-cycle.shape.txt",
+      "bytes": 3176,
+      "sha256": "2d14d45c01b3b3f5f021f45d85d548ee1d286f9cd096d0d54ea1202af415b8d4"
+    },
+    {
+      "file": "raw/causal/modules/x87-future-bias.normal-cycle.txt",
+      "bytes": 4579,
+      "sha256": "599009e1105472f5ae1dcf1c1936645c46a30eb71e1725e1778d64d7803e2c00"
+    },
+    {
+      "file": "raw/causal/modules/x87-move-after-publication.asm.txt",
+      "bytes": 31742,
+      "sha256": "6c91f5e260e8a4fafe9f480387aa2e32f1317e430f63b379abf084adeb59e142"
+    },
+    {
+      "file": "raw/causal/modules/x87-move-after-publication.normal-cycle.shape.txt",
+      "bytes": 3379,
+      "sha256": "a7628c9019ef32ef382dc83c039c948573040dac67318598bf36426783feca51"
+    },
+    {
+      "file": "raw/causal/modules/x87-move-after-publication.normal-cycle.txt",
+      "bytes": 4877,
+      "sha256": "235d0e8434e314fdc4d66e12c047591429c19ec6418d827091bda51813befb70"
+    },
+    {
+      "file": "raw/causal/modules/x87-omit.asm.txt",
+      "bytes": 32319,
+      "sha256": "820ba999fef118c30deb921d9024c4be0e86d0135b224c4fd8c313ea58e78dd4"
+    },
+    {
+      "file": "raw/causal/modules/x87-omit.normal-cycle.shape.txt",
+      "bytes": 3305,
+      "sha256": "12b782c6d1d2226f49f8aa72bd02983d95f05f94cb626e12b9e9a4a872ff590f"
+    },
+    {
+      "file": "raw/causal/modules/x87-omit.normal-cycle.txt",
+      "bytes": 4768,
+      "sha256": "3bb27cf3fcc67601d0596040dc4b2f8edba2a66c72cc68fd2ba2be572581665a"
+    },
+    {
+      "file": "raw/causal/post-helper-register-windows.json",
+      "bytes": 14651,
+      "sha256": "25a7d90e608db83554f39967388e7dfa3672f23ac0fb2ef9cc6eaf5601bf3336"
+    },
+    {
+      "file": "raw/causal/ring64-archive-identity-causal-audit.py",
+      "bytes": 14806,
+      "sha256": "4cd9cbac9308376dee88ee124248d4c7033f79c9040fa11fa280fa3959e226a7"
+    },
+    {
+      "file": "raw/causal/ring64-audit-instance-calibration.py",
+      "bytes": 15485,
+      "sha256": "ccac07df99c73b9e6949ed00e3cb91cb31d426e62e207b4ee7677ecd025b3934"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+--- as-is
++++ move-after-publication
+@@ -4,9 +4,9 @@
+ ldr x1, [sp, S1]
+ mov x11, x14
+ movz x12, #0x0
+-ldr x6, [sp, S2]
+ mov x3, x8
+-ldr x8, [sp, S3]
++ldr x8, [sp, S2]
++ldr x6, [sp, S3]
+ mov x4, x13
+ ldur x5, [x26, #-224]
+ movz x13, #0xffff
+@@ -95,8 +95,8 @@
+ sub x11, x11, #0x1 (1)
+ mov x9, x8
+ movz x13, #0xffff
+-ldr x6, [sp, S2]
+-ldr x8, [sp, S3]
++ldr x8, [sp, S2]
++ldr x6, [sp, S3]
+ ldr x10, [sp, S4]
+ ldr x4, [sp, S9]
+ ldr x3, [sp, S10]

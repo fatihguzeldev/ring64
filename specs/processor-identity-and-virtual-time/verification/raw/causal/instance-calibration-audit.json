@@ -1,0 +1,494 @@
+{
+  "mode": "independent-read-only-receipt-audit-no-execution",
+  "receipt": "build/verification/identity-time-instance-calibration-node.json",
+  "receiptSha256": "f66d4f43fad1c2fed6632e93dfef0a8d6719b74889cf7be249ec94888cc9834e",
+  "plan": "build/verification/identity-time-instance-calibration-plan.json",
+  "planSha256": "f76e7aa3a0b81f1770b56e363a3805ad93b29f98cca7baf7dfbd07e6e8b1086d",
+  "harnessSha256": "d029c80c5e0179a611817d1e8da900b4d7177daf7ab1a2430c60e15a527de8ba",
+  "allGuardsAndRecomputedFieldsPass": true,
+  "checks": {
+    "placement": 64,
+    "paired_semantics": 288,
+    "raw_side_samples": 576
+  },
+  "recordCounts": {
+    "rawSideSamples": 576,
+    "allPairs": 288,
+    "laterPairs": 160,
+    "freshCpuPlacements": 64,
+    "measureCalls": 16,
+    "replicateEstimates": 32,
+    "headlineGroups": 4
+  },
+  "frozenArtifacts": [
+    {
+      "artifact": "baseline",
+      "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+      "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+      "verifiedFiles": 46
+    },
+    {
+      "artifact": "current",
+      "coreSha256": "a2ac7c44ed8b459b7ac826b44a5d562e2c210234035c73b83c2c9276e99ac260",
+      "hostSha256": "c6d3d80b8ddaff949282e0127061ca913a2f76cd4ef260992f0b821fcd9f83ea",
+      "verifiedFiles": 48
+    }
+  ],
+  "rawZeros": 0,
+  "undefinedRatios": 0,
+  "resourceByteDeltas": {
+    "18": 144,
+    "0": 144
+  },
+  "placements": {
+    "observedGroups": [
+      {
+        "artifact": "baseline",
+        "statePointer": 1114624,
+        "stateBytes": 768,
+        "x87BankMod64": 8,
+        "count": 16
+      },
+      {
+        "artifact": "current",
+        "statePointer": 1114624,
+        "stateBytes": 784,
+        "x87BankMod64": 8,
+        "count": 48
+      }
+    ],
+    "facts": [
+      "Every observed statePointer was1114624, aligned modulo16/64 to0; x87 bank offset456, modulo16/64 both8.",
+      "Baseline bank768bytes; current784bytes. Recorded slot3/4 payload ranges are arithmetically correct for every placement.",
+      "All64 linear offsets coincide; this does not establish native memory/cache-line placement or actual active TOP during execution."
+    ]
+  },
+  "balance": {
+    "creationGroups": [
+      {
+        "cohort": "baseline-current",
+        "workload": "x87-stack-churn",
+        "first": "baseline",
+        "pairs": 4
+      },
+      {
+        "cohort": "baseline-current",
+        "workload": "mmx-x87-emms",
+        "first": "baseline",
+        "pairs": 4
+      },
+      {
+        "cohort": "current-current-aa",
+        "workload": "x87-stack-churn",
+        "first": "baseline",
+        "pairs": 4
+      },
+      {
+        "cohort": "current-current-aa",
+        "workload": "mmx-x87-emms",
+        "first": "baseline",
+        "pairs": 4
+      },
+      {
+        "cohort": "baseline-current",
+        "workload": "x87-stack-churn",
+        "first": "current",
+        "pairs": 4
+      },
+      {
+        "cohort": "baseline-current",
+        "workload": "mmx-x87-emms",
+        "first": "current",
+        "pairs": 4
+      },
+      {
+        "cohort": "current-current-aa",
+        "workload": "x87-stack-churn",
+        "first": "current",
+        "pairs": 4
+      },
+      {
+        "cohort": "current-current-aa",
+        "workload": "mmx-x87-emms",
+        "first": "current",
+        "pairs": 4
+      }
+    ],
+    "laterExecutionFirstGroups": [
+      {
+        "cohort": "baseline-current",
+        "workload": "x87-stack-churn",
+        "first": "baseline",
+        "laterPairs": 20
+      },
+      {
+        "cohort": "baseline-current",
+        "workload": "x87-stack-churn",
+        "first": "current",
+        "laterPairs": 20
+      },
+      {
+        "cohort": "baseline-current",
+        "workload": "mmx-x87-emms",
+        "first": "baseline",
+        "laterPairs": 20
+      },
+      {
+        "cohort": "baseline-current",
+        "workload": "mmx-x87-emms",
+        "first": "current",
+        "laterPairs": 20
+      },
+      {
+        "cohort": "current-current-aa",
+        "workload": "x87-stack-churn",
+        "first": "baseline",
+        "laterPairs": 20
+      },
+      {
+        "cohort": "current-current-aa",
+        "workload": "x87-stack-churn",
+        "first": "current",
+        "laterPairs": 20
+      },
+      {
+        "cohort": "current-current-aa",
+        "workload": "mmx-x87-emms",
+        "first": "baseline",
+        "laterPairs": 20
+      },
+      {
+        "cohort": "current-current-aa",
+        "workload": "mmx-x87-emms",
+        "first": "current",
+        "laterPairs": 20
+      }
+    ]
+  },
+  "results": [
+    {
+      "cohort": "baseline-current",
+      "workload": "x87-stack-churn",
+      "independentCpuPairs": 8,
+      "laterPairsPerCpuPair": 5,
+      "medianReplicatePairedRatio": 1.0010222824764392,
+      "definedReplicateRatios": 8,
+      "undefinedReplicateRatios": 0,
+      "minReplicateRatio": 0.9685500162058208,
+      "maxReplicateRatio": 1.026652241440575,
+      "medianReplicateDeltaMs": 0.13043800000014016,
+      "medianReplicateDeltaNsPerGuestInstruction": 0.0217396449270451,
+      "creationOrderGroups": [
+        {
+          "first": "baseline",
+          "independentCpuPairs": 4,
+          "medianReplicatePairedRatio": 1.001599518613454,
+          "medianReplicateDeltaMs": 0.2071879999984958
+        },
+        {
+          "first": "current",
+          "independentCpuPairs": 4,
+          "medianReplicatePairedRatio": 0.9993416990023687,
+          "medianReplicateDeltaMs": -0.08447899999919173
+        }
+      ],
+      "positiveReplicateMedians": 4,
+      "negativeReplicateMedians": 4,
+      "replicates": [
+        {
+          "replicate": 0,
+          "first": "baseline",
+          "ratio": 1.026652241440575,
+          "deltaMs": 3.2989999999995234
+        },
+        {
+          "replicate": 1,
+          "first": "current",
+          "ratio": 0.9948879628771728,
+          "deltaMs": -0.654833000000508
+        },
+        {
+          "replicate": 2,
+          "first": "baseline",
+          "ratio": 0.9982491298253139,
+          "deltaMs": -0.22499900000184425
+        },
+        {
+          "replicate": 3,
+          "first": "current",
+          "ratio": 1.0037954351275644,
+          "deltaMs": 0.4858750000021246
+        },
+        {
+          "replicate": 4,
+          "first": "baseline",
+          "ratio": 1.0049499074015942,
+          "deltaMs": 0.6393749999988358
+        },
+        {
+          "replicate": 5,
+          "first": "current",
+          "ratio": 0.9685500162058208,
+          "deltaMs": -4.248957000010705
+        },
+        {
+          "replicate": 6,
+          "first": "baseline",
+          "ratio": 0.9891817265509272,
+          "deltaMs": -1.418125999996846
+        },
+        {
+          "replicate": 7,
+          "first": "current",
+          "ratio": 1.0094350094528868,
+          "deltaMs": 1.23145900000236
+        }
+      ]
+    },
+    {
+      "cohort": "baseline-current",
+      "workload": "mmx-x87-emms",
+      "independentCpuPairs": 8,
+      "laterPairsPerCpuPair": 5,
+      "medianReplicatePairedRatio": 0.9937645216829974,
+      "definedReplicateRatios": 8,
+      "undefinedReplicateRatios": 0,
+      "minReplicateRatio": 0.9805680140759883,
+      "maxReplicateRatio": 1.0211962610384657,
+      "medianReplicateDeltaMs": -0.3500834999977087,
+      "medianReplicateDeltaNsPerGuestInstruction": -0.07001662998291176,
+      "creationOrderGroups": [
+        {
+          "first": "baseline",
+          "independentCpuPairs": 4,
+          "medianReplicatePairedRatio": 1.004957112944888,
+          "medianReplicateDeltaMs": 0.2633124999986194
+        },
+        {
+          "first": "current",
+          "independentCpuPairs": 4,
+          "medianReplicatePairedRatio": 0.9920748760253748,
+          "medianReplicateDeltaMs": -0.4435204999972484
+        }
+      ],
+      "positiveReplicateMedians": 3,
+      "negativeReplicateMedians": 5,
+      "replicates": [
+        {
+          "replicate": 0,
+          "first": "baseline",
+          "ratio": 1.0145790134664114,
+          "deltaMs": 0.7892919999999322
+        },
+        {
+          "replicate": 1,
+          "first": "current",
+          "ratio": 0.9805680140759883,
+          "deltaMs": -1.0834999999988213
+        },
+        {
+          "replicate": 2,
+          "first": "baseline",
+          "ratio": 1.0211962610384657,
+          "deltaMs": 1.1520000000018626
+        },
+        {
+          "replicate": 3,
+          "first": "current",
+          "ratio": 1.0013079751950411,
+          "deltaMs": 0.07279099999868777
+        },
+        {
+          "replicate": 4,
+          "first": "baseline",
+          "ratio": 0.9919098787613787,
+          "deltaMs": -0.44633299999986775
+        },
+        {
+          "replicate": 5,
+          "first": "current",
+          "ratio": 0.9921938309426305,
+          "deltaMs": -0.43749999999272404
+        },
+        {
+          "replicate": 6,
+          "first": "baseline",
+          "ratio": 0.9953352124233644,
+          "deltaMs": -0.2626670000026934
+        },
+        {
+          "replicate": 7,
+          "first": "current",
+          "ratio": 0.991955921108119,
+          "deltaMs": -0.4495410000017728
+        }
+      ]
+    },
+    {
+      "cohort": "current-current-aa",
+      "workload": "x87-stack-churn",
+      "independentCpuPairs": 8,
+      "laterPairsPerCpuPair": 5,
+      "medianReplicatePairedRatio": 1.0023559007138387,
+      "definedReplicateRatios": 8,
+      "undefinedReplicateRatios": 0,
+      "minReplicateRatio": 0.9860753635462036,
+      "maxReplicateRatio": 1.007773017358951,
+      "medianReplicateDeltaMs": 0.30639549999978044,
+      "medianReplicateDeltaNsPerGuestInstruction": 0.05106586560076447,
+      "creationOrderGroups": [
+        {
+          "first": "baseline",
+          "independentCpuPairs": 4,
+          "medianReplicatePairedRatio": 1.004329215137178,
+          "medianReplicateDeltaMs": 0.5542500000001382
+        },
+        {
+          "first": "current",
+          "independentCpuPairs": 4,
+          "medianReplicatePairedRatio": 0.9943929009536369,
+          "medianReplicateDeltaMs": -0.7206455000005008
+        }
+      ],
+      "positiveReplicateMedians": 5,
+      "negativeReplicateMedians": 3,
+      "replicates": [
+        {
+          "replicate": 0,
+          "first": "baseline",
+          "ratio": 1.007773017358951,
+          "deltaMs": 0.9766669999989972
+        },
+        {
+          "replicate": 1,
+          "first": "current",
+          "ratio": 0.9998448308742177,
+          "deltaMs": -0.019833000000289758
+        },
+        {
+          "replicate": 2,
+          "first": "baseline",
+          "ratio": 1.0040794054905362,
+          "deltaMs": 0.5189579999987473
+        },
+        {
+          "replicate": 3,
+          "first": "current",
+          "ratio": 0.988940971033056,
+          "deltaMs": -1.4214580000007118
+        },
+        {
+          "replicate": 4,
+          "first": "baseline",
+          "ratio": 1.0027029933453313,
+          "deltaMs": 0.349833000000217
+        },
+        {
+          "replicate": 5,
+          "first": "current",
+          "ratio": 0.9860753635462036,
+          "deltaMs": -1.8085840000057942
+        },
+        {
+          "replicate": 6,
+          "first": "baseline",
+          "ratio": 1.0045790247838198,
+          "deltaMs": 0.5895420000015292
+        },
+        {
+          "replicate": 7,
+          "first": "current",
+          "ratio": 1.0020088080823464,
+          "deltaMs": 0.2629579999993439
+        }
+      ]
+    },
+    {
+      "cohort": "current-current-aa",
+      "workload": "mmx-x87-emms",
+      "independentCpuPairs": 8,
+      "laterPairsPerCpuPair": 5,
+      "medianReplicatePairedRatio": 0.9991659033322529,
+      "definedReplicateRatios": 8,
+      "undefinedReplicateRatios": 0,
+      "minReplicateRatio": 0.9857573913410425,
+      "maxReplicateRatio": 1.011034957627321,
+      "medianReplicateDeltaMs": -0.04602100000192877,
+      "medianReplicateDeltaNsPerGuestInstruction": -0.009204190796194958,
+      "creationOrderGroups": [
+        {
+          "first": "baseline",
+          "independentCpuPairs": 4,
+          "medianReplicatePairedRatio": 1.0028032711596921,
+          "medianReplicateDeltaMs": 0.15322849999938626
+        },
+        {
+          "first": "current",
+          "independentCpuPairs": 4,
+          "medianReplicatePairedRatio": 0.9958950829053611,
+          "medianReplicateDeltaMs": -0.2273544999952719
+        }
+      ],
+      "positiveReplicateMedians": 4,
+      "negativeReplicateMedians": 4,
+      "replicates": [
+        {
+          "replicate": 0,
+          "first": "baseline",
+          "ratio": 1.0023321835343033,
+          "deltaMs": 0.12820800000008603
+        },
+        {
+          "replicate": 1,
+          "first": "current",
+          "ratio": 0.9959473763924906,
+          "deltaMs": -0.22366699999838602
+        },
+        {
+          "replicate": 2,
+          "first": "baseline",
+          "ratio": 1.003274358785081,
+          "deltaMs": 0.17824899999868649
+        },
+        {
+          "replicate": 3,
+          "first": "current",
+          "ratio": 0.9962303035408367,
+          "deltaMs": -0.20700000000215368
+        },
+        {
+          "replicate": 4,
+          "first": "baseline",
+          "ratio": 1.011034957627321,
+          "deltaMs": 0.6117499999963911
+        },
+        {
+          "replicate": 5,
+          "first": "current",
+          "ratio": 0.9958427894182316,
+          "deltaMs": -0.2310419999921578
+        },
+        {
+          "replicate": 6,
+          "first": "baseline",
+          "ratio": 1.002101503123669,
+          "deltaMs": 0.11495799999829615
+        },
+        {
+          "replicate": 7,
+          "first": "current",
+          "ratio": 0.9857573913410425,
+          "deltaMs": -0.7892499999943539
+        }
+      ]
+    }
+  ],
+  "verdict": "The original single-pair0.9\u20132.6percent Node x87 loss is not established as a repeatable artifact regression by the combined preserved evidence. Balanced fresh-pair calibration center is+0.102percent with4 positive/4 negative replicate medians; current/current A/A center is+0.236percent and order strata change sign. Same-Core clock removal/relocation/B-liveness counterfactuals did not recover speed. This neither proves zero cost nor proves the earlier observation fixed or caused by creation order.",
+  "claimCeilings": [
+    "These are8 fresh CPU-pair replicates per cohort/workload in one shared process/compiled Core, not demonstrated independent engine or OS realizations.",
+    "Do not pool40 later pairs as40 independent CPU pairs. No arbitrary performance threshold or statistical-significance claim is introduced.",
+    "Recorded full scalar/context/numeric packets and unit/resource flow were independently rechecked. RAM/code runtime guards were executed by the unchanged benchmark but their byte arrays are not serialized in this receipt, so no independent RAM/code snapshot comparison is claimed here.",
+    "No per-sample TimeState observation is present; clock correctness comes from dedicated semantic verification and mutation evidence.",
+    "Zero-overhead, resolved root cause, fixed regression, native-address alignment and hardware cache-miss claims remain unsupported."
+  ]
+}

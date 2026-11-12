@@ -1,0 +1,385 @@
+--- as-is
++++ future-bias
+@@ -1,75 +1,72 @@
+-movz x5, #0x1000
+-str x9, [sp, S0]
+-mov x7, x1
+-ldr x1, [sp, S1]
+-mov x8, x14
+-mov x3, x11
+-movz x11, #0x0
+-ldr x6, [sp, S2]
+-mov x4, x13
+-ldur x9, [x26, #-224]
+-cmp sp, x9
++mov x3, x9
++movz x9, #0x1000
++str x8, [sp, S0]
++mov x7, x1
++ldr x1, [sp, S1]
++mov x2, x13
++movz x5, #0x0
++ldr x6, [sp, S2]
++mov x4, x12
++ldur x8, [x26, #-224]
++cmp sp, x8
+ b.ls TARGET
+-cmp w11, #0x6 (6)
++cmp w5, #0x6 (6)
+ b.hs TARGET
+ adr x16, #+0xc
+-add x16, x16, w11, uxtw #2
++add x16, x16, w5, uxtw #2
+ br x16
+ b TARGET
+-cbz x8, TARGET
++cbz x2, TARGET
+ cmp x3, #0x1000 (4096)
+-cset x9, eq
+-tst w4, w9
+-b.ne TARGET
+-ldur x9, [x7, #7]
+-ldur x9, [x9, #39]
+-ldur x11, [x1, #39]
++cset x8, eq
++tst w4, w8
++b.ne TARGET
++ldur x8, [x7, #7]
++ldur x8, [x8, #39]
++ldur x9, [x1, #39]
+ str x10, [sp, S3]
+-str x8, [sp, S4]
+-mov x7, x9
++str x2, [sp, S4]
++mov x7, x8
+ movz x0, #0xb
+ movk x0, #0xf40, lsl #16
+ movz x2, #0x0
+ movz x3, #0x2
+ movz x4, #0x1000
+ ldr x5, [sp, S5]
+-blr x11
+-ldr x1, [sp, S6]
+-ldur x8, [x1, #39]
+-cmp w0, #0x2 (2)
+-cset x9, eq
+-cmp w0, #0x0 (0)
+-cset x10, eq
+-orr w9, w10, w9
+-cbz w9, TARGET
+-ldr x9, [sp, S4]
+-sub x9, x9, #0x1 (1)
+-mov x16, x8
+-mov x8, x9
+-mov x9, x16
+-ldr x6, [sp, S2]
+-ldr x10, [sp, S3]
+-ldr x4, [sp, S7]
+-ldr x3, [sp, S8]
+-mov x7, x1
+-ldr x1, [sp, S1]
+-b TARGET
+-str x8, [sp, S4]
+-cbz x8, TARGET
+-movz x11, #0x1002
+-cmp x3, x11
++blr x9
++ldr x1, [sp, S6]
++ldur x8, [x1, #39]
++cmp w0, #0x2 (2)
++cset x9, eq
++cmp w0, #0x0 (0)
++cset x10, eq
++orr w9, w10, w9
++cbz w9, TARGET
++ldr x2, [sp, S4]
++sub x2, x2, #0x1 (1)
++mov x7, x1
++ldr x1, [sp, S1]
++ldr x6, [sp, S2]
++ldr x10, [sp, S3]
++ldr x4, [sp, S7]
++ldr x3, [sp, S8]
++b TARGET
++str x2, [sp, S4]
++cbz x2, TARGET
++movz x9, #0x1002
++cmp x3, x9
+ cset x5, eq
+ tst w4, w5
+ b.ne TARGET
+-ldur x9, [x7, #7]
+-ldur x9, [x9, #39]
++ldur x8, [x7, #7]
++ldur x8, [x8, #39]
+ ldur x5, [x1, #39]
+-mov x7, x9
++mov x7, x8
+ movz x0, #0x180b
+ movk x0, #0xf70, lsl #16
+ movz x2, #0x0
+ movz x3, #0x2
+-mov x4, x11
++mov x4, x9
+ mov x1, x5
+ ldr x5, [sp, S5]
+ blr x1
+@@ -81,142 +78,130 @@
+ cset x10, eq
+ orr w9, w10, w9
+ cbz w9, TARGET
+-ldr x10, [sp, S4]
+-sub x9, x10, #0x1 (1)
+-mov x16, x8
+-mov x8, x9
+-mov x9, x16
+-ldr x6, [sp, S2]
+-ldr x10, [sp, S3]
+-ldr x4, [sp, S7]
+-ldr x3, [sp, S8]
+-mov x7, x1
+-ldr x1, [sp, S1]
+-b TARGET
+-str x8, [sp, S4]
+-cbz x8, TARGET
+-movz x11, #0x1004
+-mov x12, x3
+-cmp x12, x11
+-cset x13, eq
+-mov x14, x4
+-tst w14, w13
+-b.ne TARGET
+-ldur x9, [x7, #7]
+-ldur x9, [x9, #39]
+-ldur x13, [x1, #39]
++ldr x2, [sp, S4]
++sub x2, x2, #0x1 (1)
++mov x7, x1
++ldr x1, [sp, S1]
++ldr x6, [sp, S2]
++ldr x10, [sp, S3]
++ldr x4, [sp, S7]
++ldr x3, [sp, S8]
++b TARGET
++str x2, [sp, S4]
++cbz x2, TARGET
++movz x9, #0x1004
++mov x11, x3
++cmp x11, x9
++cset x12, eq
++mov x13, x4
++tst w13, w12
++b.ne TARGET
++ldur x8, [x7, #7]
++ldur x8, [x8, #39]
++ldur x12, [x1, #39]
+ movz x0, #0x442
+ movk x0, #0xe48, lsl #16
+-mov x7, x9
+-movz x2, #0x0
+-movz x3, #0x2
+-mov x4, x11
+-ldr x5, [sp, S5]
+-blr x13
+-ldr x1, [sp, S6]
+-ldur x8, [x1, #39]
+-cmp w0, #0x2 (2)
+-cset x9, eq
+-cmp w0, #0x0 (0)
+-cset x10, eq
+-orr w9, w10, w9
+-cbz w9, TARGET
+-ldr x10, [sp, S4]
+-sub x9, x10, #0x1 (1)
+-mov x16, x8
+-mov x8, x9
+-mov x9, x16
+-ldr x6, [sp, S2]
+-ldr x10, [sp, S3]
+-ldr x4, [sp, S7]
+-ldr x3, [sp, S8]
+-mov x7, x1
+-ldr x1, [sp, S1]
+-b TARGET
+-str x8, [sp, S4]
+-cbz x8, TARGET
+-movz x11, #0x1006
+-mov x12, x3
+-cmp x12, x11
+-cset x13, eq
+-mov x14, x4
+-tst w14, w13
+-b.ne TARGET
+-ldur x9, [x7, #7]
+-ldur x9, [x9, #39]
+-ldur x13, [x1, #39]
+-mov x7, x9
++mov x7, x8
++movz x2, #0x0
++movz x3, #0x2
++mov x4, x9
++ldr x5, [sp, S5]
++blr x12
++ldr x1, [sp, S6]
++ldur x8, [x1, #39]
++cmp w0, #0x2 (2)
++cset x9, eq
++cmp w0, #0x0 (0)
++cset x10, eq
++orr w9, w10, w9
++cbz w9, TARGET
++ldr x2, [sp, S4]
++sub x2, x2, #0x1 (1)
++mov x7, x1
++ldr x1, [sp, S1]
++ldr x6, [sp, S2]
++ldr x10, [sp, S3]
++ldr x4, [sp, S7]
++ldr x3, [sp, S8]
++b TARGET
++str x2, [sp, S4]
++cbz x2, TARGET
++movz x9, #0x1006
++mov x11, x3
++cmp x11, x9
++cset x12, eq
++mov x13, x4
++tst w13, w12
++b.ne TARGET
++ldur x8, [x7, #7]
++ldur x8, [x8, #39]
++ldur x12, [x1, #39]
++mov x7, x8
+ movz x0, #0x4041
+ movk x0, #0x2ec0, lsl #16
+ movz x2, #0x0
+ movz x3, #0x2
+-mov x4, x11
+-ldr x5, [sp, S5]
+-blr x13
+-ldr x1, [sp, S6]
+-ldur x8, [x1, #39]
+-cmp w0, #0x2 (2)
+-cset x9, eq
+-cmp w0, #0x0 (0)
+-cset x10, eq
+-orr w9, w10, w9
+-cbz w9, TARGET
+-ldr x10, [sp, S4]
+-sub x9, x10, #0x1 (1)
+-mov x16, x8
+-mov x8, x9
+-mov x9, x16
+-ldr x6, [sp, S2]
+-ldr x10, [sp, S3]
+-ldr x4, [sp, S7]
+-ldr x3, [sp, S8]
+-mov x7, x1
+-ldr x1, [sp, S1]
+-b TARGET
+-str x8, [sp, S4]
+-cbz x8, TARGET
+-movz x11, #0x1008
+-mov x12, x3
+-cmp x12, x11
+-cset x13, eq
+-mov x14, x4
+-tst w14, w13
+-b.ne TARGET
+-ldur x9, [x7, #7]
+-ldur x9, [x9, #39]
+-ldur x13, [x1, #39]
+-mov x7, x9
++mov x4, x9
++ldr x5, [sp, S5]
++blr x12
++ldr x1, [sp, S6]
++ldur x8, [x1, #39]
++cmp w0, #0x2 (2)
++cset x9, eq
++cmp w0, #0x0 (0)
++cset x10, eq
++orr w9, w10, w9
++cbz w9, TARGET
++ldr x2, [sp, S4]
++sub x2, x2, #0x1 (1)
++mov x7, x1
++ldr x1, [sp, S1]
++ldr x6, [sp, S2]
++ldr x10, [sp, S3]
++ldr x4, [sp, S7]
++ldr x3, [sp, S8]
++b TARGET
++str x2, [sp, S4]
++cbz x2, TARGET
++movz x9, #0x1008
++mov x11, x3
++cmp x11, x9
++cset x12, eq
++mov x13, x4
++tst w13, w12
++b.ne TARGET
++ldur x8, [x7, #7]
++ldur x8, [x8, #39]
++ldur x12, [x1, #39]
++mov x7, x8
+ movz x0, #0x4041
+ movk x0, #0x2ec0, lsl #16
+ movz x2, #0x0
+ movz x3, #0x2
+-mov x4, x11
+-ldr x5, [sp, S5]
+-blr x13
+-ldr x1, [sp, S6]
+-ldur x8, [x1, #39]
+-cmp w0, #0x2 (2)
+-cset x9, eq
+-cmp w0, #0x0 (0)
+-cset x10, eq
+-orr w9, w10, w9
+-cbz w9, TARGET
+-ldr x10, [sp, S4]
+-sub x9, x10, #0x1 (1)
+-mov x16, x8
+-mov x8, x9
+-mov x9, x16
+-b TARGET
+-cbz x8, TARGET
++mov x4, x9
++ldr x5, [sp, S5]
++blr x12
++ldr x1, [sp, S6]
++ldur x8, [x1, #39]
++cmp w0, #0x2 (2)
++cset x9, eq
++cmp w0, #0x0 (0)
++cset x10, eq
++orr w9, w10, w9
++cbz w9, TARGET
++ldr x2, [sp, S4]
++sub x2, x2, #0x1 (1)
++b TARGET
++cbz x2, TARGET
+ movz x10, #0x100a
+-ldr x11, [sp, S8]
+-cmp x11, x10
+-cset x12, eq
+-ldr x13, [sp, S7]
+-tst w13, w12
+-b.ne TARGET
+-ldr x12, [sp, S3]
+-sub x10, x12, #0x1 (1)
+-sub x14, x8, #0x1 (1)
+-cmp x12, #0x1 (1)
+-b.ne TARGET
++ldr x9, [sp, S8]
++cmp x9, x10
++cset x11, eq
++ldr x12, [sp, S7]
++tst w12, w11
++b.ne TARGET
++ldr x11, [sp, S3]
++sub x10, x11, #0x1 (1)
++sub x13, x2, #0x1 (1)
++cmp x11, #0x1 (1)
++b.ne TARGET

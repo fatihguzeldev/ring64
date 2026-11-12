@@ -1,0 +1,12 @@
+{
+  "kind": "pre-execution-plan-replacement",
+  "reason": "Independent provenance review required exact consumed Core compile bytes to match the recorded artifact; no Core/guest/timing execution occurred under the superseded plan. Host import ceiling clarified as frozen paths plus pre/post guards, not per-import interception.",
+  "oldPreparedPlanSha256": "5d0956fefaea8c8d972889fb98fdaa14793dbc2ada771e387fc68a067966c6f7",
+  "oldHarnessSha256": "769140976df471214d23313d0ef2d83133239a24825e0b6cf94dfe00477ebe23",
+  "oldPreparedPlanCopy": "/tmp/identity-instance-calibration-superseded-5d0956fefaea8c8d972889fb98fdaa14793dbc2ada771e387fc68a067966c6f7.json",
+  "oldHarnessCopy": "/tmp/ring64-identity-instance-calibration-superseded-769140976df4.mjs",
+  "replacementBeforeExecutionOutput": true,
+  "newPreparedPlanSha256": "f76e7aa3a0b81f1770b56e363a3805ad93b29f98cca7baf7dfbd07e6e8b1086d",
+  "newHarnessSha256": "d029c80c5e0179a611817d1e8da900b4d7177daf7ab1a2430c60e15a527de8ba",
+  "newPreparedAt": "2026-11-12T23:05:15.633Z"
+}

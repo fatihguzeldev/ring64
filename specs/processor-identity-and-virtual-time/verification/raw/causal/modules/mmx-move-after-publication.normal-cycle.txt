@@ -1,0 +1,149 @@
+0130: movz x16, #0x1000
+0134: str x16, [sp, #48]
+0138: mov x7, x1
+013c: ldr x1, [sp, #16]
+0140: mov x11, x14
+0144: movz x12, #0x0
+0148: mov x3, x8
+014c: ldr x8, [sp, #80]
+0150: ldr x6, [sp, #72]
+0154: mov x4, x13
+0158: ldur x5, [x26, #-224]
+015c: movz x13, #0xffff
+0160: cmp sp, x5
+0164: b.ls target@6d4
+0168: cmp w12, #0x5 (5)
+016c: b.hs target@3b0
+0170: adr x16, target@17c
+0174: add x16, x16, w12, uxtw #2
+0178: br x16
+017c: b target@190
+0190: cbz x11, target@3f8
+0194: cmp x3, #0x1000 (4096)
+0198: cset x12, eq
+019c: tst w4, w12
+01a0: b.ne target@3e0
+01a4: add x12, x8, x9
+01a8: ldrh w5, [x12, #538]
+01ac: str x10, [sp, #56]
+01b0: ldrh w10, [x12, #536]
+01b4: bic w10, w5, w10
+01b8: tst w10, #0x3f
+01bc: b.ne target@3c8
+01c0: add x10, x9, #0x1c8 (456)
+01c4: ldr d0, [x10, x8]
+01c8: ldr d1, [x10, x8]
+01cc: eor v0.16b, v0.16b, v1.16b
+01d0: mov x10, v0.d[0]
+01d4: str x10, [x12, #456]
+01d8: strh w13, [x12, #464]
+01dc: ldrh w10, [x12, #538]
+01e0: and w10, w10, #0xffffc7ff
+01e4: strh w10, [x12, #538]
+01e8: strh wzr, [x12, #540]
+01ec: sub x11, x11, #0x1 (1)
+01f0: b target@1fc
+01fc: cbz x11, target@43c
+0200: movz x10, #0x1003
+0204: cmp x3, x10
+0208: cset x12, eq
+020c: tst w4, w12
+0210: b.ne target@428
+0214: add x12, x8, x9
+0218: ldrh w5, [x12, #538]
+021c: str x9, [sp, #64]
+0220: ldrh w9, [x12, #536]
+0224: bic w9, w5, w9
+0228: tst w9, #0x3f
+022c: b.ne target@410
+0230: ldrh w9, [x12, #538]
+0234: and w9, w9, #0xffffc7ff
+0238: strh w9, [x12, #538]
+023c: strh w13, [x12, #540]
+0240: sub x11, x11, #0x1 (1)
+0244: ldr x10, [sp, #56]
+0248: ldr x9, [sp, #64]
+024c: b target@254
+0254: str x11, [sp, #40]
+0258: cbz x11, target@48c
+025c: movz x12, #0x1005
+0260: cmp x3, x12
+0264: cset x5, eq
+0268: tst w4, w5
+026c: b.ne target@474
+0270: ldur x9, [x7, #7]
+0274: ldur x9, [x9, #39]
+0278: ldur x5, [x1, #39]
+027c: mov x7, x9
+0280: movz x0, #0xb
+0284: movk x0, #0xf40, lsl #16
+0288: movz x2, #0x0
+028c: movz x3, #0x2
+0290: mov x4, x12
+0294: mov x1, x5
+0298: ldr x5, [sp, #208]
+029c: blr x1
+02a0: ldr x1, [sp, #224]
+02a4: ldur x8, [x1, #39]
+02a8: cmp w0, #0x2 (2)
+02ac: cset x9, eq
+02b0: cmp w0, #0x0 (0)
+02b4: cset x10, eq
+02b8: orr w9, w10, w9
+02bc: cbz w9, target@454
+02c0: ldr x11, [sp, #40]
+02c4: sub x11, x11, #0x1 (1)
+02c8: mov x9, x8
+02cc: movz x13, #0xffff
+02d0: ldr x8, [sp, #80]
+02d4: ldr x6, [sp, #72]
+02d8: ldr x10, [sp, #56]
+02dc: ldr x4, [sp, #32]
+02e0: ldr x3, [sp, #24]
+02e4: mov x7, x1
+02e8: ldr x1, [sp, #16]
+02ec: b target@2f4
+02f4: str x11, [sp, #40]
+02f8: cbz x11, target@4dc
+02fc: movz x12, #0x1007
+0300: cmp x3, x12
+0304: cset x5, eq
+0308: tst w4, w5
+030c: b.ne target@4c4
+0310: ldur x9, [x7, #7]
+0314: ldur x9, [x9, #39]
+0318: ldur x5, [x1, #39]
+031c: mov x7, x9
+0320: movz x0, #0x4041
+0324: movk x0, #0x2ec0, lsl #16
+0328: movz x2, #0x0
+032c: movz x3, #0x2
+0330: mov x4, x12
+0334: mov x1, x5
+0338: ldr x5, [sp, #208]
+033c: blr x1
+0340: ldr x1, [sp, #224]
+0344: ldur x8, [x1, #39]
+0348: cmp w0, #0x2 (2)
+034c: cset x9, eq
+0350: cmp w0, #0x0 (0)
+0354: cset x10, eq
+0358: orr w9, w10, w9
+035c: cbz w9, target@4a4
+0360: ldr x11, [sp, #40]
+0364: sub x11, x11, #0x1 (1)
+0368: mov x9, x8
+036c: b target@378
+0378: cbz x11, target@590
+037c: movz x10, #0x1009
+0380: ldr x8, [sp, #24]
+0384: cmp x8, x10
+0388: cset x12, eq
+038c: ldr x13, [sp, #32]
+0390: tst w13, w12
+0394: b.ne target@574
+0398: ldr x12, [sp, #56]
+039c: sub x10, x12, #0x1 (1)
+03a0: sub x14, x11, #0x1 (1)
+03a4: cmp x12, #0x1 (1)
+03a8: b.ne target@130

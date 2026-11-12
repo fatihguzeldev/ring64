@@ -1,0 +1,1073 @@
+{
+  "mode": "independent-source-evidence-index-no-new-guest-or-timing-execution",
+  "createdAt": "2026-11-12T23:07:47.755417+00:00",
+  "source": {
+    "commit": "2f94b0dd881fd4a34b666d64fb98e476effedf86",
+    "sourceInventoryFiles": 773,
+    "sourceManifest": "build/verification/identity-time-source-before.json",
+    "sourceManifestTreeContentSha256": "92f3e90c0bc743ff0b82e6b339f59f4a28ec6ef9fd04b0fdb504964f1bd9c2ae",
+    "mutationSourceSha256": "be0fd6df93a346aeeed570bdba4de49a0fa866d92832bdd7fb73ce93419e98bc",
+    "hashDistinction": "treeContentSha256 and mutationSourceSha256 use different encodings. Mutation SHA is SHA256(JSON.stringify(sorted [path,fileSHA] tuples)); it was independently recomputed from all773 source manifest entries."
+  },
+  "frozenArtifacts": {
+    "baseline": {
+      "path": "/tmp/ring64-identity-baseline-e785914",
+      "source": {
+        "observedHead": "e714be220dd9b8f48386359b5ff3e4da1ede00b1",
+        "workingTree": [],
+        "productionBase": "e785914aa60d7bc48359561107508bef7e82c3c2",
+        "identityBasis": "Exact existing built Core/host hashes from completed call-gate predecessor; read/copy freeze, not rebuilt from current checkout.",
+        "commit": "e785914aa60d7bc48359561107508bef7e82c3c2"
+      },
+      "metadataSha256": "89b94158d0df9043c8575d37f5ae37e712ba706955d8a8f4bf8b48a3196f436e",
+      "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+      "coreBytes": 1240374,
+      "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+      "productionHostSha256": "2f2ccdfa6177c2cd42afb4c811f8e019216e4ebfbaf719668b8ff506dbcf4a84"
+    },
+    "current": {
+      "path": "/Users/fatihguzel/ring64/build/verification/identity-time-final-2f94b0d",
+      "source": {
+        "commit": "2f94b0dd881fd4a34b666d64fb98e476effedf86",
+        "workingTree": []
+      },
+      "metadataSha256": "da5695a1bdd645242ae946403c0bafad0e41a31b4237271d8945dc37b610e2f0",
+      "coreSha256": "a2ac7c44ed8b459b7ac826b44a5d562e2c210234035c73b83c2c9276e99ac260",
+      "coreBytes": 1246882,
+      "hostSha256": "c6d3d80b8ddaff949282e0127061ca913a2f76cd4ef260992f0b821fcd9f83ea",
+      "productionHostSha256": "688881a73bd9e66827b56e7041ba3c35815e9ec7e0706fd729a1c2a75961697a"
+    }
+  },
+  "sourceContractMap": [
+    {
+      "contract": "Literal anonymous CPUID profile, modulo64 time sampling/settlement and selected TSC/AUX MSRs",
+      "owner": "src/x86/processor.rs",
+      "line": 18,
+      "nativeTests": "src/x86/processor.rs:89",
+      "proofCeiling": "Portable semantics; emitted operation proof additionally needs public runtime oracles."
+    },
+    {
+      "contract": "Timestamp/CPUID decode, all-mode opcode admission and rawF9/prefix frontiers",
+      "owners": [
+        "src/x86/decode/opcode.rs:632",
+        "src/x86/decode/protection.rs:119"
+      ],
+      "nativeTests": "src/x86/decode/tests/processor.rs",
+      "publicBoundary": "tests/execution/identity-time/boundaries.ts"
+    },
+    {
+      "contract": "Single canonical reprC bank and public descriptor",
+      "owners": [
+        "src/embedding/layout.rs:253",
+        "src/embedding/layout.rs:353"
+      ],
+      "publicConsumers": [
+        "host/time.ts:13",
+        "host/core.ts:1111"
+      ]
+    },
+    {
+      "contract": "One generated common-exit settlement of originalB-liveR, zero extension, scoped processor helper calls",
+      "owners": [
+        "src/dbt/wasm/state.rs:76",
+        "src/dbt/wasm/mod.rs:965"
+      ],
+      "nativeTests": "src/dbt/wasm/tests/processor.rs",
+      "publicRuntime": "tests/execution/identity-time/oracle.ts"
+    },
+    {
+      "contract": "Live timestamp TSD admission before scratch/output writes and inherited MSR privilege phase",
+      "owners": [
+        "src/embedding/exports/processor.rs:5",
+        "src/embedding/exports/paging.rs:337"
+      ],
+      "nativeTests": "src/embedding/exports/tests/processor.rs",
+      "publicBoundary": "tests/execution/identity-time/boundaries.ts"
+    },
+    {
+      "contract": "TSD allowed without translation identity change or cached PAE PDPTE reload",
+      "owners": [
+        "src/x86/paging/controls.rs:286",
+        "src/x86/paging/controls.rs:398",
+        "src/embedding/exports/paging.rs:485"
+      ],
+      "nativeTests": [
+        "src/embedding/exports/tests/processor.rs",
+        "src/embedding/exports/tests/context_reuse.rs"
+      ],
+      "publicBoundary": "tests/execution/identity-time/boundaries.ts"
+    },
+    {
+      "contract": "Strict TimeState capture/lifecycle; separate scalar/state/time API; no setter rollback of accessor effects",
+      "owners": [
+        "host/time.ts:13",
+        "host/cpu.ts:385"
+      ],
+      "hostTests": "host/time.test.ts",
+      "publicBoundary": "tests/execution/identity-time/boundaries.ts"
+    }
+  ],
+  "executedEvidence": {
+    "semanticValidation": {
+      "receipts": [
+        "build/verification/identity-time-characterization-validation-node.json",
+        "build/verification/identity-time-characterization-validation-chrome.json"
+      ],
+      "workloadsPerRuntime": 22,
+      "samplesPerRuntime": 44,
+      "claimCeiling": "New-behavior validation, not predecessor timing comparison."
+    },
+    "mutationCampaign": {
+      "receipt": "build/verification/identity-time-mutations.json",
+      "executed": true,
+      "namedSemanticKills": 25,
+      "originalSourceUnchanged": true,
+      "rows": [
+        {
+          "name": "omit-common-settlement",
+          "assertion": "direct BigInt ledger bank:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "ledger"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "double-common-settlement",
+          "assertion": "direct BigInt ledger bank:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "ledger"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "stale-canonical-budget-instead-of-original-budget",
+          "assertion": "direct BigInt ledger bank:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "ledger"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "wrmsr-missing-own-retirement-offset",
+          "assertion": "independent final time bank:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "msr"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "preserve-dirty-output-upper32",
+          "assertion": "CPUID full raw sixteen-register packet:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "identity"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "truncate-aux-reserved-upper32",
+          "assertion": "AUX upper32 refusal:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "msr"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "reverse-tsd-cpl-guard-including-v86",
+          "assertion": "TSD live permission:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "tsd"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "apply-tsd-to-real-address-mode",
+          "assertion": "TSD live permission:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "tsd"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "misclassify-f9-as-fa-neighbor",
+          "assertion": "literal required-byte/frontier packet f00f01f9:",
+          "oracleArgv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"virtual time decode boundaries preserve LOCK fetch length RF and neighbor priority\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "freeze-cpuid-leaf-to-zero",
+          "assertion": "CPUID full raw sixteen-register packet:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "identity"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "drop-live-retired-delta-at-read",
+          "assertion": "ledger full raw registers:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "ledger"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "freeze-aux-read-to-zero",
+          "assertion": "raw AUX output zero-extension:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "raw"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "clock-only-for-artifacts-containing-reads",
+          "assertion": "time completed warm runs during capture reject without rolling back run reset dispose or other bank effects:.*independent boundary bank",
+          "oracleArgv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"time completed warm runs during capture reject without rolling back run reset dispose or other bank effects\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "tick-unfinished-rep-after-committed-element",
+          "assertion": "independent final time bank:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "accounting"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "tick-automatic-event-entry",
+          "assertion": "MOV IRET and retried DIV only; entry and failed source tick zero",
+          "oracleArgv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {exceptionDeliveryScenarios} from './build/tests/execution/exception-delivery/index.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=exceptionDeliveryScenarios(core).filter(s=>s.name===\"exception delivery repairs a protected32 divide error and IRET retries its source exactly once\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "tick-compilation-discovery",
+          "assertion": "independent final time bank:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "accounting"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "scalar-import-mints-a-retirement",
+          "assertion": "independent final time bank:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "accounting"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "reset-mints-a-retirement",
+          "assertion": "independent final time bank:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "lifetime"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "allow-completed-run-during-time-capture",
+          "assertion": "completed warm run invalidates capture",
+          "oracleArgv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"time completed warm runs during capture reject without rolling back run reset dispose or other bank effects\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "tsd-change-retires-translation-owners",
+          "assertion": "TSD host import keeps published owner",
+          "oracleArgv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"TSD host and guest changes keep warmed owners and cached PAE PDPTEs without clock side effects\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "tsd-change-reloads-cached-pae-pdpte",
+          "assertion": "embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt.*panicked.*assertion `left == right` failed",
+          "oracleArgv": [
+            "cargo",
+            "test",
+            "--locked",
+            "embedding::exports::tests::processor::tsd_only_guest_and_host_pae_changes_never_reload_the_unmapped_pdpt",
+            "--",
+            "--exact",
+            "--nocapture"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 101
+        },
+        {
+          "name": "host-wall-time-enters-public-tsc",
+          "assertion": "default bank:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "lifetime"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "host-hardware-overrides-cpuid-query",
+          "assertion": "CPUID full raw sixteen-register packet:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "identity"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "clear-family-disclosure-blocks-existing-numeric-admission",
+          "assertion": "unclaimed SSE2 LFENCE and x87 FLD1 remain admitted:",
+          "oracleArgv": [
+            "node",
+            "scripts/identity-time-audit.mjs",
+            "--current",
+            ".",
+            "--groups",
+            "identity"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        },
+        {
+          "name": "frozen-tsd0-permission-assumption",
+          "assertion": "warm TSD1 denies this same CPL3 read",
+          "oracleArgv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {readFile} from 'node:fs/promises'; import {identityBoundaryScenarios} from './build/tests/execution/identity-time/boundaries.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=identityBoundaryScenarios(core).filter(s=>s.name===\"warm CPL3 timestamp owners read TSD changes live without recompilation or output publication on refusal\"); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+          ],
+          "setupStatuses": [
+            0
+          ],
+          "semanticStatus": 1
+        }
+      ],
+      "claimCeiling": "Every setup completed0 and each actual nonsignal failure matched its precise semantic assertion. Commands include public emitted scenarios, host lifecycle, decode frontier and one native PAE case; command cohort is not identical to first-failure observation layer."
+    },
+    "initialSerializedPerformance": {
+      "receipt": "build/verification/identity-time-performance-execution.json",
+      "jobs": 30,
+      "allStatusesZero": true,
+      "claimCeiling": "Executed benchmark envelopes and semantic guards; ratios require declared later cutoffs, A/A/order controls and row-specific uncertainty."
+    },
+    "sameCoreCounterfactual": {
+      "receipt": "build/verification/identity-time-counterfactual-execution.json",
+      "jobs": 7,
+      "allStatusesZero": true,
+      "variants": [
+        "omit",
+        "move-after-publication",
+        "future-bias"
+      ],
+      "directions": [
+        "primary",
+        "reverse"
+      ],
+      "control": "as-is/as-is",
+      "oldGoldenProof": "build/verification/identity-time-cf-validation-omit.json",
+      "claimCeiling": "Only generated CodeSection changes within SAME candidate Core/host; invalid-clock omit diagnostic and fixed non-timestamp future variant do not prove a shipping implementation. Omit unitSHA matching predecessor does not replace predecessor Core/helper/layout."
+    }
+  },
+  "machineCodeAudit": {
+    "capture": "build/verification/identity-time-causal-artifacts/assembly-capture.json",
+    "compileReceipt": "build/verification/identity-time-causal-artifacts/assembly-compile-receipt.json",
+    "audit": "build/verification/identity-time-causal-artifacts/assembly-audit.json",
+    "pathRemapping": "Archived raw receipts preserve original /tmp paths byte-for-byte. Resolve them with archive[].original -> archive[].durable below.",
+    "uniqueGeneratedModules": 8,
+    "capturedHashesMatchCounterfactualReceipts": true,
+    "compiler": "Node22.16.0 ARM64 TurboFan; fresh process per unit, --no-liftoff --no-wasm-lazy-compilation --print-wasm-code-function-index=4 --code-comments; no Core instantiation in assembly process.",
+    "facts": [
+      "Original B is incomingx2 per exact Node22.16.0 wasm ABI source; source links and slot traces retained in audit.",
+      "As-is/move B has entry store, epilogue reload and entry-stack-check slow-path reload only; zero recurring hot-span accesses.",
+      "x87 frame is224 bytes as-is/move versus208 omit/future, after a fixed32byte prologue.",
+      "Static nonfaulting recurring x87 CFG paths:222/217/222/207 instructions as-is/omit/move/future. All have61loads/7stores, including40SPloads/7SPstores, and5helper calls.",
+      "Future removes five3-MOV post-helper swaps; these15MOVs establish a register-shuffle difference, not a demonstrated speedup.",
+      "Same-Core timing did not demonstrate improvement for these variants; repeated B spilling and a historical-performance causal explanation remain unproved."
+    ],
+    "claimCeilings": [
+      "Static CFG path counts exclude imported helper internals and stack-check slow paths; they are not measured dynamic instruction retirement.",
+      "No new timing was executed by capture/compile-only assembly audit.",
+      "No production rewrite follows from fewer instructions or a smaller frame."
+    ]
+  },
+  "instanceCalibrationPreflight": {
+    "harness": "build/verification/identity-time-causal-artifacts/instance-calibration-reviewed-harness.mjs",
+    "harnessSha256": "d029c80c5e0179a611817d1e8da900b4d7177daf7ab1a2430c60e15a527de8ba",
+    "plan": "build/verification/identity-time-instance-calibration-plan.json",
+    "planSha256": "f76e7aa3a0b81f1770b56e363a3805ad93b29f98cca7baf7dfbd07e6e8b1086d",
+    "status": "executed; independently audited all576 raw samples/64 placements and all derived pair/replicate/summary fields",
+    "blockers": [],
+    "resolvedFinding": "Actual consumed Core bytes are now hashed against pinned identity before compiling those same bytes. Host dynamic-import bytes rely on declared operational quiet plus before/after hashes, with no transient-change detection claim.",
+    "methodChecks": [
+      "Fixed current/baseline ratio direction survives reversed creation arrays.",
+      "Eight fresh CPU pairs per cohort/workload; headline median of eight per-pair medians, not40 independent pairs.",
+      "AB/BA creation4/4 and cohort-first order orthogonal; alternating per-sample execution balances odd five-later3/2 order across eight replicates.",
+      "Real Instance/result and CPU objects retained; instantiate observer only during factory, restored before sampling; metadata reads after factory timer.",
+      "Unchanged measure imports/resets inputs outside elapsed run timer, validates semantic/context/numeric/memory/resource flow, and disposes each live pair in finally."
+    ],
+    "ceilings": [
+      "Fresh-instance replicate estimates share one process and compiled Core; statistical independence of engine/OS/allocation factors is not established.",
+      "Sample0 is a cold translation-owner event, not a proof of cold V8 machine code.",
+      "Linear state offsets modulo16/64 do not measure native backing addresses, hardware cache lines or misses.",
+      "Cpu.creationMs includes instantiate promise bookkeeping; no uninstrumented startup comparison.",
+      "No per-sample TimeState assertion is introduced by this calibration; dedicated semantic receipts carry the clock proof."
+    ],
+    "completedReceipt": "build/verification/identity-time-instance-calibration-node.json",
+    "independentAudit": "build/verification/identity-time-instance-calibration-audit.json",
+    "verdict": "The original single-pair0.9\u20132.6percent Node x87 loss is not established as a repeatable artifact regression by the combined preserved evidence. Balanced fresh-pair calibration center is+0.102percent with4 positive/4 negative replicate medians; current/current A/A center is+0.236percent and order strata change sign. Same-Core clock removal/relocation/B-liveness counterfactuals did not recover speed. This neither proves zero cost nor proves the earlier observation fixed or caused by creation order."
+  },
+  "durableEvidence": [
+    {
+      "path": "build/verification/identity-time-source-before.json",
+      "bytes": 114785,
+      "sha256": "3dc79731373713bc3868298d7e74c240efa7966a6dd6ae2db399705a3c0ceccf"
+    },
+    {
+      "path": "build/verification/identity-time-source-after-initial-performance.json",
+      "bytes": 114810,
+      "sha256": "a9208404c07545e69e8b77ea96f7ea67ee44de86d514b97736f1d6a03373b473"
+    },
+    {
+      "path": "build/verification/identity-time-mutations.json",
+      "bytes": 77739,
+      "sha256": "9362be4ed9de1d620ffc2d02270c7a7ea6e8c5646b235aef040a4fcad9350441"
+    },
+    {
+      "path": "build/verification/identity-time-performance-execution.json",
+      "bytes": 23526,
+      "sha256": "9066d2468475a1da4d279cf63c91f3d7cf3b2b8f8e0187cb9db5178793f369e4"
+    },
+    {
+      "path": "build/verification/identity-time-counterfactual-plan.json",
+      "bytes": 2755,
+      "sha256": "1963f721eea2409001859ccd4c283b75b3d95e030e3189d7e39f5fae352c92dd"
+    },
+    {
+      "path": "build/verification/identity-time-counterfactual-execution.json",
+      "bytes": 3410,
+      "sha256": "d0488609a92481f7ad4e6a37f4396af2361cd7ceafb4fd814767ea0964046bc5"
+    },
+    {
+      "path": "build/verification/identity-time-characterization-validation-node.json",
+      "bytes": 149161,
+      "sha256": "66638194608e0268f40219bfa9213bcb5b08425a572b08b9b6012ae9095b619b"
+    },
+    {
+      "path": "build/verification/identity-time-characterization-validation-chrome.json",
+      "bytes": 149351,
+      "sha256": "cc3951349214b49f86f06df4ea38605b2d7f4a681c2129a2846af873e2ef8cf9"
+    },
+    {
+      "path": "build/verification/identity-time-characterization-node.json",
+      "bytes": 430474,
+      "sha256": "14a8378bb4dce0999da3b9aecb008c4e3df0a06e374bf2b26a56f3e31bd840e7"
+    },
+    {
+      "path": "build/verification/identity-time-characterization-chrome.json",
+      "bytes": 427891,
+      "sha256": "ae440f83aeffc0ab774aafa4258253f2ba9db0a97a87ffac7ce96790471e78b7"
+    },
+    {
+      "path": "build/verification/identity-time-instance-calibration-plan.json",
+      "bytes": 23716,
+      "sha256": "f76e7aa3a0b81f1770b56e363a3805ad93b29f98cca7baf7dfbd07e6e8b1086d"
+    },
+    {
+      "path": "build/verification/identity-time-cf-aa-node.json",
+      "bytes": 468178,
+      "sha256": "7f4a154e0586545377590dd36f0812d40aaf651ea761f263ebe3a8445311be94"
+    },
+    {
+      "path": "build/verification/identity-time-cf-future-primary-node.json",
+      "bytes": 468274,
+      "sha256": "8d99e4bde086e7dfbc0b42fcbb45cfa4d44f056573889645f9116d7e078b0840"
+    },
+    {
+      "path": "build/verification/identity-time-cf-future-reverse-node.json",
+      "bytes": 468426,
+      "sha256": "43da27cf71019b6b443a504d49ff20590d47c81ac01f87777ba309882f9cb2f6"
+    },
+    {
+      "path": "build/verification/identity-time-cf-move-primary-node.json",
+      "bytes": 468887,
+      "sha256": "5a56e66e4cbb6a573b08ccfc3eba175a0761b69d0ff0185ca845331249c41c74"
+    },
+    {
+      "path": "build/verification/identity-time-cf-move-reverse-node.json",
+      "bytes": 468905,
+      "sha256": "974308f4097099606174797ab163385af1aed7c247222d46407acb5f93c17b2a"
+    },
+    {
+      "path": "build/verification/identity-time-cf-omit-primary-node.json",
+      "bytes": 467963,
+      "sha256": "5c06a05217a005e3fef58fbc815b3a32a9803ad9864bb039cb085c12afb143fd"
+    },
+    {
+      "path": "build/verification/identity-time-cf-omit-reverse-node.json",
+      "bytes": 468006,
+      "sha256": "b387554695dfba18fe50287fcf883439443d5ef1cf699f04da6ad7a8d7178209"
+    },
+    {
+      "path": "build/verification/identity-time-cf-validation-future.json",
+      "bytes": 65618,
+      "sha256": "4b05980b5dae2fad2c9b74c7d7aaec8a058af82f7a7b539abe17721e9dd3edfc"
+    },
+    {
+      "path": "build/verification/identity-time-cf-validation-move.json",
+      "bytes": 65677,
+      "sha256": "b52d7971c435ca6035a15dc5bc247aa9ce705f10b54b1c82637898476b82e750"
+    },
+    {
+      "path": "build/verification/identity-time-cf-validation-omit.json",
+      "bytes": 70568,
+      "sha256": "a53106e2b42d06db308b77e59e6c3e3a036ea3fadfbb9a78a1612337399c2963"
+    },
+    {
+      "path": "build/verification/paging-performance-identity-time-x87-aa-report-chrome.json",
+      "bytes": 443727,
+      "sha256": "1dabbe98873db03f6e904aeb96c9dff178a755a510dc6b5ec220278c007a2620"
+    },
+    {
+      "path": "build/verification/paging-performance-identity-time-x87-aa-report-node.json",
+      "bytes": 444215,
+      "sha256": "eb7c18757b5c80f0987a90e994ee254b5d1eac9a0fdde725638ec8dd09bf8500"
+    },
+    {
+      "path": "build/verification/paging-performance-identity-time-x87-primary-report-chrome.json",
+      "bytes": 443604,
+      "sha256": "e4f364784eed444a7239f110bb57dec25e1fa86dcc677e27540067c46d578d66"
+    },
+    {
+      "path": "build/verification/paging-performance-identity-time-x87-primary-report-node.json",
+      "bytes": 444481,
+      "sha256": "68ef19b6324a4563ffee90c47eff864dfdab8cd7c430fbbce5c2c637a9c17467"
+    },
+    {
+      "path": "build/verification/paging-performance-identity-time-x87-reverse-report-chrome.json",
+      "bytes": 443749,
+      "sha256": "9c3e8560f488eac305280714cc7628eece4a7307a7eddb995296d1b8e26f16ec"
+    },
+    {
+      "path": "build/verification/paging-performance-identity-time-x87-reverse-report-node.json",
+      "bytes": 444496,
+      "sha256": "9c550ebfa79522f40ff7b853f7468072d3c4b64a989a798e9e3e4ebb51a160f3"
+    },
+    {
+      "path": "build/verification/identity-time-paging-aa-chrome.json",
+      "bytes": 232859,
+      "sha256": "cb091454ff8b2f0e2c2cb66bac778135dd2a5e423c41d5fdb39d214e47064920"
+    },
+    {
+      "path": "build/verification/identity-time-paging-aa-node.json",
+      "bytes": 234553,
+      "sha256": "a8fcb1c6c125bba327377cf56c87023a0eaa15c56823aa9833e9710f841ae533"
+    },
+    {
+      "path": "build/verification/identity-time-paging-primary-chrome.json",
+      "bytes": 234526,
+      "sha256": "c7ec89d40421d6f503f5731b7fe4b06320aa8aacc8265f7e225b4a2d6657effd"
+    },
+    {
+      "path": "build/verification/identity-time-paging-primary-node.json",
+      "bytes": 235705,
+      "sha256": "6f3eacac841a3c8acc2b607f2380f97b9dfd9b1cdf4fa269ca994837e3f6e9c8"
+    },
+    {
+      "path": "build/verification/identity-time-paging-reverse-chrome.json",
+      "bytes": 234065,
+      "sha256": "34f49690a5bcfab5bb952135fb8270531373eff80ffb031064d30725eb1c5d63"
+    },
+    {
+      "path": "build/verification/identity-time-paging-reverse-node.json",
+      "bytes": 235673,
+      "sha256": "f59925d9dee6e17edff544b7a61799d2f864f576f4bbe976e0178d99296d6d3c"
+    },
+    {
+      "path": "build/verification/identity-time-instance-calibration-node.json",
+      "bytes": 4879888,
+      "sha256": "f66d4f43fad1c2fed6632e93dfef0a8d6719b74889cf7be249ec94888cc9834e"
+    },
+    {
+      "path": "build/verification/identity-time-instance-calibration-audit.json",
+      "bytes": 15239,
+      "sha256": "82f55ec5f63d20e8fc4d8e40e125f0d7023f61f860ec0460d08917c9fbc734e8"
+    }
+  ],
+  "archive": [
+    {
+      "original": "/tmp/ring64-x87-counterfactual.mjs",
+      "durable": "build/verification/identity-time-causal-artifacts/counterfactual-harness.mjs",
+      "bytes": 19176,
+      "sha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998"
+    },
+    {
+      "original": "/tmp/ring64-x87-counterfactual-plan.json",
+      "durable": "build/verification/identity-time-causal-artifacts/counterfactual-early-plan.json",
+      "bytes": 6565,
+      "sha256": "d2100a1d05f6403c154b2212f179f13107bf079ab56eb28a51a517272356a288"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-capture.mjs",
+      "durable": "build/verification/identity-time-causal-artifacts/assembly-capture-harness.mjs",
+      "bytes": 19982,
+      "sha256": "0fda0b7f96dba95d0a27a8942eef3e678fffe6c2d53bf5872e2442d9492ca3a8"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-capture.json",
+      "durable": "build/verification/identity-time-causal-artifacts/assembly-capture.json",
+      "bytes": 52397,
+      "sha256": "2cff5b1b3145a071d26b88cbb19b08761d29a0109b079a9e4cdf7953ccddb340"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-compile-receipt.json",
+      "durable": "build/verification/identity-time-causal-artifacts/assembly-compile-receipt.json",
+      "bytes": 7222,
+      "sha256": "1c4e2e610cb2805013d085bb539cf366c80a0ccef70da0d61723418b68516348"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-audit.json",
+      "durable": "build/verification/identity-time-causal-artifacts/assembly-audit.json",
+      "bytes": 37547,
+      "sha256": "920db1fc56a5af262dbdd84da8de3e6d957c626020113ba02572d34879c19c1c"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-audit.py",
+      "durable": "build/verification/identity-time-causal-artifacts/assembly-audit.py",
+      "bytes": 7493,
+      "sha256": "0c22e3e67dbad5d02e354b79941119d4c7d7c8b3c3d01df63c0a259558c3b3c0"
+    },
+    {
+      "original": "/tmp/ring64-x87-post-helper-register-windows.json",
+      "durable": "build/verification/identity-time-causal-artifacts/post-helper-register-windows.json",
+      "bytes": 14651,
+      "sha256": "25a7d90e608db83554f39967388e7dfa3672f23ac0fb2ef9cc6eaf5601bf3336"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/2ea1e092f4f54e818c5dbaccf85f39ea72b512363732c5f94bf8264832d32691.wasm",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/2ea1e092f4f54e818c5dbaccf85f39ea72b512363732c5f94bf8264832d32691.wasm",
+      "bytes": 1113,
+      "sha256": "2ea1e092f4f54e818c5dbaccf85f39ea72b512363732c5f94bf8264832d32691"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/309b142e8ee4e4488e708a3716861b225d415139cd0a01338f26e717583a34ba.wasm",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/309b142e8ee4e4488e708a3716861b225d415139cd0a01338f26e717583a34ba.wasm",
+      "bytes": 1113,
+      "sha256": "309b142e8ee4e4488e708a3716861b225d415139cd0a01338f26e717583a34ba"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/4de39e07c1c7b95e136085f0e8ad38240647a198a41a6738c777f3ee3095c824.wasm",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/4de39e07c1c7b95e136085f0e8ad38240647a198a41a6738c777f3ee3095c824.wasm",
+      "bytes": 1113,
+      "sha256": "4de39e07c1c7b95e136085f0e8ad38240647a198a41a6738c777f3ee3095c824"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/5a1f015906a92582b7a8d30845f50b706da437e8320aa288f61ffbe673216833.wasm",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/5a1f015906a92582b7a8d30845f50b706da437e8320aa288f61ffbe673216833.wasm",
+      "bytes": 1125,
+      "sha256": "5a1f015906a92582b7a8d30845f50b706da437e8320aa288f61ffbe673216833"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/79faccfe4bb1085721c74d1a37000af1715c1d52798296860f691e6bb018c3aa.wasm",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/79faccfe4bb1085721c74d1a37000af1715c1d52798296860f691e6bb018c3aa.wasm",
+      "bytes": 1095,
+      "sha256": "79faccfe4bb1085721c74d1a37000af1715c1d52798296860f691e6bb018c3aa"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/85bc5d291732fbce834bd42291f4f0d849a79f63e41a7d071867c7a5c8e710a8.wasm",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/85bc5d291732fbce834bd42291f4f0d849a79f63e41a7d071867c7a5c8e710a8.wasm",
+      "bytes": 1083,
+      "sha256": "85bc5d291732fbce834bd42291f4f0d849a79f63e41a7d071867c7a5c8e710a8"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/c3e174d9eb3a460152f4f623486164d842af11d7cf0a4bf7435015cbf0cb52a0.wasm",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/c3e174d9eb3a460152f4f623486164d842af11d7cf0a4bf7435015cbf0cb52a0.wasm",
+      "bytes": 1101,
+      "sha256": "c3e174d9eb3a460152f4f623486164d842af11d7cf0a4bf7435015cbf0cb52a0"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/cf3bcc098f1852481e38907b84e116698cd13f1dd89ae889cd4cb0aa4d9455e6.wasm",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/cf3bcc098f1852481e38907b84e116698cd13f1dd89ae889cd4cb0aa4d9455e6.wasm",
+      "bytes": 1101,
+      "sha256": "cf3bcc098f1852481e38907b84e116698cd13f1dd89ae889cd4cb0aa4d9455e6"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-as-is-vs-future-bias.shape.diff.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-as-is-vs-future-bias.shape.diff.txt",
+      "bytes": 3254,
+      "sha256": "88fdc28b67cb7b03158a89be7c8189e0864decac2a272487bc74a448b9783d74"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-as-is-vs-move-after-publication.shape.diff.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-as-is-vs-move-after-publication.shape.diff.txt",
+      "bytes": 441,
+      "sha256": "37fe3854ba926fcbbb60bfaf456497a3e8035be4874a6680fad677fe723b7ec0"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-as-is-vs-omit.shape.diff.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-as-is-vs-omit.shape.diff.txt",
+      "bytes": 4323,
+      "sha256": "947b38d142081372fcd19cc8ebc363fd70cbf772a4da511406436e661027c411"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-as-is.asm.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-as-is.asm.txt",
+      "bytes": 26745,
+      "sha256": "398028b2481ec36e0f8a67f2696caec0a48a1a047725332a9e825350a778997b"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-as-is.normal-cycle.shape.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-as-is.normal-cycle.shape.txt",
+      "bytes": 2409,
+      "sha256": "2d2a9281b4b58ba7492b21b1520accbd58abed866205f644eb96a3edf376857e"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-as-is.normal-cycle.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-as-is.normal-cycle.txt",
+      "bytes": 3423,
+      "sha256": "ff5d52e4b15a835c0fa35262f8fd687e898ebec6fbcddb9adf048ea8d9123424"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-future-bias.asm.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-future-bias.asm.txt",
+      "bytes": 27814,
+      "sha256": "a36374b1b66a3644e0f20e1ed417d32badbb7f9561415af1f003e0c9e429aabe"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-future-bias.normal-cycle.shape.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-future-bias.normal-cycle.shape.txt",
+      "bytes": 2389,
+      "sha256": "0edce9746f15b509c1f38e545ece2982c4c54df2ee55b64101372c19e78520fb"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-future-bias.normal-cycle.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-future-bias.normal-cycle.txt",
+      "bytes": 3401,
+      "sha256": "68e52c071482da3383a62df7957c3b18df556adc95ed1b04906a3de255329018"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-move-after-publication.asm.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-move-after-publication.asm.txt",
+      "bytes": 27766,
+      "sha256": "b1c151ca6c4324a1afd20549d67cc0a2c02d94b2f25fc5c7f8c5922da904b539"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-move-after-publication.normal-cycle.shape.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-move-after-publication.normal-cycle.shape.txt",
+      "bytes": 2409,
+      "sha256": "7034c9fe0cfd8934fd348cdb69e9200d8885d5c930c33573b86126d0cc52b9c4"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-move-after-publication.normal-cycle.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-move-after-publication.normal-cycle.txt",
+      "bytes": 3423,
+      "sha256": "6c0e6c4e714d64bfef9501b82afb2b6c4fac2962aac9b6caa41cbeca877b213e"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-omit.asm.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-omit.asm.txt",
+      "bytes": 27984,
+      "sha256": "46b5862777fe215f39b2fdb6ee60f43b82a1ae2eb3b633a971ef4f78c0680a45"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-omit.normal-cycle.shape.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-omit.normal-cycle.shape.txt",
+      "bytes": 2409,
+      "sha256": "d43944a75576a60716caa258a8743e70d952970b9eaaa9f7ce99a47dc623e470"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/mmx-omit.normal-cycle.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/mmx-omit.normal-cycle.txt",
+      "bytes": 3418,
+      "sha256": "8e2f9594a2fd3b14d4c7bdf64bdcc552b0f90d52ee2e0112bcb3b5fc8858e529"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-as-is-vs-future-bias.shape.diff.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-as-is-vs-future-bias.shape.diff.txt",
+      "bytes": 6237,
+      "sha256": "a333746fb41a9a3b0b04af311df30d81acef1a15aea9b8de0840f48768492090"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-as-is-vs-move-after-publication.shape.diff.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-as-is-vs-move-after-publication.shape.diff.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-as-is-vs-omit.shape.diff.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-as-is-vs-omit.shape.diff.txt",
+      "bytes": 6310,
+      "sha256": "51177e91a465a26b9bb5a812d7a71ca36889cbc8ab01d9f34a9f8ab5d87993cb"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-as-is.asm.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-as-is.asm.txt",
+      "bytes": 31763,
+      "sha256": "fae16c85d4a5b36635570bcbaf8d3382fe024b45f91865204bd947d04ef583ce"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-as-is.normal-cycle.shape.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-as-is.normal-cycle.shape.txt",
+      "bytes": 3379,
+      "sha256": "a7628c9019ef32ef382dc83c039c948573040dac67318598bf36426783feca51"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-as-is.normal-cycle.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-as-is.normal-cycle.txt",
+      "bytes": 4877,
+      "sha256": "56c52e21e7abe8cc5b0786989a06059c6b187d681253ad8dabc80735c03e6e08"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-future-bias.asm.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-future-bias.asm.txt",
+      "bytes": 30012,
+      "sha256": "7c032525ee8074fa48480dca7c96e80d1081ac0718bdd2bf7c4d2d5951115887"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-future-bias.normal-cycle.shape.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-future-bias.normal-cycle.shape.txt",
+      "bytes": 3176,
+      "sha256": "2d14d45c01b3b3f5f021f45d85d548ee1d286f9cd096d0d54ea1202af415b8d4"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-future-bias.normal-cycle.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-future-bias.normal-cycle.txt",
+      "bytes": 4579,
+      "sha256": "599009e1105472f5ae1dcf1c1936645c46a30eb71e1725e1778d64d7803e2c00"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-move-after-publication.asm.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-move-after-publication.asm.txt",
+      "bytes": 31742,
+      "sha256": "6c91f5e260e8a4fafe9f480387aa2e32f1317e430f63b379abf084adeb59e142"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-move-after-publication.normal-cycle.shape.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-move-after-publication.normal-cycle.shape.txt",
+      "bytes": 3379,
+      "sha256": "a7628c9019ef32ef382dc83c039c948573040dac67318598bf36426783feca51"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-move-after-publication.normal-cycle.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-move-after-publication.normal-cycle.txt",
+      "bytes": 4877,
+      "sha256": "235d0e8434e314fdc4d66e12c047591429c19ec6418d827091bda51813befb70"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-omit.asm.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-omit.asm.txt",
+      "bytes": 32319,
+      "sha256": "820ba999fef118c30deb921d9024c4be0e86d0135b224c4fd8c313ea58e78dd4"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-omit.normal-cycle.shape.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-omit.normal-cycle.shape.txt",
+      "bytes": 3305,
+      "sha256": "12b782c6d1d2226f49f8aa72bd02983d95f05f94cb626e12b9e9a4a872ff590f"
+    },
+    {
+      "original": "/tmp/ring64-x87-assembly-modules/x87-omit.normal-cycle.txt",
+      "durable": "build/verification/identity-time-causal-artifacts/modules/x87-omit.normal-cycle.txt",
+      "bytes": 4768,
+      "sha256": "3bb27cf3fcc67601d0596040dc4b2f8edba2a66c72cc68fd2ba2be572581665a"
+    },
+    {
+      "original": "/tmp/ring64-identity-time-performance-independent-audit.json",
+      "durable": "build/verification/identity-time-causal-artifacts/independent-targeted-performance-screen.json",
+      "bytes": 75195,
+      "sha256": "632c929988e1896f234584dacabb0af17f2f86b7863137b1f10413b8bba1bd09",
+      "transformation": "Remove duplicate raw arrays only; preserve all84 calculated row summaries, integrity and crosschecks."
+    },
+    {
+      "original": "/tmp/ring64-identity-instance-calibration.mjs",
+      "durable": "build/verification/identity-time-causal-artifacts/instance-calibration-reviewed-harness.mjs",
+      "bytes": 20198,
+      "sha256": "d029c80c5e0179a611817d1e8da900b4d7177daf7ab1a2430c60e15a527de8ba"
+    },
+    {
+      "original": "/tmp/ring64-archive-identity-causal-audit.py",
+      "durable": "build/verification/identity-time-causal-artifacts/ring64-archive-identity-causal-audit.py",
+      "bytes": 14806,
+      "sha256": "4cd9cbac9308376dee88ee124248d4c7033f79c9040fa11fa280fa3959e226a7",
+      "scope": "exact executed read/copy/audit script; no guest or timing execution"
+    },
+    {
+      "original": "/tmp/ring64-audit-instance-calibration.py",
+      "durable": "build/verification/identity-time-causal-artifacts/ring64-audit-instance-calibration.py",
+      "bytes": 15485,
+      "sha256": "ccac07df99c73b9e6949ed00e3cb91cb31d426e62e207b4ee7677ecd025b3934",
+      "scope": "exact executed read/copy/audit script; no guest or timing execution"
+    }
+  ],
+  "deliveryCeiling": "Evidence index does not claim commit/push, full test-suite totals, final calibration results or resolved zero-overhead performance. Those require the root final delivery receipts."
+}

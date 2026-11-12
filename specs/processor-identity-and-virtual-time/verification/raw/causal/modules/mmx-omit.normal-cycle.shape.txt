@@ -1,0 +1,150 @@
+movz x16, #0x1000
+str x16, [sp, S0]
+mov x1, x9
+ldr x9, [sp, S1]
+mov x7, x8
+mov x3, x11
+movz x11, #0x0
+ldr x8, [sp, S2]
+ldr x6, [sp, S3]
+mov x4, x13
+ldur x5, [x26, #-224]
+movz x12, #0xffff
+cmp sp, x5
+b.ls TARGET
+cmp w11, #0x5 (5)
+b.hs TARGET
+adr x16, #+0xc
+add x16, x16, w11, uxtw #2
+br x16
+b TARGET
+cbz x1, TARGET
+cmp x3, #0x1000 (4096)
+cset x11, eq
+tst w4, w11
+b.ne TARGET
+add x11, x8, x10
+ldrh w5, [x11, #538]
+ldrh w13, [x11, #536]
+bic w13, w5, w13
+tst w13, #0x3f
+b.ne TARGET
+add x13, x10, #0x1c8 (456)
+ldr d0, [x13, x8]
+ldr d1, [x13, x8]
+eor v0.16b, v0.16b, v1.16b
+mov x13, v0.d[0]
+str x13, [x11, #456]
+strh w12, [x11, #464]
+ldrh w13, [x11, #538]
+and w13, w13, #0xffffc7ff
+strh w13, [x11, #538]
+strh wzr, [x11, #540]
+sub x1, x1, #0x1 (1)
+nop
+cbz x1, TARGET
+movz x11, #0x1003
+cmp x3, x11
+cset x13, eq
+tst w4, w13
+b.ne TARGET
+add x13, x8, x10
+ldrh w5, [x13, #538]
+str x10, [sp, S4]
+ldrh w10, [x13, #536]
+bic w10, w5, w10
+tst w10, #0x3f
+b.ne TARGET
+ldrh w10, [x13, #538]
+and w10, w10, #0xffffc7ff
+strh w10, [x13, #538]
+strh w12, [x13, #540]
+sub x1, x1, #0x1 (1)
+ldr x10, [sp, S4]
+nop
+str x1, [sp, S5]
+cbz x1, TARGET
+movz x11, #0x1005
+cmp x3, x11
+cset x13, eq
+tst w4, w13
+b.ne TARGET
+ldur x10, [x7, #7]
+ldur x10, [x10, #39]
+ldur x13, [x9, #39]
+str x2, [sp, S6]
+mov x7, x10
+movz x0, #0xb
+movk x0, #0xf40, lsl #16
+movz x2, #0x0
+movz x3, #0x2
+mov x4, x11
+ldr x5, [sp, S7]
+blr x13
+ldr x8, [sp, S8]
+ldur x1, [x8, #39]
+cmp w0, #0x2 (2)
+cset x9, eq
+cmp w0, #0x0 (0)
+cset x10, eq
+orr w9, w10, w9
+cbz w9, TARGET
+ldr x2, [sp, S5]
+sub x2, x2, #0x1 (1)
+mov x10, x1
+mov x1, x2
+mov x7, x8
+ldr x8, [sp, S2]
+ldr x6, [sp, S3]
+ldr x2, [sp, S6]
+ldr x4, [sp, S9]
+ldr x3, [sp, S10]
+ldr x9, [sp, S1]
+movz x12, #0xffff
+b TARGET
+str x1, [sp, S5]
+cbz x1, TARGET
+movz x11, #0x1007
+mov x13, x3
+cmp x13, x11
+cset x3, eq
+tst w4, w3
+b.ne TARGET
+ldur x10, [x7, #7]
+ldur x10, [x10, #39]
+ldur x3, [x9, #39]
+mov x1, x3
+mov x7, x10
+movz x0, #0x4041
+movk x0, #0x2ec0, lsl #16
+movz x2, #0x0
+movz x3, #0x2
+mov x4, x11
+ldr x5, [sp, S7]
+blr x1
+ldr x8, [sp, S8]
+ldur x1, [x8, #39]
+cmp w0, #0x2 (2)
+cset x9, eq
+cmp w0, #0x0 (0)
+cset x10, eq
+orr w9, w10, w9
+cbz w9, TARGET
+ldr x2, [sp, S5]
+sub x2, x2, #0x1 (1)
+mov x10, x1
+mov x1, x2
+b TARGET
+cbz x1, TARGET
+movz x9, #0x1009
+ldr x11, [sp, S10]
+cmp x11, x9
+cset x12, eq
+ldr x13, [sp, S9]
+tst w13, w12
+b.ne TARGET
+ldr x12, [sp, S6]
+sub x2, x12, #0x1 (1)
+sub x9, x1, #0x1 (1)
+cmp x12, #0x1 (1)
+b.ne TARGET

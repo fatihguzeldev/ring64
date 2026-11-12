@@ -1,0 +1,94 @@
+{
+  "declaredAt": "2026-11-12T22:39:42.868859+00:00",
+  "source": "same frozen2f94Corehost; no rebuild; only generatedcodepatch",
+  "harnessSha256": "f0dc8d7548b29cd6a3ca3b56faf447ca67d50a498b93579512b847940fbfb998",
+  "jobs": [
+    {
+      "name": "identity-time-cf-omit-primary-node",
+      "argv": [
+        "node",
+        "/tmp/ring64-x87-counterfactual.mjs",
+        "--run",
+        "--variant",
+        "omit",
+        "--output",
+        "/Users/fatihguzel/ring64/build/verification/identity-time-cf-omit-primary-node.json"
+      ]
+    },
+    {
+      "name": "identity-time-cf-omit-reverse-node",
+      "argv": [
+        "node",
+        "/tmp/ring64-x87-counterfactual.mjs",
+        "--run",
+        "--variant",
+        "omit",
+        "--reverse",
+        "--output",
+        "/Users/fatihguzel/ring64/build/verification/identity-time-cf-omit-reverse-node.json"
+      ]
+    },
+    {
+      "name": "identity-time-cf-move-primary-node",
+      "argv": [
+        "node",
+        "/tmp/ring64-x87-counterfactual.mjs",
+        "--run",
+        "--variant",
+        "move-after-publication",
+        "--output",
+        "/Users/fatihguzel/ring64/build/verification/identity-time-cf-move-primary-node.json"
+      ]
+    },
+    {
+      "name": "identity-time-cf-move-reverse-node",
+      "argv": [
+        "node",
+        "/tmp/ring64-x87-counterfactual.mjs",
+        "--run",
+        "--variant",
+        "move-after-publication",
+        "--reverse",
+        "--output",
+        "/Users/fatihguzel/ring64/build/verification/identity-time-cf-move-reverse-node.json"
+      ]
+    },
+    {
+      "name": "identity-time-cf-future-primary-node",
+      "argv": [
+        "node",
+        "/tmp/ring64-x87-counterfactual.mjs",
+        "--run",
+        "--variant",
+        "future-bias",
+        "--output",
+        "/Users/fatihguzel/ring64/build/verification/identity-time-cf-future-primary-node.json"
+      ]
+    },
+    {
+      "name": "identity-time-cf-future-reverse-node",
+      "argv": [
+        "node",
+        "/tmp/ring64-x87-counterfactual.mjs",
+        "--run",
+        "--variant",
+        "future-bias",
+        "--reverse",
+        "--output",
+        "/Users/fatihguzel/ring64/build/verification/identity-time-cf-future-reverse-node.json"
+      ]
+    },
+    {
+      "name": "identity-time-cf-aa-node",
+      "argv": [
+        "node",
+        "/tmp/ring64-x87-counterfactual.mjs",
+        "--run",
+        "--aa",
+        "--output",
+        "/Users/fatihguzel/ring64/build/verification/identity-time-cf-aa-node.json"
+      ]
+    }
+  ],
+  "scope": "Node x87stack/MMX,actualN1000001,samples17,later>=4; omitdiagnosticinvalidclock; move/futurelimitednontimestampvalidation only. AlloriginalCore/host/owner metadata retained. Keepallrawattempts."
+}
