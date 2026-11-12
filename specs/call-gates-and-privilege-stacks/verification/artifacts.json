@@ -1,0 +1,143 @@
+{
+  "baseline": {
+    "source": {
+      "commit": "ec501335d2c2931f4f01cb7b2004a225d2fd54bc",
+      "workingTree": ["M src/x86/protection/far.rs", "?? src/x86/protection/far/gate_tests.rs"]
+    },
+    "coreSha256": "670a46f37d8cec0f4b0868b63285354a587cdc82723b2a5c90dc978e7b5f7416",
+    "coreBytes": 1179084,
+    "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+    "productionHostSha256": "2f2ccdfa6177c2cd42afb4c811f8e019216e4ebfbaf719668b8ff506dbcf4a84",
+    "hostBytes": 316707,
+    "productionHostBytes": 134807,
+    "path": "/Users/fatihguzel/ring64/build/verification/call-gates-baseline-ec50133",
+    "capturedOriginalPath": "/Users/fatihguzel/ring64",
+    "manifestFile": "build/verification/call-gates-baseline-ec50133/paging-source.json",
+    "manifestSha256": "11f573007f6058dbdffa96bb554dd0930acd8bd281ee93c4fc24f31b6353a7ab"
+  },
+  "final": {
+    "source": {
+      "commit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+      "workingTree": []
+    },
+    "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+    "coreBytes": 1240374,
+    "hostSha256": "a3945ddb4b62f434ee59a5056df0525eb96ae21ada4c1e6e81404924c38319b3",
+    "productionHostSha256": "2f2ccdfa6177c2cd42afb4c811f8e019216e4ebfbaf719668b8ff506dbcf4a84",
+    "hostBytes": 316707,
+    "productionHostBytes": 134807,
+    "path": "/Users/fatihguzel/ring64/build/verification/call-gates-final-d232452",
+    "capturedOriginalPath": "/Users/fatihguzel/ring64",
+    "manifestFile": "build/verification/call-gates-final-d232452/paging-source.json",
+    "manifestSha256": "c00f24064d566976f446141339ff21231c48481179b5b3772919b02d5f4ec5a0"
+  },
+  "baselineNote": "ec50133 is a specification-only commit over43dad55. The freeze records cfg(test) edits, not a clean checkout. Production Core670a46 is the exact pre-feature43dad55 artifact; those test edits are absent from release code.",
+  "coreGrowthBytes": 61290,
+  "checks": {
+    "formatLintNativeWasmClippy": true,
+    "nativeTests": 888,
+    "nodeTests": 239,
+    "chromeScenarios": 994,
+    "newSharedGateScenarios": 52,
+    "fullCheckLogSha256": "b94fd4b5b5417d173cd5100f08079b96b12ed5532d0c67c904857e39c583f7fc",
+    "browserEvidenceSha256": "93c00947edd0d5cf941322964750cb91161072182b22dda715e86991a9acb794"
+  },
+  "gateOracles": [
+    {
+      "file": "build/verification/call-gates-oracle-final-node.json",
+      "sha256": "b3dceb527bae2c8bae9fad9efa355a132ea526202580f2d88c6f8f987e8242dd",
+      "runtime": "node",
+      "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+      "oracle": {
+        "matrixCases": 1024,
+        "cases": 1041,
+        "guestCalls": 2080,
+        "coverage": "literal raw descriptors, all 32 counts, both slot widths, old/new SS.B, both busy TR banks, source CS.D, wrap/raw-pointer/overlap, memory banks, IA64 same/inner/compatibility/full-RSP/canonical touched spans",
+        "ceiling": "Finite imported-context CALL+matching-RETF oracle; not native hardware overlap equivalence or application coverage."
+      },
+      "postRunIntegrity": {
+        "core": true,
+        "host": true,
+        "sources": true
+      }
+    },
+    {
+      "file": "build/verification/call-gates-oracle-final-chrome.json",
+      "sha256": "47dc6a854fb47817f34cea79264872e6a077f435d044e9abfa10f1308c3814c2",
+      "runtime": "chrome",
+      "coreSha256": "8ad967df3b2f9af4c901c82c42fcad90300a9c7e90cc863ac0e31235af80b1d2",
+      "oracle": {
+        "matrixCases": 1024,
+        "cases": 1041,
+        "guestCalls": 2080,
+        "coverage": "literal raw descriptors, all 32 counts, both slot widths, old/new SS.B, both busy TR banks, source CS.D, wrap/raw-pointer/overlap, memory banks, IA64 same/inner/compatibility/full-RSP/canonical touched spans",
+        "ceiling": "Finite imported-context CALL+matching-RETF oracle; not native hardware overlap equivalence or application coverage."
+      },
+      "postRunIntegrity": {
+        "core": true,
+        "host": true,
+        "sources": true
+      }
+    }
+  ],
+  "inheritedOracles": {
+    "rationalRaw80Cases": 2200,
+    "rationalCasesSha256": "00e8ba737bce022b333901244a4f38b0f96e34d0dbefd0ec0be97a995e3ff113",
+    "rationalLogSha256": "f477b845b3835997664aefb003922f462a3a77e691845fb266c7217940613600",
+    "ioCases": 6480,
+    "ioEvidenceSha256": "a5ad09f66b462ed6f12e118ec5b28074bdc8e032f40e7a34d58e2cbbb0f288a6",
+    "rawStoreCases": 2496,
+    "rawStoreEvidenceSha256": "ee9643f329d01133fe3fb09087b4702d844e6aa8f8f8d261980384b08939e63a",
+    "integrityNote": "Gate/IO/raw-store drivers include post-run guards. The arithmetic driver records the Core bytes consumed; the frozen and live Core were also checked after the complete window. Do not infer identical per-driver postguard coverage."
+  },
+  "readmeSha256": "8b5c428abbf6bdff38ef1dc5d0436873bdffa8283e68a98da23f1fce0f4372ac",
+  "sourceDiff": {
+    "base": "43dad557f539d69138fa25e0e8da640b895e002b",
+    "head": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+    "changedFiles": [
+      "src/embedding/exports/exception_delivery.rs",
+      "src/embedding/exports/far_control.rs",
+      "src/embedding/exports/tests.rs",
+      "src/embedding/exports/tests/call_gate_owners.rs",
+      "src/embedding/exports/tests/call_gate_sources.rs",
+      "src/embedding/exports/tests/far_plan_lifetime.rs",
+      "src/x86/access.rs",
+      "src/x86/paging/access.rs",
+      "src/x86/paging/access_tests.rs",
+      "src/x86/protection/access.rs",
+      "src/x86/protection/event/entry.rs",
+      "src/x86/protection/event/system.rs",
+      "src/x86/protection/far.rs",
+      "src/x86/protection/far/boundary_tests.rs",
+      "src/x86/protection/far/gate_boundary_tests.rs",
+      "src/x86/protection/far/gate_paging_review_tests.rs",
+      "src/x86/protection/far/gate_phase_tests.rs",
+      "src/x86/protection/far/gate_review_tests.rs",
+      "src/x86/protection/far/gate_tests.rs",
+      "src/x86/protection/far/gates.rs",
+      "src/x86/protection/operands.rs",
+      "src/x86/protection/task.rs"
+    ],
+    "unchangedGroups": [
+      "host/",
+      "src/dbt/",
+      "src/x86/x87*",
+      "src/x86/mmx*",
+      "src/x86/float*",
+      "README.md",
+      "Cargo.toml",
+      "Cargo.lock",
+      "package.json",
+      "package-lock.json"
+    ],
+    "diffPathScope": [
+      "src",
+      "host",
+      "README.md",
+      "Cargo.toml",
+      "Cargo.lock",
+      "package.json",
+      "package-lock.json"
+    ]
+  }
+}

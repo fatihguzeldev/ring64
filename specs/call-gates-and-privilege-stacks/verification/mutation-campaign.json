@@ -1,0 +1,217 @@
+{
+  "note": "Thirteen deliberate semantic mutants; own sandbox builds, named assertion kills only. The prepared-context mutant tests old SS identity with distinct bases; a separate read_system mutant tests supervisor bypass of old user parameter permission.",
+  "timeoutMs": 300000,
+  "mutations": [
+    {
+      "name": "truncate-count31-to15",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": "(raw >> 32) as usize & 31",
+      "after": "(raw >> 32) as usize & 15",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/call-gates-audit.mjs", "--current", "."]
+      ],
+      "assertion": "legacy-w2-n16-[^\\n]*entry GPRs/raw stack"
+    },
+    {
+      "name": "swapped-gate-width",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": "} else if gate_kind == 12 {",
+      "after": "} else if gate_kind == 4 {",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/call-gates-audit.mjs", "--current", "."]
+      ],
+      "assertion": "legacy-w2-n0-[^\\n]*entry GPRs/raw stack"
+    },
+    {
+      "name": "reverse-captured-parameter-order",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": "frame.writes[2 + count - 1 - index].value = value;",
+      "after": "frame.writes[2 + index].value = value;",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/call-gates-audit.mjs", "--current", ".", "--no-matrix"]
+      ],
+      "assertion": "raw-old-b16-wrap-full-dword:[^\\n]*exact frame and all untouched RAM"
+    },
+    {
+      "name": "reread-parameters-during-payload-publication",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": "    for slot in &frame.writes[..frame.count] {\n        image\n            .write(slot.address, slot.width, slot.value)\n            .expect(\"admitted private gate frame write\");\n    }",
+      "after": "    for (index, slot) in frame.writes[..frame.count].iter().enumerate() {\n        let value = if index >= 2 && index < 2 + count {\n            let source_index = count - 1 - (index - 2);\n            let offset = step(operands.input_sp, source_index as u64 * u64::from(width.bytes()), context.stack_width());\n            read_stack(context, image, offset, width, observe)?\n        } else { slot.value };\n        image\n            .write(slot.address, slot.width, value)\n            .expect(\"admitted private gate frame write\");\n    }",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/call-gates-audit.mjs", "--current", ".", "--no-matrix"]
+      ],
+      "assertion": "captured-overlap-n1:[^\\n]*exact frame and all untouched RAM"
+    },
+    {
+      "name": "tss-pointer-before-selector",
+      "path": "src/x86/protection/task.rs",
+      "before": "    let ss = attempt.read(context, image, ext)?;\n    let sp = super::access::SystemRead {\n        offset,\n        width,\n        ..attempt\n    }\n    .read(context, image, ext)?;",
+      "after": "    let sp = super::access::SystemRead {\n        offset,\n        width,\n        ..attempt\n    }\n    .read(context, image, ext)?;\n    let ss = attempt.read(context, image, ext)?;",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {callGateScenarios} from './build/tests/execution/call-gates/index.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=callGateScenarios(core).filter(s=>s.name.includes(\"TSS reads selector field before pointer field\")); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "SS field first, not earlier ESP address"
+    },
+    {
+      "name": "reject-initial-noncanonical-rsp",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": "    let mut frame = Frame::new(",
+      "after": "    if wide && !crate::memory::canonical48(initial_sp) { return Err(target_fault()); }\n    let mut frame = Frame::new(",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/call-gates-audit.mjs", "--current", ".", "--no-matrix"]
+      ],
+      "assertion": "ia64-inner-first-hole-pushes-canonical:[^\\n]*completion"
+    },
+    {
+      "name": "old-cpl-destination-admission",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": ".check_frame_write(slot.address, slot.width, cpl)",
+      "after": ".check_frame_write(slot.address, slot.width, context.cpl())",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {callGateScenarios} from './build/tests/execution/call-gates/index.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=callGateScenarios(core).filter(s=>s.name.includes(\"late destination admission retains capture A\")); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "prospective kernel CPL write"
+    },
+    {
+      "name": "prospective-context-parameter-read",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": "read_stack(context, image, offset, width, observe)?",
+      "after": "read_stack(&prepared, image, offset, width, observe)?",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/call-gates-audit.mjs", "--current", "."]
+      ],
+      "assertion": "legacy-w2-n1-[^\\n]*exact frame and all untouched RAM"
+    },
+    {
+      "name": "erase-observed-operand-hit-mask",
+      "path": "src/embedding/exports/far_control.rs",
+      "before": "candidate |= bank.matches(address, width, access)",
+      "after": "candidate |= bank.matches(address, width, access) & 0",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {callGateScenarios} from './build/tests/execution/call-gates/index.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=callGateScenarios(core).filter(s=>s.name.includes(\"debug merges explicit pointer old parameters new stack writes\")); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "one completed DB source outranks stop|actual operand spans aggregate without TSS metadata"
+    },
+    {
+      "name": "erase-selected-canonical-source",
+      "path": "src/embedding/exports/far_control.rs",
+      "before": "&& fault.cause == Cause::Noncanonical",
+      "after": "&& fault.cause != Cause::Noncanonical",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {callGateScenarios} from './build/tests/execution/call-gates/index.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=callGateScenarios(core).filter(s=>s.name.includes(\"canonical descriptor reports retain full diagnostics\")); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "captured selector source"
+    },
+    {
+      "name": "save-masked-active-old-sp",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": "frame.push(&prepared, operands.input_sp, width)?;",
+      "after": "frame.push(&prepared, operands.input_sp & context.stack_width().mask(), width)?;",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/call-gates-audit.mjs", "--current", ".", "--no-matrix"]
+      ],
+      "assertion": "raw-old-b16-wrap-full-dword:[^\\n]*exact frame and all untouched RAM"
+    },
+    {
+      "name": "align64-gate-stack",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": "        initial_sp,\n        new_stack.map",
+      "after": "        if wide { initial_sp & !15 } else { initial_sp },\n        new_stack.map",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/call-gates-audit.mjs", "--current", ".", "--no-matrix"]
+      ],
+      "assertion": "ia64-long-inner-unaligned:[^\\n]*entry GPRs/raw stack"
+    },
+    {
+      "name": "supervisor-old-parameter-read",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": "        let value = read_stack(context, image, offset, width, observe)?;",
+      "after": "        let address = stack_geometry(context, offset, u32::from(width.bytes()), Access::Read)?;\n        let bytes = image.read_system(address, u32::from(width.bytes()))\n            .map_err(|failure| linear_failure(failure, Segment::Ss))?;\n        let value = u64::from_le_bytes(bytes[..8].try_into().unwrap());",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {readFile} from 'node:fs/promises'; import {callGateScenarios} from './build/tests/execution/call-gates/index.js'; const core=await WebAssembly.compile(await readFile('./build/ring64.wasm')); const cases=callGateScenarios(core).filter(s=>s.name.includes(\"debug faults discard pointer and tentative old parameter hits\")); if(cases.length!==1)throw Error('campaign scenario selection must match exactly one'); for(const s of cases){try{await s.run();}catch(e){e.message=s.name+': '+e.message;throw e;}}"
+        ]
+      ],
+      "assertion": "old-CPL parameter read denied|user read of supervisor page"
+    },
+    {
+      "name": "discard-captured-publication-origin",
+      "path": "src/x86/protection/far/gates.rs",
+      "before": "Some(index) => descriptors.nth(index),",
+      "after": "Some(_) => descriptors.find(|write| write.contains(fault.failure)),",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import{readFile}from'node:fs/promises';import{callGateScenarios}from'./build/tests/execution/call-gates/index.js';const c=await WebAssembly.compile(await readFile('build/ring64.wasm'));const t=callGateScenarios(c).find(t=>t.name.includes('dirty refusal retains captured frame identity'));if(!t)throw Error('scenario selection missing');await t.run();"
+        ]
+      ],
+      "assertion": "captured frame D refusal is not an earlier descriptor accessed write"
+    },
+    {
+      "name": "restart-already-begun-source-alias",
+      "path": "src/embedding/exports/far_control.rs",
+      "before": "        let outcome = match result {",
+      "after": "        if PAGED && core.image.active_changed() { return 26; }\n        let outcome = match result {",
+      "commands": [
+        ["npm", "run", "build"],
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import{readFile}from'node:fs/promises';import{callGateScenarios}from'./build/tests/execution/call-gates/index.js';const c=await WebAssembly.compile(await readFile('build/ring64.wasm'));const t=callGateScenarios(c).find(t=>t.name.includes('post-begin TSS page A alias'));if(!t)throw Error('scenario selection missing');await t.run();"
+        ]
+      ],
+      "assertion": "completed selected gate|captured gate13 completes|captured original gate reaches invalid new SS"
+    },
+    {
+      "name": "omit-outer-return-cleanup",
+      "path": "src/x86/protection/far.rs",
+      "before": "step(restored_sp, u64::from(cleanup), target_width)",
+      "after": "step(restored_sp, 0, target_width)",
+      "commands": [
+        ["npm", "run", "build"],
+        ["node", "scripts/call-gates-audit.mjs", "--current", "."]
+      ],
+      "assertion": "legacy-w2-n1-[^\\n]*cleanup/raw pointer roundtrip"
+    }
+  ]
+}

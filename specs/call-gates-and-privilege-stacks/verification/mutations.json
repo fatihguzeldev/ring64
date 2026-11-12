@@ -1,0 +1,142 @@
+{
+  "sourceCommit": "d23245255cbb732c631e55ea7852fbd3d47cd672",
+  "sourceSnapshotSha256": "86ed6555762d82665eec91c30650459805fe10fd09123fe4b82fbbe0787cae7d",
+  "originalSourceUnchanged": true,
+  "executedCampaignSha256": "4c76dfb9d22c93ad529e434b06da9959d77ec2718b14c8384db74d3dca5d0579",
+  "formattedCampaignSha256": "809b13dc1a0fbe5829a44b376ad1f7faaff413144d0422b177decc7ca9bb7e4c",
+  "campaignDefinitionsEqual": true,
+  "resultFile": "build/verification/call-gates-mutations.json",
+  "resultSha256": "be76f96a2038575ae309a0f8904dd0f7ba16210118959404d8909edf94a45f94",
+  "killed": 16,
+  "records": [
+    {
+      "name": "truncate-count31-to15",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "legacy-w2-n16-[^\\n]*entry GPRs/raw stack",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: legacy-w2-n16-old16-new16-tr16-cs16: legacy-w2-n16-old16-new16-tr16-cs16 entry GPRs/raw stack: [\"3333000000000000\",\"3333000000000001\",\"3333000000000002\",\"6000\",\"8ff8\",\"3333000000000005\",\"3333000000000006\",\"3333000000000007\",\"3333000000000008\",\"3333000000000009\",\"333300000000000a\",\"333300000000000b\",\"333300000000000c\",\"333300000000000d\",\"333300000000000e\",\"333300000000000f\"] != [\"3333000000000000\",\"3333000000000001\",\"3333000000000002\",\"6000\",\"8fd8\",\"3333000000000005\",\"3333000000000006\",\"3333000000000007\",\"3333000000000008\",\"3333000000000009\",\"333300000000000a\",\"333300000000000b\",\"333300000000000c\",\"333300000000000d\",\"333300000000000e\",\"333300000000000f\"]",
+      "fullDiagnosticSha256": "409b3e92d7d318ed1b49aa21e6afa221d1be098f96f0656213051bfca6e9d9b7"
+    },
+    {
+      "name": "swapped-gate-width",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "legacy-w2-n0-[^\\n]*entry GPRs/raw stack",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: legacy-w2-n0-old16-new16-tr16-cs16: legacy-w2-n0-old16-new16-tr16-cs16 entry GPRs/raw stack: [\"3333000000000000\",\"3333000000000001\",\"3333000000000002\",\"6000\",\"8ff0\",\"3333000000000005\",\"3333000000000006\",\"3333000000000007\",\"3333000000000008\",\"3333000000000009\",\"333300000000000a\",\"333300000000000b\",\"333300000000000c\",\"333300000000000d\",\"333300000000000e\",\"333300000000000f\"] != [\"3333000000000000\",\"3333000000000001\",\"3333000000000002\",\"6000\",\"8ff8\",\"3333000000000005\",\"3333000000000006\",\"3333000000000007\",\"3333000000000008\",\"3333000000000009\",\"333300000000000a\",\"333300000000000b\",\"333300000000000c\",\"333300000000000d\",\"333300000000000e\",\"333300000000000f\"]",
+      "fullDiagnosticSha256": "547aad90dcdfccfe5f41e093c8c893698fb3d78d7e019e31e2e1b1d71d3358e1"
+    },
+    {
+      "name": "reverse-captured-parameter-order",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "raw-old-b16-wrap-full-dword:[^\\n]*exact frame and all untouched RAM",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: raw-old-b16-wrap-full-dword: raw-old-b16-wrap-full-dword exact frame and all untouched RAM: byte 0x28ff0 = 118, expected 189",
+      "fullDiagnosticSha256": "4fd114b2f006c2b1599163060f38d735d1107120255f2b2be5f8d0d8baf07a04"
+    },
+    {
+      "name": "reread-parameters-during-payload-publication",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "captured-overlap-n1:[^\\n]*exact frame and all untouched RAM",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: captured-overlap-n1: captured-overlap-n1 exact frame and all untouched RAM: byte 0x7ffc = 0, expected 189",
+      "fullDiagnosticSha256": "09bf69d046e5232a3a0f2840292ae0431aa99f3f2e6a6d73fee2be01bc47e052"
+    },
+    {
+      "name": "tss-pointer-before-selector",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "SS field first, not earlier ESP address",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: call gate TSS reads selector field before pointer field and count0 omits old parameter access: SS field first, not earlier ESP address: expected 32768, received 32764",
+      "fullDiagnosticSha256": "79f00cddc2248a20a40f38cd157243498c90909a5a220bc8790f0d234a310ba4"
+    },
+    {
+      "name": "reject-initial-noncanonical-rsp",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "ia64-inner-first-hole-pushes-canonical:[^\\n]*completion",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: ia64-inner-first-hole-pushes-canonical: ia64-inner-first-hole-pushes-canonical completion: \"protection-fault\" != \"budget\"",
+      "fullDiagnosticSha256": "517a55c523a52e7d1f9fd3b4398f29d8ec322c9aba9a7d476ddcc89cd9210d36"
+    },
+    {
+      "name": "old-cpl-destination-admission",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "prospective kernel CPL write",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: call gate late destination admission retains capture A but publishes no D descriptor A or frame payload: prospective kernel CPL write: expected 2, received 6",
+      "fullDiagnosticSha256": "2bb0c95fc61f1e201f85306d2e1464ef8bfaba75ad7e0052cf852234f125aef4"
+    },
+    {
+      "name": "prospective-context-parameter-read",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "legacy-w2-n1-[^\\n]*exact frame and all untouched RAM",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: legacy-w2-n1-old16-new16-tr16-cs16: legacy-w2-n1-old16-new16-tr16-cs16 exact frame and all untouched RAM: byte 0x28ffa = 165, expected 187",
+      "fullDiagnosticSha256": "77c5330e4c40e48ebfb863d1ee49765ea079c2de84a0c27ef85e2b515d4e5a4b"
+    },
+    {
+      "name": "erase-observed-operand-hit-mask",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "one completed DB source outranks stop|actual operand spans aggregate without TSS metadata",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: call gate debug merges explicit pointer old parameters new stack writes and TF once in the destination context: one completed DB source outranks stop: expected event-budget, received budget",
+      "fullDiagnosticSha256": "a2689b382fd155a7cfa80bbe7d13d29c9040e4a0840ba14447c20a9abc961079"
+    },
+    {
+      "name": "erase-selected-canonical-source",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "captured selector source",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: call gate canonical descriptor reports retain full diagnostics while captured and delivered GP names the resolved selector: captured selector source: expected {\"exception\":{\"errorCode\":56,\"instructionPc\":\"1000\",\"returnPc\":\"1000\",\"savedFlags\":\"10202\",\"vector\":13},\"kind\":\"pending\"}, received {\"exception\":{\"errorCode\":0,\"instructionPc\":\"1000\",\"returnPc\":\"1000\",\"savedFlags\":\"10202\",\"vector\":13},\"kind\":\"pending\"}",
+      "fullDiagnosticSha256": "36c966ad9021fa2ec8748e2fc42daff190e0abe49de23fcafd29930e5fda6241"
+    },
+    {
+      "name": "save-masked-active-old-sp",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "raw-old-b16-wrap-full-dword:[^\\n]*exact frame and all untouched RAM",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: raw-old-b16-wrap-full-dword: raw-old-b16-wrap-full-dword exact frame and all untouched RAM: byte 0x28ffa = 0, expected 205",
+      "fullDiagnosticSha256": "d39ddd4cd8592259b570b1a46406754f852905136b013b2c6598644d7184766e"
+    },
+    {
+      "name": "align64-gate-stack",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "ia64-long-inner-unaligned:[^\\n]*entry GPRs/raw stack",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: ia64-long-inner-unaligned: ia64-long-inner-unaligned entry GPRs/raw stack: [\"3333000000000000\",\"3333000000000001\",\"3333000000000002\",\"6000\",\"8fe0\",\"3333000000000005\",\"3333000000000006\",\"3333000000000007\",\"3333000000000008\",\"3333000000000009\",\"333300000000000a\",\"333300000000000b\",\"333300000000000c\",\"333300000000000d\",\"333300000000000e\",\"333300000000000f\"] != [\"3333000000000000\",\"3333000000000001\",\"3333000000000002\",\"6000\",\"8fe3\",\"3333000000000005\",\"3333000000000006\",\"3333000000000007\",\"3333000000000008\",\"3333000000000009\",\"333300000000000a\",\"333300000000000b\",\"333300000000000c\",\"333300000000000d\",\"333300000000000e\",\"333300000000000f\"]",
+      "fullDiagnosticSha256": "d3468df7bdec86de214be1ba7f00e0b7ecf10bbe10a4e85982ddc7ad34e9e500"
+    },
+    {
+      "name": "supervisor-old-parameter-read",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "old-CPL parameter read denied|user read of supervisor page",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: call gate debug faults discard pointer and tentative old parameter hits and a JMP has no fictitious frame writes: old-CPL parameter read denied: expected page-fault, received debug-exception",
+      "fullDiagnosticSha256": "49a954702a03fef4aedfbcd36f53e1016a333392da8779e14a9f80669862455d"
+    },
+    {
+      "name": "discard-captured-publication-origin",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "captured frame D refusal is not an earlier descriptor accessed write",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: captured frame D refusal is not an earlier descriptor accessed write: expected {\"access\":\"write\",\"address\":\"ffd\",\"cause\":\"permission\",\"failingPhysicalAddress\":\"57000\",\"instructionPc\":\"4000\",\"phase\":\"dirty-write\",\"physicalAccess\":\"write\",\"physicalAddress\":\"57000\",\"segment\":\"ss\",\"width\":4}, received {\"access\":\"write\",\"address\":\"ffd\",\"cause\":\"permission\",\"failingPhysicalAddress\":\"57000\",\"instructionPc\":\"4000\",\"phase\":\"dirty-write\",\"physicalAccess\":\"write\",\"physicalAddress\":\"57000\",\"selector\":8,\"systemPhase\":\"descriptor-accessed-write\",\"table\":\"gdt\",\"width\":4}",
+      "fullDiagnosticSha256": "9c4743ae41a0822f572430924a0d5e49c0db01f74eeee1d6bc4cef70da81c348"
+    },
+    {
+      "name": "restart-already-begun-source-alias",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "completed selected gate|captured gate13 completes|captured original gate reaches invalid new SS",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: completed selected gate: expected budget, received protection-fault",
+      "fullDiagnosticSha256": "29ace9f26b1ceff8948916392b4233ae890599b0b316e8550245962f4c2ff365"
+    },
+    {
+      "name": "omit-outer-return-cleanup",
+      "classification": "killed-by-specific-assertion",
+      "assertion": "legacy-w2-n1-[^\\n]*cleanup/raw pointer roundtrip",
+      "statuses": [0, 1],
+      "assertionDiagnosticExcerpt": "Error: legacy-w2-n1-old16-new16-tr16-cs16: legacy-w2-n1-old16-new16-tr16-cs16 cleanup/raw pointer roundtrip: [\"3333000000000000\",\"3333000000000001\",\"3333000000000002\",\"6000\",\"4000\",\"3333000000000005\",\"3333000000000006\",\"3333000000000007\",\"3333000000000008\",\"3333000000000009\",\"333300000000000a\",\"333300000000000b\",\"333300000000000c\",\"333300000000000d\",\"333300000000000e\",\"333300000000000f\"] != [\"3333000000000000\",\"3333000000000001\",\"3333000000000002\",\"6000\",\"4002\",\"3333000000000005\",\"3333000000000006\",\"3333000000000007\",\"3333000000000008\",\"3333000000000009\",\"333300000000000a\",\"333300000000000b\",\"333300000000000c\",\"333300000000000d\",\"333300000000000e\",\"333300000000000f\"]",
+      "fullDiagnosticSha256": "603d2fcd69e899f051d9379d1ecf1ec64bf5c4df27acec826dd190fc5422416a"
+    }
+  ],
+  "diagnosticHashScope": "full stdout plus stderr of the final command; the adjacent assertionDiagnosticExcerpt retains only its Error line"
+}
