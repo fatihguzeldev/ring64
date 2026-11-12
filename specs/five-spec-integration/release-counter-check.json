@@ -1,0 +1,207 @@
+{
+  "kind": "cfg-test-release-section-comparison",
+  "observedAt": "2026-11-12T00:17:30.793995+00:00",
+  "source": {
+    "testOnlyCommit": "fd14f5ca481ccf6b35b61ef13a469bb83d252bf0",
+    "parentCommit": "88dc7093ba226fba54b71c98efbbc83981173e8a",
+    "inspectionHead": "72eae35b45bb414242a852f74877f68a349be318",
+    "changedProductionFiles": ["src/x86/paging/walk.rs", "src/x86/paging/controls.rs"],
+    "productionChange": "Only cfg(test) instrumentation/calls and tests; existing source positions shift.",
+    "frozenManifestSourceCommit": "fd14f5ca481ccf6b35b61ef13a469bb83d252bf0",
+    "frozenManifestCapturedAt": "2026-11-12T00:11:31.645Z",
+    "frozenSourceCaveat": "The frozen manifest was captured after the test-only commit but before rebuilding its Core. Artifact hashes identify the compared binaries; old panic line values match the parent source, new values match the test-only commit."
+  },
+  "old": {
+    "path": "build/verification/paging-latency-1794442291575-82714-A/build/ring64.wasm",
+    "bytes": 1179167,
+    "sha256": "0825d5f2a8253d66fd6c4f438634741d8fdff0d504569530c7e3ad050a86869b"
+  },
+  "new": {
+    "path": "build/ring64.wasm",
+    "bytes": 1179167,
+    "sha256": "d11c4a3e0847e57e82b61eb3e41ef67d1ad8462722a6235b546600208f98299f"
+  },
+  "compilerProducers": [
+    {
+      "field": "language",
+      "values": [
+        {
+          "name": "Rust",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "field": "processed-by",
+      "values": [
+        {
+          "name": "rustc",
+          "version": "1.97.1 (8bab26f4f 2026-07-14)"
+        }
+      ]
+    }
+  ],
+  "releaseProfileFromGit": {
+    "path": "Cargo.toml",
+    "commit": "fd14f5ca481ccf6b35b61ef13a469bb83d252bf0",
+    "opt-level": 3,
+    "lto": "thin",
+    "codegen-units": 1,
+    "panic": "abort"
+  },
+  "sections": [
+    {
+      "id": 1,
+      "customName": null,
+      "oldBytes": 802,
+      "newBytes": 802,
+      "oldSha256": "cb55e28dba257e6964c79d8a0878e6a070b358b06e3c832dc87c46bbd07bc69b",
+      "newSha256": "cb55e28dba257e6964c79d8a0878e6a070b358b06e3c832dc87c46bbd07bc69b",
+      "equal": true
+    },
+    {
+      "id": 2,
+      "customName": null,
+      "oldBytes": 22,
+      "newBytes": 22,
+      "oldSha256": "2bc2dc4dc00f0b31b099786daf1067ec62677e7992ca766c664e0bb4f72e4a6f",
+      "newSha256": "2bc2dc4dc00f0b31b099786daf1067ec62677e7992ca766c664e0bb4f72e4a6f",
+      "equal": true
+    },
+    {
+      "id": 3,
+      "customName": null,
+      "oldBytes": 1415,
+      "newBytes": 1415,
+      "oldSha256": "848f92d9df5a865fd6d057f929acb2d32d420e04b898f26982e4751d2282df72",
+      "newSha256": "848f92d9df5a865fd6d057f929acb2d32d420e04b898f26982e4751d2282df72",
+      "equal": true
+    },
+    {
+      "id": 4,
+      "customName": null,
+      "oldBytes": 5,
+      "newBytes": 5,
+      "oldSha256": "443ef67732a93e541de743c1acf86ad210ddcf35a26ab55de0e58f5f3b4156ff",
+      "newSha256": "443ef67732a93e541de743c1acf86ad210ddcf35a26ab55de0e58f5f3b4156ff",
+      "equal": true
+    },
+    {
+      "id": 5,
+      "customName": null,
+      "oldBytes": 3,
+      "newBytes": 3,
+      "oldSha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950",
+      "newSha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950",
+      "equal": true
+    },
+    {
+      "id": 6,
+      "customName": null,
+      "oldBytes": 9,
+      "newBytes": 9,
+      "oldSha256": "da3c74f89a28b8e9a570d349d0f0a216ef8e69818c7226007164845feaceaf63",
+      "newSha256": "da3c74f89a28b8e9a570d349d0f0a216ef8e69818c7226007164845feaceaf63",
+      "equal": true
+    },
+    {
+      "id": 7,
+      "customName": null,
+      "oldBytes": 3381,
+      "newBytes": 3381,
+      "oldSha256": "59a1b442cff0a5c16002e86c07022829d9ff921d2555aa34866c5c0f90ea3eb8",
+      "newSha256": "59a1b442cff0a5c16002e86c07022829d9ff921d2555aa34866c5c0f90ea3eb8",
+      "equal": true
+    },
+    {
+      "id": 9,
+      "customName": null,
+      "oldBytes": 141,
+      "newBytes": 141,
+      "oldSha256": "274f3246bf9dcdc1f10e742989cd046732063d7db28abc4a519999dfab12d31f",
+      "newSha256": "274f3246bf9dcdc1f10e742989cd046732063d7db28abc4a519999dfab12d31f",
+      "equal": true
+    },
+    {
+      "id": 10,
+      "customName": null,
+      "oldBytes": 990309,
+      "newBytes": 990309,
+      "oldSha256": "c79a98d6fa0f4c002bae5a783277d79c43e216cb16c9e4f3ce83a5cf4f471211",
+      "newSha256": "c79a98d6fa0f4c002bae5a783277d79c43e216cb16c9e4f3ce83a5cf4f471211",
+      "equal": true
+    },
+    {
+      "id": 11,
+      "customName": null,
+      "oldBytes": 53331,
+      "newBytes": 53331,
+      "oldSha256": "802232ad9639737769687f9a4bbeadccb850ba16090fb7462735dc9948e3dcc7",
+      "newSha256": "7a9c26241954e25ce5a73d931f4a7c8dfaee7d418ba435a78a18ab22d99a8aec",
+      "equal": false
+    },
+    {
+      "id": 0,
+      "customName": "name",
+      "oldBytes": 129479,
+      "newBytes": 129479,
+      "oldSha256": "2b7b5566eade46c971f646a677d2179e5bfc4f88c5a39dc0e15e0ac4a504ec8a",
+      "newSha256": "2b7b5566eade46c971f646a677d2179e5bfc4f88c5a39dc0e15e0ac4a504ec8a",
+      "equal": true
+    },
+    {
+      "id": 0,
+      "customName": "producers",
+      "oldBytes": 77,
+      "newBytes": 77,
+      "oldSha256": "0cd36929729e36033d3f75ac8b927441544d3cdc0bb183c6188f581aadd48341",
+      "newSha256": "0cd36929729e36033d3f75ac8b927441544d3cdc0bb183c6188f581aadd48341",
+      "equal": true
+    },
+    {
+      "id": 0,
+      "customName": "target_features",
+      "oldBytes": 148,
+      "newBytes": 148,
+      "oldSha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd",
+      "newSha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd",
+      "equal": true
+    }
+  ],
+  "changedBytes": [
+    {
+      "absoluteByteOffset": 1002170,
+      "dataSectionPayloadOffset": 6047,
+      "oldByte": 197,
+      "newByte": 237,
+      "filenamePointer": "0x100a47",
+      "filenameBytes": 22,
+      "filename": "src/x86/paging/walk.rs",
+      "oldLine": 197,
+      "newLine": 237,
+      "column": 25,
+      "sourceExpression": "state.pdpte.expect(\"validated legacy PAE quartet\")[(request.linear >> 30 & 3) as usize];"
+    },
+    {
+      "absoluteByteOffset": 1016054,
+      "dataSectionPayloadOffset": 19931,
+      "oldByte": 68,
+      "newByte": 98,
+      "filenamePointer": "0x100a47",
+      "filenameBytes": 22,
+      "filename": "src/x86/paging/walk.rs",
+      "oldLine": 68,
+      "newLine": 98,
+      "column": 22,
+      "sourceExpression": "&self.entries[..self.count]"
+    }
+  ],
+  "conclusion": {
+    "wholeModuleIdentical": false,
+    "codeSectionIdentical": true,
+    "importsExportsAndCustomSectionsIdentical": true,
+    "totalChangedBytes": 2,
+    "mechanism": "Two Rust panic Location.line fields for the same walk.rs expressions changed from 197 to 237 and 68 to 98. Code, imports, exports, function names and all non-Data sections are identical.",
+    "instrumentationCeiling": "No added counter instructions, imports or functions in release Code; this is binary/source inspection, not a timing or full-engine count measurement."
+  }
+}
