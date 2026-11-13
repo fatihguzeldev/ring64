@@ -220,6 +220,14 @@ for (const cohort of report)
       ratioDistribution: cohort.ratioDistribution,
       resourcesExactlyMatched: cohort.resourcesExactlyMatched,
       outputsExactlyMatched: cohort.outputsExactlyMatched,
+      wallComparisons: cohort.rows
+        .filter((row) => row.wallRatio !== null || row.wallDeltaMs !== null)
+        .map(({ name, wallRatio, wallDeltaMs, timingScopes }) => ({
+          name,
+          wallRatio,
+          wallDeltaMs,
+          ...(timingScopes ? { timingScopes } : {}),
+        })),
       worst: cohort.rows
         .filter((row) => row.ratio !== null)
         .sort((a, b) => b.ratio - a.ratio)

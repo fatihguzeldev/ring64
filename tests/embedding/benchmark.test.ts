@@ -125,7 +125,7 @@ async function analyzeTimings(
   samples: object[],
 ): Promise<{
   rows: AnalyzedTiming[];
-  cli: { worst: WallComparison[] };
+  cli: { worst: WallComparison[]; wallComparisons: WallComparison[] };
 }> {
   const directory = await mkdtemp(join(tmpdir(), 'ring64-timing-analysis-'));
   try {
@@ -225,12 +225,19 @@ test('wall comparisons retain zeros and refuse missing or invalid measurement se
       })),
     ),
   );
-  const { rows } = await analyzeTimings(definitions, samples);
+  const { rows, cli } = await analyzeTimings(definitions, samples);
   for (const expected of cases) {
     const row = rows.find(({ name }) => name === expected.name)!;
     assert.equal(row.ratio, 1.1, expected.name);
     assert.equal(row.wallRatio, expected.ratio, expected.name);
     assert.equal(row.wallDeltaMs, expected.delta, expected.name);
+    const displayed = cli.wallComparisons.find(({ name }) => name === expected.name);
+    if (expected.ratio !== null || expected.delta !== null) {
+      assert.equal(displayed?.wallRatio, expected.ratio, expected.name);
+      assert.equal(displayed?.wallDeltaMs, expected.delta, expected.name);
+    } else {
+      assert.equal(displayed, undefined, expected.name);
+    }
     if (expected.name === 'ordinary') assert.equal(row.timingScopes, undefined);
   }
 });
@@ -294,4 +301,35 @@ test('wall comparisons require matching sample ordinals and windows', async () =
     assert.equal(row.wallRatio, null, row.name);
     assert.equal(row.wallDeltaMs, null, row.name);
   }
+});
+
+test('CLI retains wall comparisons when elapsed ratio is unavailable', async () => {
+  const name = 'zero-elapsed';
+  const {
+    rows: [row],
+    cli,
+  } = await analyzeTimings(
+    [{ name, resume: true, instructions: '9000' }],
+    ['baseline', 'current'].map((side) => ({
+      workload: name,
+      side,
+      sample: -1,
+      window: 'first',
+      elapsedMs: 0,
+      wallMs: side === 'baseline' ? 10 : 11,
+      resources: { nativeEntries: 9000 },
+    })),
+  );
+  assert.equal(row!.ratio, null);
+  assert.equal(row!.wallRatio, 1.1);
+  assert.equal(row!.wallDeltaMs, 1);
+  assert.deepEqual(cli.worst, []);
+  assert.deepEqual(
+    cli.wallComparisons?.map(({ name, wallRatio, wallDeltaMs }) => ({
+      name,
+      wallRatio,
+      wallDeltaMs,
+    })),
+    [{ name, wallRatio: 1.1, wallDeltaMs: 1 }],
+  );
 });
