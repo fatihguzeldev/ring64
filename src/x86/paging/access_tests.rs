@@ -81,6 +81,116 @@ fn protection_fault(address: u64, access: Access, error_code: u32) -> AccessFail
 }
 
 #[test]
+fn publication_geometry_read_and_execute_do_not_allocate() {
+    let (mut image, state) = fixture(0, true, false);
+    let mut work = AccessState::default();
+    let memory = Memory::new(&mut image, &state, 3, 2, &mut work);
+    let geometry: Vec<_> = [Access::Read, Access::Execute]
+        .into_iter()
+        .map(|access| {
+            let prepared = memory
+                .prepare(0x1000, 8, access, false, memory.class)
+                .unwrap();
+            (access, prepared.fields.capacity(), prepared.fields.len())
+        })
+        .collect();
+    assert_eq!(
+        geometry,
+        vec![(Access::Read, 0, 0), (Access::Execute, 0, 0)],
+        "read/execute preparation must not allocate publication geometry"
+    );
+}
+
+#[test]
+fn publication_geometry_write_rmw_and_sparse_intent_stays_exact() {
+    let (mut image, state) = fixture(0, true, false);
+    let mut work = AccessState::default();
+    let mut memory = Memory::new(&mut image, &state, 3, 2, &mut work);
+    for rmw in [false, true] {
+        let prepared = memory
+            .prepare(0x1000, 8, Access::Write, rmw, memory.class)
+            .unwrap();
+        assert_eq!(prepared.fields, [(0, 8)], "write/rmw{rmw} geometry");
+    }
+    assert_eq!(memory.read_for_write(0x1000, 8).unwrap(), 0);
+    assert_eq!(memory.storage.borrow().work.pending[0].fields, [(0, 8)]);
+    memory.prepare_publication().unwrap();
+    assert_eq!(
+        memory
+            .storage
+            .borrow()
+            .image
+            .physical_read(0x4008, 8)
+            .unwrap(),
+        0x9067
+    );
+    memory.storage.borrow_mut().work.clear();
+    for fields in [
+        vec![(0, 8)],
+        vec![(5, 1)],
+        vec![],
+        vec![(5, 1), (0, 1)],
+        vec![(0, 8), (0, 8)],
+    ] {
+        memory
+            .storage
+            .borrow_mut()
+            .image
+            .physical_write(0x4008, 8, 0x9027)
+            .unwrap();
+        memory
+            .capture_write_fields(0x1000, 8, &fields, memory.class)
+            .unwrap();
+        assert_eq!(
+            memory.storage.borrow().work.pending.last().unwrap().fields,
+            fields
+        );
+        memory.prepare_publication().unwrap();
+        assert_eq!(
+            memory
+                .storage
+                .borrow()
+                .image
+                .physical_read(0x4008, 8)
+                .unwrap(),
+            if fields.is_empty() { 0x9027 } else { 0x9067 }
+        );
+        memory.storage.borrow_mut().work.clear();
+    }
+    memory
+        .storage
+        .borrow_mut()
+        .image
+        .physical_write(0x4008, 8, 0x9027)
+        .unwrap();
+    for fields in [vec![], vec![(0, 1)]] {
+        assert_eq!(
+            memory.capture_write_fields(0x1ff8, 16, &fields, memory.class),
+            Err(protection_fault(0x2000, Access::Write, 6))
+        );
+        assert!(memory.storage.borrow().work.pending.is_empty());
+        assert_eq!(
+            memory
+                .storage
+                .borrow()
+                .image
+                .physical_read(0x4008, 8)
+                .unwrap(),
+            0x9027
+        );
+    }
+    assert_eq!(
+        memory
+            .storage
+            .borrow()
+            .image
+            .physical_read(0x9000, 8)
+            .unwrap(),
+        0
+    );
+}
+
+#[test]
 fn smap_uses_live_ac_for_explicit_data_but_never_exempts_system_metadata() {
     for cpl in 0..4 {
         for ac in [0, 1 << 18] {

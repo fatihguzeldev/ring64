@@ -82,7 +82,11 @@ impl<'a> Memory<'a> {
             width,
             fragments: Vec::new(),
             published: false,
-            fields: vec![(0, width)],
+            fields: if access == Access::Write {
+                vec![(0, width)]
+            } else {
+                Vec::new()
+            },
         };
         let mut offset = 0;
         let mut storage = self.storage.borrow_mut();
@@ -163,7 +167,9 @@ impl<'a> Memory<'a> {
         class: AccessClass,
     ) -> Result<(), AccessFailure> {
         let mut prepared = self.prepare(address, width, Access::Write, false, class)?;
-        prepared.fields = fields.to_vec();
+        if prepared.fields.as_slice() != fields {
+            prepared.fields = fields.to_vec();
+        }
         self.storage.borrow_mut().work.pending.push(prepared);
         Ok(())
     }
