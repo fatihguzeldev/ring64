@@ -100,11 +100,11 @@ fn decode_and_check(expected: &[u8]) {
 }
 
 #[test]
-fn warm_paged_decode_reads_each_source_hierarchy_once_per_byte() {
+fn warm_paged_decode_reads_one_hierarchy_per_unchanged_leaf_span() {
     for (family, counts) in [
-        ("ia32e", [12, 96, 0, 0, 0, 0]),
-        ("legacy32", [6, 24, 0, 0, 0, 0]),
-        ("pae", [6, 48, 0, 0, 0, 0]),
+        ("ia32e", [4, 32, 0, 0, 0, 0]),
+        ("legacy32", [2, 8, 0, 0, 0, 0]),
+        ("pae", [2, 16, 0, 0, 0, 0]),
         ("pg0", [0; 6]),
     ] {
         let expected = fixture(family, true, true);
@@ -163,4 +163,145 @@ fn pg0_decode_keeps_actual_physical_execute_permission_checks() {
         assert_eq!(unsafe { (*core.state.get()).flags }, RF);
     });
     assert_eq!(physical_counts::take(), [0; 6]);
+}
+
+#[test]
+fn warm_decode_keeps_each_later_byte_physical_execute_admission() {
+    use crate::memory::{MappingInput, MemoryLimits, Permissions};
+    for mapped_tail in [false, true] {
+        let bytes = fixture("ia32e", true, true);
+        BRIDGE.with_borrow_mut(|bridge| {
+            let core = bridge.core.as_mut().unwrap();
+            let mut mappings = vec![MappingInput {
+                base: 0,
+                backing: "ram".into(),
+                offset: 0,
+                length: 0x9001,
+                permissions: Permissions {
+                    read: true,
+                    write: true,
+                    execute: true,
+                },
+            }];
+            if mapped_tail {
+                mappings.push(MappingInput {
+                    base: 0x9001,
+                    backing: "ram".into(),
+                    offset: 0x9001,
+                    length: 0xfff,
+                    permissions: Permissions {
+                        read: true,
+                        write: true,
+                        execute: false,
+                    },
+                });
+            }
+            core.image = Image::physical_mapped(
+                vec![("ram".into(), bytes)],
+                mappings,
+                MemoryLimits {
+                    max_backing_bytes: 0xa000,
+                    max_backings: 1,
+                    max_mappings: 2,
+                },
+            )
+            .unwrap();
+            let bank = core.paging;
+            let context = core.context.clone();
+            let before = unsafe { (*core.state.get()).registers };
+            let fault = match core.paged_decode(PC) {
+                Err(DecodeError::Paging(Failure::Physical(fault))) => fault,
+                other => panic!("expected later-byte physical refusal: {other:?}"),
+            };
+            assert_eq!(fault.linear, PC + 1);
+            assert_eq!(fault.access, Access::Execute);
+            assert_eq!(fault.phase, PhysicalPhase::FinalAccess);
+            assert_eq!(fault.physical.address, 0x9001);
+            assert_eq!(fault.physical.failing, 0x9001);
+            assert_eq!(fault.physical.width, 1);
+            assert_eq!(fault.physical.access, Access::Execute);
+            assert_eq!(
+                fault.physical.cause,
+                if mapped_tail {
+                    Cause::Permission
+                } else {
+                    Cause::Unmapped
+                }
+            );
+            assert_eq!(core.paging, bank);
+            assert_eq!(core.context, context);
+            unsafe {
+                assert_eq!((*core.state.get()).registers, before);
+                assert_eq!((*core.state.get()).rip, PC);
+                assert_eq!((*core.state.get()).flags, RF);
+            }
+        });
+    }
+}
+
+#[test]
+fn warm_decode_hits_remain_in_cold_cross_page_accessed_alias_revalidation() {
+    use crate::memory::{MappingInput, MemoryLimits, Permissions};
+    let mut bytes = fixture("ia32e", true, true);
+    bytes.resize(0xb000, 0xa5);
+    bytes[0x9ffc] = 0xb8; // MOV EAX, imm32 crosses onto the cold next page.
+    bytes[0x9ffd..0xa005].copy_from_slice(&0xa007u64.to_le_bytes());
+    let mappings = [
+        (0, 0, 0x4010),
+        (0x4010, 0x9ffd, 8), // PTE2.A aliases an already consumed immediate byte.
+        (0x4018, 0x4018, 0xb000 - 0x4018),
+    ]
+    .into_iter()
+    .map(|(base, offset, length)| MappingInput {
+        base,
+        backing: "ram".into(),
+        offset,
+        length,
+        permissions: Permissions {
+            read: true,
+            write: true,
+            execute: true,
+        },
+    })
+    .collect();
+    BRIDGE.with_borrow_mut(|bridge| {
+        let core = bridge.core.as_mut().unwrap();
+        core.image = Image::physical_mapped(
+            vec![("ram".into(), bytes)],
+            mappings,
+            MemoryLimits {
+                max_backing_bytes: 0xb000,
+                max_backings: 1,
+                max_mappings: 3,
+            },
+        )
+        .unwrap();
+        let bank = core.paging;
+        let context = core.context.clone();
+        let before = unsafe { (*core.state.get()).registers };
+        assert!(matches!(
+            core.paged_decode(0x1ffc),
+            Err(DecodeError::PagingRestart)
+        ));
+        assert_eq!(core.image.physical_read(0x4010, 8).unwrap(), 0xa027);
+        assert_eq!(core.image.physical_read(0x9ffd, 1).unwrap(), 0x27);
+        let instruction = core.paged_decode(0x1ffc).unwrap();
+        assert_eq!(instruction.pc, 0x1ffc);
+        assert_eq!(instruction.next_pc, 0x2001);
+        assert_eq!(
+            instruction.operation,
+            Operation::Mov {
+                dst: RegisterView::low(0),
+                src: DataOperand::Immediate(0xa027),
+                width: Width::W32,
+            }
+        );
+        assert_eq!(core.paging, bank);
+        assert_eq!(core.context, context);
+        unsafe {
+            assert_eq!((*core.state.get()).registers, before);
+            assert_eq!((*core.state.get()).rip, PC);
+            assert_eq!((*core.state.get()).flags, RF);
+        }
+    });
 }

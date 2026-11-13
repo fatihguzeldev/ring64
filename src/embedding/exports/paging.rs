@@ -9,6 +9,8 @@ impl Core {
         let paging = self.paging.as_ref().expect("paged decode profile");
         let context = &self.context;
         let mut consumed = Vec::new();
+        let mut warm_span: Option<(u64, u64, u64)> = None;
+        let mut reuse_warm = paging.cr0 & (1 << 31) != 0;
         decode::decode_with_profile(pc, context, true, |offset| {
             let linear = context
                 .translate(offset, 1, Segment::Cs, Access::Execute, false)
@@ -22,30 +24,42 @@ impl Core {
                 access: Access::Execute,
                 class: paging::walk::AccessClass::operand(context.cpl(), false),
             };
-            let mut accessed_write = false;
-            let translation = paging::walk::fetch_walk(&mut self.image, paging, request, |image| {
-                accessed_write = true;
-                encoding_current(image, paging, &consumed, request.class)
-            })
-            .map_err(DecodeError::Paging)?
-            .ok_or(DecodeError::PagingRestart)?;
-            // Only an A write can change encoding during this synchronous byte fetch.
-            if accessed_write
-                && (!encoding_current(&self.image, paging, &consumed, request.class)
-                    || !paging::walk::peek(&self.image, paging, request)
-                        .is_ok_and(|fresh| fresh.physical == translation.physical))
+            // Only an A write can mutate memory between these synchronous required bytes.
+            let physical = if let Some((base, physical, remaining)) = warm_span
+                && linear >= base
+                && linear - base < remaining
             {
-                return Err(DecodeError::PagingRestart);
-            }
-            let byte = self
-                .image
-                .physical_fetch(translation.physical)
-                .map_err(|fault| {
-                    DecodeError::Paging(
-                        request.physical_failure(fault, paging::walk::PhysicalPhase::FinalAccess),
-                    )
-                })?;
-            consumed.push((linear, translation.physical, byte));
+                physical + (linear - base)
+            } else {
+                warm_span = None;
+                let mut accessed_write = false;
+                let translation =
+                    paging::walk::fetch_walk(&mut self.image, paging, request, |image| {
+                        accessed_write = true;
+                        reuse_warm = false;
+                        encoding_current(image, paging, &consumed, request.class)
+                    })
+                    .map_err(DecodeError::Paging)?
+                    .ok_or(DecodeError::PagingRestart)?;
+                // Only an A write can change encoding during this synchronous byte fetch.
+                if accessed_write
+                    && (!encoding_current(&self.image, paging, &consumed, request.class)
+                        || !paging::walk::peek(&self.image, paging, request)
+                            .is_ok_and(|fresh| fresh.physical == translation.physical))
+                {
+                    return Err(DecodeError::PagingRestart);
+                }
+                if reuse_warm {
+                    warm_span = Some((linear, translation.physical, translation.remaining));
+                }
+                translation.physical
+            };
+            let byte = self.image.physical_fetch(physical).map_err(|fault| {
+                DecodeError::Paging(
+                    request.physical_failure(fault, paging::walk::PhysicalPhase::FinalAccess),
+                )
+            })?;
+            consumed.push((linear, physical, byte));
             Ok(byte)
         })
     }
