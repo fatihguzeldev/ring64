@@ -80,7 +80,7 @@ fn timestamp_bridge_uses_the_live_delta_without_settling_and_cpuid_ignores_tsd()
         .chunks_exact(4)
         .map(|b| u32::from_le_bytes(b.try_into().unwrap()))
         .collect();
-    assert_eq!(words, [1, 0x676e6952, 0x656e6967, 0x6e453436]);
+    assert_eq!(words, [7, 0x676e6952, 0x656e6967, 0x6e453436]);
 }
 
 #[test]

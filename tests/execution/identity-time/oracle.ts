@@ -207,11 +207,14 @@ export async function using(
 }
 
 const words = new Map<bigint, readonly bigint[]>([
-  [0n, [1n, 0x676e6952n, 0x656e6967n, 0x6e453436n]],
+  [0n, [7n, 0x676e6952n, 0x656e6967n, 0x6e453436n]],
   [1n, [0n, 0n, 0n, 0x10n]],
+  [7n, [0n, 0x00100080n, 0n, 0n]],
   [0x80000000n, [0x80000001n, 0n, 0n, 0n]],
   [0x80000001n, [0n, 0n, 0n, 0x08000000n]],
 ]);
+const identification = (leaf: bigint, subleaf: bigint): readonly bigint[] =>
+  leaf === 7n && subleaf !== 0n ? [0n, 0n, 0n, 0n] : (words.get(leaf) ?? [0n, 0n, 0n, 0n]);
 const outputs = [0, 3, 1, 2];
 const sample = (cpu: Cpu) => {
   const r = cpu.readState().registers;
@@ -260,7 +263,7 @@ function ledgerStep(
     if (op.kind === 'rdtscp') r[1] = BigInt(time.tscAux);
   }
   if (op.kind === 'cpuid') {
-    const record = words.get(r[0]! & 0xffffffffn) ?? [0n, 0n, 0n, 0n];
+    const record = identification(r[0]! & 0xffffffffn, r[1]! & 0xffffffffn);
     for (const [i, register] of outputs.entries()) r[register] = record[i]!;
   }
   if (op.kind === 'aux') time.tscAux = Number(r[0]! & 0xffffffffn);
@@ -276,7 +279,6 @@ async function identity(side: Side): Promise<number> {
   const leaves = [
     ...words.keys(),
     2n,
-    7n,
     0x15n,
     0x16n,
     0x0dn,
@@ -303,7 +305,7 @@ async function identity(side: Side): Promise<number> {
             const expected = structuredClone(before);
             expected.rip = ENTRY + 2n;
             for (const [i, register] of outputs.entries())
-              expected.registers[register] = (words.get(leaf) ?? [0n, 0n, 0n, 0n])[i]!;
+              expected.registers[register] = identification(leaf, subleaf)[i]!;
             equal(
               result.state.registers,
               expected.registers,

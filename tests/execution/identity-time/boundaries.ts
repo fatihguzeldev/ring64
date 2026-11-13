@@ -172,7 +172,7 @@ export function identityBoundaryScenarios(compiler: WebAssembly.Module): Scenari
               const r = state.registers;
               if (step === 1) r[0] = profile.bits === 64 ? 0n : r[0]! & 0xffffffff00000000n;
               if (step === 2)
-                [r[0], r[3], r[1], r[2]] = [1n, 0x676e6952n, 0x656e6967n, 0x6e453436n];
+                [r[0], r[3], r[1], r[2]] = [7n, 0x676e6952n, 0x656e6967n, 0x6e453436n];
               if (step === 3 || step === 5) {
                 r[0] = tsc & 0xffffffffn;
                 r[2] = tsc >> 32n;
@@ -328,7 +328,7 @@ export function identityBoundaryScenarios(compiler: WebAssembly.Module): Scenari
           '0fa2',
           { mode: 'protected', bits: 32, family: 'pg0' },
           async (cpu) => {
-            const words = [1n, 0x676e6952n, 0x656e6967n, 0x6e453436n];
+            const words = [7n, 0x676e6952n, 0x656e6967n, 0x6e453436n];
             const registers = [0, 3, 1, 2];
             const before = cpu.readState();
             before.registers[0] = 0n;

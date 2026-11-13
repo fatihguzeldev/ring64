@@ -245,7 +245,7 @@ function expected(row, state) {
       r[2] = sample >> 32n;
       if (row.op === 'rdtscp') r[1] = BigInt(AUX);
     }
-    if (row.op === 'cpuid') [r[0], r[3], r[1], r[2]] = [1n, 0x676e6952n, 0x656e6967n, 0x6e453436n];
+    if (row.op === 'cpuid') [r[0], r[3], r[1], r[2]] = [7n, 0x676e6952n, 0x656e6967n, 0x6e453436n];
     if (row.op === 'aux-read') {
       r[0] = BigInt(AUX);
       r[2] = 0n;

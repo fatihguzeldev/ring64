@@ -56,9 +56,9 @@ fn processor_helpers_receive_live_inputs_and_delta_and_zero_extend_full_outputs(
     for (operation, outputs, args, words) in [
         (
             Processor::Cpuid,
-            vec![(0, 1), (3, 0x676e6952), (1, 0x656e6967), (2, 0x6e453436)],
+            vec![(0, 7), (3, 0x676e6952), (1, 0x656e6967), (2, 0x6e453436)],
             json!([0, 0, 7, "1"]),
-            json!([1, 0x676e6952u32, 0x656e6967u32, 0x6e453436u32]),
+            json!([7, 0x676e6952u32, 0x656e6967u32, 0x6e453436u32]),
         ),
         (
             Processor::Rdtsc,
@@ -386,8 +386,8 @@ fn processor_tf_completion_clears_rf_and_settles_once_before_exposing_debug_outp
     for (operation, outputs, words) in [
         (
             Processor::Cpuid,
-            vec![(0, 1), (3, 0x676e6952), (1, 0x656e6967), (2, 0x6e453436)],
-            json!([1, 0x676e6952u32, 0x656e6967u32, 0x6e453436u32]),
+            vec![(0, 7), (3, 0x676e6952), (1, 0x656e6967), (2, 0x6e453436)],
+            json!([7, 0x676e6952u32, 0x656e6967u32, 0x6e453436u32]),
         ),
         (
             Processor::Rdtsc,
@@ -439,8 +439,8 @@ fn processor_shadow_completion_settles_before_external_acceptance_and_last_budge
     for (operation, outputs, words) in [
         (
             Processor::Cpuid,
-            vec![(0, 1), (3, 0x676e6952), (1, 0x656e6967), (2, 0x6e453436)],
-            json!([1, 0x676e6952u32, 0x656e6967u32, 0x6e453436u32]),
+            vec![(0, 7), (3, 0x676e6952), (1, 0x656e6967), (2, 0x6e453436)],
+            json!([7, 0x676e6952u32, 0x656e6967u32, 0x6e453436u32]),
         ),
         (
             Processor::Rdtsc,
