@@ -24,6 +24,13 @@ const rows = [
   },
   { name: 'stac-clac-ia32e-alternating', kind: 'alternating', paged: true, controls: SMEP | SMAP },
   {
+    name: 'stac-clac-ia32e-sparse',
+    kind: 'alternating',
+    userLoads: 16,
+    paged: true,
+    controls: SMEP | SMAP,
+  },
+  {
     name: 'stac-clac-ia32e-short-resume',
     kind: 'alternating',
     paged: true,
@@ -80,7 +87,7 @@ function program(row) {
   if (row.kind === 'implicit-denial') return hex('8ed8'); // MOV DS,AX reads GDT metadata.
   const body =
     row.kind === 'alternating'
-      ? '0f01cb488b030f01ca488b32'
+      ? '0f01cb' + '488b03'.repeat(row.userLoads ?? 1) + '0f01ca488b32'
       : row.kind === 'store'
         ? '488903'
         : '488b03';
@@ -110,7 +117,15 @@ export function supervisorAccessPlan(knobs) {
         control = row.kind.startsWith('pae-'),
         repair = row.kind === 'repair',
         n = Math.min(knobs.iterations, control || repair ? 31 : row.resume || fault ? 257 : 100001),
-        perCycle = fault ? 0 : control ? 3 : repair ? 8 : row.kind === 'alternating' ? 5 : 2,
+        perCycle = fault
+          ? 0
+          : control
+            ? 3
+            : repair
+              ? 8
+              : row.kind === 'alternating'
+                ? (row.userLoads ?? 1) + 4
+                : 2,
         code = program(row),
         retired = BigInt(n * perCycle),
         calls = fault || repair ? n : row.resume || control ? n * perCycle : 1;
@@ -156,7 +171,15 @@ export function supervisorAccessPlan(knobs) {
           flags: row.kind === 'alternating' ? 2 * n : 0,
           ...(repair
             ? { ordinaryStackInstructions: 2 * n, stringMemoryAttempts: 3 * n }
-            : { explicitMemory: fault || control ? 0 : row.kind === 'alternating' ? 2 * n : n }),
+            : {
+                explicitMemory:
+                  fault || control
+                    ? 0
+                    : row.kind === 'alternating'
+                      ? ((row.userLoads ?? 1) + 1) * n
+                      : n,
+              }),
+          ...(row.kind === 'alternating' ? { canonicalAcStores: 2 * n } : {}),
           ...(!repair ? { implicitMetadata: fault ? n : 0 } : {}),
           ...(control
             ? { cr4Writes: 2 * n, quartetCaptures: row.kind === 'pae-smep' ? 2 * n : 0 }
