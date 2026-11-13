@@ -3,6 +3,8 @@ import type { Scenario } from '../../support/fixture.js';
 import { checkSupervisorAccess, groups } from './oracle.js';
 import { supervisorFlagScenarios } from './flags.js';
 import { supervisorContextScenarios } from './contexts.js';
+import { supervisorEventScenarios } from './events.js';
+import { supervisorEntryScenarios } from './entry.js';
 
 export function supervisorAccessScenarios(compiler: WebAssembly.Module): Scenario[] {
   return [
@@ -14,5 +16,7 @@ export function supervisorAccessScenarios(compiler: WebAssembly.Module): Scenari
     })),
     ...supervisorFlagScenarios(compiler),
     ...supervisorContextScenarios(compiler),
+    ...supervisorEventScenarios(compiler),
+    ...supervisorEntryScenarios(compiler),
   ];
 }
