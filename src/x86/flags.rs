@@ -7,6 +7,14 @@ pub const TF: u64 = 1 << 8;
 pub const IF: u64 = 1 << 9;
 pub const RF: u64 = 1 << 16;
 pub const VM: u64 = 1 << 17;
+pub const AC: u64 = 1 << 18;
+
+pub fn alignment_check(flags: u64, set: bool, context: &ExecutionContext) -> Option<u64> {
+    if context.cpl() != 0 || context.mode() == Mode::Virtual8086 {
+        return None;
+    }
+    Some(if set { flags | AC } else { flags & !AC })
+}
 
 pub fn architectural(flags: u64, context: &ExecutionContext) -> u64 {
     flags

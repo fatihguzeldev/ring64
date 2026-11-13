@@ -112,6 +112,22 @@ where
                 _ => return Err(DecodeError::Unsupported),
             },
             0x01 => {
+                if operands.mode == 3 && operands.selector == 1 && matches!(operands.rm & 7, 2 | 3)
+                {
+                    if prefixes.lock || prefixes.operand_override || prefixes.repeat.is_some() {
+                        return Err(DecodeError::UndefinedEncoding);
+                    }
+                    return Ok(Operation::SystemFlags(
+                        crate::x86::instruction::SystemFlagsDescriptor {
+                            kind: if operands.rm & 7 == 2 {
+                                crate::x86::instruction::SystemFlagsKind::Clac
+                            } else {
+                                crate::x86::instruction::SystemFlagsKind::Stac
+                            },
+                            width: Width::W16,
+                        },
+                    ));
+                }
                 if operands.mode == 3 && operands.selector == 7 && operands.rm & 7 == 1 {
                     return if prefixes.lock {
                         Err(DecodeError::UndefinedEncoding)

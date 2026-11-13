@@ -92,13 +92,6 @@ pub extern "C" fn core_flags(operation: u32, flags: u64, input: u64) -> i32 {
         if !operation.valid_in_mode(&core.context) {
             return -1;
         }
-        let result = match operation.kind {
-            SystemFlagsKind::Push => flags::push(flags, operation.width, &core.context),
-            SystemFlagsKind::Pop => flags::pop(flags, input, operation.width, &core.context),
-            SystemFlagsKind::Cli | SystemFlagsKind::Sti => {
-                flags::interrupt(flags, operation.kind == SystemFlagsKind::Sti, &core.context)
-            }
-        };
         core.fault = None;
         core.segment_fault = None;
         core.alignment_fault = None;
@@ -109,6 +102,25 @@ pub extern "C" fn core_flags(operation: u32, flags: u64, input: u64) -> i32 {
         core.system_memory_fault = None;
         core.debug_exception = None;
         core.divide_failed = false;
+        core.decode_fault = None;
+        let result = match operation.kind {
+            SystemFlagsKind::Push => flags::push(flags, operation.width, &core.context),
+            SystemFlagsKind::Pop => flags::pop(flags, input, operation.width, &core.context),
+            SystemFlagsKind::Cli | SystemFlagsKind::Sti => {
+                flags::interrupt(flags, operation.kind == SystemFlagsKind::Sti, &core.context)
+            }
+            SystemFlagsKind::Clac | SystemFlagsKind::Stac => {
+                let Some(value) = flags::alignment_check(
+                    flags,
+                    operation.kind == SystemFlagsKind::Stac,
+                    &core.context,
+                ) else {
+                    core.decode_fault = Some(decode::DecodeFault::UndefinedOpcode);
+                    return INVALID;
+                };
+                Ok(value)
+            }
+        };
         match result {
             Ok(value) => {
                 unsafe {

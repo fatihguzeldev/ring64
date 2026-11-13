@@ -52,6 +52,25 @@ impl Emitter {
         }
     }
 
+    fn publish_ac(&mut self) {
+        let memory = MemArg {
+            offset: offset_of!(RunState, flags) as u64,
+            align: 3,
+            memory_index: 0,
+        };
+        // Only successful in-unit AC producers synchronize this live permission bit.
+        self.op(Op::LocalGet(0))
+            .op(Op::LocalGet(0))
+            .op(Op::I64Load(memory))
+            .op(Op::I64Const(!crate::x86::flags::AC as i64))
+            .op(Op::I64And)
+            .op(Op::LocalGet(SYSTEM))
+            .op(Op::I64Const(crate::x86::flags::AC as i64))
+            .op(Op::I64And)
+            .op(Op::I64Or)
+            .op(Op::I64Store(memory));
+    }
+
     pub(super) fn system_flags(&mut self, operation: SystemFlagsDescriptor, exit_depth: u32) {
         match operation.kind {
             SystemFlagsKind::Push => {
@@ -91,6 +110,12 @@ impl Emitter {
                 if operation.kind == SystemFlagsKind::Sti && !self.observed {
                     self.op(Op::LocalGet(STORE_STATUS)).op(Op::LocalSet(SHADOW));
                 }
+            }
+            SystemFlagsKind::Clac | SystemFlagsKind::Stac => {
+                self.flags_call(operation, None, exit_depth);
+                self.flags_result();
+                self.install_flags();
+                self.publish_ac();
             }
         }
     }

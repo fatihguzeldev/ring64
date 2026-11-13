@@ -71,11 +71,10 @@ fn malformed_flags_and_debug_helpers_preserve_complete_state_and_diagnostics() {
     let before = snapshot();
     let push = descriptor(SystemFlagsKind::Push, Width::W64);
     for word in [
-        12,
-        13,
         14,
         15,
         16,
+        17,
         u32::MAX,
         descriptor(SystemFlagsKind::Cli, Width::W64),
         descriptor(SystemFlagsKind::Push, Width::W32),
@@ -100,6 +99,89 @@ fn malformed_flags_and_debug_helpers_preserve_complete_state_and_diagnostics() {
         assert_eq!(snapshot(), before);
         assert_eq!(metadata(DATA), fault);
     }
+}
+
+#[test]
+fn ac_helper_only_publishes_a_candidate_and_runtime_denial_has_no_error_code() {
+    use super::super::exception_delivery::{core_configure_delivery, core_stage_exception};
+    use crate::x86::context::Mode;
+    use crate::x86::exception::EventState;
+    for kind in [SystemFlagsKind::Clac, SystemFlagsKind::Stac] {
+        initialize(0x1000, &[0x90]);
+        poison_state();
+        let before = snapshot();
+        let expected = if kind == SystemFlagsKind::Stac {
+            0x40002_u64
+        } else {
+            2
+        };
+        let mut changed = before.clone();
+        changed.6.1[..8].copy_from_slice(&expected.to_le_bytes());
+        assert_eq!(
+            core_flags(descriptor(kind, Width::W16), 0x40002, u64::MAX),
+            0
+        );
+        assert_eq!(snapshot(), changed);
+        for (mode, cpl) in [
+            (Mode::Protected, 1),
+            (Mode::Compatibility, 2),
+            (Mode::Long64, 3),
+            (Mode::Virtual8086, 3),
+        ] {
+            initialize(0x1000, &[0x90]);
+            poison_state();
+            BRIDGE
+                .with_borrow_mut(|b| b.core.as_mut().unwrap().context.set_mode_and_cpl(mode, cpl));
+            let unchanged = snapshot();
+            assert_eq!(
+                core_flags(descriptor(kind, Width::W16), 0x40002, 0),
+                INVALID
+            );
+            assert_eq!(snapshot(), unchanged);
+            BRIDGE.with_borrow(|b| {
+                let c = b.core.as_ref().unwrap();
+                assert_eq!(c.decode_fault.unwrap().vector_and_code(), (6, None));
+                assert!(c.protection_fault.is_none());
+            });
+            assert_eq!(core_configure_delivery(1), 0);
+            assert_eq!(core_stage_exception(INVALID), 1);
+            BRIDGE.with_borrow(|b| {
+                let raw = unsafe { &*b.core.as_ref().unwrap().state.get() };
+                let EventState::Pending(event) = raw.event.decode().unwrap() else {
+                    panic!("pending AC admission fault")
+                };
+                assert_eq!(
+                    (event.vector, event.error_code, event.instruction_pc),
+                    (6, None, 0x1234)
+                );
+            });
+        }
+    }
+}
+
+#[test]
+fn successful_ac_helper_clears_stale_decode_diagnostic_without_touching_the_scalar_bank() {
+    initialize(0x1000, &[0x90]);
+    BRIDGE.with_borrow_mut(|b| {
+        let core = b.core.as_mut().unwrap();
+        core.context
+            .set_mode_and_cpl(crate::x86::context::Mode::Protected, 3);
+    });
+    let word = descriptor(SystemFlagsKind::Stac, Width::W16);
+    assert_eq!(core_flags(word, 2, 0), INVALID);
+    BRIDGE.with_borrow_mut(|b| {
+        b.core
+            .as_mut()
+            .unwrap()
+            .context
+            .set_mode_and_cpl(crate::x86::context::Mode::Protected, 0)
+    });
+    assert_eq!(core_flags(word, 2, 0), 0);
+    BRIDGE.with_borrow(|b| {
+        let core = b.core.as_ref().unwrap();
+        assert!(core.decode_fault.is_none());
+        assert_eq!(unsafe { (*core.state.get()).flags }, 2);
+    });
 }
 
 #[test]

@@ -5,17 +5,143 @@ use crate::x86::instruction::{
 };
 
 fn contextual(bytes: &[u8], mode: &str, code32: bool) -> Result<Instruction, DecodeError> {
+    contextual_profile(bytes, mode, code32, false)
+}
+
+fn contextual_profile(
+    bytes: &[u8],
+    mode: &str,
+    code32: bool,
+    paged: bool,
+) -> Result<Instruction, DecodeError> {
     let segments=["cs","ss","ds","es","fs","gs"].into_iter().map(|name| {
         (name.to_owned(),serde_json::json!({"base":"0x0","limit":if mode=="virtual8086"{0xffffu32}else{u32::MAX},"default32":code32,"usable":true,"type":if name=="cs"&&mode!="virtual8086"{"readable-code"}else{"read-write"}}))
     }).collect::<serde_json::Map<_,_>>();
-    let c =
-        ExecutionContext::from_json(&serde_json::json!({"mode":mode,"segments":segments})).unwrap();
-    super::super::decode_with_context(0x1000, &c, |pc| {
+    let c = if mode == "long64" {
+        ExecutionContext::default()
+    } else {
+        ExecutionContext::from_json(&serde_json::json!({"mode":mode,"segments":segments})).unwrap()
+    };
+    super::super::decode_with_profile(0x1000, &c, paged, |pc| {
         bytes
             .get(pc.wrapping_sub(0x1000) as usize)
             .copied()
             .ok_or(DecodeError::Fetch(missing(pc)))
     })
+}
+
+#[test]
+fn ac_selected_forms_reach_the_flags_owner_without_prevalidating_privilege() {
+    for mode in [
+        "real",
+        "protected",
+        "compatibility",
+        "long64",
+        "virtual8086",
+    ] {
+        for code32 in [false, true] {
+            if matches!(mode, "long64" | "virtual8086") && code32 {
+                continue;
+            }
+            for paged in [false, true] {
+                for (tail, kind) in [(0xca, SystemFlagsKind::Clac), (0xcb, SystemFlagsKind::Stac)] {
+                    let instruction =
+                        contextual_profile(&[0x0f, 0x01, tail], mode, code32, paged).unwrap();
+                    assert_eq!(
+                        instruction.operation,
+                        Operation::SystemFlags(SystemFlagsDescriptor {
+                            kind,
+                            width: Width::W16
+                        })
+                    );
+                    assert_eq!(instruction.encoded_len(), 3);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn ac_np_prefixes_and_register_refinement_keep_required_fetch_and_neighbor_frontiers() {
+    for tail in [0xca, 0xcb] {
+        for prefix in [&[][..], &[0x67], &[0x26, 0x64, 0x67], &[0x67, 0x67]] {
+            let mut bytes = prefix.to_vec();
+            bytes.extend([0x0f, 0x01, tail]);
+            assert_eq!(
+                at(0x1000, &bytes).unwrap().encoded_len(),
+                bytes.len() as u32
+            );
+        }
+        for prefix in [
+            &[0x66][..],
+            &[0xf2],
+            &[0xf3],
+            &[0xf0],
+            &[0x66, 0x66],
+            &[0xf2, 0xf3],
+            &[0xf3, 0xf2],
+        ] {
+            let mut bytes = prefix.to_vec();
+            bytes.extend([0x0f, 0x01, tail]);
+            assert_eq!(
+                at(0x1000, &bytes),
+                Err(DecodeError::UndefinedEncoding),
+                "{bytes:x?}"
+            );
+        }
+        for prefix in [&[0xf0, 0xf3][..], &[0xf3, 0xf0]] {
+            let mut bytes = prefix.to_vec();
+            bytes.extend([0x0f, 0x01, tail]);
+            assert_eq!(at(0x1000, &bytes), Err(DecodeError::Unsupported));
+        }
+        for rex in 0x40..=0x4f {
+            let bytes = [rex, 0x0f, 0x01, tail];
+            assert_eq!(at(0x1000, &bytes).unwrap().encoded_len(), 4);
+            assert!(matches!(
+                contextual(&bytes, "protected", true).unwrap().operation,
+                Operation::Unary { .. }
+            ));
+            assert_eq!(
+                contextual(&bytes, "protected", true).unwrap().encoded_len(),
+                1
+            );
+        }
+        for prefix in [&[][..], &[0x66], &[0xf2], &[0xf3], &[0xf0]] {
+            let mut bytes = prefix.to_vec();
+            bytes.extend([0x0f, 0x01, tail]);
+            for length in prefix.len() + 1..bytes.len() {
+                assert!(
+                    matches!(at(0x1000, &bytes[..length]), Err(DecodeError::Fetch(_))),
+                    "{bytes:x?}/{length}"
+                );
+            }
+        }
+        let mut fifteen = vec![0x67; 12];
+        fifteen.extend([0x0f, 0x01, tail]);
+        assert_eq!(at(0x1000, &fifteen).unwrap().encoded_len(), 15);
+        let mut np_fifteen = vec![0x66; 12];
+        np_fifteen.extend([0x0f, 0x01, tail]);
+        assert_eq!(at(0x1000, &np_fifteen), Err(DecodeError::UndefinedEncoding));
+        for prefix in [0x66, 0x67] {
+            let mut too_long = vec![prefix; 13];
+            too_long.extend([0x0f, 0x01]);
+            assert_eq!(at(0x1000, &too_long), Err(DecodeError::InstructionLength));
+        }
+    }
+    for neighbor in [0xc8, 0xc9, 0xcc, 0xcd] {
+        assert_eq!(
+            at(0x1000, &[0x0f, 0x01, neighbor]),
+            Err(DecodeError::Unsupported)
+        );
+    }
+    assert!(matches!(
+        operation(&[0x0f, 0x01, 0xf9]),
+        Operation::Processor(_)
+    ));
+    assert!(matches!(
+        operation(&[0x0f, 0x01, 0x10]),
+        Operation::Protection(_)
+    ));
 }
 
 #[test]

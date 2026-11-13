@@ -18,6 +18,87 @@ fn context(mode: &str, cpl: u8) -> ExecutionContext {
 }
 
 #[test]
+fn ac_selected_forms_have_distinct_checked_operation_words() {
+    for (word, kind) in [(12, SystemFlagsKind::Clac), (13, SystemFlagsKind::Stac)] {
+        assert_eq!(
+            SystemFlagsDescriptor::try_decode(word),
+            Some(SystemFlagsDescriptor {
+                kind,
+                width: Width::W16
+            })
+        );
+    }
+}
+
+#[test]
+fn system_flags_words_preserve_old_encodings_and_reject_every_reserved_bit() {
+    let selected = [
+        (0, SystemFlagsKind::Push, Width::W16),
+        (1, SystemFlagsKind::Pop, Width::W16),
+        (2, SystemFlagsKind::Cli, Width::W16),
+        (3, SystemFlagsKind::Sti, Width::W16),
+        (4, SystemFlagsKind::Push, Width::W32),
+        (5, SystemFlagsKind::Pop, Width::W32),
+        (8, SystemFlagsKind::Push, Width::W64),
+        (9, SystemFlagsKind::Pop, Width::W64),
+        (12, SystemFlagsKind::Clac, Width::W16),
+        (13, SystemFlagsKind::Stac, Width::W16),
+    ];
+    for word in 0..=255 {
+        let expected = selected.iter().find_map(|&(encoded, kind, width)| {
+            (encoded == word).then_some(SystemFlagsDescriptor { kind, width })
+        });
+        assert_eq!(SystemFlagsDescriptor::try_decode(word), expected, "{word}");
+        if let Some(operation) = expected {
+            assert_eq!(operation.encode(), word);
+            for bit in 4..32 {
+                assert_eq!(
+                    SystemFlagsDescriptor::try_decode(word | (1 << bit)),
+                    None,
+                    "{word}/{bit}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn ac_admission_uses_cpl_and_v86_but_no_paging_or_iopl_gate() {
+    for mode in [
+        "real",
+        "protected",
+        "compatibility",
+        "long64",
+        "virtual8086",
+    ] {
+        for cpl in 0..4 {
+            if mode == "real" && cpl != 0 || mode == "virtual8086" && cpl != 3 {
+                continue;
+            }
+            let c = context(mode, cpl);
+            for flags in [2, 0x3002, 0x40002, 0x3d7fd7] {
+                for set in [false, true] {
+                    let expected = if mode != "virtual8086" && cpl == 0 {
+                        Some(if set {
+                            flags | 0x40000
+                        } else {
+                            flags & !0x40000
+                        })
+                    } else {
+                        None
+                    };
+                    assert_eq!(
+                        alignment_check(flags, set, &c),
+                        expected,
+                        "{mode}/{cpl}/{flags:x}/{set}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn flags_stack_images_use_literal_reserved_rf_vm_and_width_rules() {
     let long = ExecutionContext::default();
     assert_eq!(push(0x3d7fd7, Width::W64, &long), Ok(0x3c7fd7));
@@ -115,6 +196,8 @@ fn private_descriptors_and_shadow_admission_reject_malformed_inputs() {
         SystemFlagsKind::Pop,
         SystemFlagsKind::Cli,
         SystemFlagsKind::Sti,
+        SystemFlagsKind::Clac,
+        SystemFlagsKind::Stac,
     ] {
         for width in [Width::W16, Width::W32, Width::W64] {
             let d = SystemFlagsDescriptor { kind, width };
@@ -126,7 +209,7 @@ fn private_descriptors_and_shadow_admission_reject_malformed_inputs() {
             );
         }
     }
-    for word in [12, 13, 14, 15, 16, u32::MAX] {
+    for word in [14, 15, 16, 17, 31, u32::MAX] {
         assert_eq!(SystemFlagsDescriptor::try_decode(word), None);
     }
     for bits in 0..8 {

@@ -1,7 +1,9 @@
 use super::*;
 use crate::embedding::layout::{BUDGET, DEBUG_EXCEPTION, DISPATCH, PROTECTION, X87_EXCEPTION};
 use crate::x86::context::{ExecutionContext, Mode, Segment};
-use crate::x86::instruction::{ProtectionDescriptor, ProtectionKind};
+use crate::x86::instruction::{
+    ProtectionDescriptor, ProtectionKind, SystemFlagsDescriptor, SystemFlagsKind,
+};
 
 fn artifact(code: &[u8], context: &ExecutionContext, observed: bool) -> crate::dbt::Artifact {
     let image = crate::memory::Image::new(0x1000, code.to_vec(), 0x8000, vec![0; 8]).unwrap();
@@ -22,6 +24,128 @@ fn artifact(code: &[u8], context: &ExecutionContext, observed: bool) -> crate::d
 fn packet(code: &[u8], flags: u64, observed: bool, budget: u64, outcome: Outcome<'_>) -> Value {
     let a = artifact(code, &ExecutionContext::default(), observed);
     execution_case(&a.bytes, &a.entries, &[], flags, 0x1000, budget, outcome)
+}
+
+#[test]
+fn ac_producers_publish_live_permission_before_following_memory_imports() {
+    let mut cases = vec![];
+    let observed = false;
+    let code = [0x0f, 0x01, 0xcb, 0x8b, 0x03, 0x0f, 0x01, 0xca, 0x8b, 0x0b];
+    let a = artifact(&code, &ExecutionContext::default(), observed);
+    let mut p = execution_case(
+        &a.bytes,
+        &a.entries,
+        &[(3, 0x4000)],
+        2,
+        0x1000,
+        4,
+        (
+            &[(0, 0x11223344), (1, 0x55667788)],
+            2,
+            0x100a,
+            BUDGET as u32,
+            0,
+        ),
+    );
+    p["accesses"] = json!([
+        {"kind":"flags","args":[13,"2","0"],"canonicalAc":false,"result":{"reason":0,"value":"40002"}},
+        {"kind":"load","args":["4000",4],"canonicalAc":true,"result":"11223344"},
+        {"kind":"access_failed","args":[],"canonicalAc":true,"result":0},
+        {"kind":"flags","args":[12,"40002","0"],"canonicalAc":true,"result":{"reason":0,"value":"2"}},
+        {"kind":"load","args":["4000",4],"canonicalAc":false,"result":"55667788"},
+        {"kind":"access_failed","args":[],"canonicalAc":false,"result":0}
+    ]);
+    cases.push(p);
+    for (incoming, loaded, after) in [(2, 0x40002, 0x40002), (0x40002, 2, 2)] {
+        let a = artifact(&[0x9d, 0x8b, 0x03], &ExecutionContext::default(), observed);
+        let mut p = execution_case(
+            &a.bytes,
+            &a.entries,
+            &[(3, 0x6000), (4, 0x4000)],
+            incoming,
+            0x1000,
+            2,
+            (&[(4, 0x4008)], after, 0x1001, DISPATCH as u32, 1),
+        );
+        assert!(a.entries.contains(&0x1001));
+        let suffix = execution_case(
+            &a.bytes,
+            &a.entries,
+            &[(3, 0x6000), (4, 0x4008)],
+            after,
+            0x1001,
+            1,
+            (&[(0, 0x12345678)], after, 0x1003, BUDGET as u32, 0),
+        );
+        p["preservingSuffix"] = json!({
+            "pc": suffix["pc"], "budget": suffix["budget"], "expected": suffix["expected"]
+        });
+        p["accesses"] = json!([
+            {"kind":"load","args":["4000",8],"canonicalAc":incoming&0x40000!=0,"result":format!("{loaded:x}")},
+            {"kind":"access_failed","args":[],"result":0},
+            {"kind":"flags","args":[9,format!("{incoming:x}"),format!("{loaded:x}")],"canonicalAc":incoming&0x40000!=0,"result":{"reason":0,"value":format!("{after:x}")}},
+            {"kind":"load","args":["6000",4],"canonicalAc":after&0x40000!=0,"result":"12345678"},
+            {"kind":"access_failed","args":[],"result":0}
+        ]);
+        cases.push(p);
+    }
+    run_cases(cases);
+}
+
+#[test]
+fn ac_failed_execution_admission_preserves_permission_and_suppresses_candidate_installation() {
+    let mut cases = vec![];
+    for (kind, tail, incoming, candidate) in [
+        (SystemFlagsKind::Clac, 0xca, 0x50002, 2),
+        (SystemFlagsKind::Stac, 0xcb, 0x10002, 0x40002),
+    ] {
+        let live = incoming & !0x10000;
+        let word = SystemFlagsDescriptor {
+            kind,
+            width: Width::W16,
+        }
+        .encode();
+        let mut p = packet(
+            &[0x0f, 0x01, tail],
+            incoming,
+            true,
+            1,
+            (
+                &[],
+                live,
+                0x1000,
+                crate::embedding::layout::INVALID as u32,
+                1,
+            ),
+        );
+        p["accesses"] = json!([
+            {"kind":"flags","args":[word,format!("{live:x}"),"0"],"canonicalAc":live&0x40000!=0,"result":{"reason":crate::embedding::layout::INVALID,"value":format!("{candidate:x}")}}
+        ]);
+        cases.push(p);
+    }
+    run_cases(cases);
+}
+
+#[test]
+fn completed_ac_change_has_no_shadow_and_tf_observes_installed_flags() {
+    let mut cases = vec![];
+    for (tail, word, before, after) in [(0xcb, 13, 0x102, 0x40102), (0xca, 12, 0x40102, 0x102)] {
+        let mut p = packet(
+            &[0x0f, 0x01, tail],
+            before,
+            true,
+            2,
+            (&[], after, 0x1003, DEBUG_EXCEPTION as u32, 1),
+        );
+        p["interruptibility"] = json!(0);
+        p["expected"]["interruptibility"] = json!(0);
+        p["accesses"] = json!([
+            {"kind":"flags","args":[word,format!("{before:x}"),"0"],"result":{"reason":0,"value":format!("{after:x}")}},
+            {"kind":"debug_step","args":["1000","1003",1,format!("{after:x}")],"canonicalAc":after&0x40000!=0,"result":DEBUG_EXCEPTION}
+        ]);
+        cases.push(p);
+    }
+    run_cases(cases);
 }
 
 #[test]

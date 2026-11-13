@@ -492,6 +492,7 @@ for (const [index,c] of cases.entries()) {
  const access=(kind,args)=>{
   const expected=c.accesses?.[accessIndex++];assert(expected,'unexpected '+kind+' import');
   assert.deepEqual({kind,args},{kind:expected.kind,args:expected.args},'memory import '+index);
+  if(expected.canonicalAc!==undefined)assert.equal((d.getBigUint64(l.flags,true)&0x40000n)!==0n,expected.canonicalAc,'live canonical AC before '+kind);
   return expected.result;
  };
  const bits=v=>BigInt.asUintN(64,v).toString(16);

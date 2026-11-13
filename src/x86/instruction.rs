@@ -429,6 +429,8 @@ pub enum SystemFlagsKind {
     Pop,
     Cli,
     Sti,
+    Clac,
+    Stac,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -439,17 +441,20 @@ pub struct SystemFlagsDescriptor {
 
 impl SystemFlagsDescriptor {
     pub fn encode(self) -> u32 {
-        let kind = match self.kind {
-            SystemFlagsKind::Push => 0,
-            SystemFlagsKind::Pop => 1,
-            SystemFlagsKind::Cli => 2,
-            SystemFlagsKind::Sti => 3,
-        };
         let width = match self.width {
             Width::W16 => 0,
             Width::W32 => 1,
             Width::W64 => 2,
             Width::W8 => panic!("byte FLAGS operand"),
+        };
+        // Operandless AC forms use the previously reserved width3 words.
+        let kind = match self.kind {
+            SystemFlagsKind::Push => 0,
+            SystemFlagsKind::Pop => 1,
+            SystemFlagsKind::Cli => 2,
+            SystemFlagsKind::Sti => 3,
+            SystemFlagsKind::Clac => return 12 + (width << 1),
+            SystemFlagsKind::Stac => return 13 + (width << 1),
         };
         kind | width << 2
     }
@@ -459,6 +464,16 @@ impl SystemFlagsDescriptor {
     }
 
     pub fn try_decode(encoded: u32) -> Option<Self> {
+        if matches!(encoded, 12 | 13) {
+            return Some(Self {
+                kind: if encoded == 12 {
+                    SystemFlagsKind::Clac
+                } else {
+                    SystemFlagsKind::Stac
+                },
+                width: Width::W16,
+            });
+        }
         if encoded & !15 != 0 {
             return None;
         }
@@ -482,7 +497,10 @@ impl SystemFlagsDescriptor {
 
     pub fn valid_in_mode(self, context: &super::context::ExecutionContext) -> bool {
         match self.kind {
-            SystemFlagsKind::Cli | SystemFlagsKind::Sti => self.width == Width::W16,
+            SystemFlagsKind::Cli
+            | SystemFlagsKind::Sti
+            | SystemFlagsKind::Clac
+            | SystemFlagsKind::Stac => self.width == Width::W16,
             SystemFlagsKind::Push | SystemFlagsKind::Pop => {
                 self.width == Width::W16
                     || self.width
