@@ -74,7 +74,6 @@ fn unpaged_walk_is_identity_without_table_reads_dirty_metadata_or_zero_remaining
                 linear: 0,
                 access,
                 class: walk::AccessClass::User,
-                ac: false,
             },
         )
         .unwrap();

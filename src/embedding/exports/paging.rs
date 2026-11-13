@@ -20,8 +20,7 @@ impl Core {
             let request = paging::walk::Request {
                 linear,
                 access: Access::Execute,
-                class: paging::walk::AccessClass::operand(context.cpl()),
-                ac: false,
+                class: paging::walk::AccessClass::operand(context.cpl(), false),
             };
             let mut accessed_write = false;
             let translation = paging::walk::fetch_walk(&mut self.image, paging, request, |image| {
@@ -135,7 +134,6 @@ fn encoding_current(
                 linear,
                 access: Access::Execute,
                 class,
-                ac: false,
             },
         )
         .is_ok_and(|translation| translation.physical == physical)

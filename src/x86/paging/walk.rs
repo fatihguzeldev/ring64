@@ -38,16 +38,16 @@ pub(crate) mod physical_counts {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AccessClass {
     User,
-    Supervisor,
+    Supervisor { ac: bool },
     ImplicitSupervisor,
 }
 
 impl AccessClass {
-    pub fn operand(cpl: u8) -> Self {
+    pub fn operand(cpl: u8, ac: bool) -> Self {
         if cpl == 3 {
             Self::User
         } else {
-            Self::Supervisor
+            Self::Supervisor { ac }
         }
     }
 
@@ -61,7 +61,6 @@ pub struct Request {
     pub linear: u64,
     pub access: Access,
     pub class: AccessClass,
-    pub ac: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -330,7 +329,7 @@ fn walk_paged_with<const EFFECTS: bool, const FETCH: bool, const IA32E: bool, co
                     state.cr4 & CR4_SMEP != 0
                 } else {
                     state.cr4 & CR4_SMAP != 0
-                        && (request.class == AccessClass::ImplicitSupervisor || !request.ac)
+                        && !matches!(request.class, AccessClass::Supervisor { ac: true })
                 };
             if user_request && !user
                 || request.access == Access::Write
@@ -412,7 +411,6 @@ mod tests {
             linear: 0x1234,
             access: Access::Read,
             class: AccessClass::User,
-            ac: false,
         };
         let result = peek(&image, &state, request).unwrap();
         assert_eq!(
@@ -433,7 +431,6 @@ mod tests {
                 linear: 0x2000,
                 access: Access::Write,
                 class: AccessClass::User,
-                ac: false,
             },
         )
         .unwrap_err();
@@ -472,8 +469,7 @@ mod tests {
                     Request {
                         linear: 0x1234,
                         access,
-                        class: AccessClass::operand(if user { 3 } else { 0 }),
-                        ac: false,
+                        class: AccessClass::operand(if user { 3 } else { 0 }, false),
                     }
                 ),
                 Err(Failure::Page(PageFault {
@@ -499,7 +495,6 @@ mod tests {
                     linear: 0x1234,
                     access: Access::Read,
                     class: AccessClass::User,
-                    ac: false,
                 }
             ),
             Err(Failure::Page(PageFault {
@@ -518,7 +513,6 @@ mod tests {
             linear: 0x1234,
             access: Access::Read,
             class: AccessClass::User,
-            ac: false,
         };
         for (entry, word, expected) in [
             (0x2000, 0x7ff0000040001087, 0x40001234),
@@ -556,7 +550,6 @@ mod tests {
                     linear: 0x1234,
                     access: Access::Read,
                     class: AccessClass::User,
-                    ac: false,
                 },
                 |address, width, accessed| {
                     actual.push((address, width, accessed));
@@ -891,7 +884,6 @@ mod tests {
                 linear,
                 access: Access::Read,
                 class: AccessClass::User,
-                ac: false,
             };
             let mut actual = image(&words, width, false, 0x6000);
             physical_counts::take();

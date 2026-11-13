@@ -124,36 +124,38 @@ fn smap_uses_live_ac_for_explicit_data_but_never_exempts_system_metadata() {
 
 #[test]
 fn smap_frame_payload_uses_prospective_privilege_and_its_captured_admission() {
-    for origin in [0, 3] {
-        for destination in 0..4 {
-            let (mut image, mut state) = fixture(0, true, false);
-            state.cr4 |= 1 << 21;
-            let mut work = AccessState::default();
-            {
-                let mut memory = Memory::new(&mut image, &state, origin, 2, &mut work);
-                let admitted = memory.check_frame_write(0x1000, 8, destination);
+    for ac in [0, 1 << 18] {
+        for origin in [0, 3] {
+            for destination in 0..4 {
+                let (mut image, mut state) = fixture(0, true, false);
+                state.cr4 |= 1 << 21;
+                let mut work = AccessState::default();
+                {
+                    let mut memory = Memory::new(&mut image, &state, origin, 2 | ac, &mut work);
+                    let admitted = memory.check_frame_write(0x1000, 8, destination);
+                    assert_eq!(
+                        admitted,
+                        if destination == 3 || ac != 0 {
+                            Ok(())
+                        } else {
+                            Err(protection_fault(0x1000, Access::Write, 3))
+                        },
+                        "origin{origin}/destination{destination}/AC{ac:x}"
+                    );
+                    if admitted.is_ok() {
+                        memory.prepare_publication().unwrap();
+                        memory.write(0x1000, 8, 0x123456789abcdef0).unwrap();
+                    }
+                }
                 assert_eq!(
-                    admitted,
-                    if destination == 3 {
-                        Ok(())
+                    image.physical_read(0x9000, 8).unwrap(),
+                    if destination == 3 || ac != 0 {
+                        0x123456789abcdef0
                     } else {
-                        Err(protection_fault(0x1000, Access::Write, 3))
-                    },
-                    "origin{origin}/destination{destination}"
+                        0
+                    }
                 );
-                if admitted.is_ok() {
-                    memory.prepare_publication().unwrap();
-                    memory.write(0x1000, 8, 0x123456789abcdef0).unwrap();
-                }
             }
-            assert_eq!(
-                image.physical_read(0x9000, 8).unwrap(),
-                if destination == 3 {
-                    0x123456789abcdef0
-                } else {
-                    0
-                }
-            );
         }
     }
 }

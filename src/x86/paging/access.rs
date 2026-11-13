@@ -48,7 +48,7 @@ pub struct Memory<'a> {
     storage: RefCell<Storage<'a>>,
     paging: &'a State,
     class: AccessClass,
-    ac: bool,
+    raw_ac: bool,
 }
 
 impl<'a> Memory<'a> {
@@ -59,11 +59,12 @@ impl<'a> Memory<'a> {
         flags: u64,
         work: &'a mut AccessState,
     ) -> Self {
+        let ac = flags & (1 << 18) != 0;
         Self {
             storage: RefCell::new(Storage { image, work }),
             paging,
-            class: AccessClass::operand(cpl),
-            ac: flags & (1 << 18) != 0,
+            class: AccessClass::operand(cpl, ac),
+            raw_ac: ac,
         }
     }
 
@@ -90,7 +91,6 @@ impl<'a> Memory<'a> {
                 linear: address + u64::from(offset),
                 access,
                 class,
-                ac: self.ac,
             };
             let translation =
                 walk::walk(storage.image, self.paging, request).map_err(AccessFailure::Paging)?;
@@ -380,7 +380,7 @@ impl GuestMemory for Memory<'_> {
         )
     }
     fn check_frame_write(&self, address: u64, width: u32, cpl: u8) -> Result<(), AccessFailure> {
-        self.capture_write(address, width, AccessClass::operand(cpl))
+        self.capture_write(address, width, AccessClass::operand(cpl, self.raw_ac))
     }
     fn prepare_publication(&mut self) -> Result<(), AccessFailure> {
         self.prepare_publication_ordered()

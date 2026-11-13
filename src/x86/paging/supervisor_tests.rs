@@ -57,9 +57,29 @@ fn fixture(family: Family) -> (Image, State, u64, u64, u32) {
     (image, state, upper, leaf, width)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LogicalClass {
+    User,
+    Supervisor,
+    ImplicitSupervisor,
+}
+
+// Preserve independent logical inputs; only construct the new private request shape.
+fn request(linear: u64, access: Access, class: LogicalClass, ac: bool) -> Request {
+    Request {
+        linear,
+        access,
+        class: match class {
+            LogicalClass::User => AccessClass::User,
+            LogicalClass::Supervisor => AccessClass::Supervisor { ac },
+            LogicalClass::ImplicitSupervisor => AccessClass::ImplicitSupervisor,
+        },
+    }
+}
+
 // Independent access-rights table, deliberately unlike the combined walk predicate.
 fn table(
-    class: AccessClass,
+    class: LogicalClass,
     access: Access,
     page_user: bool,
     page_write: bool,
@@ -67,7 +87,7 @@ fn table(
     controls: [bool; 4],
 ) -> bool {
     let [wp, smep, smap, ac] = controls;
-    if class == AccessClass::User {
+    if class == LogicalClass::User {
         return page_user
             && match access {
                 Access::Read => true,
@@ -85,7 +105,7 @@ fn table(
     if access == Access::Execute {
         return !smep && !nx;
     }
-    if smap && (!ac || class == AccessClass::ImplicitSupervisor) {
+    if smap && (!ac || class == LogicalClass::ImplicitSupervisor) {
         return false;
     }
     access != Access::Write || !wp || page_write
@@ -98,12 +118,12 @@ fn independent_supervisor_rights_table_matches_all_three_walk_families() {
         let (mut image, original, upper, leaf, width) = fixture(family);
         let upper_base = image.physical_read(upper, width).unwrap() & !7;
         for class in [
-            AccessClass::User,
-            AccessClass::Supervisor,
-            AccessClass::ImplicitSupervisor,
+            LogicalClass::User,
+            LogicalClass::Supervisor,
+            LogicalClass::ImplicitSupervisor,
         ] {
             for access in [Access::Read, Access::Write, Access::Execute] {
-                if class == AccessClass::ImplicitSupervisor && access == Access::Execute {
+                if class == LogicalClass::ImplicitSupervisor && access == Access::Execute {
                     continue;
                 }
                 for bits in 0u16..1024 {
@@ -159,7 +179,7 @@ fn independent_supervisor_rights_table_matches_all_three_walk_families() {
                             access,
                             error_code: 1
                                 | u32::from(access == Access::Write) << 1
-                                | u32::from(class == AccessClass::User) << 2
+                                | u32::from(class == LogicalClass::User) << 2
                                 | u32::from(
                                     access == Access::Execute
                                         && (smep || !matches!(family, Family::NonPae) && nxe),
@@ -167,17 +187,8 @@ fn independent_supervisor_rights_table_matches_all_three_walk_families() {
                         }))
                     };
                     assert_eq!(
-                        peek(
-                            &image,
-                            &state,
-                            Request {
-                                linear: 0x1234,
-                                access,
-                                class,
-                                ac,
-                            },
-                        )
-                        .map(|translation| translation.physical),
+                        peek(&image, &state, request(0x1234, access, class, ac),)
+                            .map(|translation| translation.physical),
                         expected,
                         "independent supervisor rights table: {family:?}/{class:?}/{access:?}/{bits:x}"
                     );
@@ -197,22 +208,13 @@ fn every_ia32e_level_contributes_to_supervisor_page_classification() {
         let old = image.physical_read(level, 8).unwrap();
         image.physical_write(level, 8, old & !4).unwrap();
         for (class, access) in [
-            (AccessClass::Supervisor, Access::Execute),
-            (AccessClass::ImplicitSupervisor, Access::Read),
+            (LogicalClass::Supervisor, Access::Execute),
+            (LogicalClass::ImplicitSupervisor, Access::Read),
         ] {
             assert_eq!(
-                peek(
-                    &image,
-                    &state,
-                    Request {
-                        linear: 0x1234,
-                        access,
-                        class,
-                        ac: false,
-                    },
-                )
-                .unwrap()
-                .physical,
+                peek(&image, &state, request(0x1234, access, class, false),)
+                    .unwrap()
+                    .physical,
                 0x9234,
                 "supervisor page at level {level:x}"
             );
@@ -232,22 +234,18 @@ fn supervisor_protection_applies_to_every_admitted_large_leaf() {
         image.physical_write(leaf, width, entry).unwrap();
         state.cr4 |= CR4_SMEP | CR4_SMAP | if pse { 0x10 } else { 0 };
         for (class, access, ac, expected) in [
-            (AccessClass::Supervisor, Access::Execute, true, Some(0x11)),
-            (AccessClass::Supervisor, Access::Read, false, Some(1)),
-            (AccessClass::ImplicitSupervisor, Access::Read, true, Some(1)),
-            (AccessClass::Supervisor, Access::Read, true, None),
-            (AccessClass::User, Access::Execute, false, None),
+            (LogicalClass::Supervisor, Access::Execute, true, Some(0x11)),
+            (LogicalClass::Supervisor, Access::Read, false, Some(1)),
+            (
+                LogicalClass::ImplicitSupervisor,
+                Access::Read,
+                true,
+                Some(1),
+            ),
+            (LogicalClass::Supervisor, Access::Read, true, None),
+            (LogicalClass::User, Access::Execute, false, None),
         ] {
-            let result = peek(
-                &image,
-                &state,
-                Request {
-                    linear: 0x1234,
-                    access,
-                    class,
-                    ac,
-                },
-            );
+            let result = peek(&image, &state, request(0x1234, access, class, ac));
             if let Some(error_code) = expected {
                 assert_eq!(
                     result,
@@ -268,8 +266,8 @@ fn supervisor_protection_applies_to_every_admitted_large_leaf() {
 #[test]
 fn reached_protection_denial_keeps_accessed_effects_but_no_dirty_update() {
     for (class, ac) in [
-        (AccessClass::Supervisor, false),
-        (AccessClass::ImplicitSupervisor, true),
+        (LogicalClass::Supervisor, false),
+        (LogicalClass::ImplicitSupervisor, true),
     ] {
         let (mut image, mut state, _, _, _) = fixture(Family::Ia32e);
         state.cr4 |= CR4_SMAP;
@@ -281,12 +279,7 @@ fn reached_protection_denial_keeps_accessed_effects_but_no_dirty_update() {
             walk(
                 &mut image,
                 &state,
-                Request {
-                    linear: 0x1234,
-                    access: Access::Write,
-                    class,
-                    ac,
-                },
+                request(0x1234, Access::Write, class, ac),
             ),
             Err(Failure::Page(PageFault {
                 address: 0x1234,
@@ -315,12 +308,7 @@ fn lower_structural_faults_precede_smap_and_smep_permission_denial() {
             walk(
                 &mut image,
                 &state,
-                Request {
-                    linear: 0x1234,
-                    access: Access::Execute,
-                    class: AccessClass::Supervisor,
-                    ac: false,
-                },
+                request(0x1234, Access::Execute, LogicalClass::Supervisor, false),
             ),
             Err(Failure::Page(PageFault {
                 address: 0x1234,
@@ -338,26 +326,16 @@ fn inactive_paging_ignores_supervisor_permissions_without_inventing_table_work()
     state.cr4 |= CR4_SMEP | CR4_SMAP;
     physical_counts::take();
     for class in [
-        AccessClass::User,
-        AccessClass::Supervisor,
-        AccessClass::ImplicitSupervisor,
+        LogicalClass::User,
+        LogicalClass::Supervisor,
+        LogicalClass::ImplicitSupervisor,
     ] {
         for access in [Access::Read, Access::Write, Access::Execute] {
-            if class == AccessClass::ImplicitSupervisor && access == Access::Execute {
+            if class == LogicalClass::ImplicitSupervisor && access == Access::Execute {
                 continue;
             }
             for ac in [false, true] {
-                let translation = peek(
-                    &image,
-                    &state,
-                    Request {
-                        linear: 0x1234,
-                        access,
-                        class,
-                        ac,
-                    },
-                )
-                .unwrap();
+                let translation = peek(&image, &state, request(0x1234, access, class, ac)).unwrap();
                 assert_eq!(translation.physical, 0x1234);
                 assert_eq!(translation.entry_width, 0);
                 assert!(!translation.dirty);

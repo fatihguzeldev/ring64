@@ -52,8 +52,7 @@ fn request(linear: u64, access: Access, user: bool) -> Request {
     Request {
         linear,
         access,
-        class: AccessClass::operand(if user { 3 } else { 0 }),
-        ac: false,
+        class: AccessClass::operand(if user { 3 } else { 0 }, false),
     }
 }
 fn pf(linear: u64, access: Access, error_code: u32) -> Failure {
