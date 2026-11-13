@@ -59,8 +59,11 @@ fn compile() -> u64 {
     assert_eq!(core_compile(0x1000, 1, 16, 65536), 0);
     BRIDGE.with_borrow(|bridge| {
         let value: serde_json::Value = serde_json::from_slice(&bridge.info).unwrap();
-        u64::from_str_radix(value["owner"].as_str().unwrap().trim_start_matches("0x"), 16)
-            .unwrap()
+        u64::from_str_radix(
+            value["owner"].as_str().unwrap().trim_start_matches("0x"),
+            16,
+        )
+        .unwrap()
     })
 }
 
@@ -142,7 +145,10 @@ fn supervisor_control_fences_cancel_pending_and_aba_owners_at_epoch_saturation()
             set_flags(2 | AC);
             assert_eq!(mapped::core_validity(installed), 1);
             assert_eq!(mapped::core_validity(pending), 1);
-            assert_eq!(paging::core_paging_control(1, 4, 0x608, 0x1000, 2 | AC, 0), 0);
+            assert_eq!(
+                paging::core_paging_control(1, 4, 0x608, 0x1000, 2 | AC, 0),
+                0
+            );
             assert_eq!(mapped::core_validity(installed), 1);
             import_bits(bits);
             assert_eq!(mapped::core_validity(installed), 0);
@@ -153,7 +159,10 @@ fn supervisor_control_fences_cancel_pending_and_aba_owners_at_epoch_saturation()
             let fresh = compile();
             assert!(fresh > pending);
             assert_eq!(mapped::core_publish(fresh), 1);
-            assert_eq!(paging::core_paging_control(1, 4, 0x608 | bits, 0x1000, 2 | AC, 0), 0);
+            assert_eq!(
+                paging::core_paging_control(1, 4, 0x608 | bits, 0x1000, 2 | AC, 0),
+                0
+            );
             assert_eq!(mapped::core_validity(fresh), 0);
             BRIDGE.with_borrow(|bridge| {
                 let core = bridge.core.as_ref().unwrap();
