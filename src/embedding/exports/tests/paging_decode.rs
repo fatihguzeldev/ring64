@@ -168,74 +168,76 @@ fn pg0_decode_keeps_actual_physical_execute_permission_checks() {
 #[test]
 fn warm_decode_keeps_each_later_byte_physical_execute_admission() {
     use crate::memory::{MappingInput, MemoryLimits, Permissions};
-    for mapped_tail in [false, true] {
-        let bytes = fixture("ia32e", true, true);
-        BRIDGE.with_borrow_mut(|bridge| {
-            let core = bridge.core.as_mut().unwrap();
-            let mut mappings = vec![MappingInput {
-                base: 0,
-                backing: "ram".into(),
-                offset: 0,
-                length: 0x9001,
-                permissions: Permissions {
-                    read: true,
-                    write: true,
-                    execute: true,
-                },
-            }];
-            if mapped_tail {
-                mappings.push(MappingInput {
-                    base: 0x9001,
+    for (family, physical) in [("ia32e", 0x9000), ("pg0", 0x1000)] {
+        for mapped_tail in [false, true] {
+            let bytes = fixture(family, true, true);
+            BRIDGE.with_borrow_mut(|bridge| {
+                let core = bridge.core.as_mut().unwrap();
+                let mut mappings = vec![MappingInput {
+                    base: 0,
                     backing: "ram".into(),
-                    offset: 0x9001,
-                    length: 0xfff,
+                    offset: 0,
+                    length: physical + 1,
                     permissions: Permissions {
                         read: true,
                         write: true,
-                        execute: false,
+                        execute: true,
                     },
-                });
-            }
-            core.image = Image::physical_mapped(
-                vec![("ram".into(), bytes)],
-                mappings,
-                MemoryLimits {
-                    max_backing_bytes: 0xa000,
-                    max_backings: 1,
-                    max_mappings: 2,
-                },
-            )
-            .unwrap();
-            let bank = core.paging;
-            let context = core.context.clone();
-            let before = unsafe { (*core.state.get()).registers };
-            let fault = match core.paged_decode(PC) {
-                Err(DecodeError::Paging(Failure::Physical(fault))) => fault,
-                other => panic!("expected later-byte physical refusal: {other:?}"),
-            };
-            assert_eq!(fault.linear, PC + 1);
-            assert_eq!(fault.access, Access::Execute);
-            assert_eq!(fault.phase, PhysicalPhase::FinalAccess);
-            assert_eq!(fault.physical.address, 0x9001);
-            assert_eq!(fault.physical.failing, 0x9001);
-            assert_eq!(fault.physical.width, 1);
-            assert_eq!(fault.physical.access, Access::Execute);
-            assert_eq!(
-                fault.physical.cause,
+                }];
                 if mapped_tail {
-                    Cause::Permission
-                } else {
-                    Cause::Unmapped
+                    mappings.push(MappingInput {
+                        base: u64::from(physical + 1),
+                        backing: "ram".into(),
+                        offset: physical + 1,
+                        length: 0xa000 - physical - 1,
+                        permissions: Permissions {
+                            read: true,
+                            write: true,
+                            execute: false,
+                        },
+                    });
                 }
-            );
-            assert_eq!(core.paging, bank);
-            assert_eq!(core.context, context);
-            unsafe {
-                assert_eq!((*core.state.get()).registers, before);
-                assert_eq!((*core.state.get()).rip, PC);
-                assert_eq!((*core.state.get()).flags, RF);
-            }
-        });
+                core.image = Image::physical_mapped(
+                    vec![("ram".into(), bytes)],
+                    mappings,
+                    MemoryLimits {
+                        max_backing_bytes: 0xa000,
+                        max_backings: 1,
+                        max_mappings: 2,
+                    },
+                )
+                .unwrap();
+                let bank = core.paging;
+                let context = core.context.clone();
+                let before = unsafe { (*core.state.get()).registers };
+                let fault = match core.paged_decode(PC) {
+                    Err(DecodeError::Paging(Failure::Physical(fault))) => fault,
+                    other => panic!("expected later-byte physical refusal: {other:?}"),
+                };
+                assert_eq!(fault.linear, PC + 1);
+                assert_eq!(fault.access, Access::Execute);
+                assert_eq!(fault.phase, PhysicalPhase::FinalAccess);
+                assert_eq!(fault.physical.address, u64::from(physical + 1));
+                assert_eq!(fault.physical.failing, u128::from(physical + 1));
+                assert_eq!(fault.physical.width, 1);
+                assert_eq!(fault.physical.access, Access::Execute);
+                assert_eq!(
+                    fault.physical.cause,
+                    if mapped_tail {
+                        Cause::Permission
+                    } else {
+                        Cause::Unmapped
+                    }
+                );
+                assert_eq!(core.paging, bank);
+                assert_eq!(core.context, context);
+                unsafe {
+                    assert_eq!((*core.state.get()).registers, before);
+                    assert_eq!((*core.state.get()).rip, PC);
+                    assert_eq!((*core.state.get()).flags, RF);
+                }
+            });
+        }
     }
 }
 
@@ -300,6 +302,36 @@ fn warm_decode_hits_remain_in_cold_cross_page_accessed_alias_revalidation() {
         assert_eq!(core.context, context);
         unsafe {
             assert_eq!((*core.state.get()).registers, before);
+            assert_eq!((*core.state.get()).rip, PC);
+            assert_eq!((*core.state.get()).flags, RF);
+        }
+    });
+}
+
+#[test]
+fn pg0_decode_keeps_later_required_byte_cs_limit_priority() {
+    fixture("pg0", true, true);
+    BRIDGE.with_borrow_mut(|bridge| {
+        let core = bridge.core.as_mut().unwrap();
+        let mut context = core.context.to_json();
+        context["segments"]["cs"]["limit"] = serde_json::json!(0x1000);
+        core.context = ExecutionContext::from_json(&context).unwrap();
+        let context = core.context.clone();
+        let bank = core.paging;
+        let registers = unsafe { (*core.state.get()).registers };
+        let fault = match core.paged_decode(PC) {
+            Err(DecodeError::Segment(fault)) => fault,
+            other => panic!("expected next required-byte CS limit refusal: {other:?}"),
+        };
+        assert_eq!(fault.segment, Segment::Cs);
+        assert_eq!(fault.offset, PC + 1);
+        assert_eq!(fault.width, 1);
+        assert_eq!(fault.access, Access::Execute);
+        assert_eq!(fault.cause, SegmentCause::Limit);
+        assert_eq!(core.context, context);
+        assert_eq!(core.paging, bank);
+        unsafe {
+            assert_eq!((*core.state.get()).registers, registers);
             assert_eq!((*core.state.get()).rip, PC);
             assert_eq!((*core.state.get()).flags, RF);
         }

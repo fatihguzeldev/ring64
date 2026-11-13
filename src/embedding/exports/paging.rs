@@ -8,9 +8,17 @@ impl Core {
     ) -> Result<crate::x86::instruction::Instruction, DecodeError> {
         let paging = self.paging.as_ref().expect("paged decode profile");
         let context = &self.context;
+        let pg0 = paging.cr0 & (1 << 31) == 0;
+        let final_byte = |image: &Image, request: paging::walk::Request, physical| {
+            image.physical_fetch(physical).map_err(|fault| {
+                DecodeError::Paging(
+                    request.physical_failure(fault, paging::walk::PhysicalPhase::FinalAccess),
+                )
+            })
+        };
         let mut consumed = Vec::new();
         let mut warm_span: Option<(u64, u64, u64)> = None;
-        let mut reuse_warm = paging.cr0 & (1 << 31) != 0;
+        let mut reuse_warm = !pg0;
         decode::decode_with_profile(pc, context, true, |offset| {
             let linear = context
                 .translate(offset, 1, Segment::Cs, Access::Execute, false)
@@ -24,6 +32,14 @@ impl Core {
                 access: Access::Execute,
                 class: paging::walk::AccessClass::operand(context.cpl(), false),
             };
+            if pg0 {
+                // PG0 cannot write A bits, but still admits this exact required byte.
+                let translation =
+                    paging::walk::fetch_walk(&mut self.image, paging, request, |_| true)
+                        .map_err(DecodeError::Paging)?
+                        .ok_or(DecodeError::PagingRestart)?;
+                return final_byte(&self.image, request, translation.physical);
+            }
             // Only an A write can mutate memory between these synchronous required bytes.
             let physical = if let Some((base, physical, remaining)) = warm_span
                 && linear >= base
@@ -54,11 +70,7 @@ impl Core {
                 }
                 translation.physical
             };
-            let byte = self.image.physical_fetch(physical).map_err(|fault| {
-                DecodeError::Paging(
-                    request.physical_failure(fault, paging::walk::PhysicalPhase::FinalAccess),
-                )
-            })?;
+            let byte = final_byte(&self.image, request, physical)?;
             consumed.push((linear, physical, byte));
             Ok(byte)
         })
