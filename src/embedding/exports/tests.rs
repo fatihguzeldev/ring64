@@ -15,6 +15,7 @@ mod protection_bridge;
 mod reset;
 mod software_events;
 mod streaming_bridge;
+mod supervisor;
 mod system_flags;
 mod system_flags_review;
 mod system_provenance;

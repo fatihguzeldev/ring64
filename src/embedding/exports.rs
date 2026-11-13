@@ -15,9 +15,10 @@ macro_rules! guest_access {
     ($core:expr, $paged:expr, $method:ident($($argument:expr),* $(,)?)) => {{
         if $paged {
             let cpl = $core.context.cpl();
+            let flags = unsafe { (*$core.state.get()).flags };
             let mut memory = crate::x86::paging::access::Memory::new(
                 &mut $core.image, $core.paging.as_ref().expect("paged helper profile"),
-                cpl, &mut $core.paging_work,
+                cpl, flags, &mut $core.paging_work,
             );
             crate::x86::access::GuestMemory::$method(&mut memory, $($argument),*)
         } else {
@@ -30,7 +31,8 @@ macro_rules! guest_semantics {
     ($core:expr,$paged:expr,$operation:path,$($argument:expr),* $(,)?) => {{
         if $paged {
             let cpl=$core.context.cpl();
-            let mut memory=crate::x86::paging::access::Memory::new(&mut $core.image,$core.paging.as_ref().expect("paged helper profile"),cpl,&mut $core.paging_work);
+            let flags=unsafe { (*$core.state.get()).flags };
+            let mut memory=crate::x86::paging::access::Memory::new(&mut $core.image,$core.paging.as_ref().expect("paged helper profile"),cpl,flags,&mut $core.paging_work);
             $operation(&mut $core.context,&mut memory,$($argument),*)
         } else {$operation(&mut $core.context,&mut $core.image,$($argument),*)}
     }};

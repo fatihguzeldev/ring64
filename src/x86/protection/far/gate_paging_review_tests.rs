@@ -72,7 +72,7 @@ fn frame_dirty_failure_after_a_remap_is_not_an_earlier_descriptor_write() {
     let mut work = AccessState::default();
     let result = execute(
         &mut context,
-        &mut Memory::new(&mut image, &state, 3, &mut work),
+        &mut Memory::new(&mut image, &state, 3, 2, &mut work),
         FarDescriptor {
             kind: FarKind::Call,
             width: Width::W32,
@@ -169,7 +169,7 @@ fn ordinary_call_frame_dirty_refusal_keeps_its_own_prepared_origin() {
     let mut work = AccessState::default();
     let result = execute(
         &mut context,
-        &mut Memory::new(&mut image, &state, 3, &mut work),
+        &mut Memory::new(&mut image, &state, 3, 2, &mut work),
         FarDescriptor {
             kind: FarKind::Call,
             width: Width::W32,

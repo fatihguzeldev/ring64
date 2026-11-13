@@ -224,6 +224,7 @@ pub extern "C" fn core_deliver_exception() -> i32 {
                 &mut core.image,
                 &bank,
                 cpl,
+                flags,
                 &mut core.paging_work,
             );
             let outcome = match event {

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use super::{
     State,
-    walk::{self, PhysicalPhase, Request},
+    walk::{self, AccessClass, PhysicalPhase, Request},
 };
 use crate::memory::{Access, Image, PreparedPhysicalUpdate, PreparedPhysicalWrite, check_span};
 use crate::x86::{
@@ -47,7 +47,8 @@ struct Storage<'a> {
 pub struct Memory<'a> {
     storage: RefCell<Storage<'a>>,
     paging: &'a State,
-    user: bool,
+    class: AccessClass,
+    ac: bool,
 }
 
 impl<'a> Memory<'a> {
@@ -55,12 +56,14 @@ impl<'a> Memory<'a> {
         image: &'a mut Image,
         paging: &'a State,
         cpl: u8,
+        flags: u64,
         work: &'a mut AccessState,
     ) -> Self {
         Self {
             storage: RefCell::new(Storage { image, work }),
             paging,
-            user: cpl == 3,
+            class: AccessClass::operand(cpl),
+            ac: flags & (1 << 18) != 0,
         }
     }
 
@@ -70,7 +73,7 @@ impl<'a> Memory<'a> {
         width: u32,
         access: Access,
         rmw: bool,
-        user: bool,
+        class: AccessClass,
     ) -> Result<Prepared, AccessFailure> {
         check_span(address, width, access).map_err(AccessFailure::Linear)?;
         let mut prepared = Prepared {
@@ -86,7 +89,8 @@ impl<'a> Memory<'a> {
             let request = Request {
                 linear: address + u64::from(offset),
                 access,
-                user,
+                class,
+                ac: self.ac,
             };
             let translation =
                 walk::walk(storage.image, self.paging, request).map_err(AccessFailure::Paging)?;
@@ -129,16 +133,26 @@ impl<'a> Memory<'a> {
         }
     }
 
-    fn read_at(&self, address: u64, width: u32, user: bool) -> Result<[u8; 16], AccessFailure> {
+    fn read_at(
+        &self,
+        address: u64,
+        width: u32,
+        class: AccessClass,
+    ) -> Result<[u8; 16], AccessFailure> {
         assert!(width <= 16);
-        let prepared = self.prepare(address, width, Access::Read, false, user)?;
+        let prepared = self.prepare(address, width, Access::Read, false, class)?;
         let mut bytes = [0; 16];
         self.read_prepared(&prepared, &mut bytes);
         Ok(bytes)
     }
 
-    fn capture_write(&self, address: u64, width: u32, user: bool) -> Result<(), AccessFailure> {
-        self.capture_write_fields(address, width, &[(0, width)], user)
+    fn capture_write(
+        &self,
+        address: u64,
+        width: u32,
+        class: AccessClass,
+    ) -> Result<(), AccessFailure> {
+        self.capture_write_fields(address, width, &[(0, width)], class)
     }
 
     fn capture_write_fields(
@@ -146,9 +160,9 @@ impl<'a> Memory<'a> {
         address: u64,
         width: u32,
         fields: &[(u32, u32)],
-        user: bool,
+        class: AccessClass,
     ) -> Result<(), AccessFailure> {
-        let mut prepared = self.prepare(address, width, Access::Write, false, user)?;
+        let mut prepared = self.prepare(address, width, Access::Write, false, class)?;
         prepared.fields = fields.to_vec();
         self.storage.borrow_mut().work.pending.push(prepared);
         Ok(())
@@ -195,7 +209,7 @@ impl<'a> Memory<'a> {
         width: u32,
         fields: &[(u32, u32)],
         bytes: &[u8],
-        user: bool,
+        class: AccessClass,
     ) -> Result<(), AccessFailure> {
         let captured = {
             let mut storage = self.storage.borrow_mut();
@@ -208,7 +222,7 @@ impl<'a> Memory<'a> {
         };
         let prepared = match captured {
             Some(p) => p,
-            None => self.prepare(address, width, Access::Write, false, user)?,
+            None => self.prepare(address, width, Access::Write, false, class)?,
         };
         if !prepared.published {
             let updates = self.dirty_admission(&prepared, fields)?;
@@ -243,7 +257,7 @@ fn participates(fragment: &Fragment, fields: &[(u32, u32)]) -> bool {
 
 impl GuestMemory for Memory<'_> {
     fn fetch(&self, address: u64) -> Result<u8, AccessFailure> {
-        let prepared = self.prepare(address, 1, Access::Execute, false, self.user)?;
+        let prepared = self.prepare(address, 1, Access::Execute, false, self.class)?;
         let storage = self.storage.borrow();
         Ok(storage
             .image
@@ -251,18 +265,18 @@ impl GuestMemory for Memory<'_> {
             .expect("admitted physical fetch"))
     }
     fn read(&self, address: u64, width: u32) -> Result<u64, AccessFailure> {
-        let bytes = self.read_at(address, width, self.user)?;
+        let bytes = self.read_at(address, width, self.class)?;
         Ok(u64::from_le_bytes(bytes[..8].try_into().unwrap()))
     }
     fn read_for_write(&self, address: u64, width: u32) -> Result<u64, AccessFailure> {
-        let prepared = self.prepare(address, width, Access::Write, true, self.user)?;
+        let prepared = self.prepare(address, width, Access::Write, true, self.class)?;
         let mut bytes = [0; 8];
         self.read_prepared(&prepared, &mut bytes);
         self.storage.borrow_mut().work.pending.push(prepared);
         Ok(u64::from_le_bytes(bytes))
     }
     fn read_vector(&self, address: u64, width: u32) -> Result<[u8; 16], AccessFailure> {
-        self.read_at(address, width, self.user)
+        self.read_at(address, width, self.class)
     }
     fn read_fields(
         &self,
@@ -271,7 +285,7 @@ impl GuestMemory for Memory<'_> {
         fields: &[(u32, u32)],
         output: &mut [u8],
     ) -> Result<(), AccessFailure> {
-        let prepared = self.prepare(address, width, Access::Read, false, self.user)?;
+        let prepared = self.prepare(address, width, Access::Read, false, self.class)?;
         let storage = self.storage.borrow();
         for fragment in &prepared.fragments {
             for &(start, length) in fields {
@@ -297,7 +311,7 @@ impl GuestMemory for Memory<'_> {
             width,
             &[(0, width)],
             &value.to_le_bytes(),
-            self.user,
+            self.class,
         )
     }
     fn write_bytes(&mut self, address: u64, bytes: &[u8]) -> Result<(), AccessFailure> {
@@ -306,7 +320,7 @@ impl GuestMemory for Memory<'_> {
             bytes.len() as u32,
             &[(0, bytes.len() as u32)],
             bytes,
-            self.user,
+            self.class,
         )
     }
     fn write_fields(
@@ -316,20 +330,20 @@ impl GuestMemory for Memory<'_> {
         fields: &[(u32, u32)],
         bytes: &[u8],
     ) -> Result<(), AccessFailure> {
-        self.write_at(address, width, fields, bytes, self.user)
+        self.write_at(address, width, fields, bytes, self.class)
     }
     fn check_read(&self, address: u64, width: u32) -> Result<(), AccessFailure> {
-        self.prepare(address, width, Access::Read, false, self.user)
+        self.prepare(address, width, Access::Read, false, self.class)
             .map(|_| ())
     }
     fn check_write(&self, address: u64, width: u32) -> Result<(), AccessFailure> {
-        self.capture_write(address, width, self.user)
+        self.capture_write(address, width, self.class)
     }
     fn read_system(&self, address: u64, width: u32) -> Result<[u8; 16], AccessFailure> {
-        self.read_at(address, width, false)
+        self.read_at(address, width, AccessClass::ImplicitSupervisor)
     }
     fn check_system_write(&self, address: u64, width: u32) -> Result<(), AccessFailure> {
-        self.capture_write(address, width, false)
+        self.capture_write(address, width, AccessClass::ImplicitSupervisor)
     }
     fn check_system_write_fields(
         &self,
@@ -337,10 +351,16 @@ impl GuestMemory for Memory<'_> {
         width: u32,
         fields: &[(u32, u32)],
     ) -> Result<(), AccessFailure> {
-        self.capture_write_fields(address, width, fields, false)
+        self.capture_write_fields(address, width, fields, AccessClass::ImplicitSupervisor)
     }
     fn write_system(&mut self, address: u64, width: u32, value: u64) -> Result<(), AccessFailure> {
-        self.write_at(address, width, &[(0, width)], &value.to_le_bytes(), false)
+        self.write_at(
+            address,
+            width,
+            &[(0, width)],
+            &value.to_le_bytes(),
+            AccessClass::ImplicitSupervisor,
+        )
     }
     fn publish_system_byte(
         &mut self,
@@ -351,10 +371,16 @@ impl GuestMemory for Memory<'_> {
     ) -> Result<(), AccessFailure> {
         let mut bytes = [0; 16];
         bytes[offset as usize] = byte;
-        self.write_at(address, width, &[(offset, 1)], &bytes, false)
+        self.write_at(
+            address,
+            width,
+            &[(offset, 1)],
+            &bytes,
+            AccessClass::ImplicitSupervisor,
+        )
     }
     fn check_frame_write(&self, address: u64, width: u32, cpl: u8) -> Result<(), AccessFailure> {
-        self.capture_write(address, width, cpl == 3)
+        self.capture_write(address, width, AccessClass::operand(cpl))
     }
     fn prepare_publication(&mut self) -> Result<(), AccessFailure> {
         self.prepare_publication_ordered()

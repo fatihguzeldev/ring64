@@ -58,10 +58,163 @@ fn fixture(second: u64, data_write: bool, protected_pte: bool) -> (Image, State)
 }
 
 #[test]
+fn supervisor_protection_smap_denies_supervisor_operand_data() {
+    let (mut image, mut state) = fixture(0, true, false);
+    state.cr4 |= 1 << 21;
+    let mut work = AccessState::default();
+    assert_eq!(
+        Memory::new(&mut image, &state, 0, 0, &mut work).read(0x1000, 1),
+        Err(AccessFailure::Paging(Failure::Page(PageFault {
+            address: 0x1000,
+            access: Access::Read,
+            error_code: 1,
+        })))
+    );
+}
+
+fn protection_fault(address: u64, access: Access, error_code: u32) -> AccessFailure {
+    AccessFailure::Paging(Failure::Page(PageFault {
+        address,
+        access,
+        error_code,
+    }))
+}
+
+#[test]
+fn smap_uses_live_ac_for_explicit_data_but_never_exempts_system_metadata() {
+    for cpl in 0..4 {
+        for ac in [0, 1 << 18] {
+            let (mut image, mut state) = fixture(0, true, false);
+            state.cr4 |= 1 << 21;
+            image.physical_write(0x9000, 1, 0x5a).unwrap();
+            let mut work = AccessState::default();
+            let mut memory = Memory::new(&mut image, &state, cpl, ac | 2, &mut work);
+            let allowed = cpl == 3 || ac != 0;
+            assert_eq!(
+                memory.read(0x1000, 1),
+                if allowed {
+                    Ok(0x5a)
+                } else {
+                    Err(protection_fault(0x1000, Access::Read, 1))
+                },
+                "CPL{cpl}/AC{ac:x} explicit read"
+            );
+            assert_eq!(
+                memory.write(0x1000, 1, 0xa5),
+                if allowed {
+                    Ok(())
+                } else {
+                    Err(protection_fault(0x1000, Access::Write, 3))
+                },
+                "CPL{cpl}/AC{ac:x} explicit write"
+            );
+            assert_eq!(
+                memory.read_system(0x1000, 8),
+                Err(protection_fault(0x1000, Access::Read, 1)),
+                "CPL{cpl}/AC{ac:x} implicit read"
+            );
+            assert_eq!(
+                memory.check_system_write(0x1000, 1),
+                Err(protection_fault(0x1000, Access::Write, 3)),
+                "CPL{cpl}/AC{ac:x} implicit write"
+            );
+        }
+    }
+}
+
+#[test]
+fn smap_frame_payload_uses_prospective_privilege_and_its_captured_admission() {
+    for origin in [0, 3] {
+        for destination in 0..4 {
+            let (mut image, mut state) = fixture(0, true, false);
+            state.cr4 |= 1 << 21;
+            let mut work = AccessState::default();
+            {
+                let mut memory = Memory::new(&mut image, &state, origin, 2, &mut work);
+                let admitted = memory.check_frame_write(0x1000, 8, destination);
+                assert_eq!(
+                    admitted,
+                    if destination == 3 {
+                        Ok(())
+                    } else {
+                        Err(protection_fault(0x1000, Access::Write, 3))
+                    },
+                    "origin{origin}/destination{destination}"
+                );
+                if admitted.is_ok() {
+                    memory.prepare_publication().unwrap();
+                    memory.write(0x1000, 8, 0x123456789abcdef0).unwrap();
+                }
+            }
+            assert_eq!(
+                image.physical_read(0x9000, 8).unwrap(),
+                if destination == 3 {
+                    0x123456789abcdef0
+                } else {
+                    0
+                }
+            );
+        }
+    }
+}
+
+#[test]
+fn smap_does_not_turn_a_permitted_read_into_rmw_write_admission() {
+    let (mut image, mut state) = fixture(0, true, false);
+    state.cr4 |= 1 << 21;
+    state.cr0 |= 1 << 16;
+    image.physical_write(0x4008, 8, 0x9025).unwrap();
+    let mut work = AccessState::default();
+    let memory = Memory::new(&mut image, &state, 0, 0x40002, &mut work);
+    assert_eq!(memory.read(0x1000, 8), Ok(0));
+    assert_eq!(
+        memory.read_for_write(0x1000, 8),
+        Err(protection_fault(0x1000, Access::Write, 3))
+    );
+}
+
+#[test]
+fn smap_checks_full_image_span_but_dirties_only_selected_payload_pages() {
+    for ac in [0, 1 << 18] {
+        let (mut image, mut state) = fixture(0xb027, true, false);
+        state.cr4 |= 1 << 21;
+        image.physical_write(0x4008, 8, 0x9023).unwrap();
+        let mut work = AccessState::default();
+        let result = Memory::new(&mut image, &state, 0, ac | 2, &mut work).write_fields(
+            0x1ee0,
+            512,
+            &[(0, 288)],
+            &[0xa5; 512],
+        );
+        assert_eq!(
+            result,
+            if ac != 0 {
+                Ok(())
+            } else {
+                Err(protection_fault(0x2000, Access::Write, 3))
+            }
+        );
+        assert_eq!(
+            image.physical_read_bytes(0x9ee0, 288).unwrap(),
+            vec![if ac != 0 { 0xa5 } else { 0 }; 288]
+        );
+        assert_eq!(
+            image.physical_read_bytes(0xb000, 224).unwrap(),
+            vec![0; 224]
+        );
+        assert_eq!(
+            image.physical_read(0x4008, 8).unwrap(),
+            if ac != 0 { 0x9063 } else { 0x9023 }
+        );
+        assert_eq!(image.physical_read(0x4010, 8).unwrap(), 0xb027);
+    }
+}
+
+#[test]
 fn later_page_fault_publishes_no_cross_page_payload_or_dirty_bits() {
     let (mut image, state) = fixture(0, true, false);
     let mut work = AccessState::default();
-    let error = Memory::new(&mut image, &state, 3, &mut work)
+    let error = Memory::new(&mut image, &state, 3, 0, &mut work)
         .write(0x1ffe, 4, 0xaabbccdd)
         .unwrap_err();
     assert_eq!(
@@ -80,7 +233,7 @@ fn later_page_fault_publishes_no_cross_page_payload_or_dirty_bits() {
 fn earlier_private_payload_refusal_precedes_next_missing_page() {
     let (mut image, state) = fixture(0, false, false);
     let mut work = AccessState::default();
-    let error = Memory::new(&mut image, &state, 3, &mut work)
+    let error = Memory::new(&mut image, &state, 3, 0, &mut work)
         .write(0x1ffe, 4, 0xaabbccdd)
         .unwrap_err();
     let AccessFailure::Paging(Failure::Physical(error)) = error else {
@@ -97,7 +250,7 @@ fn earlier_private_payload_refusal_precedes_next_missing_page() {
 fn nonadjacent_fragments_write_exact_bytes_after_all_dirty_admission() {
     let (mut image, state) = fixture(0xb027, true, false);
     let mut work = AccessState::default();
-    Memory::new(&mut image, &state, 3, &mut work)
+    Memory::new(&mut image, &state, 3, 0, &mut work)
         .write(0x1ffe, 4, 0xaabbccdd)
         .unwrap();
     assert_eq!(image.physical_read(0x9ffe, 2).unwrap(), 0xccdd);
@@ -111,7 +264,7 @@ fn nonadjacent_fragments_write_exact_bytes_after_all_dirty_admission() {
 fn prepared_frame_dirty_refusal_cannot_leak_earlier_slots_or_dirty_updates() {
     let (mut image, state) = fixture(0, true, true);
     let mut work = AccessState::default();
-    let mut memory = Memory::new(&mut image, &state, 0, &mut work);
+    let mut memory = Memory::new(&mut image, &state, 0, 0, &mut work);
     memory.check_frame_write(0x8008, 8, 0).unwrap();
     memory.check_frame_write(0x7ff8, 8, 0).unwrap();
     let error = memory.prepare_publication().unwrap_err();
@@ -129,14 +282,14 @@ fn rmw_retains_its_leaf_and_payload_may_clear_the_planned_dirty_bit() {
     image.physical_write(0x4008, 8, 0x4027).unwrap();
     let mut work = AccessState::default();
     {
-        let mut memory = Memory::new(&mut image, &state, 0, &mut work);
+        let mut memory = Memory::new(&mut image, &state, 0, 0, &mut work);
         assert_eq!(memory.read_for_write(0x1008, 8).unwrap(), 0x4027);
         memory.write(0x1008, 8, 0xa027).unwrap();
     }
     assert_eq!(image.physical_read(0x4008, 8).unwrap(), 0xa027);
     assert_eq!(image.physical_read(0xa008, 8).unwrap(), 0);
     assert_eq!(
-        Memory::new(&mut image, &state, 0, &mut work)
+        Memory::new(&mut image, &state, 0, 0, &mut work)
             .read(0x1008, 8)
             .unwrap(),
         0
@@ -147,7 +300,7 @@ fn rmw_retains_its_leaf_and_payload_may_clear_the_planned_dirty_bit() {
 fn sparse_nominal_probe_dirties_only_a_participating_page() {
     let (mut image, state) = fixture(0xb027, true, false);
     let mut work = AccessState::default();
-    Memory::new(&mut image, &state, 3, &mut work)
+    Memory::new(&mut image, &state, 3, 0, &mut work)
         .write_fields(0x1ff0, 32, &[(0, 2)], &[0x55; 32])
         .unwrap();
     assert_eq!(image.physical_read(0x4008, 8).unwrap(), 0x9067);
@@ -192,11 +345,11 @@ fn ordered_dirty_refusal_identifies_duplicate_spans_and_discards_the_failed_batc
     };
     let mut work = AccessState::default();
     // The same nominal span is admitted twice under distinct captured translations.
-    Memory::new(&mut image, &state, 0, &mut work)
+    Memory::new(&mut image, &state, 0, 0, &mut work)
         .check_system_write(0x1005, 1)
         .unwrap();
     image.physical_write(0x30004, 4, 0xb023).unwrap();
-    let mut memory = Memory::new(&mut image, &state, 0, &mut work);
+    let mut memory = Memory::new(&mut image, &state, 0, 0, &mut work);
     memory.check_system_write(0x1005, 1).unwrap();
     let error = memory.prepare_publication_ordered().unwrap_err();
     assert_eq!(

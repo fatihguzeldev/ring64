@@ -64,7 +64,8 @@ pub(crate) fn discover_with_profile(
                     let request = crate::x86::paging::walk::Request {
                         linear,
                         access: Access::Execute,
-                        user: context.cpl() == 3,
+                        class: crate::x86::paging::walk::AccessClass::operand(context.cpl()),
+                        ac: false,
                     };
                     let translated = crate::x86::paging::walk::peek(image, paging, request)
                         .map_err(DecodeError::Paging)?;

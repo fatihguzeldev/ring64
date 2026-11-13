@@ -20,18 +20,19 @@ impl Core {
             let request = paging::walk::Request {
                 linear,
                 access: Access::Execute,
-                user: context.cpl() == 3,
+                class: paging::walk::AccessClass::operand(context.cpl()),
+                ac: false,
             };
             let mut accessed_write = false;
             let translation = paging::walk::fetch_walk(&mut self.image, paging, request, |image| {
                 accessed_write = true;
-                encoding_current(image, paging, &consumed, request.user)
+                encoding_current(image, paging, &consumed, request.class)
             })
             .map_err(DecodeError::Paging)?
             .ok_or(DecodeError::PagingRestart)?;
             // Only an A write can change encoding during this synchronous byte fetch.
             if accessed_write
-                && (!encoding_current(&self.image, paging, &consumed, request.user)
+                && (!encoding_current(&self.image, paging, &consumed, request.class)
                     || !paging::walk::peek(&self.image, paging, request)
                         .is_ok_and(|fresh| fresh.physical == translation.physical))
             {
@@ -124,7 +125,7 @@ fn encoding_current(
     image: &Image,
     paging: &paging::State,
     bytes: &[(u64, u64, u8)],
-    user: bool,
+    class: paging::walk::AccessClass,
 ) -> bool {
     bytes.iter().all(|&(linear, physical, byte)| {
         paging::walk::peek(
@@ -133,7 +134,8 @@ fn encoding_current(
             paging::walk::Request {
                 linear,
                 access: Access::Execute,
-                user,
+                class,
+                ac: false,
             },
         )
         .is_ok_and(|translation| translation.physical == physical)

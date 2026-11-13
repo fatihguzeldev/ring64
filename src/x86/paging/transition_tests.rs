@@ -73,7 +73,8 @@ fn unpaged_walk_is_identity_without_table_reads_dirty_metadata_or_zero_remaining
             walk::Request {
                 linear: 0,
                 access,
-                user: true,
+                class: walk::AccessClass::User,
+                ac: false,
             },
         )
         .unwrap();
@@ -109,12 +110,12 @@ fn unpaged_prepared_access_at_zero_has_no_fake_leaf_or_dirty_work() {
     )
     .unwrap();
     let mut work = access::AccessState::default();
-    access::Memory::new(&mut image, &unpaged(), 3, &mut work)
+    access::Memory::new(&mut image, &unpaged(), 3, 0, &mut work)
         .write(0, 8, 0x1122334455667788)
         .unwrap();
     assert_eq!(image.physical_read(0, 8).unwrap(), 0x1122334455667788);
     assert_eq!(
-        access::Memory::new(&mut image, &unpaged(), 3, &mut work)
+        access::Memory::new(&mut image, &unpaged(), 3, 0, &mut work)
             .read(0, 8)
             .unwrap(),
         0x1122334455667788

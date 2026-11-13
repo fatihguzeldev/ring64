@@ -1,4 +1,4 @@
-use super::State;
+use super::{CR4_SMAP, CR4_SMEP, State};
 use crate::memory::{Access, Fault, Image};
 
 const ADDRESS: u64 = 0x000f_ffff_ffff_f000;
@@ -36,10 +36,32 @@ pub(crate) mod physical_counts {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AccessClass {
+    User,
+    Supervisor,
+    ImplicitSupervisor,
+}
+
+impl AccessClass {
+    pub fn operand(cpl: u8) -> Self {
+        if cpl == 3 {
+            Self::User
+        } else {
+            Self::Supervisor
+        }
+    }
+
+    pub fn is_user(self) -> bool {
+        self == Self::User
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Request {
     pub linear: u64,
     pub access: Access,
-    pub user: bool,
+    pub class: AccessClass,
+    pub ac: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -106,12 +128,12 @@ impl Request {
             access: self.access,
             error_code: u32::from(present)
                 | (u32::from(self.access == Access::Write) << 1)
-                | (u32::from(self.user) << 2)
+                | (u32::from(self.class.is_user()) << 2)
                 | (u32::from(reserved) << 3)
                 | (u32::from(
                     self.access == Access::Execute
-                        && (state.efer & (1 << 10) != 0 || state.cr4 & (1 << 5) != 0)
-                        && state.efer & (1 << 11) != 0,
+                        && (state.cr4 & CR4_SMEP != 0
+                            || state.cr4 & (1 << 5) != 0 && state.efer & (1 << 11) != 0),
                 ) << 4),
         })
     }
@@ -301,11 +323,21 @@ fn walk_paged_with<const EFFECTS: bool, const FETCH: bool, const IA32E: bool, co
         writable &= entry & 2 != 0;
         executable &= entry & (1 << 63) == 0;
         if leaf {
-            if request.user && !user
+            let user_request = request.class.is_user();
+            let protection_denied = !user_request
+                && user
+                && if request.access == Access::Execute {
+                    state.cr4 & CR4_SMEP != 0
+                } else {
+                    state.cr4 & CR4_SMAP != 0
+                        && (request.class == AccessClass::ImplicitSupervisor || !request.ac)
+                };
+            if user_request && !user
                 || request.access == Access::Write
                     && !writable
-                    && (request.user || state.cr0 & (1 << 16) != 0)
+                    && (user_request || state.cr0 & (1 << 16) != 0)
                 || request.access == Access::Execute && !executable
+                || protection_denied
             {
                 return Err(request.page_fault(state, true, false));
             }
@@ -379,7 +411,8 @@ mod tests {
         let request = Request {
             linear: 0x1234,
             access: Access::Read,
-            user: true,
+            class: AccessClass::User,
+            ac: false,
         };
         let result = peek(&image, &state, request).unwrap();
         assert_eq!(
@@ -399,7 +432,8 @@ mod tests {
             Request {
                 linear: 0x2000,
                 access: Access::Write,
-                user: true,
+                class: AccessClass::User,
+                ac: false,
             },
         )
         .unwrap_err();
@@ -438,7 +472,8 @@ mod tests {
                     Request {
                         linear: 0x1234,
                         access,
-                        user
+                        class: AccessClass::operand(if user { 3 } else { 0 }),
+                        ac: false,
                     }
                 ),
                 Err(Failure::Page(PageFault {
@@ -463,7 +498,8 @@ mod tests {
                 Request {
                     linear: 0x1234,
                     access: Access::Read,
-                    user: true
+                    class: AccessClass::User,
+                    ac: false,
                 }
             ),
             Err(Failure::Page(PageFault {
@@ -481,7 +517,8 @@ mod tests {
         let request = Request {
             linear: 0x1234,
             access: Access::Read,
-            user: true,
+            class: AccessClass::User,
+            ac: false,
         };
         for (entry, word, expected) in [
             (0x2000, 0x7ff0000040001087, 0x40001234),
@@ -518,7 +555,8 @@ mod tests {
                 Request {
                     linear: 0x1234,
                     access: Access::Read,
-                    user: true,
+                    class: AccessClass::User,
+                    ac: false,
                 },
                 |address, width, accessed| {
                     actual.push((address, width, accessed));
@@ -852,7 +890,8 @@ mod tests {
             let request = Request {
                 linear,
                 access: Access::Read,
-                user: true,
+                class: AccessClass::User,
+                ac: false,
             };
             let mut actual = image(&words, width, false, 0x6000);
             physical_counts::take();
@@ -925,3 +964,7 @@ mod tests {
 #[cfg(test)]
 #[path = "legacy_tests.rs"]
 mod legacy_tests;
+
+#[cfg(test)]
+#[path = "supervisor_tests.rs"]
+mod supervisor_tests;

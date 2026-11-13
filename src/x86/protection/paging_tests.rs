@@ -80,7 +80,7 @@ fn ring3_descriptor_traffic_uses_supervisor_permissions_and_provenance() {
     let (mut context, mut image, state) = setup(false, 0x9023, 0x00cff3000000ffff);
     context.set_mode_and_cpl(Mode::Long64, 3);
     let mut work = AccessState::default();
-    let mut memory = Memory::new(&mut image, &state, 3, &mut work);
+    let mut memory = Memory::new(&mut image, &state, 3, 2, &mut work);
     let outcome = execute(
         &mut context,
         &mut memory,
@@ -99,7 +99,7 @@ fn ring3_descriptor_traffic_uses_supervisor_permissions_and_provenance() {
     let (mut context, mut image, state) = setup(false, 0x9021, 0x00cff2000000ffff);
     context.set_mode_and_cpl(Mode::Long64, 3);
     let mut work = AccessState::default();
-    let mut memory = Memory::new(&mut image, &state, 3, &mut work);
+    let mut memory = Memory::new(&mut image, &state, 3, 2, &mut work);
     assert_eq!(
         execute(
             &mut context,
@@ -131,7 +131,7 @@ fn frame_dirty_refusal_precedes_every_frame_payload_and_context_publication() {
     let (mut context, mut image, state) = setup(true, 0x9023, 0x00cff3000000ffff);
     let before = context.clone();
     let mut work = AccessState::default();
-    let mut memory = Memory::new(&mut image, &state, 0, &mut work);
+    let mut memory = Memory::new(&mut image, &state, 0, 2, &mut work);
     let source = crate::x86::exception::ExceptionEvent {
         numeric: None,
         vector: 6,
@@ -200,7 +200,7 @@ fn busy_descriptor_nominal_second_page_is_not_a_selected_dirty_payload() {
         ])
         .unwrap();
     let mut work = AccessState::default();
-    let mut memory = Memory::new(&mut image, &state, 0, &mut work);
+    let mut memory = Memory::new(&mut image, &state, 0, 2, &mut work);
     let result = execute(
         &mut context,
         &mut memory,
@@ -255,7 +255,7 @@ fn event_frame_privilege_uses_prepared_target_not_source_cpl() {
         }
         let before = context.clone();
         let mut work = AccessState::default();
-        let mut memory = Memory::new(&mut image, &state, 3, &mut work);
+        let mut memory = Memory::new(&mut image, &state, 3, 2, &mut work);
         let event = crate::x86::exception::ExceptionEvent {
             numeric: None,
             vector: 6,
@@ -316,7 +316,7 @@ fn frame_payload_alias_can_clear_a_captured_d1_pte_without_late_rewalk_or_repair
         ])
         .unwrap();
     let mut work = AccessState::default();
-    let mut memory = Memory::new(&mut image, &state, 0, &mut work);
+    let mut memory = Memory::new(&mut image, &state, 0, 2, &mut work);
     let event = crate::x86::exception::ExceptionEvent {
         numeric: None,
         vector: 6,
@@ -340,7 +340,7 @@ fn frame_payload_alias_can_clear_a_captured_d1_pte_without_late_rewalk_or_repair
         "later slot still uses admitted PA"
     );
     assert_eq!(image.physical_read(0xbfe8, 8).unwrap(), 0x1000);
-    let memory = Memory::new(&mut image, &state, 0, &mut work);
+    let memory = Memory::new(&mut image, &state, 0, 2, &mut work);
     assert_eq!(
         memory.read(0x7ff8, 8),
         Err(AccessFailure::Paging(walk::Failure::Page(

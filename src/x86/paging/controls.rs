@@ -2,10 +2,13 @@ use crate::x86::context::{ExecutionContext, Mode, Segment};
 
 pub const EFER_MSR: u32 = 0xc0000080;
 pub const CR4_TSD: u64 = 1 << 2;
+pub const CR4_SMEP: u64 = 1 << 20;
+pub const CR4_SMAP: u64 = 1 << 21;
 const CR0_FIXED: u64 = 0x80000033;
 const CR0_WP: u64 = 1 << 16;
 const CR0_NUMERIC: u64 = 0xe;
 const CR4_NUMERIC: u64 = 0x600;
+const CR4_PROTECTION: u64 = CR4_SMEP | CR4_SMAP;
 const CR3_ALLOWED: u64 = 0x000ffffffffff018;
 const CR4_FIXED: u64 = 0x628;
 const EFER_FIXED: u64 = 0x500;
@@ -82,7 +85,7 @@ impl State {
             || pg && !pe
             || self.cr0 & 0x60000000 == 0x20000000
             || self.cr3 & !0x000f_ffff_ffff_fff8 != 0
-            || self.cr4 & !0x63c != 0
+            || self.cr4 & !(0x63c | CR4_PROTECTION) != 0
             || self.efer & !0xd01 != 0
             || (self.efer & 0x400 != 0) != lma
             || lma && self.cr4 & 0x20 == 0
@@ -218,7 +221,7 @@ impl State {
                 {
                     return Err(GeneralProtection);
                 }
-                if value & !0x63c != 0 {
+                if value & !(0x63c | CR4_PROTECTION) != 0 {
                     return Err(Unsupported);
                 }
                 candidate.cr4 = value;
@@ -283,7 +286,7 @@ impl State {
         if self.pdpte.is_some()
             || self.cr0 & !(CR0_WP | CR0_NUMERIC) != CR0_FIXED & !CR0_NUMERIC
             || self.cr3 & !CR3_ALLOWED != 0
-            || self.cr4 & !(CR4_NUMERIC | CR4_TSD) != CR4_FIXED & !CR4_NUMERIC
+            || self.cr4 & !(CR4_NUMERIC | CR4_TSD | CR4_PROTECTION) != CR4_FIXED & !CR4_NUMERIC
             || self.efer & !(EFER_NXE | EFER_SCE) != EFER_FIXED
         {
             Err("paging controls do not match the normalized IA32e profile")
@@ -348,7 +351,7 @@ impl State {
                 {
                     return Err(GeneralProtection);
                 }
-                if value & !(CR4_NUMERIC | CR4_TSD) != CR4_FIXED & !CR4_NUMERIC {
+                if value & !(CR4_NUMERIC | CR4_TSD | CR4_PROTECTION) != CR4_FIXED & !CR4_NUMERIC {
                     return Err(Unsupported);
                 }
                 candidate.cr4 = value;
@@ -416,6 +419,90 @@ impl State {
 mod tests {
     use super::*;
     use ControlFailure::{GeneralProtection, Undefined, Unsupported};
+
+    #[test]
+    fn supervisor_protection_controls_are_admitted_in_both_control_models() {
+        for bits in [1 << 20, 1 << 21, 3 << 20] {
+            let fixed = State {
+                cr4: State::default().cr4 | bits,
+                ..State::default()
+            };
+            assert_eq!(fixed.validate(), Ok(()), "fixed bits {bits:x}");
+            assert_eq!(
+                State::default().prepare_cr_write(4, fixed.cr4, Mode::Long64),
+                Ok(fixed)
+            );
+            let physical = State {
+                cr0: 0x80000033,
+                cr4: 0x608 | bits,
+                efer: 0,
+                ..State::default()
+            };
+            assert_eq!(physical.validate_physical(Mode::Protected), Ok(()));
+            assert_eq!(
+                State {
+                    cr4: 0x608,
+                    ..physical
+                }
+                .prepare_physical_cr_write(4, physical.cr4, Mode::Protected),
+                Ok(physical)
+            );
+        }
+    }
+
+    #[test]
+    fn supervisor_protection_control_effects_keep_quartet_and_numeric_authorities_separate() {
+        for (state, mode) in [
+            (State::reset(), Mode::Real),
+            (
+                State {
+                    cr0: 0x60000011,
+                    ..State::reset()
+                },
+                Mode::Protected,
+            ),
+            (
+                State {
+                    cr0: 0x80000033,
+                    cr4: 0x608,
+                    efer: 0,
+                    ..State::default()
+                },
+                Mode::Protected,
+            ),
+            (
+                State {
+                    cr0: 0x80000033,
+                    cr4: 0x628,
+                    efer: 0,
+                    pdpte: Some([0x3001, 0, 0, 0]),
+                    ..State::default()
+                },
+                Mode::Protected,
+            ),
+            (State::default(), Mode::Long64),
+        ] {
+            for bits in [0, CR4_SMEP, CR4_SMAP, CR4_SMEP | CR4_SMAP] {
+                let candidate = State {
+                    cr4: state.cr4 | bits,
+                    ..state
+                };
+                assert_eq!(candidate.validate_physical(mode), Ok(()));
+                assert_eq!(
+                    state.prepare_physical_cr_write(4, candidate.cr4, mode),
+                    Ok(candidate),
+                    "{mode:?}/bits{bits:x}"
+                );
+                assert_eq!(state.numeric_controls(), candidate.numeric_controls());
+                assert_eq!(state.translation_changed(candidate), bits != 0);
+                assert_eq!(candidate.translation_changed(state), bits != 0);
+                let reload = state.legacy_pae() && bits & CR4_SMEP != 0;
+                assert_eq!(state.needs_pdpte_reload(candidate, 4), reload);
+                assert_eq!(candidate.needs_pdpte_reload(state, 4), reload);
+                assert!(!candidate.needs_pdpte_reload(candidate, 4));
+            }
+        }
+    }
 
     fn bank() -> State {
         State {
@@ -675,7 +762,7 @@ mod tests {
             cr3: 0x3000,
             ..state
         };
-        for bit in [0, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 32] {
+        for bit in [0, 7, 16, 17, 18, 19, 22, 23, 24, 25, 27, 28, 32] {
             assert_eq!(
                 aligned.prepare_cr_write(4, 0x628 | (1 << bit), Mode::Long64),
                 Err(Unsupported),

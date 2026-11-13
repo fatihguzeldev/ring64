@@ -52,7 +52,8 @@ fn request(linear: u64, access: Access, user: bool) -> Request {
     Request {
         linear,
         access,
-        user,
+        class: AccessClass::operand(if user { 3 } else { 0 }),
+        ac: false,
     }
 }
 fn pf(linear: u64, access: Access, error_code: u32) -> Failure {
@@ -61,6 +62,54 @@ fn pf(linear: u64, access: Access, error_code: u32) -> Failure {
         access,
         error_code,
     })
+}
+
+#[test]
+fn supervisor_protection_smep_denies_nonpae_user_fetch() {
+    let image = image(&[(0x1000, 0x2007, 4), (0x2010, 0x5007, 4)]);
+    let state = State {
+        cr4: 0x00100608,
+        ..legacy(false)
+    };
+    assert_eq!(
+        peek(&image, &state, request(0x4000, Access::Execute, false)),
+        Err(pf(0x4000, Access::Execute, 0x11))
+    );
+}
+
+#[test]
+fn supervisor_protection_smep_marks_all_nonpae_fetch_faults_as_instructions() {
+    for (user, code) in [(false, 0x10), (true, 0x14)] {
+        let mut image = image(&[(0x1000, 0x2007, 4), (0x2010, 0, 4)]);
+        let state = State {
+            cr4: 0x00100608,
+            ..legacy(false)
+        };
+        assert_eq!(
+            walk(&mut image, &state, request(0x4000, Access::Execute, user)),
+            Err(pf(0x4000, Access::Execute, code))
+        );
+    }
+}
+
+#[test]
+fn supervisor_protection_nonpae_reserved_large_fetch_keeps_reserved_priority() {
+    for (smep, code) in [(0, 9), (1 << 20, 0x19)] {
+        let mut image = image(&[(0x1004, 0x00200087, 4)]);
+        let state = State {
+            cr4: 0x618 | smep,
+            ..legacy(false)
+        };
+        assert_eq!(
+            walk(
+                &mut image,
+                &state,
+                request(0x400000, Access::Execute, false)
+            ),
+            Err(pf(0x400000, Access::Execute, code))
+        );
+        assert_eq!(image.physical_read(0x1004, 4).unwrap(), 0x00200087);
+    }
 }
 
 #[test]
