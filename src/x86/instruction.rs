@@ -1001,6 +1001,7 @@ pub enum Operation {
     Leave {
         width: Width,
     },
+    CompoundStack(super::compound_stack::CompoundStack),
     Call {
         /// Absolute guest target, also for a decoded relative CALL.
         target: Operand,

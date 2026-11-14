@@ -335,6 +335,7 @@ type CoreExports = WebAssembly.Exports & {
   core_masked_store_observed: CoreExports['core_masked_store'];
   core_protection_observed: CoreExports['core_protection'];
   core_far_control_observed: CoreExports['core_far_control'];
+  core_compound_stack_observed: CoreExports['core_compound_stack'];
   core_software_event_observed: CoreExports['core_software_event'];
   core_debug_finish(
     pc: bigint,
@@ -366,6 +367,7 @@ type CoreExports = WebAssembly.Exports & {
     nextPc: bigint,
     segment: number,
   ): number;
+  core_compound_stack(descriptor: number): number;
   core_flags(operation: number, flags: bigint, input: bigint): number;
   core_software_event(operation: number, inputSp: bigint, flags: bigint, nextPc: bigint): number;
   core_debug_step(
@@ -583,6 +585,7 @@ const PAGED_HELPERS = {
   clflush: 'core_paged_clflush',
   protection: 'core_paged_protection',
   far_control: 'core_paged_far_control',
+  compound_stack: 'core_paged_compound_stack',
   software_event: 'core_paged_software_event',
   access_failed: 'core_paged_access_failed',
   segmented_access_failed: 'core_paged_segmented_access_failed',
@@ -608,6 +611,7 @@ const PAGED_OBSERVED_HELPERS = {
   masked_store: 'core_paged_masked_store_observed',
   protection: 'core_paged_protection_observed',
   far_control: 'core_paged_far_control_observed',
+  compound_stack: 'core_paged_compound_stack_observed',
   software_event: 'core_paged_software_event_observed',
 } as const;
 
@@ -783,6 +787,7 @@ export class Core {
         'core_masked_store_observed',
         'core_protection_observed',
         'core_far_control_observed',
+        'core_compound_stack_observed',
         'core_software_event_observed',
         'core_debug_finish',
         'core_debug_begin',
@@ -798,6 +803,7 @@ export class Core {
         'core_clflush',
         'core_protection',
         'core_far_control',
+        'core_compound_stack',
         'core_software_event',
         'core_flags',
         'core_debug_step',
@@ -1324,6 +1330,7 @@ export class Core {
           core_masked_store: this.#exports.core_masked_store_observed,
           core_protection: this.#exports.core_protection_observed,
           core_far_control: this.#exports.core_far_control_observed,
+          core_compound_stack: this.#exports.core_compound_stack_observed,
           core_software_event: this.#exports.core_software_event_observed,
         }
       : this.#exports;
@@ -1351,6 +1358,7 @@ export class Core {
       clflush: this.#exports.core_clflush,
       protection: operands.core_protection,
       far_control: operands.core_far_control,
+      compound_stack: operands.core_compound_stack,
       software_event: operands.core_software_event,
       flags: this.#exports.core_flags,
       debug_step: this.#exports.core_debug_step,

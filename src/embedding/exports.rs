@@ -39,6 +39,7 @@ macro_rules! guest_semantics {
 }
 
 mod admission;
+mod compound_stack;
 mod context;
 mod debug;
 mod exception_delivery;

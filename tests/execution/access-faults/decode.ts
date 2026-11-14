@@ -86,7 +86,6 @@ export function decodeScenarios(compiler: WebAssembly.Module): Scenario[] {
           ['82', 'unsupported', 0],
           ['0f33', 'unsupported', 0],
           ['f0f090', 'unsupported', 0],
-          ['c8000000', 'unsupported', 0],
         ] as const)
           await using(compiler, code, snapshot(), async (cpu) => {
             cpu.setState(initial(0x1000n, {}, 0x10202n));

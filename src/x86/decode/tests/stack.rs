@@ -3,8 +3,69 @@ use crate::memory::{Access, Cause, Fault};
 use crate::x86::decode::{self, DecodeError};
 use crate::x86::instruction::{Instruction, Operand, Operation};
 
+use crate::x86::compound_stack::{CompoundStack, CompoundStackKind};
+use crate::x86::instruction::Width;
 use Operand::{Immediate, Register};
 use Operation::{Call, JumpRegister, Pop, Push, Return};
+
+#[test]
+fn compound_enter_width_nesting_and_required_encoding_are_independent() {
+    for (prefix, width) in [
+        (&[][..], Width::W64),
+        (&[0x66][..], Width::W16),
+        (&[0x66, 0x48][..], Width::W64),
+        (&[0x48, 0x66][..], Width::W16),
+        (&[0x67, 0x64, 0x4f][..], Width::W64),
+    ] {
+        for raw in 0..=255u8 {
+            let mut bytes = prefix.to_vec();
+            bytes.extend([0xc8, 0xff, 0xff, raw]);
+            assert_eq!(
+                operation(&bytes),
+                Operation::CompoundStack(CompoundStack {
+                    kind: CompoundStackKind::Enter {
+                        allocation: 65535,
+                        nesting: raw & 31
+                    },
+                    width,
+                })
+            );
+        }
+    }
+    let mut bytes = vec![0x66; 11];
+    bytes.extend([0xc8, 0, 0, 0]);
+    assert!(at(0x1000, &bytes).is_ok());
+    bytes.insert(0, 0x66);
+    assert_eq!(at(0x1000, &bytes), Err(DecodeError::InstructionLength));
+    for prefix in [0xf2, 0xf3] {
+        assert_eq!(at(0x1000, &[prefix, 0xc8]), Err(DecodeError::Unsupported));
+    }
+    for opcode in [0x60, 0x61] {
+        for prefix in [&[][..], &[0x66][..], &[0x4f][..]] {
+            let mut bytes = prefix.to_vec();
+            bytes.push(opcode);
+            assert_eq!(at(0x1000, &bytes), Err(DecodeError::Invalid));
+        }
+    }
+}
+
+#[test]
+fn compound_enter_fetches_every_required_byte_before_lock_legality() {
+    for bytes in [&[0xc8, 0x20, 0, 0xff][..], &[0xf0, 0xc8, 0, 0, 0][..]] {
+        for length in 0..bytes.len() {
+            assert_eq!(
+                at(0x1000, &bytes[..length]),
+                Err(DecodeError::Fetch(missing(0x1000 + length as u64))),
+                "{bytes:02x?} truncated to {length}"
+            );
+        }
+    }
+    assert!(at(0x1000, &[0xc8, 0x20, 0, 0xff]).is_ok());
+    assert_eq!(
+        at(0x1000, &[0xf0, 0xc8, 0, 0, 0]),
+        Err(DecodeError::Invalid)
+    );
+}
 
 #[test]
 fn stack_and_near_transfer_literals_require_their_complete_encodings() {

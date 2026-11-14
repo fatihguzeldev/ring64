@@ -1,3 +1,4 @@
+use crate::x86::compound_stack::{CompoundStack, CompoundStackKind};
 use crate::x86::context::{Mode, Segment};
 use crate::x86::instruction::{
     Address, AddressBase, Alu, Bit, BitIndex, Carry, Condition, Count, CountCondition, DataOperand,
@@ -101,8 +102,8 @@ where
         && !matches!(opcode,
             0x00..=0x05 | 0x08..=0x0d | 0x0f | 0x10..=0x15 | 0x18..=0x1d
             | 0x20..=0x25 | 0x28..=0x2d | 0x30..=0x35 | 0x38..=0x3d
-            | 0x50..=0x5f | 0x68 | 0x6a | 0x80 | 0x81 | 0x83..=0x87 | 0x8f | 0x90..=0x97
-            | 0xc2 | 0xc3 | 0xc9 | 0xe0..=0xe3 | 0xe8 | 0xf6 | 0xf7 | 0xfe | 0xff)
+            | 0x50..=0x61 | 0x68 | 0x6a | 0x80 | 0x81 | 0x83..=0x87 | 0x8f | 0x90..=0x97
+            | 0xc2 | 0xc3 | 0xc8 | 0xc9 | 0xe0..=0xe3 | 0xe8 | 0xf6 | 0xf7 | 0xfe | 0xff)
     {
         return Err(if string_kind.is_some() || matches!(opcode, 0xfc | 0xfd) {
             DecodeError::Invalid
@@ -194,6 +195,17 @@ where
             })
         }
         0xc9 => Ok(Operation::Leave { width: stack_width }),
+        0xc8 => {
+            let allocation = cursor.unsigned(2)? as u16;
+            let nesting = cursor.byte()? & 31;
+            Ok(Operation::CompoundStack(CompoundStack {
+                kind: CompoundStackKind::Enter {
+                    allocation,
+                    nesting,
+                },
+                width: stack_width,
+            }))
+        }
         0x40..=0x4f => Ok(Operation::Unary {
             kind: if opcode < 0x48 {
                 Unary::Inc
@@ -203,11 +215,19 @@ where
             dst: Location::Register(RegisterView::low(opcode & 7)),
             width: wide,
         }),
-        0x60 | 0x61 => Err(if prefixes.long64 {
-            DecodeError::Invalid
-        } else {
-            DecodeError::Unsupported
-        }),
+        0x60 | 0x61 => {
+            if prefixes.long64 {
+                return Err(DecodeError::Invalid);
+            }
+            Ok(Operation::CompoundStack(CompoundStack {
+                kind: if opcode == 0x60 {
+                    CompoundStackKind::PushAll
+                } else {
+                    CompoundStackKind::PopAll
+                },
+                width: stack_width,
+            }))
+        }
         0x69 | 0x6b => {
             let operands = ModRm::read(cursor, rex)?;
             let src = operands.location(cursor, prefixes, wide)?;

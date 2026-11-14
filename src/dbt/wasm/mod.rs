@@ -1,5 +1,6 @@
 mod bits;
 mod boundary;
+mod compound_stack;
 mod control;
 mod counts;
 mod data;
@@ -92,6 +93,7 @@ struct Emitter {
     clflush: Option<u32>,
     protection: Option<u32>,
     far_control: Option<u32>,
+    compound_stack: Option<u32>,
     software_event: Option<u32>,
     system_flags: Option<u32>,
     debug_step: Option<u32>,
@@ -292,6 +294,10 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
         .instructions
         .iter()
         .any(|i| matches!(i.operation, Operation::Far(_)));
+    let has_compound_stack = unit
+        .instructions
+        .iter()
+        .any(|i| matches!(i.operation, Operation::CompoundStack(_)));
     let has_debug_register = unit
         .instructions
         .iter()
@@ -397,6 +403,12 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
             [ValType::I32, ValType::I64, ValType::I64, ValType::I32],
             [ValType::I32],
         );
+        next_type += 1;
+        index
+    });
+    let compound_stack_type = has_compound_stack.then(|| {
+        let index = next_type;
+        types.ty().function([ValType::I32], [ValType::I32]);
         next_type += 1;
         index
     });
@@ -753,6 +765,12 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
         run_index += 1;
         function
     });
+    let compound_stack = compound_stack_type.map(|index| {
+        imports.import("env", "compound_stack", EntityType::Function(index));
+        let function = run_index;
+        run_index += 1;
+        function
+    });
     let far_control = far_type.map(|index| {
         imports.import("env", "far_control", EntityType::Function(index));
         let function = run_index;
@@ -896,6 +914,7 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
         clflush,
         protection,
         far_control,
+        compound_stack,
         software_event,
         system_flags,
         debug_step,
@@ -1191,6 +1210,7 @@ pub(crate) fn emit_profile(unit: &Unit, observed: bool, paged: bool) -> Vec<u8> 
                 emitter.pop_memory(address, width, instruction.next_pc, exit_depth)
             }
             Operation::Leave { width } => emitter.leave(width, exit_depth),
+            Operation::CompoundStack(operation) => emitter.compound_stack(operation, exit_depth),
             Operation::Call { target, width } => {
                 emitter.call(target, width, instruction.next_pc, loop_depth, exit_depth);
                 continue;

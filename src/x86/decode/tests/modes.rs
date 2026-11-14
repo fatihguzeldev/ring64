@@ -518,7 +518,13 @@ fn mode_collisions_never_admit_another_modes_opcode_or_require_unneeded_bytes() 
                 matches!(decoded(0x1000, &[opcode], &context).operation, Operation::Unary { kind, dst: crate::x86::instruction::Location::Register(RegisterView { bank, high_byte: false }), .. } if kind == if opcode < 0x48 { Unary::Inc } else { Unary::Dec } && bank == opcode & 7)
             );
         }
-        for opcode in [0x60, 0x61, 0x62, 0xc4, 0xc5] {
+        for opcode in [0x60, 0x61] {
+            assert!(matches!(
+                decoded(0x1000, &[opcode], &context).operation,
+                Operation::CompoundStack(_)
+            ));
+        }
+        for opcode in [0x62, 0xc4, 0xc5] {
             assert_eq!(
                 decode_with_context(0x1000, &context, |_| Ok(opcode)),
                 Err(DecodeError::Unsupported)
