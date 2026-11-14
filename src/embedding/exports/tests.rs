@@ -3,6 +3,7 @@ mod access_faults;
 mod admission;
 mod call_gate_owners;
 mod call_gate_sources;
+mod compound_stack;
 mod context_reuse;
 mod exception_delivery;
 mod exception_review;
