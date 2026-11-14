@@ -677,7 +677,7 @@ fn every_actual_popa_limit_frontier_exposes_only_the_successful_read_views() {
     const SLOTS: [u64; 7] = [0, 1, 2, 4, 5, 6, 7];
     for width in [Width::W16, Width::W32] {
         let size = u64::from(width.bytes());
-        for frontier in 0..7 {
+        for (frontier, slot) in SLOTS.into_iter().enumerate() {
             let mut memory = Memory::new();
             for (i, slot) in SLOTS.into_iter().enumerate() {
                 memory
@@ -685,7 +685,7 @@ fn every_actual_popa_limit_frontier_exposes_only_the_successful_read_views() {
                     .write(0x4000 + slot * size, size as u32, 0x1230 + i as u64)
                     .unwrap();
             }
-            let limit = (0x4000 + SLOTS[frontier] * size - 1) as u32;
+            let limit = (0x4000 + slot * size - 1) as u32;
             let mut banks = registers(0x1122334400004000, 0x5566778800005000);
             let before = banks;
             let result = execute(

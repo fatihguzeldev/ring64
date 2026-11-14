@@ -132,7 +132,7 @@ export function decodeScenarios(core: WebAssembly.Module): Scenario[] {
             const before = input(CODE, { 0: 0x800000000000n, 4: 0x7000n });
             cpu.setState(before);
             const result = await cpu.run({ budget: 1n });
-            const fetched = code === 'ff1c' || code === 'ff2c' || code === 'ca';
+            const fetched = ['ff1c', 'ff2c', 'ca', 'c8'].includes(code);
             const invalid = code === 'ffd8' || code === 'ffe8' || code === '9a';
             const reason = fetched
               ? 'fetch-fault'
