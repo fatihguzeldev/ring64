@@ -13,6 +13,7 @@ import { compoundSegmentScenarios } from './compound-segments.js';
 import { compoundEventScenarios } from './compound-events.js';
 import { compoundLifecycleScenarios } from './compound-lifecycle.js';
 import { compoundVmScenarios } from './compound-vm.js';
+import { compoundModelScenarios } from './compound-models.js';
 
 export function stackScenarios(core: WebAssembly.Module) {
   return [
@@ -31,5 +32,6 @@ export function stackScenarios(core: WebAssembly.Module) {
     ...compoundEventScenarios(core),
     ...compoundLifecycleScenarios(core),
     ...compoundVmScenarios(core),
+    ...compoundModelScenarios(core),
   ];
 }
