@@ -244,8 +244,30 @@ fn push_all_snapshots_original_raw_sp_and_wraps_each_complete_slot() {
 #[test]
 fn enter_progressive_aliases_and_observations_follow_each_completed_slot() {
     let mut memory = Memory::new();
+    memory.image = Image::mapped(
+        vec![("ram".into(), vec![0xa5; 0x11000])],
+        vec![MappingInput {
+            base: 0,
+            backing: "ram".into(),
+            offset: 0,
+            length: 0x11000,
+            permissions: Permissions {
+                read: true,
+                write: true,
+                execute: true,
+            },
+        }],
+        MemoryLimits {
+            max_backing_bytes: 0x11000,
+            max_backings: 1,
+            max_mappings: 1,
+        },
+    )
+    .unwrap();
     memory.image.write(0x4ffc, 4, 0x11111111).unwrap();
     memory.image.write(0x4ff8, 4, 0x22222222).unwrap();
+    let owner = memory.image.register_source([(0x4ffc, 4)]).unwrap();
+    assert!(memory.image.activate(owner));
     let mut banks = registers(0x5000, 0x5000);
     let trace = memory.trace.clone();
     execute_observing(
@@ -257,6 +279,8 @@ fn enter_progressive_aliases_and_observations_follow_each_completed_slot() {
     )
     .unwrap();
     assert_eq!((banks[4], banks[5]), (0x4ff0, 0x4ffc));
+    assert!(!memory.image.owner_valid(owner));
+    assert!(memory.image.active_changed());
     for (address, value) in [
         (0x4ffc, 0x5000),
         (0x4ff8, 0x5000),
@@ -321,13 +345,13 @@ fn enter_uses_operand_raw_frame_temp_and_stack_sized_allocation() {
     ] {
         let mut memory = Memory::new();
         let mut banks = registers(sp, bp);
-        execute(
+        let result = execute(
             &context(Mode::Protected, stack32, u32::MAX),
             &mut memory,
             &mut banks,
             enter(width, allocation, 0),
-        )
-        .unwrap();
+        );
+        assert_eq!(result, Ok(()), "allocation must use the stack-sized cursor");
         assert_eq!((banks[4], banks[5]), (expected_sp, expected_bp));
         assert_eq!(
             memory
@@ -691,7 +715,7 @@ fn popa_skipped_slot_has_no_backing_or_segment_read_even_when_it_crosses_the_lim
     let mut memory = Memory::new();
     memory.refuse = Some(8); // there are only seven actual reads
     let mut banks = registers(0x112233440000fff3, 0x5566778800005000);
-    execute(
+    let result = execute(
         &context(Mode::Protected, false, 0xffff),
         &mut memory,
         &mut banks,
@@ -699,8 +723,8 @@ fn popa_skipped_slot_has_no_backing_or_segment_read_even_when_it_crosses_the_lim
             kind: CompoundStackKind::PopAll,
             width: Width::W32,
         },
-    )
-    .unwrap();
+    );
+    assert_eq!(result, Ok(()), "saved-SP slot must not be read");
     assert_eq!(banks[4], 0x1122334400000013);
     assert_eq!(
         *memory.trace.borrow(),
@@ -721,75 +745,139 @@ fn popa_skipped_slot_has_no_backing_or_segment_read_even_when_it_crosses_the_lim
 
 #[test]
 fn enter_probe_is_one_byte_and_does_not_scan_an_unmapped_allocation_gap() {
+    for endpoint_writable in [true, false] {
+        let mut memory = Memory::new();
+        memory.image = Image::mapped(
+            vec![("ram".into(), vec![0xa5; 9])],
+            vec![(0x3fff, 0, 1), (0x6ff8, 1, 8)]
+                .into_iter()
+                .map(|(base, offset, length)| MappingInput {
+                    base,
+                    backing: "ram".into(),
+                    offset,
+                    length,
+                    permissions: Permissions {
+                        read: true,
+                        write: base != 0x3fff || endpoint_writable,
+                        execute: false,
+                    },
+                })
+                .collect(),
+            MemoryLimits {
+                max_backing_bytes: 9,
+                max_backings: 1,
+                max_mappings: 2,
+            },
+        )
+        .unwrap();
+        let mut banks = registers(0x7000, 0x8000);
+        let before = banks;
+        let result = execute(
+            &ExecutionContext::default(),
+            &mut memory,
+            &mut banks,
+            enter(Width::W64, 0x2ff9, 0),
+        );
+        if endpoint_writable {
+            assert_eq!(result, Ok(()));
+            assert_eq!((banks[4], banks[5]), (0x3fff, 0x6ff8));
+        } else {
+            assert!(
+                matches!(
+                    result,
+                    Err(Failure::Operand(AccessFailure::Linear(Fault {
+                        address: 0x3fff,
+                        width: 1,
+                        access: Access::Write,
+                        cause: Cause::Permission,
+                        ..
+                    })))
+                ),
+                "the endpoint must require write permission"
+            );
+            assert_eq!(banks, before);
+        }
+        assert_eq!(memory.image.read(0x6ff8, 8).unwrap(), 0x8000);
+        assert_eq!(
+            *memory.trace.borrow(),
+            vec![
+                Traffic::Admit(0x6ff8, 8),
+                Traffic::Prepare,
+                Traffic::Write(0x6ff8, 8),
+                Traffic::Probe(0x3fff)
+            ]
+        );
+        assert_eq!(memory.image.read(0x3fff, 1).unwrap(), 0xa5);
+        assert!(memory.image.check_write(0x3fff, 2).is_err());
+    }
+}
+
+#[test]
+fn enter_endpoint_byte_can_be_the_last_byte_of_the_stack_segment() {
     let mut memory = Memory::new();
-    memory.image = Image::mapped(
-        vec![("ram".into(), vec![0xa5; 9])],
-        vec![(0x3fff, 0, 1), (0x6ff8, 1, 8)]
-            .into_iter()
-            .map(|(base, offset, length)| MappingInput {
-                base,
-                backing: "ram".into(),
-                offset,
-                length,
-                permissions: Permissions {
-                    read: true,
-                    write: true,
-                    execute: false,
-                },
-            })
-            .collect(),
-        MemoryLimits {
-            max_backing_bytes: 9,
-            max_backings: 1,
-            max_mappings: 2,
-        },
-    )
-    .unwrap();
-    let mut banks = registers(0x7000, 0x8000);
-    execute(
-        &ExecutionContext::default(),
+    let mut banks = registers(2, 0x1234);
+    let result = execute(
+        &context(Mode::Protected, false, 0xffff),
         &mut memory,
         &mut banks,
-        enter(Width::W64, 0x2ff9, 0),
-    )
-    .unwrap();
-    assert_eq!((banks[4], banks[5]), (0x3fff, 0x6ff8));
-    assert_eq!(
-        *memory.trace.borrow(),
-        vec![
-            Traffic::Admit(0x6ff8, 8),
-            Traffic::Prepare,
-            Traffic::Write(0x6ff8, 8),
-            Traffic::Probe(0x3fff)
-        ]
+        enter(Width::W16, 1, 0),
     );
-    assert_eq!(memory.image.read(0x3fff, 1).unwrap(), 0xa5);
-    assert!(memory.image.check_write(0x3fff, 2).is_err());
+    assert_eq!(
+        result,
+        Ok(()),
+        "final endpoint is one byte, not an operand span"
+    );
+    assert_eq!((banks[4], banks[5]), (0xffff, 0));
+    assert_eq!(memory.image.read(0, 2).unwrap(), 0x1234);
+    assert_eq!(memory.image.read(0xffff, 1).unwrap(), 0xa5);
+    assert_eq!(memory.trace.borrow().last(), Some(&Traffic::Probe(0xffff)));
 }
 
 #[test]
 fn long64_word_enter_preserves_high_bp_and_uses_high_stack_addresses() {
-    let mut memory = Memory::new();
-    memory.image = Image::new(0x20000, vec![0x90], 0x100000000, vec![0xa5; 0x2000]).unwrap();
-    let mut banks = registers(0x100000010, 0x100001235);
-    execute(
-        &ExecutionContext::default(),
-        &mut memory,
-        &mut banks,
-        enter(Width::W16, 8, 0),
-    )
-    .unwrap();
-    assert_eq!((banks[4], banks[5]), (0x100000006, 0x10000000e));
-    assert_eq!(memory.image.read(0x10000000e, 2).unwrap(), 0x1235);
-    assert_eq!(
-        *memory.trace.borrow(),
-        vec![
+    for nesting in [0, 2] {
+        let mut memory = Memory::new();
+        memory.image = Image::new(0x20000, vec![0x90], 0x100000000, vec![0xa5; 0x2000]).unwrap();
+        memory.image.write(0x100001233, 2, 0xbeef).unwrap();
+        let mut banks = registers(0x100000010, 0x100001235);
+        let result = execute(
+            &ExecutionContext::default(),
+            &mut memory,
+            &mut banks,
+            enter(Width::W16, 8, nesting),
+        );
+        assert_eq!(
+            result,
+            Ok(()),
+            "high stack and chain addresses must remain 64-bit"
+        );
+        assert_eq!(banks[5], 0x10000000e);
+        assert_eq!(memory.image.read(0x10000000e, 2).unwrap(), 0x1235);
+        let mut expected = vec![
             Traffic::Admit(0x10000000e, 2),
             Traffic::Prepare,
             Traffic::Write(0x10000000e, 2),
-            Traffic::Probe(0x100000006)
-        ]
-    );
+        ];
+        if nesting != 0 {
+            assert_eq!(banks[4], 0x100000002);
+            assert_eq!(memory.image.read(0x10000000c, 2).unwrap(), 0xbeef);
+            assert_eq!(memory.image.read(0x10000000a, 2).unwrap(), 0xe);
+            expected.extend([
+                Traffic::Read(0x100001233, 2),
+                Traffic::Admit(0x10000000c, 2),
+                Traffic::Prepare,
+                Traffic::Write(0x10000000c, 2),
+                Traffic::Admit(0x10000000a, 2),
+                Traffic::Prepare,
+                Traffic::Write(0x10000000a, 2),
+                Traffic::Probe(0x100000002),
+            ]);
+        } else {
+            assert_eq!(banks[4], 0x100000006);
+            expected.push(Traffic::Probe(0x100000006));
+        }
+        assert_eq!(*memory.trace.borrow(), expected);
+    }
 }
 
 #[test]
