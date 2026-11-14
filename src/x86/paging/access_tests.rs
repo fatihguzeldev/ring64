@@ -80,6 +80,290 @@ fn protection_fault(address: u64, access: Access, error_code: u32) -> AccessFail
     }))
 }
 
+fn write_probe_fixture(leaf: u64, data_write: bool) -> (Image, State) {
+    let mut bytes = vec![0; 0xa000];
+    for (address, entry) in [
+        (0x1000, 0x2007u64),
+        (0x2000, 0x3007),
+        (0x3000, 0x4007),
+        (0x4008, leaf),
+    ] {
+        bytes[address..address + 8].copy_from_slice(&entry.to_le_bytes());
+    }
+    bytes[0x9000] = 0xa5;
+    let image = Image::physical_mapped(
+        vec![("ram".into(), bytes)],
+        vec![
+            MappingInput {
+                base: 0,
+                backing: "ram".into(),
+                offset: 0,
+                length: 0x9000,
+                permissions: Permissions {
+                    read: true,
+                    write: true,
+                    execute: true,
+                },
+            },
+            MappingInput {
+                base: 0x9000,
+                backing: "ram".into(),
+                offset: 0x9000,
+                length: 1,
+                permissions: Permissions {
+                    read: false,
+                    write: data_write,
+                    execute: false,
+                },
+            },
+            MappingInput {
+                base: 0xa000,
+                backing: "ram".into(),
+                offset: 0x9000,
+                length: 1,
+                permissions: Permissions {
+                    read: true,
+                    write: false,
+                    execute: true,
+                },
+            },
+        ],
+        MemoryLimits {
+            max_backing_bytes: 0xa000,
+            max_backings: 1,
+            max_mappings: 3,
+        },
+    )
+    .unwrap();
+    (
+        image,
+        State {
+            cr3: 0x1000,
+            ..State::default()
+        },
+    )
+}
+
+#[test]
+fn probe_write_paging_permits_accessed_without_dirty_capture_or_payload() {
+    let (mut image, state) = write_probe_fixture(0x9007, true);
+    let leaf_owner = image.register_source([(0x4008, 8)]).unwrap();
+    let data_owner = image.register_source([(0xa000, 1)]).unwrap();
+    assert!(image.activate(leaf_owner));
+    let mut work = AccessState::default();
+    {
+        let mut memory = Memory::new(&mut image, &state, 3, 2, &mut work);
+        assert_eq!(memory.probe_write(0x1000), Ok(()));
+        assert!(
+            memory.storage.borrow().work.pending.is_empty(),
+            "probe must not capture a write"
+        );
+        assert_eq!(memory.prepare_publication(), Ok(()));
+    }
+    for (address, value) in [
+        (0x1000, 0x2027),
+        (0x2000, 0x3027),
+        (0x3000, 0x4027),
+        (0x4008, 0x9027),
+    ] {
+        assert_eq!(image.physical_read(address, 8), Ok(value));
+    }
+    assert!(
+        !image.owner_valid(leaf_owner),
+        "real A writes invalidate their source aliases"
+    );
+    assert!(image.active_changed());
+    assert!(
+        image.owner_valid(data_owner),
+        "permission probe is not a payload write"
+    );
+    assert_eq!(image.physical_read(0xa000, 1), Ok(0xa5));
+    assert!(image.activate(data_owner));
+    {
+        let mut memory = Memory::new(&mut image, &state, 3, 2, &mut work);
+        assert_eq!(memory.probe_write(0x1000), Ok(()));
+        assert_eq!(memory.prepare_publication(), Ok(()));
+    }
+    assert!(work.pending.is_empty());
+    assert_eq!(image.physical_read(0x4008, 8), Ok(0x9027));
+    assert!(image.owner_valid(data_owner));
+    assert!(!image.active_changed());
+}
+
+#[test]
+fn probe_write_paging_preserves_existing_capture_and_private_fault_provenance() {
+    use crate::memory::{Cause, Fault};
+    use crate::x86::paging::walk::PhysicalFault;
+
+    for (data_write, address, physical, cause) in [
+        (false, 0x1000, 0x9000, Cause::Permission),
+        (true, 0x1001, 0x9001, Cause::Unmapped),
+    ] {
+        let (mut image, state) = write_probe_fixture(0x9007, data_write);
+        let mut work = AccessState::default();
+        let memory = Memory::new(&mut image, &state, 3, 2, &mut work);
+        assert_eq!(
+            memory.probe_write(address),
+            Err(AccessFailure::Paging(Failure::Physical(PhysicalFault {
+                linear: address,
+                access: Access::Write,
+                physical: Fault {
+                    address: physical,
+                    width: 1,
+                    access: Access::Write,
+                    cause,
+                    failing: u128::from(physical)
+                },
+                phase: PhysicalPhase::FinalAccess,
+            })))
+        );
+        assert!(memory.storage.borrow().work.pending.is_empty());
+    }
+    let (mut image, state) = write_probe_fixture(0x9007, true);
+    let mut work = AccessState::default();
+    let memory = Memory::new(&mut image, &state, 3, 2, &mut work);
+    memory.check_write(0x1000, 1).unwrap();
+    assert_eq!(memory.probe_write(0x1000), Ok(()));
+    let storage = memory.storage.borrow();
+    assert_eq!(
+        storage.work.pending.len(),
+        1,
+        "probe must preserve the preceding captured write alone"
+    );
+    let captured = &storage.work.pending[0];
+    assert_eq!(
+        (captured.address, captured.width, captured.published),
+        (0x1000, 1, false)
+    );
+    assert_eq!(storage.image.physical_read(0x4008, 8), Ok(0x9027));
+}
+
+#[test]
+fn probe_write_paging_uses_ordinary_cpl_ac_wp_and_user_rights() {
+    for cpl in 0..=2 {
+        for ac in [false, true] {
+            let (mut image, mut state) = write_probe_fixture(0x9007, true);
+            state.cr4 |= 1 << 21;
+            let mut work = AccessState::default();
+            let memory = Memory::new(&mut image, &state, cpl, u64::from(ac) << 18, &mut work);
+            assert_eq!(
+                memory.probe_write(0x1000),
+                if ac {
+                    Ok(())
+                } else {
+                    Err(protection_fault(0x1000, Access::Write, 3))
+                },
+                "cpl{cpl} ac{ac}"
+            );
+            assert!(memory.storage.borrow().work.pending.is_empty());
+        }
+    }
+    for (cpl, wp, leaf, expected) in [
+        (0, false, 0x9005, Ok(())),
+        (
+            0,
+            true,
+            0x9005,
+            Err(protection_fault(0x1000, Access::Write, 3)),
+        ),
+        (
+            3,
+            false,
+            0x9005,
+            Err(protection_fault(0x1000, Access::Write, 7)),
+        ),
+        (
+            3,
+            false,
+            0x9003,
+            Err(protection_fault(0x1000, Access::Write, 7)),
+        ),
+        (3, false, 0x9007, Ok(())),
+    ] {
+        let (mut image, mut state) = write_probe_fixture(leaf, true);
+        state.cr0 |= u64::from(wp) << 16;
+        let mut work = AccessState::default();
+        let memory = Memory::new(&mut image, &state, cpl, 2, &mut work);
+        assert_eq!(
+            memory.probe_write(0x1000),
+            expected,
+            "cpl{cpl} wp{wp} leaf{leaf:x}"
+        );
+        assert!(memory.storage.borrow().work.pending.is_empty());
+    }
+}
+
+#[test]
+fn probe_write_paging_does_not_require_dirty_update_permission() {
+    let (mut image, state) = fixture(0, true, true);
+    let owner = image.register_source([(0x4038, 8)]).unwrap();
+    assert!(image.activate(owner));
+    let mut work = AccessState::default();
+    {
+        let mut memory = Memory::new(&mut image, &state, 3, 2, &mut work);
+        assert_eq!(memory.probe_write(0x7000), Ok(()));
+        assert_eq!(
+            memory.prepare_publication(),
+            Ok(()),
+            "probe cannot admit a D write to the read-only PTE"
+        );
+    }
+    assert!(work.pending.is_empty());
+    assert_eq!(image.physical_read(0x4038, 8), Ok(0x7027));
+    assert!(image.owner_valid(owner));
+    assert!(!image.active_changed());
+}
+
+#[test]
+fn probe_write_pg0_checks_exact_final_byte_before_high_backing() {
+    use crate::memory::{Cause, Fault};
+    use crate::x86::paging::walk::PhysicalFault;
+
+    let mut image = Image::physical_mapped(
+        vec![("ram".into(), vec![0xa5])],
+        [0xffff_ffff, 0x1_0000_0000]
+            .into_iter()
+            .map(|base| MappingInput {
+                base,
+                backing: "ram".into(),
+                offset: 0,
+                length: 1,
+                permissions: Permissions {
+                    read: false,
+                    write: true,
+                    execute: false,
+                },
+            })
+            .collect(),
+        MemoryLimits {
+            max_backing_bytes: 1,
+            max_backings: 1,
+            max_mappings: 2,
+        },
+    )
+    .unwrap();
+    let state = State::reset();
+    let mut work = AccessState::default();
+    let memory = Memory::new(&mut image, &state, 0, 2, &mut work);
+    assert_eq!(memory.probe_write(0xffff_ffff), Ok(()));
+    assert_eq!(
+        memory.probe_write(0x1_0000_0000),
+        Err(AccessFailure::Paging(Failure::Physical(PhysicalFault {
+            linear: 0x1_0000_0000,
+            access: Access::Write,
+            physical: Fault {
+                address: 0x1_0000_0000,
+                width: 1,
+                access: Access::Write,
+                cause: Cause::AddressRange,
+                failing: 1u128 << 32
+            },
+            phase: PhysicalPhase::FinalAccess,
+        })))
+    );
+    assert!(memory.storage.borrow().work.pending.is_empty());
+}
+
 #[test]
 fn publication_geometry_read_and_execute_do_not_allocate() {
     let (mut image, state) = fixture(0, true, false);

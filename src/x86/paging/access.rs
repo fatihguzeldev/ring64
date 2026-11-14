@@ -345,6 +345,23 @@ impl GuestMemory for Memory<'_> {
     fn check_write(&self, address: u64, width: u32) -> Result<(), AccessFailure> {
         self.capture_write(address, width, self.class)
     }
+    fn probe_write(&self, address: u64) -> Result<(), AccessFailure> {
+        check_span(address, 1, Access::Write).map_err(AccessFailure::Linear)?;
+        let request = Request {
+            linear: address,
+            access: Access::Write,
+            class: self.class,
+        };
+        let mut storage = self.storage.borrow_mut();
+        let translation =
+            walk::walk(storage.image, self.paging, request).map_err(AccessFailure::Paging)?;
+        storage
+            .image
+            .physical_check_write(translation.physical, 1)
+            .map_err(|fault| {
+                AccessFailure::Paging(request.physical_failure(fault, PhysicalPhase::FinalAccess))
+            })
+    }
     fn read_system(&self, address: u64, width: u32) -> Result<[u8; 16], AccessFailure> {
         self.read_at(address, width, AccessClass::ImplicitSupervisor)
     }

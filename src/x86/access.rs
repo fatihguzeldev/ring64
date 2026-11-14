@@ -32,6 +32,9 @@ pub trait GuestMemory {
     ) -> Result<(), AccessFailure>;
     fn check_read(&self, address: u64, width: u32) -> Result<(), AccessFailure>;
     fn check_write(&self, address: u64, width: u32) -> Result<(), AccessFailure>;
+    /// Admit one ordinary write-intent byte without reading or publishing it.
+    /// Page-walk accessed effects remain permitted; no dirty or captured write is created.
+    fn probe_write(&self, address: u64) -> Result<(), AccessFailure>;
     fn read_system(&self, address: u64, width: u32) -> Result<[u8; 16], AccessFailure> {
         self.read_vector(address, width)
     }
@@ -118,5 +121,70 @@ impl GuestMemory for Image {
     }
     fn check_write(&self, address: u64, width: u32) -> Result<(), AccessFailure> {
         Image::check_write(self, address, width).map_err(AccessFailure::Linear)
+    }
+    fn probe_write(&self, address: u64) -> Result<(), AccessFailure> {
+        Image::check_write(self, address, 1).map_err(AccessFailure::Linear)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::memory::{Access, Cause, Fault, MappingInput, MemoryLimits, Permissions};
+
+    #[test]
+    fn probe_write_image_is_one_write_only_byte_without_publication() {
+        let mut image = Image::mapped(
+            vec![("ram".into(), vec![0xa5])],
+            vec![
+                MappingInput {
+                    base: 0x2000,
+                    backing: "ram".into(),
+                    offset: 0,
+                    length: 1,
+                    permissions: Permissions {
+                        read: false,
+                        write: true,
+                        execute: false,
+                    },
+                },
+                MappingInput {
+                    base: 0x3000,
+                    backing: "ram".into(),
+                    offset: 0,
+                    length: 1,
+                    permissions: Permissions {
+                        read: true,
+                        write: false,
+                        execute: true,
+                    },
+                },
+            ],
+            MemoryLimits {
+                max_backing_bytes: 1,
+                max_backings: 1,
+                max_mappings: 2,
+            },
+        )
+        .unwrap();
+        let owner = image.register_source([(0x3000, 1)]).unwrap();
+        assert!(image.activate(owner));
+        assert_eq!(image.probe_write(0x2000), Ok(()));
+        assert!(image.owner_valid(owner));
+        assert!(!image.active_changed());
+        assert_eq!(image.read(0x3000, 1), Ok(0xa5));
+        for (address, cause) in [(0x2001, Cause::Unmapped), (0x3000, Cause::Permission)] {
+            assert_eq!(
+                image.probe_write(address),
+                Err(AccessFailure::Linear(Fault {
+                    address,
+                    width: 1,
+                    access: Access::Write,
+                    cause,
+                    failing: u128::from(address),
+                }))
+            );
+        }
+        assert!(image.owner_valid(owner));
     }
 }

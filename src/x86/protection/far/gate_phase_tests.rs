@@ -96,6 +96,9 @@ impl GuestMemory for Probe {
     fn check_write(&self, address: u64, width: u32) -> Result<(), AccessFailure> {
         GuestMemory::check_write(&self.image, address, width)
     }
+    fn probe_write(&self, address: u64) -> Result<(), AccessFailure> {
+        GuestMemory::probe_write(&self.image, address)
+    }
     fn read_system(&self, address: u64, width: u32) -> Result<[u8; 16], AccessFailure> {
         self.traffic
             .borrow_mut()
