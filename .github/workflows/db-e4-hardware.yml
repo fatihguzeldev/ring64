@@ -8,30 +8,52 @@ permissions:
   contents: read
 
 jobs:
-  routes:
+  capture:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, macos-15-intel, macos-26-intel, windows-2025]
+        runner: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 5
+    timeout-minutes: 7
+    defaults:
+      run:
+        working-directory: tools/db-e4-reference
     steps:
-      - shell: bash
-        if: runner.os == 'Linux' || runner.os == 'macOS'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Identify hardware and build reference
         run: |
           uname -smr
-          if [[ "$(uname -s)" == Linux ]]; then
-            lscpu | awk -F: '/^(Vendor ID|Model name|Hypervisor vendor|Virtualization|CPU family|Model|Stepping):/ {print}'
-            ls -l /dev/kvm || true
-            if sudo sh -c 'test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm'; then echo KVM-device-ready; fi
-            command -v qemu-system-x86_64 || true
-          else
-            sysctl -n machdep.cpu.vendor machdep.cpu.brand_string machdep.cpu.family machdep.cpu.model machdep.cpu.stepping || true
-            sysctl kern.hv_support || true
-            sysctl -in sysctl.proc_translated || true
-          fi
-      - shell: pwsh
-        if: runner.os == 'Windows'
+          lscpu | tee host.txt
+          test "$(uname -m)" = x86_64
+          sudo test -c /dev/kvm
+          gcc -m32 -c db-e4-boot.S -o "$RUNNER_TEMP/boot.o"
+          gcc -m32 -std=c11 -O2 -ffreestanding -fno-builtin -fno-pie -fno-stack-protector -mno-sse -mno-mmx -msoft-float -Wall -Wextra -Werror -c db-e4-ring0.c -o "$RUNNER_TEMP/probe.o"
+          ld -m elf_i386 -T db-e4-boot.ld "$RUNNER_TEMP/boot.o" "$RUNNER_TEMP/probe.o" -o "$RUNNER_TEMP/probe.elf"
+          gcc -std=gnu11 -O2 -Wall -Wextra db-e4-ring3.c -o "$RUNNER_TEMP/ring3"
+          "$RUNNER_TEMP/ring3" | tee ring3.txt
+      - name: Capture CR0 and x87 exception matrix using KVM
         run: |
-          Get-CimInstance Win32_Processor | Select-Object Manufacturer,Name,VirtualizationFirmwareEnabled,VMMonitorModeExtensions | Format-List
-          Get-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform | Select-Object FeatureName,State | Format-List
+          if ! command -v qemu-system-x86_64; then
+            sudo apt-get -qq update
+            sudo apt-get -qq install -y --no-install-recommends qemu-system-x86
+          fi
+          qemu-system-x86_64 --version | head -1
+          set +e
+          sudo timeout 35s qemu-system-x86_64 -accel kvm -cpu host -m 64 -display none -monitor none -serial stdio -no-reboot -device isa-debug-exit,iobase=0xf4,iosize=4 -kernel "$RUNNER_TEMP/probe.elf" > probe.txt 2> qemu.stderr
+          result=$?
+          set -e
+          cat qemu.stderr
+          cat probe.txt
+          test "$result" = 3
+          grep '^probe-complete cases=80$' probe.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: db-e4-${{ matrix.runner }}
+          path: |
+            tools/db-e4-reference/host.txt
+            tools/db-e4-reference/probe.txt
+            tools/db-e4-reference/qemu.stderr
+            tools/db-e4-reference/ring3.txt
