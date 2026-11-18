@@ -24,12 +24,18 @@ jobs:
           test "$(uname -m)" = x86_64
           if test "$(uname -s)" = Darwin; then
             test "$(sysctl -in sysctl.proc_translated || true)" != 1
+            sysctl machdep.cpu.brand_string machdep.cpu.microcode_version > cpu.txt 2>&1 || true
+          else
+            awk '/^(model name|microcode)/ && !seen[$1]++' /proc/cpuinfo > cpu.txt
           fi
           cc -std=c11 -O2 -Wall -Wextra -Werror scripts/fsincos-native-probe.c -o "$RUNNER_TEMP/fsincos-native-probe"
           "$RUNNER_TEMP/fsincos-native-probe" > fsincos-native.ndjson
-          test "$(wc -l < fsincos-native.ndjson | tr -d ' ')" = 2373
-          head -5 fsincos-native.ndjson
+          test "$(wc -l < fsincos-native.ndjson | tr -d ' ')" = 2936
+          cat cpu.txt
+          head -1 fsincos-native.ndjson
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: fsincos-native-${{ matrix.runner }}
-          path: fsincos-native.ndjson
+          path: |
+            cpu.txt
+            fsincos-native.ndjson

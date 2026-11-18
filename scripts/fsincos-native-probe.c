@@ -16,6 +16,14 @@
 
 typedef struct { _Alignas(16) unsigned char data[512]; } Image;
 typedef struct { const char *name, *raw; } Case;
+enum Control {
+    FSINCOS,
+    FSQRT_INVALID,
+    FSINCOS_OLD_PENDING,
+    NOP_OLD_PENDING,
+    NOP_READY,
+    FSINCOS_STICKY
+};
 static void put(Image *image, unsigned offset, uint64_t value, unsigned bytes) {
     memcpy(image->data + offset, &value, bytes);
 }
@@ -43,7 +51,10 @@ static void describe(const Image *image, uintptr_t pc) {
         printf("%s\"%04" PRIx64 "%016" PRIx64 "\"", slot == 0 ? "" : ",",
                get(image, at + 8, 2), get(image, at, 8));
     }
-    fputs("]}", stdout);
+    fputs("],\"image\":\"", stdout);
+    for (unsigned i = 0; i < sizeof(image->data); ++i)
+        printf("%02x", image->data[i]);
+    fputs("\"}", stdout);
 }
 static volatile uintptr_t producer_pc, detector_pc, restore_pc;
 static volatile sig_atomic_t fault_stage, fault_signal, fault_vector, fault_code;
@@ -84,24 +95,28 @@ static void handle_fault(int sig, siginfo_t *info, void *opaque) {
         : [host] "r"(&host), [in] "r"(&in), [before] "r"(&before), [out] "r"(&out) \
         : "rax", "memory")
 
-static void capture(const Case *test, int source, int occupied, unsigned top, uint16_t cw, uint16_t cc, int control) {
+static void capture(const Case *test, int source, int occupied, unsigned top, uint16_t cw, uint16_t cc, enum Control control) {
     Image in = {{0}}, before = {{0}}, out = {{0}}, host = {{0}};
     unsigned previous = (top + 7) & 7, second = (top + 1) & 7;
-    const uint16_t sw = (top << 11) | cc | (control == 2 || control == 3 ? 0x8081 : 0);
+    const int old_pending = control == FSINCOS_OLD_PENDING || control == NOP_OLD_PENDING;
+    const uint16_t sw = (top << 11) | cc | (old_pending ? 0x8081 : 0)
+        | (control == FSINCOS_STICKY ? 0x000c : 0);
     put(&in, 0, cw, 2);
     put(&in, 2, sw, 2);
     in.data[4] = (source ? 1 << top : 0) | (occupied ? 1 << previous : 0) | 1 << second;
     put(&in, 6, 0x456, 2);
     put(&in, 8, 0xabcdeffedc, 8);
     put(&in, 16, 0x123456789a, 8);
-    put(&in, 24, 0x1f80, 4);
+    put(&in, 24, 0x1f95, 4);
+    for (unsigned i = 160; i < 416; ++i)
+        in.data[i] = (unsigned char)(i * 53u + 7u);
     raw80(&in, 0, test->raw);
     raw80(&in, 1, "4001dedecafebabebeef");
     raw80(&in, 7, "bffe8888444422221111");
     fault_stage = fault_signal = fault_vector = fault_code = 0;
-    if (control == 1) {
+    if (control == FSQRT_INVALID) {
         CAPTURE("fsqrt");
-    } else if (control == 3 || control == 4) {
+    } else if (control == NOP_OLD_PENDING || control == NOP_READY) {
         CAPTURE("nop");
     } else {
         CAPTURE("fsincos");
@@ -116,7 +131,7 @@ static void capture(const Case *test, int source, int occupied, unsigned top, ui
 }
 
 static void observe(const Case *test, int source, int occupied, unsigned top, uint16_t cw, uint16_t cc) {
-    capture(test, source, occupied, top, cw, cc, 0);
+    capture(test, source, occupied, top, cw, cc, FSINCOS);
 }
 
 int main(void) {
@@ -152,16 +167,24 @@ int main(void) {
         {"plus-infinity", "7fff8000000000000000"}, {"minus-infinity", "ffff8000000000000000"},
         {"quiet", "ffffc000000000000042"}, {"signaling", "7fffa000000000000045"},
         {"unsupported", "40000000000000000011"},
+        {"negative-threshold-below", "c03e8000000000000001"},
+        {"negative-threshold-above", "c03dffffffffffffffff"},
+        {"minus-quarter", "bffd8000000000000000"},
+        {"sixteenth", "3ffb8000000000000000"},
+        {"minus-sixteenth", "bffb8000000000000000"},
         {"min-subnormal", "00000000000000000001"}, {"min-normal", "00018000000000000000"},
         {"negative-min-normal", "80018000000000000000"},
         {"negative-min-subnormal", "80000000000000000001"},
         {"pseudo-denormal", "00008000000000000000"},
         {"tiny-normal", "3f9b8000000000000000"}, {"negative-tiny-normal", "bf9b8000000000000000"},
     };
-    capture(&cases[3], 1, 0, 0, 0x037e, 0x4700, 1);
-    capture(&cases[2], 1, 0, 0, 0x037e, 0x4700, 2);
-    capture(&cases[2], 1, 0, 0, 0x037e, 0x4700, 3);
-    capture(&cases[2], 1, 0, 0, 0x037e, 0x4700, 4);
+    capture(&cases[3], 1, 0, 0, 0x037e, 0x4700, FSQRT_INVALID);
+    capture(&cases[2], 1, 0, 0, 0x037e, 0x4700, FSINCOS_OLD_PENDING);
+    capture(&cases[2], 1, 0, 0, 0x037e, 0x4700, NOP_OLD_PENDING);
+    capture(&cases[2], 1, 0, 0, 0x037e, 0x4700, NOP_READY);
+    capture(&cases[2], 1, 0, 0, 0x035f, 0x0400, FSINCOS_STICKY);
+    capture(&cases[6], 1, 0, 0, 0x037f, 0x0000, FSINCOS_STICKY);
+    capture(&cases[6], 1, 1, 0, 0x037e, 0x0400, FSINCOS_STICKY);
     const uint16_t cws[] = {0x37f, 0x37e, 0x37d, 0x36f, 0x35f, 0x36d, 0x34f};
     for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         for (int occupied = 0; occupied <= 1; ++occupied) {
