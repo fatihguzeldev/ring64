@@ -1,0 +1,37 @@
+name: DB E4 hardware verification
+
+on:
+  push:
+    branches: [db-e4-hardware]
+
+permissions:
+  contents: read
+
+jobs:
+  routes:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, macos-15-intel, macos-26-intel, windows-2025]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 5
+    steps:
+      - shell: bash
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: |
+          uname -smr
+          if [[ "$(uname -s)" == Linux ]]; then
+            lscpu | awk -F: '/^(Vendor ID|Model name|Hypervisor vendor|Virtualization|CPU family|Model|Stepping):/ {print}'
+            ls -l /dev/kvm || true
+            if sudo sh -c 'test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm'; then echo KVM-device-ready; fi
+            command -v qemu-system-x86_64 || true
+          else
+            sysctl -n machdep.cpu.vendor machdep.cpu.brand_string machdep.cpu.family machdep.cpu.model machdep.cpu.stepping || true
+            sysctl kern.hv_support || true
+            sysctl -in sysctl.proc_translated || true
+          fi
+      - shell: pwsh
+        if: runner.os == 'Windows'
+        run: |
+          Get-CimInstance Win32_Processor | Select-Object Manufacturer,Name,VirtualizationFirmwareEnabled,VMMonitorModeExtensions | Format-List
+          Get-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform | Select-Object FeatureName,State | Format-List
