@@ -1,0 +1,35 @@
+name: FPATAN native reference
+
+on:
+  push:
+    branches: [fpatan-native-reference]
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - shell: bash
+        run: |
+          test "$(uname -m)" = x86_64
+          if test "$(uname -s)" = Darwin; then
+            test "$(sysctl -in sysctl.proc_translated || true)" != 1
+          fi
+          cc -std=c11 -O2 -Wall -Wextra -Werror scripts/fpatan-reference.c -o "$RUNNER_TEMP/fpatan-reference"
+          "$RUNNER_TEMP/fpatan-reference" > fpatan.ndjson
+          test "$(wc -l < fpatan.ndjson | tr -d ' ')" = 405
+          head -1 fpatan.ndjson
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: fpatan-${{ matrix.runner }}
+          path: fpatan.ndjson
