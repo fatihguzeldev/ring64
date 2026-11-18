@@ -1,0 +1,35 @@
+name: FSINCOS native reference
+
+on:
+  push:
+    branches: [fsincos-native-reference]
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - shell: bash
+        run: |
+          test "$(uname -m)" = x86_64
+          if test "$(uname -s)" = Darwin; then
+            test "$(sysctl -in sysctl.proc_translated || true)" != 1
+          fi
+          cc -std=c11 -O2 -Wall -Wextra -Werror scripts/fsincos-native-probe.c -o "$RUNNER_TEMP/fsincos-native-probe"
+          "$RUNNER_TEMP/fsincos-native-probe" > fsincos-native.ndjson
+          test "$(wc -l < fsincos-native.ndjson | tr -d ' ')" = 2373
+          head -5 fsincos-native.ndjson
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: fsincos-native-${{ matrix.runner }}
+          path: fsincos-native.ndjson
