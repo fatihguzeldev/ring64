@@ -25,6 +25,7 @@
 .benchmarks-shell {
   --font-site: 'National Park Benchmarks', ui-sans-serif, sans-serif;
   --font-print: 'Newsreader Benchmarks', Georgia, serif;
+  container-type: inline-size;
   grid-template-rows: auto 1fr;
   font-family: var(--font-site);
 }
@@ -45,6 +46,7 @@
 .bench-intro h1 {
   font-size: var(--page-title-size);
   line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .bench-intro p {
@@ -213,9 +215,14 @@
   margin-block-start: 0.5rem;
 }
 
+.bench-table-scroll {
+  overflow-x: auto;
+  margin-block-start: 0.75rem;
+}
+
 .bench-timings {
   width: min(100%, 56rem);
-  margin-block-start: 0.75rem;
+  min-width: 18rem;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 1.0625rem;
@@ -236,10 +243,7 @@
   padding-inline-end: 0.5rem;
   text-align: start;
   font-weight: 500;
-}
-
-.bench-timings tbody td {
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .bench-timings tbody td span {
@@ -255,7 +259,7 @@
 .bench-timings thead tr:last-child > :nth-child(3),
 .bench-timings tbody tr > :nth-child(4),
 .bench-timings th[scope='colgroup']:last-child {
-  padding-inline-start: clamp(0.25rem, 3vw - 0.25rem, 2.5rem);
+  padding-inline-start: clamp(0.25rem, 3cqi - 0.25rem, 2.5rem);
 }
 
 .bench-timings tbody tr:is(:first-child, :nth-child(3)) > * {
@@ -300,7 +304,7 @@
   }
 }
 
-@media (max-width: 36rem) {
+@container (max-width: 36rem) {
   .bench-timings {
     font-size: 0.8125rem;
   }

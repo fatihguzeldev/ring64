@@ -45,30 +45,32 @@
         <p class="bench-axis-note">
           higher means faster data access. farther right means faster compute.
         </p>
-        <section class="bench-results" aria-labelledby="timings">
+        <section class="bench-results">
           <h2 id="timings">workload timings</h2>
           <p id="timings-note">the charts use these timings. lower is faster.</p>
-          <table class="bench-timings" aria-labelledby="timings" aria-describedby="timings-note">
-            <colgroup span="1"></colgroup>
-            <colgroup span="2"></colgroup>
-            <colgroup span="2"></colgroup>
-            <thead>
-              <tr>
-                <td rowspan="2"></td>
-                <th scope="colgroup" colspan="2">64-bit</th>
-                <th scope="colgroup" colspan="2">32-bit</th>
-              </tr>
-              <tr>
-                <th scope="col">ring64</th>
-                <th scope="col">v64</th>
-                <th scope="col">ring64</th>
-                <th scope="col">v86</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- benchmark-rows -->
-            </tbody>
-          </table>
+          <div class="bench-table-scroll" role="region" aria-labelledby="timings" tabindex="0">
+            <table class="bench-timings" aria-labelledby="timings" aria-describedby="timings-note">
+              <colgroup span="1"></colgroup>
+              <colgroup span="2"></colgroup>
+              <colgroup span="2"></colgroup>
+              <thead>
+                <tr>
+                  <td rowspan="2"></td>
+                  <th scope="colgroup" colspan="2">64-bit</th>
+                  <th scope="colgroup" colspan="2">32-bit</th>
+                </tr>
+                <tr>
+                  <th scope="col">ring64</th>
+                  <th scope="col">v64</th>
+                  <th scope="col">ring64</th>
+                  <th scope="col">v86</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- benchmark-rows -->
+              </tbody>
+            </table>
+          </div>
         </section>
         <section class="bench-method" aria-labelledby="method">
           <h2 id="method">how i tested</h2>
