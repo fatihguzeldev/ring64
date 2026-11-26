@@ -16,6 +16,7 @@
   min-inline-size: 0;
   font-size: 1.0625rem;
   line-height: 1.58;
+  overflow-wrap: anywhere;
 }
 
 .docs-toc {
