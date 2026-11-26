@@ -53,7 +53,7 @@
 
 .bench-figures {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
   gap: clamp(2.25rem, 6vw, 4.5rem);
   margin-block-start: clamp(1.75rem, 4vw, 2.75rem);
 }
@@ -62,7 +62,7 @@
   display: grid;
   grid-template-columns: 1rem minmax(0, 1fr);
   column-gap: 2.25rem;
-  padding-inline-end: 1rem;
+  padding-inline-end: 1.5rem;
 }
 
 .bench-machine figcaption {
@@ -97,6 +97,7 @@
 .bench-plot {
   --grid-rule: color-mix(in srgb, var(--rule) 40%, transparent);
   position: relative;
+  container-type: inline-size;
   grid-column: 2;
   grid-row: 2;
   width: 100%;
@@ -288,9 +289,14 @@
 }
 
 @media (max-width: 44rem) {
-  .bench-figures,
   .bench-method {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container (width < 5rem) {
+  .bench-xtick:nth-child(2) {
+    display: none;
   }
 }
 

@@ -70,7 +70,8 @@ function figure({ bits, points }, xMax, yMax) {
     .map(({ engine, x, y }) => {
       const left = (100 * x) / xMax;
       const bottom = (100 * y) / yMax;
-      const placement = (left > 70 ? ' label-left' : '') + (bottom > 80 ? ' label-below' : '');
+      const below = bottom > 80 || (engine !== 'ring64' && bottom > 20);
+      const placement = (left > 70 ? ' label-left' : '') + (below ? ' label-below' : '');
       return `<span class="bench-point ${engine}${placement}" style="left:${left}%;bottom:${bottom}%"><span class="bench-point-label">${engine}</span></span>`;
     })
     .join('');
