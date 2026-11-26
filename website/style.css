@@ -322,7 +322,7 @@ a:hover {
   width: 100%;
   height: 100%;
   visibility: hidden;
-  touch-action: none;
+  touch-action: pan-y pinch-zoom;
   outline-offset: -4px;
 }
 
@@ -456,6 +456,7 @@ sup.ink-note-mark {
   width: min(100%, 100dvh * 16 / 9);
   height: auto;
   aspect-ratio: 16 / 9;
+  touch-action: none;
 }
 
 .wet-ink-fullscreen-controls {
